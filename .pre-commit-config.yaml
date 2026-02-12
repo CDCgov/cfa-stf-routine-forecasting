@@ -19,6 +19,8 @@ repos:
       - id: ruff-check
         # Run the formatter
       - id: ruff-format
+  #####
+  # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.10.0
     hooks:

@@ -8,6 +8,7 @@ authors = [
   {name = "Damon Bayer", email = "xum8@cdc.gov"},
   {name = "Dylan H. Morris"},
   {name = "Subekshya Bidari"},
+  {name = "Jon Kislin", email = "qxk3@cdc.gov"}
 ]
 
 dependencies = [
@@ -28,6 +29,11 @@ dependencies = [
     "dotenv>=0.9.9",
     "polarbayes",
     "jax<0.8.2",
+    "dagster-postgres>=0.27.4",
+    "dagster-webserver==1.12.2",
+    "dagster==1.12.2",
+    "dagster-graphql==1.12.2",
+    "cfa-dagster @ git+https://github.com/cdcgov/cfa-dagster.git"
 ]
 
 [build-system]

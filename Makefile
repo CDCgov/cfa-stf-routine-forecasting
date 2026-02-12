@@ -1,43 +1,33 @@
-.PHONY: help container_build container_tag ghcr_login container_push run_timeseries run_e_model run_h_models post_process
-
 # Build parameters
 
 ifndef ENGINE
 ENGINE = docker
 endif
 
-ifndef CONTAINER_NAME
-CONTAINER_NAME = cfa-stf-routine-forecasting
+ifndef CONTAINER_REGISTRY
+CONTAINER_REGISTRY = ghcr.io/cdcgov
+endif
+
+ifndef CONTAINER_IMAGE_NAME
+CONTAINER_IMAGE_NAME = cfa-stf-routine-forecasting
+endif
+
+ifndef CONTAINER_IMAGE_VERSION
+CONTAINER_IMAGE_VERSION = latest
+endif
+
+ifndef CONTAINER_REMOTE_NAME
+CONTAINER_REMOTE_NAME = $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE_NAME):$(CONTAINER_IMAGE_VERSION)
 endif
 
 ifndef CONTAINERFILE
 CONTAINERFILE = Containerfile
 endif
 
-ifndef CONTAINER_REMOTE_NAME
-CONTAINER_REMOTE_NAME = ghcr.io/cdcgov/$(CONTAINER_NAME):latest
-endif
-
-# Model Fit Parameters
+# Post-processing Parameters
 
 ifndef FORECAST_DATE
 FORECAST_DATE = $(shell date +%Y-%m-%d)
-endif
-
-ifndef TEST
-TEST = False
-endif
-
-ifndef DRY_RUN
-DRY_RUN = False
-endif
-
-ifndef ENVIRONMENT
-ENVIRONMENT = prod
-endif
-
-ifndef RNG_KEY
-RNG_KEY = 12345
 endif
 
 # ----------- #
@@ -47,129 +37,74 @@ endif
 help:
 	@echo "Usage: make [target] [ARGS]"
 	@echo ""
+
+	@echo "Blobfuse Mount Targets: "
+	@echo "  mount              : Mount blob storage containers using blobfuse2"
+	@echo "  unmount            : Unmount blob storage containers and clean up"
+	@echo ""
 	@echo "Container Build Targets: "
-	@echo "  container_build     : Build the container image"
-	@echo "  container_tag       : Tag the container image"
 	@echo "  ghcr_login          : Log in to the Github Container Registry. Requires GH_USERNAME and GH_PAT env vars"
-	@echo "  container_push      : Push the container image to the Azure Container Registry"
+	@echo "  container_build     : Build the container image"
+	@echo "  container_tag	     : Tag the container image for pushing to the registry"
+	@echo "  container_push	     : Push the container image"
+	@echo ""
+	@echo "Dagster Targets: "
+	@echo "  dagster_push_prod   : Push the dagster container image to the Azure Container Registry and code location for production"
 	@echo ""
 	@echo "Model Fit Targets: "
-	@echo "  run_timeseries      : Run the timeseries model fit job"
-	@echo "  run_e_model         : Run an e model fit job"
-	@echo "  run_h_models        : Run an h model fit job"
-	@echo "  run_he_model        : Run an he model fit job"
-	@echo "  run_hw_model        : Run an hw model fit job"
-	@echo "  run_hew_model       : Run an hew model fit job"
-	@echo "  post_process        : Post-process the forecast batches"
-	@echo ""
-	@echo "Toggle default forecasting parameters with the following syntax:"
-	@echo "  make <target> TEST=True DRY_RUN=True RNG_KEY=54321 MODEL_LETTERS=<letters> FORECAST_DATE=<date>"
-	@echo ""
-	@echo "For example, to run the timeseries model in production, you can simply type:"
-	@echo "  make run_timeseries"
-	@echo ""
-	@echo "To run the pyrenew-e model in test mode with a dry run for a custom date:"
-	@echo "  make run_e_model TEST=True DRY_RUN=True FORECAST_DATE=2025-07-01"
-	@echo ""
-	@echo "To run the pyrenew-hew model and output to pyrenew-test-output:"
-	@echo "  make run_hew_model TEST=True MODEL_LETTERS=hew"
-	@echo ""
-	@echo "Any additional flags can be passed with ARGS, for example:"
-	@echo "  make run_hew_model ARGS=\"--locations-include 'NY GA'\""
-	@echo ""
+	@echo "  config              : Source the azureconfig.sh file to set environment variables for Azure access"
+	@echo "  acc                 : Run the Azure Command Center for routine production jobs"
+	@echo "  post_process        : Post-process model outputs."
 	@echo "Passing a flag through ARGS will also override the flags set previously."
+
+#------------------------ #
+# Blobfuse Mount Targets
+# ----------------------- #
+
+mount:
+	sudo bash -c "source ./blobfuse/mount.sh"
+
+unmount:
+	sudo bash -c "source ./blobfuse/cleanup.sh"
 
 # ----------------------- #
 # Container Build Targets
 # ----------------------- #
 
-container_build: ghcr_login
-	$(ENGINE) build . -t $(CONTAINER_NAME) -f $(CONTAINERFILE)
+ghcr_login:
+	@if [ -z "$(GH_PAT)" ] || [ -z "$(GH_USERNAME)" ]; then \
+		echo "Error: GH_PAT and GH_USERNAME environment variables must be set to log in to GitHub Container Registry"; \
+		exit 1; \
+	fi; \
+	echo "$$GH_PAT" | $(ENGINE) login ghcr.io -u "$(GH_USERNAME)" --password-stdin
+
+container_build:
+	$(ENGINE) build . -t $(CONTAINER_REMOTE_NAME) -f $(CONTAINERFILE)
 
 container_tag:
-	$(ENGINE) tag $(CONTAINER_NAME) $(CONTAINER_REMOTE_NAME)
+	$(ENGINE) tag $(CONTAINER_REMOTE_NAME) $(CONTAINER_REMOTE_NAME)
 
-ghcr_login:
-	echo $(GH_PAT) | $(ENGINE) login ghcr.io -u $(GH_USERNAME) --password-stdin
-
-container_push: container_tag ghcr_login
+container_push: ghcr_login
 	$(ENGINE) push $(CONTAINER_REMOTE_NAME)
+
+config:
+	bash -c "source ./azureconfig.sh"
+
+dagster_push_prod:
+	docker build . -t ghcr.io/cdcgov/cfa-stf-routine-forecasting:dagster_latest -f Containerfile && \
+	docker push ghcr.io/cdcgov/cfa-stf-routine-forecasting:dagster_latest && \
+	uv run https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py \
+    	--registry_image ghcr.io/cdcgov/cfa-stf-routine-forecasting:dagster_latest
 
 # ---------------- #
 # Model Fit Targets
 # ---------------- #
 
-run_timeseries:
-	uv run python pipelines/batch/setup_job.py \
-		--model-family timeseries \
-		--output-subdir "${FORECAST_DATE}_forecasts" \
-		--model-letters "e" \
-		--job-id "pyrenew-e-${ENVIRONMENT}_${FORECAST_DATE}_t" \
-		--pool-id pyrenew-pool \
-		--test "$(TEST)" \
-		--dry-run "$(DRY_RUN)" \
-		$(ARGS)
+acc: mount config
+	uv run pipelines/batch/azure_command_center.py
 
-run_e_model:
-	uv run python pipelines/batch/setup_job.py \
-		--model-family pyrenew \
-		--output-subdir "${FORECAST_DATE}_forecasts" \
-		--model-letters "e" \
-		--job-id "pyrenew-e-${ENVIRONMENT}_${FORECAST_DATE}" \
-		--pool-id pyrenew-pool \
-		--rng-key "$(RNG_KEY)" \
-		--test "$(TEST)" \
-		--dry-run "$(DRY_RUN)" \
-		$(ARGS)
-
-run_h_model:
-	uv run python pipelines/batch/setup_job.py \
-		--model-family pyrenew \
-		--output-subdir "${FORECAST_DATE}_forecasts" \
-		--model-letters "h" \
-		--job-id "pyrenew-h-${ENVIRONMENT}_${FORECAST_DATE}" \
-		--pool-id pyrenew-pool \
-		--rng-key "$(RNG_KEY)" \
-		--test "$(TEST)" \
-		--dry-run "$(DRY_RUN)" \
-		$(ARGS)
-
-run_he_model:
-	uv run python pipelines/batch/setup_job.py \
-		--model-family pyrenew \
-		--output-subdir "${FORECAST_DATE}_forecasts" \
-		--model-letters "he" \
-		--job-id "pyrenew-he-${ENVIRONMENT}_${FORECAST_DATE}" \
-		--pool-id pyrenew-pool \
-		--rng-key "$(RNG_KEY)" \
-		--test "$(TEST)" \
-		--dry-run "$(DRY_RUN)" \
-		$(ARGS)
-
-run_hw_model:
-	uv run python pipelines/batch/setup_job.py \
-		--model-family pyrenew \
-		--output-subdir "${FORECAST_DATE}_forecasts" \
-		--model-letters "hw" \
-		--job-id "pyrenew-hw-${ENVIRONMENT}_${FORECAST_DATE}" \
-		--pool-id pyrenew-pool-32gb \
-		--rng-key "$(RNG_KEY)" \
-		--test "$(TEST)" \
-		--dry-run "$(DRY_RUN)" \
-		$(ARGS)
-
-run_hew_model:
-	uv run python pipelines/batch/setup_job.py \
-		--model-family pyrenew \
-		--output-subdir "${FORECAST_DATE}_forecasts" \
-		--model-letters "hew" \
-		--job-id "pyrenew-hew-${ENVIRONMENT}_${FORECAST_DATE}" \
-		--pool-id pyrenew-pool-32gb \
-		--rng-key "$(RNG_KEY)" \
-		--test "$(TEST)" \
-		--dry-run "$(DRY_RUN)" \
-		$(ARGS)
-
-post_process:
+post_process: config
 	uv run python pipelines/utils/postprocess_forecast_batches.py \
+    	--input "./blobfuse/mounts/pyrenew-hew-prod-output/${FORECAST_DATE}_forecasts" \
+    	--output "./blobfuse/mounts/nssp-etl/gold/${FORECAST_DATE}_forecasts.parquet" \
 		${ARGS}

@@ -29,6 +29,8 @@
 *.gif
 *.pdf
 *.png
+# except when in .github/img/ folder
+!.github/img/*.png
 
 # Compressed archives
 *.gz
@@ -397,15 +399,10 @@ private_data/*
 pipelines/tests/end_to_end_test_output/*
 pipelines/tests/epiautogp_end_to_end_test_output/*
 
-# subdirs reserved for mounting blob storage containers
-config
-nssp-archival-vintages
-nssp-etl
-output
-params
-nwss-vintages
-
 # Azure configuration files
 azureconfig.env
 azureconfig.sh
+
+# blobfuse
 config.yaml
+blobfuse/mounts/

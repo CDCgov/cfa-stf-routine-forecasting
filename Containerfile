@@ -18,8 +18,9 @@ WORKDIR /cfa-stf-routine-forecasting
 RUN Rscript -e "install.packages('pak')"
 RUN Rscript -e "pak::local_install('hewr', upgrade = FALSE)"
 
-COPY --exclude=pipelines/priors . .
-COPY pipelines/priors pipelines/priors
+# TODO: Weigh cache performance vs containerfile simplificty;
+# We can specify files and folders individually for better performance
+COPY . .
 
 # Python from https://docs.astral.sh/uv/guides/integration/docker/
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -31,6 +32,14 @@ ENV PATH="/usr/local/julia/bin:${PATH}"
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PYTHON_CACHE_DIR=/root/.cache/uv/python
+
+# Set VIRTUAL_ENV variable at runtime
+ENV VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv
+
+RUN uv venv $(VIRTUAL_ENV)
+
+# Update PATH to use the selected venv
+ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync

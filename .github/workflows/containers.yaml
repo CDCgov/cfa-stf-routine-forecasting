@@ -63,3 +63,24 @@ jobs:
             build-args: |
               GIT_COMMIT_SHA=${{ github.event.pull_request.head.sha || github.sha }}
               GIT_BRANCH_NAME=${{ steps.branch-name.outputs.branch }}
+
+    deploy_dagster_code:
+      needs: build-pipeline-image
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      runs-on: ubuntu-latest
+      name: Update Dagster Code Location
+      permissions:
+            contents: read
+            packages: write
+      steps:
+        - name: Run update script with cfa runner-action
+          uses: CDCgov/cfa-actions/runner-action@v1.5.0
+
+          with:
+            github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
+            github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
+            script: |
+              echo "Running update script"
+              uv run \
+                https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py \
+                --registry_image ghcr.io/cdcgov/cfa-stf-routine-forecasting:${{ needs.build-pipeline-image.outputs.tag }}

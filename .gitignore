@@ -404,6 +404,7 @@ nssp-etl
 output
 params
 nwss-vintages
+blobfuse/mounts/
 
 # Azure configuration files
 azureconfig.env

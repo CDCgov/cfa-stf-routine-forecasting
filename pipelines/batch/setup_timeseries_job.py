@@ -104,7 +104,6 @@ def main(
         "--loc {loc} "
         f"--n-training-days {n_training_days} "
         "--facility-level-nssp-data-dir nssp-etl/gold "
-        "--param-data-dir params "
         "--output-dir {output_dir} "
         "--credentials-path config/creds.toml "
         f"--exclude-last-n-days {exclude_last_n_days} "

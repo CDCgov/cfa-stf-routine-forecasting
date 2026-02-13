@@ -17,7 +17,16 @@ if [ -d "$BASE_DIR" ]; then
 		exit 1
 	fi
 fi
+Rscript -e "devtools::install_local('hewr', force = TRUE, quick = TRUE, upgrade_dependencies = FALSE)"
 
+if [ "$?" -ne 0 ]; then
+	echo "TEST-MODE FAIL: Installing hewr package failed"
+	exit 1
+else
+	echo "TEST-MODE: Finished installing hewr package"
+fi
+
+mkdir -p "$BASE_DIR"
 uv run python pipelines/data/generate_test_data.py "$BASE_DIR"
 
 if [ "$?" -ne 0 ]; then
@@ -32,7 +41,7 @@ echo "TEST-MODE: Running Timeseries forecasting pipeline for all locations, and 
 for location in "${LOCATIONS[@]}"; do
 	for disease in "${DISEASES[@]}"; do
 		echo "TEST-MODE: Running Timeseries forecasting pipeline for $disease, $location"
-		bash pipelines/tests/test_ts_fit.sh "$BASE_DIR" "$disease" "$location" "e"
+		bash pipelines/tests/test_ts_fit.sh "$BASE_DIR" "$disease" "$location"
 		if [ "$?" -ne 0 ]; then
 			echo "TEST-MODE FAIL: Timeseries forecasting pipeline failed"
 			echo "TEST-MODE: Cleanup: removing temporary directories"

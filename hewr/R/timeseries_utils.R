@@ -22,16 +22,10 @@
 #' @export
 load_training_data <- function(
   model_dir,
-  base_data_name = "combined_data",
+  data_name = "combined_data",
   epiweekly = FALSE
 ) {
   resolution <- dplyr::if_else(epiweekly, "epiweekly", "daily")
-  prefix <- stringr::str_c(resolution, "_")
-  data_name <- dplyr::if_else(
-    epiweekly,
-    stringr::str_c(prefix, base_data_name),
-    base_data_name
-  )
   data_path <- fs::path(model_dir, "data", data_name, ext = "tsv")
 
   target_and_other_data <- readr::read_tsv(
@@ -54,8 +48,7 @@ load_training_data <- function(
     data = target_and_other_data,
     geo_value = target_and_other_data$geo_value[1],
     disease = target_and_other_data$disease[1],
-    resolution = resolution,
-    prefix = prefix
+    resolution = resolution
   )
 }
 

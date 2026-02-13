@@ -95,7 +95,6 @@ def main(
     report_date: str,
     loc: str,
     facility_level_nssp_data_dir: Path | str,
-    param_data_dir: Path | str,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
@@ -135,8 +134,6 @@ def main(
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
     facility_level_nssp_data_dir : Path | str
         Directory containing facility-level NSSP ED visit data
-    param_data_dir : Path | str
-        Directory containing parameter data for the model
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -262,7 +259,6 @@ def main(
         use_percentage=use_percentage,
         ed_visit_type=ed_visit_type,
         model_name=model_name,
-        param_data_dir=param_data_dir,
         nhsn_data_path=nhsn_data_path,
         facility_level_nssp_data_dir=facility_level_nssp_data_dir,
         output_dir=output_dir,

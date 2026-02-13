@@ -115,11 +115,11 @@ main <- function(
     "combined_data",
     epiweekly
   )
+
   target_and_other_data <- training_data$data
   geo_value <- training_data$geo_value
   disease <- training_data$disease
   resolution <- training_data$resolution
-  prefix <- training_data$prefix
 
   ## Fit and forecast other (non-target-disease) ED visits using a combination
   ## ensemble model
@@ -156,7 +156,7 @@ main <- function(
     ts_ensemble_forecast_e,
     path(
       model_dir,
-      glue::glue("{prefix}ts_ensemble_samples_e"),
+      "samples",
       ext = "parquet"
     )
   )

@@ -21,8 +21,19 @@ from pipelines.utils.common_utils import (
     create_hubverse_table,
     get_available_reports,
     load_credentials,
-    plot_and_save_loc_forecast,
+    make_figures_from_model_fit_dir,
+    run_r_script,
 )
+
+
+def create_samples_from_epiautogp_fit_dir(model_fit_dir: Path) -> None:
+    """Create samples.parquet from an EpiAutoGP model fit directory using R."""
+    run_r_script(
+        "pipelines/epiautogp/create_samples_from_epiautogp_fit_dir.R",
+        [str(model_fit_dir)],
+        function_name="create_samples_from_epiautogp_fit_dir",
+    )
+    return None
 
 
 @dataclass
@@ -58,7 +69,6 @@ class ForecastPipelineContext:
     use_percentage: bool
     ed_visit_type: str
     model_name: str
-    param_data_dir: Path | None
     nhsn_data_path: Path | None
     report_date: date
     first_training_date: date
@@ -127,33 +137,31 @@ class ForecastPipelineContext:
         Post-process forecast outputs: create hubverse table and generate plots.
 
         This function performs the final post-processing steps:
-        1. Generate forecast plots using hewr via plot_and_save_loc_forecast
+        1. Process model output samples
+        2. Generate plots
            (which also processes samples via hewr::process_loc_forecast)
-        2. Create hubverse table from processed outputs
-
-        The plot_and_save_loc_forecast function with model_name auto-detects
-        the model type and dispatches to process_model_samples.epiautogp(),
-        which reads Julia output samples, adds metadata, calculates credible
-        intervals, and saves formatted outputs.
+        3. Create hubverse table from processed outputs
 
         Returns
         -------
         None
         """
-        # Generate forecast plots and process samples using hewr
-        # The model_name parameter triggers auto-detection and S3 dispatch to
-        # process_model_samples.epiautogp() which handles Julia output format
         self.logger.info("Processing forecast and generating plots...")
-        plot_and_save_loc_forecast(
-            model_run_dir=self.model_run_dir,
-            n_forecast_days=self.n_forecast_days,
-            model_name=self.model_name,
+        model_fit_dir = Path(self.model_run_dir, self.model_name)
+
+        create_samples_from_epiautogp_fit_dir(model_fit_dir=model_fit_dir)
+
+        make_figures_from_model_fit_dir(
+            model_fit_dir=model_fit_dir,
+            save_figs=True,
+            save_ci=True,
         )
+
         self.logger.info("Processing and plotting complete.")
 
         # Create hubverse table from processed outputs
         self.logger.info("Creating hubverse table...")
-        create_hubverse_table(Path(self.model_run_dir, self.model_name))
+        create_hubverse_table(self.model_run_dir)
         self.logger.info("Postprocessing complete.")
 
 
@@ -165,7 +173,6 @@ def setup_forecast_pipeline(
     use_percentage: bool,
     ed_visit_type: str,
     model_name: str,
-    param_data_dir: Path | None,
     nhsn_data_path: Path | None,
     facility_level_nssp_data_dir: Path | str,
     output_dir: Path | str,
@@ -204,8 +211,6 @@ def setup_forecast_pipeline(
         Type of ED visits: "observed" or "other" (NSSP only)
     model_name : str
         Name of the model configuration
-    param_data_dir : Path | None
-        Directory containing parameter data
     nhsn_data_path : Path | None
         Path to NHSN hospital admission data
     facility_level_nssp_data_dir : Path | str
@@ -282,7 +287,6 @@ def setup_forecast_pipeline(
         use_percentage=use_percentage,
         ed_visit_type=ed_visit_type,
         model_name=model_name,
-        param_data_dir=param_data_dir,
         nhsn_data_path=nhsn_data_path,
         report_date=report_date_parsed,
         first_training_date=first_training_date,

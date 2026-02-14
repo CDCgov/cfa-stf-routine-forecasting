@@ -180,7 +180,7 @@ make_forecast_figure <- function(
     highlight_components <- list()
   }
 
-  forcast_highlight_components <-
+  forecast_highlight_components <-
     list(
       ggplot2::geom_vline(
         xintercept = last_training_date,
@@ -227,7 +227,7 @@ make_forecast_figure <- function(
       values = c("olivedrab1", "deeppink"),
       labels = stringr::str_to_title
     ) +
-    forcast_highlight_components +
+    forecast_highlight_components +
     highlight_components +
     ggplot2::ggtitle(
       title,

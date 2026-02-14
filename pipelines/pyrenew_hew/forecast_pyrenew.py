@@ -345,7 +345,7 @@ if __name__ == "__main__":
         "--priors-path",
         type=Path,
         help=(
-            "Path to an executible python file defining random variables "
+            "Path to an executable python file defining random variables "
             "that require priors as pyrenew RandomVariable objects."
         ),
         required=True,

@@ -1,0 +1,18 @@
+[default]
+extend-ignore-identifiers-re = [
+    "AttributeID.*Supress.*",
+]
+
+[default.extend-identifiers]
+AttributeIDSupressMenu = "AttributeIDSupressMenu"
+
+[default.extend-words]
+ND = "ND"
+lod = "lod"
+
+[files]
+extend-exclude = [
+    ".gitignore",
+    ".pre-commit-config.yaml",
+    "*.json"
+]

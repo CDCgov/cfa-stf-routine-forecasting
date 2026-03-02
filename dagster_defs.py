@@ -271,7 +271,7 @@ def run_stf_model(
         additional_args = f"--n-samples {config.n_total_samples} "
     elif model_family == "epiweekly_timeseries":
         run_script = "fable/forecast_timeseries.py"
-        additional_args = [f"--n-samples {config.n_total_samples} ", "--epiweekly"]
+        additional_args = f"--n-samples {config.n_total_samples} --epiweekly"
     else:
         raise ValueError(
             f"Unsupported model family: {model_family}. "
@@ -315,7 +315,7 @@ def timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Timeseries-e model and produce outputs.
     """
-    run_stf_model(context, config, model_letters="e", model_family="timeseries")
+    run_stf_model(context, config, model_family="timeseries")
     return "timeseries_e"
 
 
@@ -327,15 +327,21 @@ def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: ModelConfi
     """
     Run Timeseries-e model and produce outputs.
     """
-    run_stf_model(
-        context, config, model_letters="e", model_family="epiweekly_timeseries"
-    )
+    run_stf_model(context, config, model_family="epiweekly_timeseries")
     return "epiweekly_timeseries_e"
 
 
 # Pyrenew E
-@dg.asset(partitions_def=pyrenew_multi_partition_def, deps="timeseries_e")
-def pyrenew_e(context: dg.AssetExecutionContext, config: ModelConfig, timeseries_e):
+@dg.asset(
+    partitions_def=pyrenew_multi_partition_def,
+    deps=["timeseries_e", "epiweekly_timeseries_e"],
+)
+def pyrenew_e(
+    context: dg.AssetExecutionContext,
+    config: ModelConfig,
+    timeseries_e,
+    epiweekly_timeseries_e,
+):
     """
     Run Pyrenew-e model and produce outputs.
     """
@@ -357,7 +363,12 @@ def pyrenew_h(context: dg.AssetExecutionContext, config: ModelConfig):
 
 # Pyrenew HE
 @dg.asset(partitions_def=pyrenew_multi_partition_def)
-def pyrenew_he(context: dg.AssetExecutionContext, config: ModelConfig, timeseries_e):
+def pyrenew_he(
+    context: dg.AssetExecutionContext,
+    config: ModelConfig,
+    timeseries_e,
+    epiweekly_timeseries_e,
+):
     """
     Run Pyrenew-he model and produce outputs.
     """
@@ -379,7 +390,12 @@ def pyrenew_hw(context: dg.AssetExecutionContext, config: ModelConfig):
 
 # Pyrenew HEW
 @dg.asset(partitions_def=pyrenew_multi_partition_def)
-def pyrenew_hew(context: dg.AssetExecutionContext, config: ModelConfig, timeseries_e):
+def pyrenew_hew(
+    context: dg.AssetExecutionContext,
+    config: ModelConfig,
+    timeseries_e,
+    epiweekly_timeseries_e,
+):
     """
     Run Pyrenew-hew model and produce outputs.
     """
@@ -419,6 +435,7 @@ def postprocess_forecasts(
     context: dg.AssetExecutionContext,
     config: PostProcessConfig,
     timeseries_e,
+    epiweekly_timeseries_e,
     pyrenew_e,
     pyrenew_h,
     pyrenew_he,

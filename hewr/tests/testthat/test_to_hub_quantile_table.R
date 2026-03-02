@@ -42,7 +42,7 @@ test_that(
     checkmate::expect_names(
       colnames(result),
       identical.to = c(
-        "model",
+        "model_id",
         "output_type",
         "output_type_id",
         "value",

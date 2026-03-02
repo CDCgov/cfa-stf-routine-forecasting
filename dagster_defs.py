@@ -269,6 +269,9 @@ def run_stf_model(
     elif model_family == "timeseries":
         run_script = "fable/forecast_timeseries.py"
         additional_args = f"--n-samples {config.n_total_samples} "
+    elif model_family == "epiweekly_timeseries":
+        run_script = "fable/forecast_timeseries.py"
+        additional_args = [f"--n-samples {config.n_total_samples} ", "--epiweekly"]
     else:
         raise ValueError(
             f"Unsupported model family: {model_family}. "
@@ -314,6 +317,20 @@ def timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     run_stf_model(context, config, model_letters="e", model_family="timeseries")
     return "timeseries_e"
+
+
+# Epiweekly Timeseries E
+@dg.asset(
+    partitions_def=pyrenew_multi_partition_def,
+)
+def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
+    """
+    Run Timeseries-e model and produce outputs.
+    """
+    run_stf_model(
+        context, config, model_letters="e", model_family="epiweekly_timeseries"
+    )
+    return "epiweekly_timeseries_e"
 
 
 # Pyrenew E

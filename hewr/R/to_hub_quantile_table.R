@@ -63,11 +63,11 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
     }) |>
     tibble::enframe(name = "file_path", value = "data") |>
     dplyr::mutate(
-      model = .data$file_path |>
+      model_id = .data$file_path |>
         fs::path_dir() |>
         fs::path_file()
     ) |>
-    dplyr::select("model", "data")
+    dplyr::select("model_id", "data")
 
   quantiles_forecast <- quantiles_paths |>
     purrr::map(\(x) {
@@ -76,11 +76,11 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
     }) |>
     tibble::enframe(name = "file_path", value = "data") |>
     dplyr::mutate(
-      model = .data$file_path |>
+      model_id = .data$file_path |>
         fs::path_dir() |>
         fs::path_file()
     ) |>
-    dplyr::select("model", "data")
+    dplyr::select("model_id", "data")
 
   forecast_data <-
     dplyr::bind_rows(
@@ -116,7 +116,7 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
       output_type_id = round(.data$quantile_level, digits = 4)
     ) |>
     dplyr::select(
-      "model",
+      "model_id",
       "output_type",
       "output_type_id",
       value = "quantile_value",

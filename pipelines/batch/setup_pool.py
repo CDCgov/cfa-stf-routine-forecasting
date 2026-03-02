@@ -53,9 +53,6 @@ def main(pool_name: str) -> None:
         pool_config.deployment_configuration.virtual_machine_configuration.container_configuration
     ) = models.ContainerConfiguration(
         type="dockerCompatible",
-        container_image_names=[
-            "https://ghcr.io/cdcgov/cfa-stf-routine-forecasting:latest"
-        ],
         container_registries=[creds.azure_container_registry],
     )
 

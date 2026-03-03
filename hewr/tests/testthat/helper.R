@@ -5,8 +5,6 @@ create_model_results <- function(
   geo_value_options,
   disease_options,
   resolution_options,
-  aggregated_numerator_options,
-  aggregated_denominator_options,
   n_draw
 ) {
   model_components <- hewr::parse_pyrenew_model_name(model_name)
@@ -34,8 +32,6 @@ create_model_results <- function(
     geo_value = geo_value_options,
     disease = disease_options,
     resolution = resolution_options,
-    aggregated_numerator = aggregated_numerator_options,
-    aggregated_denominator = aggregated_denominator_options,
     .variable = variable_options
   ) |>
     dplyr::mutate(.value = as.double(rpois(dplyr::n(), lambda = 100)))

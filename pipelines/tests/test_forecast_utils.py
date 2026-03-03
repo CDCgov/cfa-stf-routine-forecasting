@@ -42,10 +42,8 @@ def base_context(tmp_path):
         loc="CA",
         target="nssp",
         frequency="epiweekly",
-        use_percentage=False,
         ed_visit_type="observed",
         model_name="test_model",
-        param_data_dir=None,
         nhsn_data_path=None,
         report_date=dt.date(2024, 12, 20),
         first_training_date=dt.date(2024, 9, 22),
@@ -71,10 +69,8 @@ class TestForecastPipelineContext:
             loc="CA",
             target="nssp",
             frequency="epiweekly",
-            use_percentage=False,
             ed_visit_type="observed",
             model_name="test_model",
-            param_data_dir=None,
             nhsn_data_path=None,
             report_date=dt.date(2024, 12, 20),
             first_training_date=dt.date(2024, 9, 22),
@@ -104,16 +100,12 @@ class TestModelPaths:
         paths = ModelPaths(
             model_output_dir=Path("/output/model"),
             data_dir=Path("/output/model/data"),
-            daily_training_data=Path("/output/model/data/combined_data.tsv"),
-            epiweekly_training_data=Path(
-                "/output/model/data/epiweekly_combined_data.tsv"
-            ),
+            training_data=Path("/output/model/data/combined_data.tsv"),
         )
 
         assert paths.model_output_dir == Path("/output/model")
         assert paths.data_dir == Path("/output/model/data")
-        assert paths.daily_training_data.name == "combined_data.tsv"
-        assert paths.epiweekly_training_data.name == "epiweekly_combined_data.tsv"
+        assert paths.training_data.name == "combined_data.tsv"
 
 
 class TestSetupForecastPipeline:
@@ -142,10 +134,8 @@ class TestSetupForecastPipeline:
             loc="CA",
             target="nssp",
             frequency="epiweekly",
-            use_percentage=False,
             ed_visit_type="observed",
             model_name="test_model",
-            param_data_dir=None,
             nhsn_data_path=None,
             facility_level_nssp_data_dir=tmp_path,
             output_dir=tmp_path,
@@ -181,10 +171,8 @@ class TestSetupForecastPipeline:
             loc="CA",
             target="nssp",
             frequency="epiweekly",
-            use_percentage=False,
             ed_visit_type="observed",
             model_name="test_model",
-            param_data_dir=None,
             nhsn_data_path=None,
             facility_level_nssp_data_dir=tmp_path,
             output_dir=tmp_path,
@@ -204,12 +192,16 @@ class TestSetupForecastPipeline:
 class TestPrepareModelData:
     """Tests for the prepare_model_data function."""
 
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.append_prop_data_to_combined_data"
+    )
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.generate_epiweekly_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.process_and_save_loc_data")
     def test_prepare_model_data_returns_paths(
         self,
         mock_process_loc,
         mock_gen_epiweekly,
+        mock_append_prop,
         base_context,  # Fixture is injected here
     ):
         """Test that prepare_model_data returns ModelPaths."""
@@ -219,15 +211,18 @@ class TestPrepareModelData:
         assert isinstance(paths, ModelPaths)
         assert paths.model_output_dir.name == "test_model"
         assert paths.data_dir.name == "data"
-        assert paths.daily_training_data.name == "combined_data.tsv"
-        assert paths.epiweekly_training_data.name == "epiweekly_combined_data.tsv"
+        assert paths.training_data.name == "combined_data.tsv"
 
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.append_prop_data_to_combined_data"
+    )
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.generate_epiweekly_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.process_and_save_loc_data")
     def test_prepare_model_data_creates_directories(
         self,
         mock_process_loc,
         mock_gen_epiweekly,
+        mock_append_prop,
         base_context,  # Use fixture
     ):
         """Test that prepare_model_data creates the required directories."""
@@ -237,12 +232,16 @@ class TestPrepareModelData:
         assert paths.model_output_dir.exists()
         assert paths.data_dir.exists()
 
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.append_prop_data_to_combined_data"
+    )
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.generate_epiweekly_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.process_and_save_loc_data")
     def test_prepare_model_data_passes_nhsn_data_path(
         self,
         mock_process_loc,
         mock_gen_epiweekly,
+        mock_append_prop,
         base_context,  # Use fixture
         tmp_path,
     ):
@@ -262,12 +261,16 @@ class TestPrepareModelData:
         mock_process_loc.assert_called_once()
         assert mock_process_loc.call_args[1]["nhsn_data_path"] == nhsn_path
 
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.append_prop_data_to_combined_data"
+    )
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.generate_epiweekly_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.process_and_save_loc_data")
     def test_prepare_model_data_with_nhsn_target(
         self,
         mock_process_loc,
         mock_gen_epiweekly,
+        mock_append_prop,
         base_context,  # Use fixture
         tmp_path,
     ):
@@ -294,15 +297,21 @@ class TestPrepareModelData:
 class TestPostprocessForecast:
     """Tests for the postprocess_forecast function."""
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.plot_and_save_loc_forecast")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.create_hubverse_table")
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.make_figures_from_model_fit_dir"
+    )
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.create_samples_from_epiautogp_fit_dir"
+    )
     def test_postprocess_calls_required_functions(
         self,
+        mock_create_samples,
+        mock_make_figures,
         mock_hubverse,
-        mock_plot,
         base_context,  # Use fixture
     ):
-        """Test that postprocess_forecast calls plotting and hubverse creation."""
+        """Test that post_process_forecast calls all required functions."""
         # Override exclude_last_n_days for this test
         context = replace(
             base_context,
@@ -311,28 +320,47 @@ class TestPostprocessForecast:
 
         context.post_process_forecast()
 
-        # Verify functions were called
-        mock_plot.assert_called_once()
+        # Verify all functions were called
+        mock_create_samples.assert_called_once()
+        mock_make_figures.assert_called_once()
         mock_hubverse.assert_called_once()
 
-        # Verify correct arguments to plot_and_save_loc_forecast
-        assert mock_plot.call_args[1]["model_run_dir"] == context.model_run_dir
-        assert mock_plot.call_args[1]["n_forecast_days"] == context.n_forecast_days
-        assert mock_plot.call_args[1]["model_name"] == "test_model"
+        # Verify correct arguments to create_samples_from_epiautogp_fit_dir
+        expected_model_fit_dir = context.model_run_dir / context.model_name
+        assert (
+            mock_create_samples.call_args[1]["model_fit_dir"] == expected_model_fit_dir
+        )
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.plot_and_save_loc_forecast")
+        # Verify correct arguments to make_figures_from_model_fit_dir
+        assert mock_make_figures.call_args[1]["model_fit_dir"] == expected_model_fit_dir
+        assert mock_make_figures.call_args[1]["save_figs"] is True
+        assert mock_make_figures.call_args[1]["save_ci"] is True
+
+        # Verify create_hubverse_table was called with model_run_dir
+        assert mock_hubverse.call_args[0][0] == context.model_run_dir
+
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.create_hubverse_table")
-    def test_postprocess_calculates_correct_forecast_period(
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.make_figures_from_model_fit_dir"
+    )
+    @patch(
+        "pipelines.epiautogp.epiautogp_forecast_utils.create_samples_from_epiautogp_fit_dir"
+    )
+    def test_postprocess_creates_correct_paths(
         self,
+        mock_create_samples,
+        mock_make_figures,
         mock_hubverse,
-        mock_plot,
         base_context,  # Use fixture
     ):
-        """Test that n_forecast_days is passed correctly."""
+        """Test that post_process_forecast creates correct model_fit_dir path."""
         context = base_context
 
         context.post_process_forecast()
 
-        # Verify that plot_and_save_loc_forecast was called with correct n_forecast_days
-        mock_plot.assert_called_once()
-        assert mock_plot.call_args[1]["n_forecast_days"] == context.n_forecast_days
+        # Verify model_fit_dir is correctly constructed as model_run_dir/model_name
+        expected_model_fit_dir = context.model_run_dir / context.model_name
+        assert (
+            mock_create_samples.call_args[1]["model_fit_dir"] == expected_model_fit_dir
+        )
+        assert mock_make_figures.call_args[1]["model_fit_dir"] == expected_model_fit_dir

@@ -14,7 +14,6 @@ with nowcasting requirements and forecast parameters.
 - `location::String`: Geographic location identifier (e.g., "CA", "NY", "US")
 - `target::String`: Target data type (e.g., "nssp", "nhsn")
 - `frequency::String`: Temporal frequency of data ("daily" or "epiweekly")
-- `use_percentage::Bool`: Whether data represents percentage values
 - `ed_visit_type::String`: Type of ED visits ("observed" or "other"), only applicable for NSSP target
 - `forecast_date::Date`: Reference date from which forecasting begins, often this will be a nowcast date
 - `nowcast_dates::Vector{Date}`: Dates requiring nowcasting (typically recent dates with incomplete data)
@@ -28,7 +27,6 @@ struct EpiAutoGPInput
     location::String
     target::String
     frequency::String
-    use_percentage::Bool
     ed_visit_type::String
     forecast_date::Date
     nowcast_dates::Vector{Date}
@@ -57,7 +55,7 @@ Performs comprehensive validation including:
 # Returns
 - `Bool`: Returns `true` if validation passes
 """
-function validate_input(data::EpiAutoGPInput; valid_targets = ["nhsn", "nssp"])
+function validate_input(data::EpiAutoGPInput; valid_targets=["nhsn", "nssp"])
     @assert data.target in valid_targets "Target must be one of $(valid_targets), got '$(data.target)'"
     # Check array length consistency
     if length(data.dates) != length(data.reports)

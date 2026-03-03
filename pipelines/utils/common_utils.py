@@ -425,64 +425,36 @@ def run_julia_code(
     )
 
 
-def plot_and_save_loc_forecast(
-    model_run_dir: Path,
-    n_forecast_days: int,
-    pyrenew_model_name: str = None,
-    timeseries_model_name: str = None,
-    model_name: str = None,
+def make_figures_from_model_fit_dir(
+    model_fit_dir: Path,
+    save_ci: bool = False,
+    save_figs: bool = True,
 ) -> None:
-    """Plot and save location forecast using R script.
+    """Generate forecast figures from a model fit directory using R script.
 
     Parameters
     ----------
-    model_run_dir : Path
-        Directory containing the model run.
-    n_forecast_days : int
-        Number of days to forecast.
-    pyrenew_model_name : str, optional
-        Name of the PyRenew model (legacy).
-    timeseries_model_name : str, optional
-        Name of the timeseries model (legacy).
-    model_name : str, optional
-        Generic model name. When provided, auto-detects model type
-        and dispatches to appropriate processing method.
+    model_fit_dir : Path
+        Directory containing model fit data and output.
+    save_ci : bool, optional
+        Whether to save credible intervals to disk.
+    save_figs : bool, optional
+        Whether to save figures to disk.
 
     Returns
     -------
     None
     """
-    args = [
-        f"{model_run_dir}",
-        "--n-forecast-days",
-        f"{n_forecast_days}",
-    ]
-    if pyrenew_model_name is not None:
-        args.extend(
-            [
-                "--pyrenew-model-name",
-                f"{pyrenew_model_name}",
-            ]
-        )
-    if timeseries_model_name is not None:
-        args.extend(
-            [
-                "--timeseries-model-name",
-                f"{timeseries_model_name}",
-            ]
-        )
-    if model_name is not None:
-        args.extend(
-            [
-                "--model-name",
-                f"{model_name}",
-            ]
-        )
+    args = [f"{model_fit_dir}"]
+    if save_ci:
+        args.append("--save-ci")
+    if save_figs:
+        args.append("--save-figs")
 
     run_r_script(
-        "pipelines/utils/plot_and_save_loc_forecast.R",
+        "pipelines/utils/make_figures_from_model_fit_dir.R",
         args,
-        function_name="plot_and_save_loc_forecast",
+        function_name="make_figures_from_model_fit_dir",
     )
     return None
 
@@ -619,29 +591,6 @@ def get_all_forecast_dirs(
     ]
 
 
-def get_all_model_run_dirs(parent_dir: Path) -> list[str]:
-    """
-    Get all the subdirectories within a parent directory
-    that are valid model run directories (by convention,
-    named with the two-letter code of a forecast location).
-
-    Parameters
-    ----------
-    parent_dir
-       Directory in which to look for model run subdirectories.
-
-    Returns
-    -------
-    list[str]
-        Names of matching directories, if any, otherwise an empty
-        list.
-    """
-
-    return [
-        f.name for f in os.scandir(parent_dir) if f.is_dir() and f.name in loc_abbrs_
-    ]
-
-
 def build_pyrenew_hew_model_from_dir(
     model_dir: Path | str = None,
     prior_path: Path | str = None,
@@ -702,3 +651,102 @@ def build_pyrenew_hew_model_from_dir(
         fit_wastewater=fit_wastewater,
     )
     return my_model
+
+
+def create_prop_samples(
+    model_run_dir: Path | str,
+    num_model_name: str,
+    other_model_name: str,
+    num_var_name: str = "observed_ed_visits",
+    other_var_name: str = "other_ed_visits",
+    prop_var_name: str = "prop_disease_ed_visits",
+    augment_num_with_obs: bool = False,
+    augment_other_with_obs: bool = True,
+    aggregate_num: bool = False,
+    aggregate_other: bool = False,
+    save: bool = True,
+) -> None:
+    """Create proportion samples by calling the R script.
+
+    Parameters
+    ----------
+    model_run_dir : Path | str
+        Directory containing the model data and output.
+    num_model_name : str
+        Name of the model containing the numerator variable.
+    other_model_name : str
+        Name of the model containing the other variable.
+    num_var_name : str, optional
+        Name of the numerator variable, by default "observed_ed_visits".
+    other_var_name : str, optional
+        Name of the other variable, by default "other_ed_visits".
+    prop_var_name : str, optional
+        Name of the proportion variable, by default "prop_disease_ed_visits".
+    augment_num_with_obs : bool, optional
+        Whether to augment numerator samples with observations, by default False.
+    augment_other_with_obs : bool, optional
+        Whether to augment other samples with observations, by default True.
+    aggregate_num : bool, optional
+        Whether to aggregate numerator to epiweekly, by default False.
+    aggregate_other : bool, optional
+        Whether to aggregate other to epiweekly, by default False.
+    save : bool, optional
+        Whether to save the results, by default False.
+
+    Returns
+    -------
+    None
+    """
+    args = [
+        str(model_run_dir),
+        "--num-model-name",
+        num_model_name,
+        "--other-model-name",
+        other_model_name,
+        "--num-var-name",
+        num_var_name,
+        "--other-var-name",
+        other_var_name,
+        "--prop-var-name",
+        prop_var_name,
+    ]
+    if augment_num_with_obs:
+        args.append("--augment-num-with-obs")
+    if augment_other_with_obs:
+        args.append("--augment-other-with-obs")
+    if aggregate_num:
+        args.append("--aggregate-num")
+    if aggregate_other:
+        args.append("--aggregate-other")
+    if save:
+        args.append("--save")
+
+    run_r_script(
+        "pipelines/utils/create_prop_samples.R",
+        args,
+        function_name="create_prop_samples",
+    )
+
+
+def append_prop_data_to_combined_data(data_path: Path | str) -> None:
+    args = [str(data_path)]
+
+    run_r_script(
+        "pipelines/utils/append_prop_data.R",
+        args,
+        function_name="append_prop_data_to_combined_data",
+    )
+
+
+def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> None:
+    """Generate epiweekly datasets from daily datasets using an R script."""
+    args = [str(data_dir)]
+    if overwrite_daily:
+        args.append("--overwrite-daily")
+
+    run_r_script(
+        "pipelines/data/generate_epiweekly_data.R",
+        args,
+        function_name="generate_epiweekly_data",
+    )
+    return None

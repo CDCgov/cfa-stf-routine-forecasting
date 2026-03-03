@@ -1,18 +1,3 @@
-create_model_id <- function(
-  model,
-  resolution,
-  aggregated_numerator,
-  aggregated_denominator
-) {
-  glue::glue(
-    "{model}_{resolution}",
-    "{dplyr::if_else(vctrs::vec_equal(",
-    "aggregated_numerator,TRUE, na_equal = TRUE),'_agg_num', '')}",
-    "{dplyr::if_else(vctrs::vec_equal(",
-    "aggregated_denominator, TRUE, na_equal = TRUE), '_agg_denom', '')}"
-  )
-}
-
 var_to_target <- function(variable, disease) {
   disease_abbr <- dplyr::case_match(
     disease,
@@ -78,11 +63,11 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
     }) |>
     tibble::enframe(name = "file_path", value = "data") |>
     dplyr::mutate(
-      model = .data$file_path |>
+      model_id = .data$file_path |>
         fs::path_dir() |>
         fs::path_file()
     ) |>
-    dplyr::select("model", "data")
+    dplyr::select("model_id", "data")
 
   quantiles_forecast <- quantiles_paths |>
     purrr::map(\(x) {
@@ -91,11 +76,11 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
     }) |>
     tibble::enframe(name = "file_path", value = "data") |>
     dplyr::mutate(
-      model = .data$file_path |>
+      model_id = .data$file_path |>
         fs::path_dir() |>
         fs::path_file()
     ) |>
-    dplyr::select("model", "data")
+    dplyr::select("model_id", "data")
 
   forecast_data <-
     dplyr::bind_rows(
@@ -130,17 +115,8 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
       output_type = "quantile",
       output_type_id = round(.data$quantile_level, digits = 4)
     ) |>
-    dplyr::mutate(
-      model_id = create_model_id(
-        model = .data$model,
-        resolution = .data$resolution,
-        aggregated_numerator = .data$aggregated_numerator,
-        aggregated_denominator = .data$aggregated_denominator
-      )
-    ) |>
     dplyr::select(
       "model_id",
-      "model",
       "output_type",
       "output_type_id",
       value = "quantile_value",
@@ -151,9 +127,7 @@ model_fit_dir_to_hub_q_tbl <- function(model_fit_dir) {
       "resolution",
       target_end_date = "date",
       location = "geo_value",
-      "disease",
-      "aggregated_numerator",
-      "aggregated_denominator"
+      "disease"
     )
 
   forecast_data

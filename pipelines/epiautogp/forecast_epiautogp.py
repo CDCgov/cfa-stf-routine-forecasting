@@ -95,13 +95,11 @@ def main(
     report_date: str,
     loc: str,
     facility_level_nssp_data_dir: Path | str,
-    param_data_dir: Path | str,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
     target: str,
     frequency: str,
-    use_percentage: bool = False,
     ed_visit_type: str = "observed",
     exclude_last_n_days: int = 0,
     credentials_path: Path = None,
@@ -135,8 +133,6 @@ def main(
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
     facility_level_nssp_data_dir : Path | str
         Directory containing facility-level NSSP ED visit data
-    param_data_dir : Path | str
-        Directory containing parameter data for the model
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -148,12 +144,8 @@ def main(
         "nhsn" for hospital admission counts
     frequency : str
         Data frequency: "daily" or "epiweekly"
-    use_percentage : bool, default=False
-        If True, convert ED visits to percentage of total ED visits
-        (only applicable for NSSP target)
     ed_visit_type : str, default="observed"
-        Type of ED visits to model: "observed" (disease-related) or
-        "other" (non-disease background). Only applicable for NSSP target
+        Type of ED visits to model: "observed" (disease-related), "other" (non-disease background), or "pct" (percentage of total ED visits). Only applicable for NSSP target
     exclude_last_n_days : int, default=0
         Number of recent days to exclude from training
     credentials_path : Path | None, default=None
@@ -184,8 +176,7 @@ def main(
     Raises
     ------
     ValueError
-        If invalid parameter combinations are provided (e.g., use_percentage=True
-        with target="nhsn", or frequency="daily" with target="nhsn")
+        If invalid parameter combinations are provided (e.g., frequency="daily" with target="nhsn")
     FileNotFoundError
         If required data files or directories don't exist
     RuntimeError
@@ -195,10 +186,9 @@ def main(
     -----
     For epiweekly forecasts, n_forecast_days is converted to weeks by dividing
     by 7 and rounding up. The transformation type is set to "percentage" if
-    use_percentage=True, otherwise "boxcox" is used.
+    ed_visit_type=="pct", otherwise "boxcox" is used.
 
-    The model name is automatically generated based on target, frequency,
-    use_percentage, and ed_visit_type parameters.
+    The model name is automatically generated based on target, frequency, and ed_visit_type parameters.
     """
     # Step 0: Set up logging, model name and params to pass to epiautogp
     logging.basicConfig(level=logging.INFO)
@@ -214,13 +204,13 @@ def main(
 
     # Generate model name
     model_name = f"epiautogp_{target}_{frequency}"
-    if use_percentage:
+    if ed_visit_type == "pct":
         model_name += "_pct"
     if ed_visit_type == "other":
         model_name += "_other"
 
     # Declare transformation type
-    if use_percentage:
+    if ed_visit_type == "pct":
         transformation = "percentage"
     else:
         transformation = "boxcox"
@@ -259,10 +249,8 @@ def main(
         loc=loc,
         target=target,
         frequency=frequency,
-        use_percentage=use_percentage,
         ed_visit_type=ed_visit_type,
         model_name=model_name,
-        param_data_dir=param_data_dir,
         nhsn_data_path=nhsn_data_path,
         facility_level_nssp_data_dir=facility_level_nssp_data_dir,
         output_dir=output_dir,
@@ -344,23 +332,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--use-percentage",
-        action="store_true",
-        help=(
-            "Convert ED visits to percentage of total ED visits "
-            "(only applicable for NSSP target)."
-        ),
-    )
-
-    parser.add_argument(
         "--ed-visit-type",
         type=str,
         default="observed",
-        choices=["observed", "other"],
+        choices=["observed", "other", "pct"],
         help=(
-            "Type of ED visits to model: 'observed' (disease-related) or "
-            "'other' (non-disease background). Only applicable for NSSP target "
-            "(default: observed)."
+            "Type of ED visits to model: 'observed' (disease-related), "
+            "'other' (non-disease background), or 'pct' (percentage of total ED visits). "
+            "Only applicable for NSSP target (default: observed)."
         ),
     )
 

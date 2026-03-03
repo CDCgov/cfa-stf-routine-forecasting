@@ -57,6 +57,7 @@ def clean_nssp_data(
             data_type=pl.when(pl.col("date") <= last_training_date)
             .then(pl.lit("train"))
             .otherwise(pl.lit("eval")),
+            resolution=pl.lit("daily"),
         )
         .drop("Total")
         .sort("date")
@@ -205,6 +206,7 @@ def combine_surveillance_data(
                 ".variable",
                 ".value",
                 "lab_site_index",
+                "resolution",
                 "data_type",
             ]
         )
@@ -532,6 +534,7 @@ def process_and_save_loc_data(
             data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
             .then(pl.lit("train"))
             .otherwise(pl.lit("eval")),
+            resolution=pl.lit("epiweekly"),
         )
     )
     nhsn_training_data = nhsn_full_data.filter(pl.col("data_type") == "train")
@@ -543,10 +546,13 @@ def process_and_save_loc_data(
             data_type=pl.when(pl.col("date") <= last_training_date)
             .then(pl.lit("train"))
             .otherwise(pl.lit("eval")),
+            resolution=pl.lit("daily"),
         )
-        nwss_training_data_dict = nwss_full_data.filter(
-            pl.col("date") <= last_training_date
-        ).to_dict(as_series=False)
+        nwss_training_data_dict = (
+            nwss_full_data.filter(pl.col("date") <= last_training_date)
+            .drop("resolution")
+            .to_dict(as_series=False)
+        )
 
     else:
         nwss_full_data = None
@@ -556,8 +562,12 @@ def process_and_save_loc_data(
         "loc_pop": loc_pop,
         "right_truncation_offset": right_truncation_offset,
         "nwss_training_data": nwss_training_data_dict,
-        "nssp_training_data": nssp_training_data.to_dict(as_series=False),
-        "nhsn_training_data": nhsn_training_data.to_dict(as_series=False),
+        "nssp_training_data": nssp_training_data.drop("resolution").to_dict(
+            as_series=False
+        ),
+        "nhsn_training_data": nhsn_training_data.drop("resolution").to_dict(
+            as_series=False
+        ),
         "nhsn_step_size": nhsn_step_size,
         "nssp_step_size": 1,
         "nwss_step_size": 1,

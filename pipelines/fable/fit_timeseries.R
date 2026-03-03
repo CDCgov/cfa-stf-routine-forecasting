@@ -20,27 +20,6 @@ purrr::walk(script_packages, \(pkg) {
   )
 })
 
-to_prop_forecast <- function(
-  forecast_disease_count,
-  forecast_other_count,
-  disease_count_col = "observed_ed_visits",
-  other_count_col = "other_ed_visits",
-  output_col = "prop_disease_ed_visits"
-) {
-  result <- inner_join(
-    forecast_disease_count,
-    forecast_other_count,
-    by = join_by(date, .draw)
-  ) |>
-    mutate(
-      !!output_col := .data[[disease_count_col]] /
-        (.data[[disease_count_col]] +
-          .data[[other_count_col]])
-    )
-
-  return(result)
-}
-
 
 #' Fit and Forecast Time Series Data
 #'
@@ -107,19 +86,14 @@ fit_and_forecast_ensemble <- function(
 main <- function(
   model_dir,
   n_forecast_days = 28,
-  n_samples = 2000,
-  epiweekly = FALSE
+  n_samples = 2000
 ) {
-  training_data <- hewr::load_training_data(
-    model_dir,
-    "combined_data",
-    epiweekly
-  )
+  training_data <- hewr::load_training_data(model_dir, "combined_data")
+
   target_and_other_data <- training_data$data
   geo_value <- training_data$geo_value
   disease <- training_data$disease
   resolution <- training_data$resolution
-  prefix <- training_data$prefix
 
   ## Fit and forecast other (non-target-disease) ED visits using a combination
   ## ensemble model
@@ -139,11 +113,12 @@ main <- function(
     output_col = "observed_ed_visits"
   )
 
-  ts_ensemble_prop_e <- ts_ensemble_count_e |>
-    to_prop_forecast(ts_ensemble_other_e)
-
   ts_ensemble_forecast_e <-
-    ts_ensemble_prop_e |>
+    inner_join(
+      ts_ensemble_count_e,
+      ts_ensemble_other_e,
+      by = join_by(date, .draw)
+    ) |>
     hewr::format_timeseries_output(
       geo_value = geo_value,
       disease = disease,
@@ -156,7 +131,7 @@ main <- function(
     ts_ensemble_forecast_e,
     path(
       model_dir,
-      glue::glue("{prefix}ts_ensemble_samples_e"),
+      "samples",
       ext = "parquet"
     )
   )
@@ -179,23 +154,16 @@ p <- arg_parser(
     "--n-samples",
     help = "Number of samples to generate.",
     default = 2000L
-  ) |>
-  add_argument(
-    "--epiweekly",
-    help = "Whether to use epiweekly data.",
-    flag = TRUE
   )
 
 argv <- parse_args(p)
 model_dir <- path(argv$model_dir)
 n_forecast_days <- argv$n_forecast_days
 n_samples <- argv$n_samples
-epiweekly <- argv$epiweekly
 
 
 main(
   model_dir,
   n_forecast_days = n_forecast_days,
-  n_samples = n_samples,
-  epiweekly = epiweekly
+  n_samples = n_samples
 )

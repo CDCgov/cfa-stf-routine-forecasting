@@ -37,7 +37,6 @@ def main(
     # EpiAutoGP-specific parameters
     target: str = "nssp",
     frequency: str = "epiweekly",
-    use_percentage: bool = False,
     ed_visit_type: str = "observed",
     n_particles: int = 24,
     n_mcmc: int = 100,
@@ -89,10 +88,8 @@ def main(
         'nhsn' for hospital admission counts. Default 'nssp'.
     frequency
         Data frequency for EpiAutoGP: 'daily' or 'epiweekly'. Default 'epiweekly'.
-    use_percentage
-        Convert ED visits to percentage for EpiAutoGP. Default False.
     ed_visit_type
-        Type of ED visits for EpiAutoGP: 'observed' or 'other'. Default 'observed'.
+        Type of ED visits for EpiAutoGP: 'observed', 'other', or 'pct'. Default 'observed'.
     n_particles
         Number of particles for SMC in EpiAutoGP. Default 24.
     n_mcmc
@@ -122,9 +119,9 @@ def main(
         raise ValueError(
             f"Invalid frequency: {frequency}. Must be 'daily' or 'epiweekly'."
         )
-    if ed_visit_type not in ["observed", "other"]:
+    if ed_visit_type not in ["observed", "other", "pct"]:
         raise ValueError(
-            f"Invalid ed_visit_type: {ed_visit_type}. Must be 'observed' or 'other'."
+            f"Invalid ed_visit_type: {ed_visit_type}. Must be 'observed', 'other', or 'pct'."
         )
 
     # Get filtered locations
@@ -149,8 +146,6 @@ def main(
         f"--n-threads {n_threads} "
         f"--n-forecast-days {n_forecast_days} "
     )
-    if use_percentage:
-        additional_args += "--use-percentage "
 
     base_call = (
         "/bin/bash -c '"
@@ -182,7 +177,6 @@ def main(
         "exclude_last_n_days": exclude_last_n_days,
         "target": target,
         "frequency": frequency,
-        "use_percentage": use_percentage,
         "ed_visit_type": ed_visit_type,
         "n_particles": n_particles,
         "n_mcmc": n_mcmc,
@@ -301,19 +295,11 @@ if __name__ == "__main__":
         help="Data frequency: 'daily' or 'epiweekly' (default: epiweekly).",
     )
     parser.add_argument(
-        "--use-percentage",
-        type=string_to_boolean,
-        nargs="?",
-        const=True,
-        default=False,
-        help="Convert ED visits to percentage (default: False).",
-    )
-    parser.add_argument(
         "--ed-visit-type",
         type=str,
         default="observed",
-        choices=["observed", "other"],
-        help="Type of ED visits: 'observed' or 'other' (default: observed).",
+        choices=["observed", "other", "pct"],
+        help="Type of ED visits: 'observed', 'other', or 'pct' (default: observed).",
     )
     parser.add_argument(
         "--n-particles",

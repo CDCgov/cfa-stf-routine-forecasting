@@ -20,8 +20,6 @@ test_that(
       disease_options <- "COVID-19"
       variable_options <- c("observed_ed_visits", "other_ed_visits")
       resolution_options <- c("daily", "epiweekly")
-      aggregated_numerator_options <- c(TRUE, FALSE)
-      aggregated_denominator_options <- c(TRUE, FALSE, NA)
       n_draw <- 4
 
       create_model_results(
@@ -31,8 +29,6 @@ test_that(
         geo_value_options = loc,
         disease_options = disease_options,
         resolution_options = resolution_options,
-        aggregated_numerator_options = aggregated_numerator_options,
-        aggregated_denominator_options = aggregated_denominator_options,
         n_draw = n_draw
       )
     })
@@ -47,7 +43,6 @@ test_that(
       colnames(result),
       identical.to = c(
         "model_id",
-        "model",
         "output_type",
         "output_type_id",
         "value",
@@ -58,9 +53,7 @@ test_that(
         "resolution",
         "target_end_date",
         "location",
-        "disease",
-        "aggregated_numerator",
-        "aggregated_denominator"
+        "disease"
       )
     )
   }

@@ -6,20 +6,13 @@
 pipeline.
 Load Training Data for Timeseries Forecasting}
 \usage{
-load_training_data(
-  model_dir,
-  base_data_name = "combined_data",
-  epiweekly = FALSE
-)
+load_training_data(model_dir, data_name = "combined_data")
 }
 \arguments{
 \item{model_dir}{Path to the
 directory containing model run data.}
 
-\item{base_data_name}{Base name of the data file to load.}
-
-\item{epiweekly}{Logical. Indicate epiweekly (TRUE) or daily (FALSE) data.
-Default \code{FALSE}.}
+\item{data_name}{Base name of the data file to load.}
 }
 \value{
 A list with:

@@ -32,8 +32,6 @@ A tibble with columns:
 \code{geo_value},
 \code{disease},
 \code{resolution},
-\code{aggregated_numerator},
-\code{aggregated_denominator},
 \code{.variable},
 \code{output_type_id}, and
 \code{.value}.

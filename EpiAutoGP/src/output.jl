@@ -78,16 +78,16 @@ function create_forecast_df(results::NamedTuple, output_type::QuantileOutput)
     forecast_dates = results.forecast_dates
     forecasts = results.forecasts
     # Create a DataFrame with columns: output_type_id, value, target_end_date, output_type
-    forecast_df = DataFrame(output_type_id = Float64[], value = Float64[], target_end_date = Date[])
+    forecast_df = DataFrame(output_type_id=Float64[], value=Float64[], target_end_date=Date[])
     # Populate the DataFrame row by row
     for (date_idx, target_end_date) in enumerate(forecast_dates)
         date_samples = forecasts[date_idx, :]
         for q_level in output_type.quantile_levels
             q_value = quantile(date_samples, q_level)
             push!(forecast_df,
-                (output_type_id = q_level,
-                    value = q_value,
-                    target_end_date = target_end_date))
+                (output_type_id=q_level,
+                    value=q_value,
+                    target_end_date=target_end_date))
         end
     end
     # Add constant column for output_type, this method is specifically for quantiles
@@ -146,15 +146,15 @@ hubverse table, optionally saving it to disk.
   - `location`: Geographic location identifier
 """
 function create_forecast_output(
-        input::EpiAutoGPInput,
-        results::NamedTuple,
-        output_dir::String,
-        output_type::AbstractHubverseOutput;
-        save_output::Bool,
-        disease_abbr::Dict{String, String} = DEFAULT_PATHOGEN_DICT,
-        target_abbr::Dict{String, String} = DEFAULT_TARGET_DICT,
-        group_name::String = DEFAULT_GROUP_NAME,
-        model_name::String = DEFAULT_MODEL_NAME
+    input::EpiAutoGPInput,
+    results::NamedTuple,
+    output_dir::String,
+    output_type::AbstractHubverseOutput;
+    save_output::Bool,
+    disease_abbr::Dict{String,String}=DEFAULT_PATHOGEN_DICT,
+    target_abbr::Dict{String,String}=DEFAULT_TARGET_DICT,
+    group_name::String=DEFAULT_GROUP_NAME,
+    model_name::String=DEFAULT_MODEL_NAME
 )
     # Extract relevant data
     forecast_date = input.forecast_date
@@ -192,15 +192,15 @@ function create_forecast_output(
 end
 
 function create_forecast_output(
-        input::EpiAutoGPInput,
-        results::NamedTuple,
-        output_dir::String,
-        output_type::PipelineOutput;
-        save_output::Bool,
-        disease_abbr::Dict{String, String} = DEFAULT_PATHOGEN_DICT,
-        target_abbr::Dict{String, String} = DEFAULT_TARGET_DICT,
-        group_name::String = DEFAULT_GROUP_NAME,
-        model_name::String = DEFAULT_MODEL_NAME
+    input::EpiAutoGPInput,
+    results::NamedTuple,
+    output_dir::String,
+    output_type::PipelineOutput;
+    save_output::Bool,
+    disease_abbr::Dict{String,String}=DEFAULT_PATHOGEN_DICT,
+    target_abbr::Dict{String,String}=DEFAULT_TARGET_DICT,
+    group_name::String=DEFAULT_GROUP_NAME,
+    model_name::String=DEFAULT_MODEL_NAME
 )
     # Create basic forecast DataFrame with date, .draw, .value
     forecast_df = create_forecast_df(results, output_type)
@@ -208,17 +208,16 @@ function create_forecast_output(
     # Determine variable name based on target and whether using percentages
     variable_name = if input.target == "nhsn"
         "observed_hospital_admissions"
-    else  # nssp
-        if input.use_percentage
-            "prop_disease_ed_visits"
-        else
-            # Use ed_visit_type to determine which ED visits column
-            input.ed_visit_type == "other" ? "other_ed_visits" : "observed_ed_visits"
-        end
+    else
+        Dict(
+            "observed" => "observed_ed_visits",
+            "other" => "other_ed_visits",
+            "pct" => "prop_disease_ed_visits",
+        )[input.ed_visit_type]
     end
 
     # Input is in percentage format (0-100); convert to proportion (0-1) as R expects proportions for prop_ variables
-    if input.use_percentage && input.target == "nssp"
+    if input.ed_visit_type == "pct" && input.target == "nssp"
         forecast_df[!, Symbol(".value")] = forecast_df[!, Symbol(".value")] ./ 100.0
     end
 
@@ -235,15 +234,14 @@ function create_forecast_output(
     forecast_df[!, :disease] .= input.pathogen
 
     # Convert date column to string for parquet compatibility
+    # Julia parquet does not support writing Dates
     forecast_df[!, :date] = string.(forecast_df[!, :date])
 
     # Save as parquet if requested
     if save_output
         # Use model-specific naming with frequency prefix
         # This matches the convention: {frequency}_{model}_samples_{target_letter}.parquet
-        output_letter = DEFAULT_TARGET_LETTER[input.target]
-        parquet_filename = "$(input.frequency)_epiautogp_samples_$(output_letter).parquet"
-        parquet_path = joinpath(output_dir, parquet_filename)
+        parquet_path = joinpath(output_dir, "samples_raw.parquet")
         mkpath(dirname(parquet_path))
         Parquet.write_parquet(parquet_path, forecast_df)
 

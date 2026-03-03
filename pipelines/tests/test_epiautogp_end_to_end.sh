@@ -59,77 +59,72 @@ echo "========================================="
 
 for location in "${LOCATIONS[@]}"; do
 	for disease in "${DISEASES[@]}"; do
-		echo ""
-		echo "Testing $disease, $location"
-		echo "-----------------------------------------"
-
-		# Test 1: Weekly NHSN (hospital admissions)
-		echo "  [1/4] Running weekly NHSN forecast..."
+		# Test weekly NHSN (hospital admissions)
+		echo "TEST-MODE: Running EpiAutoGP weekly NHSN forecast for $disease, $location"
 		bash pipelines/tests/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
 			"nhsn" \
 			"epiweekly" \
-			"false"
+			"observed"
 
 		if [ "$?" -ne 0 ]; then
-			echo "TEST-MODE FAIL: NHSN forecast failed for $disease, $location"
+			echo "TEST-MODE FAIL: EpiAutoGP NHSN forecast failed for $disease, $location"
 			exit 1
 		else
-			echo "  ✓ Weekly NHSN forecast complete"
+			echo "TEST-MODE: Finished EpiAutoGP weekly NHSN forecast for $disease, $location."
 		fi
 
-		# Test 2: Weekly NSSP percentage (ED visits as percentage)
-		echo "  [2/4] Running weekly NSSP percentage forecast..."
+		# Test weekly NSSP percentage (ED visits as percentage)
+		echo "TEST-MODE: Running EpiAutoGP weekly NSSP percentage forecast for $disease, $location"
 		bash pipelines/tests/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
 			"nssp" \
 			"epiweekly" \
-			"true"
+			"pct"
 
 		if [ "$?" -ne 0 ]; then
-			echo "TEST-MODE FAIL: NSSP percentage forecast failed for $disease, $location"
+			echo "TEST-MODE FAIL: EpiAutoGP NSSP percentage forecast failed for $disease, $location"
 			exit 1
 		else
-			echo "  ✓ Weekly NSSP percentage forecast complete"
+			echo "TEST-MODE: Finished EpiAutoGP weekly NSSP percentage forecast for $disease, $location."
 		fi
 
-		# Test 3: Daily NSSP counts (ED visit counts, not percentages)
-		echo "  [3/4] Running daily NSSP count forecast..."
+		# Test daily NSSP counts (ED visit counts, not percentages)
+		echo "TEST-MODE: Running EpiAutoGP daily NSSP count forecast for $disease, $location"
 		bash pipelines/tests/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
 			"nssp" \
 			"daily" \
-			"false"
+			"observed"
 
 		if [ "$?" -ne 0 ]; then
-			echo "TEST-MODE FAIL: NSSP daily count forecast failed for $disease, $location"
+			echo "TEST-MODE FAIL: EpiAutoGP daily NSSP count forecast failed for $disease, $location"
 			exit 1
 		else
-			echo "  ✓ Daily NSSP count forecast complete"
+			echo "TEST-MODE: Finished EpiAutoGP daily NSSP count forecast for $disease, $location."
 		fi
 
-		# Test 4: Daily NSSP other ED visits (non-target background)
-		echo "  [4/4] Running daily NSSP other ED visits forecast..."
+		# Test daily NSSP other ED visits (non-target background)
+		echo "TEST-MODE: Running EpiAutoGP daily NSSP other ED visits forecast for $disease, $location"
 		bash pipelines/tests/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
 			"nssp" \
 			"daily" \
-			"false" \
 			"other"
 
 		if [ "$?" -ne 0 ]; then
-			echo "TEST-MODE FAIL: NSSP daily other ED visits forecast failed for $disease, $location"
+			echo "TEST-MODE FAIL: EpiAutoGP daily NSSP other ED visits forecast failed for $disease, $location"
 			exit 1
 		else
-			echo "  ✓ Daily NSSP other ED visits forecast complete"
+			echo "TEST-MODE: Finished EpiAutoGP daily NSSP other ED visits forecast for $disease, $location."
 		fi
 
 		echo "✓ All forecasts complete for $disease, $location"

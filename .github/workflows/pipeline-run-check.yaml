@@ -71,7 +71,7 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP weekly NHSN model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nhsn epiweekly false
+                "$disease" "$location" nhsn epiweekly
             done
           done
 
@@ -114,7 +114,7 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP weekly NSSP percentage model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nssp epiweekly true
+                "$disease" "$location" nssp epiweekly pct
             done
           done
 
@@ -157,14 +157,14 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP daily NSSP count model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nssp daily false
+                "$disease" "$location" nssp daily observed
             done
           done
 
       - name: Upload model fitting output
         uses: actions/upload-artifact@v6
         with:
-          name: test-fit-epiautogp-nssp-daily
+          name: test-fit-epiautogp-nssp-daily-observed
           path: ${{ env.BASE_DIR }}
 
   fit-epiautogp-nssp-other-models:
@@ -200,7 +200,7 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP daily NSSP other ED visits model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nssp daily false other
+                "$disease" "$location" nssp daily other
             done
           done
 

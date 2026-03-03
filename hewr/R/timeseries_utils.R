@@ -9,9 +9,7 @@
 #'
 #' @param model_dir Path to the
 #' directory containing model run data.
-#' @param base_data_name Base name of the data file to load.
-#' @param epiweekly Logical. Indicate epiweekly (TRUE) or daily (FALSE) data.
-#'   Default `FALSE`.
+#' @param data_name Base name of the data file to load.
 #'
 #' @return A list with:
 #' `data` (processed training data tibble),
@@ -22,16 +20,8 @@
 #' @export
 load_training_data <- function(
   model_dir,
-  base_data_name = "combined_data",
-  epiweekly = FALSE
+  data_name = "combined_data"
 ) {
-  resolution <- dplyr::if_else(epiweekly, "epiweekly", "daily")
-  prefix <- stringr::str_c(resolution, "_")
-  data_name <- dplyr::if_else(
-    epiweekly,
-    stringr::str_c(prefix, base_data_name),
-    base_data_name
-  )
   data_path <- fs::path(model_dir, "data", data_name, ext = "tsv")
 
   target_and_other_data <- readr::read_tsv(
@@ -42,7 +32,8 @@ load_training_data <- function(
       disease = readr::col_character(),
       data_type = readr::col_character(),
       .variable = readr::col_character(),
-      .value = readr::col_double()
+      .value = readr::col_double(),
+      resolution = readr::col_character()
     )
   ) |>
     dplyr::filter(.data$data_type == "train") |>
@@ -50,12 +41,15 @@ load_training_data <- function(
     dplyr::filter(stringr::str_ends(.data$.variable, "ed_visits")) |>
     tidyr::pivot_wider(names_from = ".variable", values_from = ".value")
 
+  model_metadata <- parse_model_run_dir_path(fs::path_dir(model_dir))
+
   list(
     data = target_and_other_data,
-    geo_value = target_and_other_data$geo_value[1],
-    disease = target_and_other_data$disease[1],
-    resolution = resolution,
-    prefix = prefix
+    geo_value = model_metadata$location,
+    disease = model_metadata$disease,
+    resolution = model_dir |>
+      fs::path_file() |>
+      stringr::str_extract("daily|epiweekly")
   )
 }
 
@@ -75,8 +69,6 @@ load_training_data <- function(
 #' `geo_value`,
 #' `disease`,
 #' `resolution`,
-#' `aggregated_numerator`,
-#' `aggregated_denominator`,
 #' `.variable`,
 #' `output_type_id`, and
 #' `.value`.
@@ -97,21 +89,13 @@ format_timeseries_output <- function(
     dplyr::mutate(
       geo_value = geo_value,
       disease = disease,
-      resolution = resolution,
-      aggregated_numerator = FALSE,
-      aggregated_denominator = dplyr::if_else(
-        stringr::str_starts(.data$.variable, "prop_"),
-        FALSE,
-        NA
-      )
+      resolution = resolution
     ) |>
     dplyr::select(
       "date",
       "geo_value",
       "disease",
       "resolution",
-      "aggregated_numerator",
-      "aggregated_denominator",
       ".variable",
       tidyselect::all_of(output_type_id),
       ".value"

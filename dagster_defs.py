@@ -315,7 +315,7 @@ def timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Timeseries-e model and produce outputs.
     """
-    run_stf_model(context, config, model_family="timeseries")
+    run_stf_model(context, config, model_letters="e", model_family="timeseries")
     return "timeseries_e"
 
 
@@ -327,7 +327,9 @@ def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: ModelConfi
     """
     Run Timeseries-e model and produce outputs.
     """
-    run_stf_model(context, config, model_family="epiweekly_timeseries")
+    run_stf_model(
+        context, config, model_letters="e", model_family="epiweekly_timeseries"
+    )
     return "epiweekly_timeseries_e"
 
 

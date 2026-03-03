@@ -1,7 +1,7 @@
 # Basic Imports
 import os
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
 # Dagster and cloud Imports
@@ -26,9 +26,12 @@ from dagster_azure.blob import (
     AzureBlobStorageResource,
 )
 
-# CFA Helper Libraries
+# Helper Libraries
 from forecasttools import location_table
+from pygit2.repository import Repository
+from pytz import timezone
 
+# Local constant imports
 from pipelines.batch.common_batch_utils import (
     DEFAULT_EXCLUDED_LOCATIONS,
     SUPPORTED_DISEASES,
@@ -39,9 +42,9 @@ from pipelines.batch.common_batch_utils import (
 # from pipelines.fable.forecast_timeseries import main as forecast_timeseries
 from pipelines.utils.postprocess_forecast_batches import main as postprocess
 
-# ---------------------- #
-# Dagster Initialization #
-# ---------------------- #
+# ============================================================================
+# DAGSTER INITIALIZATION
+# ============================================================================
 
 # function to start the dev server
 start_dev_env(__name__)
@@ -52,28 +55,56 @@ is_production = not os.getenv("DAGSTER_IS_DEV_CLI")
 # get the user running the Dagster instance
 user = os.getenv("DAGSTER_USER")
 
-# --------------------------------------------------------- #
-# Runtime Configuration: Working Directory, Executors
-# - Executors define the runtime-location of an asset job
-# - See later on for Asset job definitions
-# --------------------------------------------------------- #"
+# ============================================================================
+# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS
+# ============================================================================
+# Executors define the runtime-location of an asset job
+# See later on for Asset job definitions
+
+# ---------- Working Directory, Branch, and Image Tag ----------
 
 workdir = "cfa-stf-routine-forecasting"
 local_workdir = Path(__file__).parent.resolve()
 
-tag = "latest"
+# If the tag is prod, use 'latest'.
+# Else iteratively test on our dev images
+# (You can always manually specify an override in the GUI)
+try:
+    print("You are running inside a .git repository; getting branchname from .git")
+    repo = Repository(os.getcwd())
+    current_branch_name = str(repo.head.shorthand)
+    git_commit_sha = str(repo.head.target)
+except Exception:
+    print(
+        "No .git folder detected; attempting to get branch name from build-arg $GIT_BRANCH_NAME"
+    )
+    current_branch_name = os.getenv("GIT_BRANCH_NAME", "unknown_branch")
+    git_commit_sha = os.getenv("GIT_COMMIT_SHA", "unknown_commit_hash")
+
+print(f"Current branch name is {current_branch_name}")
+
+tag = (
+    "latest"
+    if (is_production or current_branch_name == "main")
+    else current_branch_name
+)
 image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
 
+# ---------- Execution Configuration ----------
+
+# Most basic execution - launches locally, runs locally
 default_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
 )
 
+# Launches in a container app job, then executes in the same process
 azure_caj_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=AzureContainerAppJobRunLauncher.__name__),
     executor=SelectorConfig(class_name=dg.in_process_executor.__name__),
 )
 
+# Launches locally, executes in a docker container as configured below
 docker_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(
@@ -106,6 +137,7 @@ docker_config = ExecutionConfig(
     ),
 )
 
+# Config for full backfills - launches with container app jobs, sends execution to Azure Batch
 azure_batch_config = ExecutionConfig(
     launcher=SelectorConfig(
         class_name=AzureContainerAppJobRunLauncher.__name__, config={"image": image}
@@ -139,11 +171,11 @@ azure_batch_config = ExecutionConfig(
     ),
 )
 
-# --------------------------------------------------------------- #
-# Partitions: how are the data split and processed in Azure Batch?
-# --------------------------------------------------------------- #
+# ============================================================================
+# PARTITIONS
+# ============================================================================
+# How are the data split and processed in Azure Batch?
 
-# Disease Partitions
 disease_partitions = dg.StaticPartitionsDefinition(SUPPORTED_DISEASES)
 
 # location Partitions
@@ -157,21 +189,18 @@ pyrenew_multi_partition_def = dg.MultiPartitionsDefinition(
     {"disease": disease_partitions, "location": location_partitions}
 )
 
-# ----------------------------------------------------------- #
-# Asset Definitions - What are we outputting in our pipeline? #
-# ----------------------------------------------------------- #
+# ============================================================================
+# ASSET CONFIGURATIONS
+# ============================================================================
 
 
-# ---------------
-# Asset Configs
-# ---------------
 class CommonConfig(dg.Config):
     """
     Common configuration for both Model and Post-Processing assets.
     Both ModelConfig and PostProcessConfig inherit from this, then add their own parameters.
     """
 
-    forecast_date: str = datetime.now(UTC).strftime("%Y-%m-%d")
+    forecast_date: str = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     _output_basedir: str = "output" if is_production else "test-output"
     # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
     _output_subdir: str = f"{forecast_date}_forecasts"
@@ -212,10 +241,9 @@ class PostProcessConfig(CommonConfig):
     postprocess_diseases: list[str] = ["COVID-19", "Influenza", "RSV"]
 
 
-# ----------------------
-# Model Worker Function
-# ----------------------
-
+# ============================================================================
+# MODEL WORKER FUNCTION
+# ============================================================================
 # This function is NOT an asset itself, but is called by assets to run the pyrenew model
 
 
@@ -245,9 +273,7 @@ def run_stf_model(
     # Configuration inherited from ModelConfig
     context.log.debug(f"config: '{config}'")
 
-    # =====================================
-    # Model Family and Run Script Selection
-    # =====================================
+    # ---------- Model Family and Run Script Selection ----------
 
     if model_family == "pyrenew":
         # from forecast_pyrenew import forecast_pyrenew  # noqa: F401
@@ -278,9 +304,7 @@ def run_stf_model(
             "Supported values are 'pyrenew' and 'timeseries'."
         )
 
-    # =======================================
-    # Azure Batch Script Command Construction
-    # =======================================
+    # ---------- Azure Batch Script Command Construction ----------
 
     # TODO: investigate calling the run_script function directly instead of via shell-nested python subprocess
     base_call = (
@@ -300,11 +324,12 @@ def run_stf_model(
     subprocess.run(base_call, shell=True, check=True)
 
 
-# -------------------------------------------------------------------- #
-# Assets: these are the core of Dagster - functions that specify data  #
-# -------------------------------------------------------------------- #
+# ============================================================================
+# ASSET DEFINITIONS
+# ============================================================================
+# These are the core of Dagster - functions that specify data
 
-# -- Pyrenew Assets -- #
+# ---------- Pyrenew Assets ----------
 
 
 # Timeseries E
@@ -405,7 +430,7 @@ def pyrenew_hew(
     return "pyrenew_hew"
 
 
-# -- Epi AutoGP Asset -- #
+# ---------- Epi AutoGP Asset ----------
 
 
 @dg.asset
@@ -428,7 +453,7 @@ def epiautogp(context: dg.AssetExecutionContext):
 #     run_stf_model(context, config, model_letters="<?>", model_family="pyrenew")
 #     return "pyrenew_generic"
 
-# -- Postprocessing Forecast Batches -- #
+# ---------- Postprocessing Forecast Batches ----------
 # TODO: integrate this asset into the DAG fully, and trigger it via sensors
 
 
@@ -456,19 +481,19 @@ def postprocess_forecasts(
     return "postprocess_forecasts"
 
 
-# ------------------------------------------------------------------------------------------------- #
-# Orchestration of Partitioned Assets - Model Runs                                                  #
-#    and Post-Processing via Jobs and Schedules                                                     #
-# Scheduling full pipeline runs and defining a flexible configuration                               #
-# We use dagster ops and jobs here to launch asset backfills with custom configuration              #
-# ------------------------------------------------------------------------------------------------- #
+# ============================================================================
+# ORCHESTRATION: PARTITIONED ASSETS, JOBS, AND SCHEDULES
+# ============================================================================
+# Model runs and post-processing via jobs and schedules
+# Scheduling full pipeline runs and defining a flexible configuration
+# We use dagster ops and jobs here to launch asset backfills with custom configuration
 
-## --- Ops for Data Availability Checks --- ##
+# ---------- Data Availability Check Ops ----------
 
 
 @dg.op
 def check_nhsn_data_availability():
-    current_date = datetime.utcnow().strftime("%Y-%m-%d")
+    current_date = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
     try:
         resp = requests.get(nhsn_target_url, timeout=10)
@@ -496,7 +521,7 @@ def check_nhsn_data_availability():
 def check_nssp_gold_data_availability(
     account_name="cfaazurebatchprd", container_name="nssp-etl"
 ):
-    current_date = datetime.utcnow().strftime("%Y-%m-%d")
+    current_date = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     blob_name = f"gold/{current_date}.parquet"
     credential = DefaultAzureCredential()
     blob_service_client = BlobServiceClient(
@@ -522,7 +547,7 @@ def check_nssp_gold_data_availability(
 def check_nwss_gold_data_availability(
     account_name="cfaazurebatchprd", container_name="nwss-vintages"
 ):
-    current_date = datetime.utcnow().strftime("%Y-%m-%d")
+    current_date = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     folder_prefix = f"NWSS-ETL-covid-{current_date}/"
     credential = DefaultAzureCredential()
     blob_service_client = BlobServiceClient(
@@ -539,11 +564,9 @@ def check_nwss_gold_data_availability(
     }
 
 
-## -- Op for Launching Full Backfill Pipeline -- ##
-## Backfill Launch Method - Flexible Configuration via Op and Job ##
+# ---------- Pipeline Launch Op ----------
 
 
-# This is an op (non-materialized asset function) that launches backfills, as used in scheduled jobs
 @dg.op
 def launch_pyrenew_pipeline(
     context: dg.OpExecutionContext, config: ModelConfig
@@ -600,6 +623,8 @@ def launch_pyrenew_pipeline(
     else:
         context.log.info("No required data is available.")
         asset_selection = []
+        context.log.info("Execution will not be sent to Azure batch!")
+        return
 
     # Launch the backfill
     # Returns: a backfill ID,
@@ -624,6 +649,7 @@ def launch_pyrenew_pipeline(
             "models_attempted": ", ".join(asset_selection),
             "forecast_date": config.forecast_date,
             "output_dir": config.output_dir,
+            "git_commit_sha": git_commit_sha,
         },
     )
     context.log.info(
@@ -636,7 +662,7 @@ def launch_pyrenew_pipeline(
     )
 
 
-## -- Jobs -- ##
+# ---------- Job Definitions ----------
 
 # These specify the resources used to initially launch our backfill job.
 pyrenew_pipeline_caj_launch_config = {
@@ -677,7 +703,7 @@ def check_all_data():
     check_nwss_gold_data_availability()  # W Data
 
 
-## -- Schedules -- ##
+# ---------- Schedule Definitions ----------
 
 weekly_pyrenew_via_backfill_schedule = dg.ScheduleDefinition(
     default_status=(
@@ -692,12 +718,12 @@ weekly_pyrenew_via_backfill_schedule = dg.ScheduleDefinition(
     execution_timezone="America/New_York",
 )
 
-# -------------- Dagster Definitions Object ------------------ #
-# This code allows us to collect all of the above definitions  #
-# into a single Definitions object for Dagster to read!        #
-# By doing this, we can keep our Dagster code in a single file #
-# instead of splitting it across multiple files.               #
-# ------------------------------------------------------------ #
+# ============================================================================
+# DAGSTER DEFINITIONS OBJECT
+# ============================================================================
+# This code allows us to collect all of the above definitions into a single
+# Definitions object for Dagster to read. By doing this, we can keep our
+# Dagster code in a single file instead of splitting it across multiple files.
 
 # change storage accounts between dev and prod
 storage_account = "cfadagster" if is_production else "cfadagsterdev"

@@ -1,5 +1,5 @@
 [project]
-name = "pipelines"
+name = "cfa-stf-routine-forecasting"
 version = "0.1.0"
 description = "Pipelines for forecasting respiratory diseases"
 readme = "README.md"
@@ -35,6 +35,9 @@ dependencies = [
     "dagster-graphql==1.12.2",
     "cfa-dagster @ git+https://github.com/cdcgov/cfa-dagster.git"
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipelines"]
 
 [build-system]
 requires = ["hatchling"]

@@ -8,16 +8,23 @@ ifndef CONTAINER_REGISTRY
 CONTAINER_REGISTRY = ghcr.io/cdcgov
 endif
 
-ifndef CONTAINER_IMAGE_NAME
-CONTAINER_IMAGE_NAME = cfa-stf-routine-forecasting
+ifndef CONTAINER_NAME
+CONTAINER_NAME = cfa-stf-routine-forecasting
 endif
 
-ifndef CONTAINER_IMAGE_VERSION
-CONTAINER_IMAGE_VERSION = latest
+# Determine container tag from git branch: "main" -> "latest", otherwise use branch name
+GIT_BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
+GIT_COMMIT_SHA := $(shell git rev-parse HEAD)
+
+ifeq ($(GIT_BRANCH_NAME),main)
+CONTAINER_TAG ?= latest
+else
+CONTAINER_TAG ?= $(GIT_BRANCH_NAME)
 endif
+
 
 ifndef CONTAINER_REMOTE_NAME
-CONTAINER_REMOTE_NAME = $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE_NAME):$(CONTAINER_IMAGE_VERSION)
+CONTAINER_REMOTE_NAME = $(CONTAINER_REGISTRY)/$(CONTAINER_NAME):$(CONTAINER_TAG)
 endif
 
 ifndef CONTAINERFILE
@@ -47,6 +54,7 @@ help:
 	@echo "  container_build     : Build the container image"
 	@echo "  container_tag	     : Tag the container image for pushing to the registry"
 	@echo "  container_push	     : Push the container image"
+	@echo "  container_explore   : Run the last locally-built container interactively in your shell"
 	@echo ""
 # 	@echo "Dagster Targets: "
 # 	@echo "  dagster_push_prod   : Push the dagster container image to the Azure Container Registry and code location for production"
@@ -79,13 +87,18 @@ ghcr_login:
 	echo "$$GH_PAT" | $(ENGINE) login ghcr.io -u "$(GH_USERNAME)" --password-stdin
 
 container_build:
-	$(ENGINE) build . -t $(CONTAINER_REMOTE_NAME) -f $(CONTAINERFILE)
+	$(ENGINE) build . -t $(CONTAINER_REMOTE_NAME) -f $(CONTAINERFILE) \
+	--build-arg GIT_COMMIT_SHA=$(GIT_COMMIT_SHA) \
+	--build-arg GIT_BRANCH_NAME=$(GIT_BRANCH_NAME)
 
 container_tag:
 	$(ENGINE) tag $(CONTAINER_REMOTE_NAME) $(CONTAINER_REMOTE_NAME)
 
-container_push: ghcr_login
+container_push: ghcr_login container_build
 	$(ENGINE) push $(CONTAINER_REMOTE_NAME)
+
+container_explore:
+	$(ENGINE) run -it --rm $(CONTAINER_REMOTE_NAME) bash
 
 config:
 	bash -c "source ./azureconfig.sh"

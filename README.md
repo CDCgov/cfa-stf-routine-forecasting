@@ -56,18 +56,25 @@ For convenience, you can use these makefile targets to get blobfuse setup on a f
 It is not necessary to mount blobs locally if submitting to Azure Batch.
 
 #### Local Development and Testing
-> Prerequisites: `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
-> Contact cfatoolsteam@cdc.gov for assistance with the latter two.
+> Prerequisites:
+> - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
+> - Permissions to push to the container registry and both `$GH_USERNAME` and `$GH_PAT` set as environment variables in your shell.
 
 The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` to test using the local Docker Executor - this will require you to have setup Blobfuse.
 
-1. Run `uv run dagster_defs.py` and click the link in your terminal (usually [http://127.0.0.1:3000/]).
-2. Using the run ID dagster provides, you can also find your jobs in Azure Batch Explorer.
-3. Navigate to the Lineage page, where you can find your assets for materialization.
-4. You need to select partitions when materializing model run assets. For this project, there are two dimensions: disease and location.
-5. Locally, don't run more than two or three partitions at a time, or you will quickly crash your VAP VM, unless you change the executor.
+1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
+    - `make container_build` (requires Docker or Podman)
+    - `make container_push` to build and push (set `$GH_USERNAME` and `$GH_PAT` first)
+    - `make container_explore` for local testing
+2. Run `uv run dagster_defs.py` and open the terminal link (usually http://127.0.0.1:4000/)
 
-For running the full pipeline with all partitions in Azure Batch, you can change the executor code at the very end of `dagster_defs.py` to always use the Azure Batch Executor. Alternatively, you can run directly on the production server. See the next section.
+Dagster is now ready to use locally.
+
+- To run a full pyrenew model pipeline run: go to `Jobs` → `weekly_pyrenew_via_backfill`
+- To run individual models: navigate to `Lineage` and select specific assets, making sure to check the Launchpad config and make sure you've selected the appropriate partitions (State x Disease combination).
+
+In development, whenever you update code, rerun `make container_push` and then `Reload Definitions` from the dagster lineage page.
+Pushing your code to github will also re-build and push the container image, but will typically take longer and you will have to wait for completion in Github Actions.
 
 #### Production Scheduling
 

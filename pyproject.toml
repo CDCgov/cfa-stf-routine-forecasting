@@ -3,7 +3,7 @@ name = "cfa-stf-routine-forecasting"
 version = "0.1.0"
 description = "Pipelines for forecasting respiratory diseases"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 authors = [
   {name = "Damon Bayer", email = "xum8@cdc.gov"},
   {name = "Dylan H. Morris"},

@@ -574,7 +574,13 @@ def launch_pyrenew_pipeline(
         context.log.info(
             "Launching a timeseries_e, pyrenew_e, pyrenew_h, and pyrenew_he backfill."
         )
-        asset_selection = ["timeseries_e", "pyrenew_e", "pyrenew_h", "pyrenew_he"]
+        asset_selection = [
+            "epwieekly_timeseries_e",
+            "timeseries_e",
+            "pyrenew_e",
+            "pyrenew_h",
+            "pyrenew_he",
+        ]
 
     # elif nhsn_available and nwss_available:
     #     context.log.info("NHSN data and NWSS data are available, but NSSP gold data is not.")
@@ -584,7 +590,7 @@ def launch_pyrenew_pipeline(
     elif nssp_available:
         context.log.info("Only NSSP gold data are available.")
         context.log.info("Launching a timeseries_e and pyrenew_e backfill.")
-        asset_selection = ["timeseries_e", "pyrenew_e"]
+        asset_selection = ["epwieekly_timeseries_e", "timeseries_e", "pyrenew_e"]
 
     elif nhsn_available:
         context.log.info("Only NHSN data are available.")

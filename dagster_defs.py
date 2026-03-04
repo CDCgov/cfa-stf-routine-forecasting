@@ -593,7 +593,7 @@ def launch_pyrenew_pipeline(
             "Launching a timeseries_e, pyrenew_e, pyrenew_h, and pyrenew_he backfill."
         )
         asset_selection = [
-            "epwieekly_timeseries_e",
+            "epiweekly_timeseries_e",
             "timeseries_e",
             "pyrenew_e",
             "pyrenew_h",
@@ -608,7 +608,7 @@ def launch_pyrenew_pipeline(
     elif nssp_available:
         context.log.info("Only NSSP gold data are available.")
         context.log.info("Launching a timeseries_e and pyrenew_e backfill.")
-        asset_selection = ["epwieekly_timeseries_e", "timeseries_e", "pyrenew_e"]
+        asset_selection = ["epiweekly_timeseries_e", "timeseries_e", "pyrenew_e"]
 
     elif nhsn_available:
         context.log.info("Only NHSN data are available.")
@@ -709,7 +709,7 @@ weekly_pyrenew_via_backfill_schedule = dg.ScheduleDefinition(
     ),
     job=weekly_pyrenew_via_backfill,
     run_config=weekly_pyrenew_config,
-    cron_schedule="0 8,15 * * WED",
+    cron_schedule="0 8,14 * * WED",
     execution_timezone="America/New_York",
 )
 

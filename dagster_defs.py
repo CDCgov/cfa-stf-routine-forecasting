@@ -98,7 +98,6 @@ default_config = ExecutionConfig(
     executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
 )
 
-dg.multiprocess_executor._name
 
 # Launches in a container app job, then executes in the same process
 azure_caj_config = ExecutionConfig(

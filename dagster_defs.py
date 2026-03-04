@@ -442,17 +442,20 @@ def epiautogp(context: dg.AssetExecutionContext):
 # TODO: integrate this asset into the DAG fully, and trigger it via sensors
 
 
-@dg.asset
+@dg.asset(
+    deps=[
+        "timeseries_e",
+        "epiweekly_timeseries_e",
+        "pyrenew_e",
+        "pyrenew_h",
+        "pyrenew_he",
+        # "pyrenew_hw",
+        # "pyrenew_hew",
+    ],
+)
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,
     config: PostProcessConfig,
-    timeseries_e,
-    epiweekly_timeseries_e,
-    pyrenew_e,
-    pyrenew_h,
-    pyrenew_he,
-    # pyrenew_hw,
-    # pyrenew_hew,
 ):
     """
     Postprocess forecast batches.

@@ -38,8 +38,8 @@ from pipelines.batch.common_batch_utils import (
 )
 
 # Model Code
-from pipelines.fable.forecast_timeseries import main as forecast_timeseries_main
-from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew_main
+from pipelines.fable.forecast_timeseries import main as forecast_timeseries
+from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from pipelines.utils.postprocess_forecast_batches import main as postprocess
 
 # ============================================================================
@@ -285,7 +285,7 @@ def _run_timeseries_e(
     if disease is None or location is None:
         return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
 
-    forecast_timeseries_main(
+    forecast_timeseries(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
@@ -339,7 +339,7 @@ def _run_pyrenew_model(
         f"{model_letters}{config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
-    forecast_pyrenew_main(
+    forecast_pyrenew(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
@@ -435,7 +435,7 @@ def epiautogp(context: dg.AssetExecutionContext):
 # )
 # def pyrenew_generic(context: dg.AssetExecutionContext, config: ModelConfig):
 #     disease, location = get_partition_disease_location(context, model_letters="<?>")
-#     forecast_pyrenew_main(...)
+#     forecast_pyrenew(...)
 #     return "pyrenew_generic"
 
 # ---------- Postprocessing Forecast Batches ----------

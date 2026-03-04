@@ -70,7 +70,7 @@ jobs:
 
     deploy_dagster_code:
       needs: build-pipeline-image
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: github.ref == 'refs/heads/main'
       runs-on: ubuntu-latest
       name: Update Dagster Code Location
       permissions:

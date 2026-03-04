@@ -323,11 +323,7 @@ def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: ModelConfi
 
 
 def _run_pyrenew_model(
-    context: dg.AssetExecutionContext,
-    config: ModelConfig,
-    model_letters: str,
-    timeseries_e=None,
-    epiweekly_timeseries_e=None,
+    context: dg.AssetExecutionContext, config: ModelConfig, model_letters: str
 ):
     """
     Helper to run Pyrenew models with common arguments.
@@ -369,18 +365,11 @@ def _run_pyrenew_model(
     partitions_def=pyrenew_multi_partition_def,
     deps=["timeseries_e", "epiweekly_timeseries_e"],
 )
-def pyrenew_e(
-    context: dg.AssetExecutionContext,
-    config: ModelConfig,
-    timeseries_e,
-    epiweekly_timeseries_e,
-):
+def pyrenew_e(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Pyrenew-e model and produce outputs.
     """
-    return _run_pyrenew_model(
-        context, config, "e", timeseries_e, epiweekly_timeseries_e
-    )
+    return _run_pyrenew_model(context, config, "e")
 
 
 @dg.asset(
@@ -393,19 +382,15 @@ def pyrenew_h(context: dg.AssetExecutionContext, config: ModelConfig):
     return _run_pyrenew_model(context, config, "h")
 
 
-@dg.asset(partitions_def=pyrenew_multi_partition_def)
-def pyrenew_he(
-    context: dg.AssetExecutionContext,
-    config: ModelConfig,
-    timeseries_e,
-    epiweekly_timeseries_e,
-):
+@dg.asset(
+    partitions_def=pyrenew_multi_partition_def,
+    deps=["timeseries_e", "epiweekly_timeseries_e"],
+)
+def pyrenew_he(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Pyrenew-he model and produce outputs.
     """
-    return _run_pyrenew_model(
-        context, config, "he", timeseries_e, epiweekly_timeseries_e
-    )
+    return _run_pyrenew_model(context, config, "he")
 
 
 @dg.asset(
@@ -418,19 +403,15 @@ def pyrenew_hw(context: dg.AssetExecutionContext, config: ModelConfig):
     return _run_pyrenew_model(context, config, "hw")
 
 
-@dg.asset(partitions_def=pyrenew_multi_partition_def)
-def pyrenew_hew(
-    context: dg.AssetExecutionContext,
-    config: ModelConfig,
-    timeseries_e,
-    epiweekly_timeseries_e,
-):
+@dg.asset(
+    partitions_def=pyrenew_multi_partition_def,
+    deps=["timeseries_e", "epiweekly_timeseries_e"],
+)
+def pyrenew_hew(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Pyrenew-hew model and produce outputs.
     """
-    return _run_pyrenew_model(
-        context, config, "hew", timeseries_e, epiweekly_timeseries_e
-    )
+    return _run_pyrenew_model(context, config, "hew")
 
 
 # ---------- Epi AutoGP Asset ----------

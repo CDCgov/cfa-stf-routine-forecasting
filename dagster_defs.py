@@ -98,6 +98,8 @@ default_config = ExecutionConfig(
     executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
 )
 
+dg.multiprocess_executor._name
+
 # Launches in a container app job, then executes in the same process
 azure_caj_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=AzureContainerAppJobRunLauncher.__name__),
@@ -215,9 +217,6 @@ class ModelConfig(CommonConfig):
     """
 
     # Parameters that are currently defined in asset functions - this may be tweakable later
-    # model_letters: str = "hew"  # experimental - not ready to incorporate in config yet
-    # model_family: str = "pyrenew"  # experimental - not ready to incorporate in config yet
-    # manual_location_exclusions: list[str] = [] # experimental - not ready to incorporate in config yet
 
     # Parameters that can be toggled in the launchpad or in custom jobs
     n_training_days: int = 150
@@ -245,6 +244,7 @@ class PostProcessConfig(CommonConfig):
 # MODEL HELPER FUNCTION
 # ============================================================================
 # This helper is not an asset itself; assets call it to parse partition keys.
+# this needs to be updated for timeseries / other models based on signals, not letters
 def get_partition_disease_location(
     context: dg.AssetExecutionContext,
     model_letters: str,
@@ -275,6 +275,31 @@ def get_partition_disease_location(
 # ---------- Pyrenew Assets ----------
 
 
+def _run_timeseries_e(
+    context: dg.AssetExecutionContext, config: ModelConfig, epiweekly: bool
+) -> str:
+    """
+    Helper function to run timeseries-e model with optional epiweekly mode.
+    """
+    disease, location = get_partition_disease_location(context, model_letters="e")
+    if disease is None or location is None:
+        return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
+
+    forecast_timeseries_main(
+        disease=disease,
+        loc=location,
+        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+        output_dir=Path(config.output_dir),
+        n_training_days=config.n_training_days,
+        n_forecast_days=28,
+        n_samples=config.n_total_samples,
+        exclude_last_n_days=config.exclude_last_n_days,
+        epiweekly=epiweekly,
+        credentials_path=Path("config/creds.toml"),
+    )
+    return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
+
+
 # Timeseries E
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
@@ -283,22 +308,7 @@ def timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Timeseries-e model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="e")
-    if disease is None or location is None:
-        return "timeseries_e"
-
-    forecast_timeseries_main(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_samples=config.n_total_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-    )
-    return "timeseries_e"
+    return _run_timeseries_e(context, config, epiweekly=False)
 
 
 # Epiweekly Timeseries E
@@ -307,28 +317,54 @@ def timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
 )
 def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: ModelConfig):
     """
-    Run Timeseries-e model and produce outputs.
+    Run Epiweekly Timeseries-e model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="e")
-    if disease is None or location is None:
-        return "epiweekly_timeseries_e"
+    return _run_timeseries_e(context, config, epiweekly=True)
 
-    forecast_timeseries_main(
+
+def _run_pyrenew_model(
+    context: dg.AssetExecutionContext,
+    config: ModelConfig,
+    model_letters: str,
+    timeseries_e=None,
+    epiweekly_timeseries_e=None,
+):
+    """
+    Helper to run Pyrenew models with common arguments.
+    """
+    disease, location = get_partition_disease_location(
+        context, model_letters=model_letters
+    )
+    if disease is None or location is None:
+        return f"pyrenew_{model_letters}"
+
+    fit_flags = flags_from_hew_letters(model_letters)
+    forecast_flags = flags_from_hew_letters(
+        f"{model_letters}{config.additional_forecast_letters}",
+        flag_prefix="forecast",
+    )
+    forecast_pyrenew_main(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+        nwss_data_dir=Path("nwss-vintages"),
+        param_data_dir=Path("params"),
+        priors_path=Path("pipelines/priors/prod_priors.py"),
         output_dir=Path(config.output_dir),
         n_training_days=config.n_training_days,
         n_forecast_days=28,
-        n_samples=config.n_total_samples,
+        n_chains=config.n_chains,
+        n_warmup=config.n_warmup,
+        n_samples=config.n_samples,
         exclude_last_n_days=config.exclude_last_n_days,
-        epiweekly=True,
         credentials_path=Path("config/creds.toml"),
+        rng_key=config.rng_key,
+        **fit_flags,
+        **forecast_flags,
     )
-    return "epiweekly_timeseries_e"
+    return f"pyrenew_{model_letters}"
 
 
-# Pyrenew E
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
     deps=["timeseries_e", "epiweekly_timeseries_e"],
@@ -342,38 +378,11 @@ def pyrenew_e(
     """
     Run Pyrenew-e model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="e")
-    if disease is None or location is None:
-        return "pyrenew_e"
-
-    fit_flags = flags_from_hew_letters("e")
-    forecast_flags = flags_from_hew_letters(
-        f"e{config.additional_forecast_letters}",
-        flag_prefix="forecast",
+    return _run_pyrenew_model(
+        context, config, "e", timeseries_e, epiweekly_timeseries_e
     )
-    forecast_pyrenew_main(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
-        **fit_flags,
-        **forecast_flags,
-    )
-    return "pyrenew_e"
 
 
-# Pyrenew H
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
 )
@@ -381,38 +390,9 @@ def pyrenew_h(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Pyrenew-h model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="h")
-    if disease is None or location is None:
-        return "pyrenew_h"
-
-    fit_flags = flags_from_hew_letters("h")
-    forecast_flags = flags_from_hew_letters(
-        f"h{config.additional_forecast_letters}",
-        flag_prefix="forecast",
-    )
-    forecast_pyrenew_main(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
-        **fit_flags,
-        **forecast_flags,
-    )
-    return "pyrenew_h"
+    return _run_pyrenew_model(context, config, "h")
 
 
-# Pyrenew HE
 @dg.asset(partitions_def=pyrenew_multi_partition_def)
 def pyrenew_he(
     context: dg.AssetExecutionContext,
@@ -423,38 +403,11 @@ def pyrenew_he(
     """
     Run Pyrenew-he model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="he")
-    if disease is None or location is None:
-        return "pyrenew_he"
-
-    fit_flags = flags_from_hew_letters("he")
-    forecast_flags = flags_from_hew_letters(
-        f"he{config.additional_forecast_letters}",
-        flag_prefix="forecast",
+    return _run_pyrenew_model(
+        context, config, "he", timeseries_e, epiweekly_timeseries_e
     )
-    forecast_pyrenew_main(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
-        **fit_flags,
-        **forecast_flags,
-    )
-    return "pyrenew_he"
 
 
-# Pyrenew HW
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
 )
@@ -462,38 +415,9 @@ def pyrenew_hw(context: dg.AssetExecutionContext, config: ModelConfig):
     """
     Run Pyrenew-hw model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="hw")
-    if disease is None or location is None:
-        return "pyrenew_hw"
-
-    fit_flags = flags_from_hew_letters("hw")
-    forecast_flags = flags_from_hew_letters(
-        f"hw{config.additional_forecast_letters}",
-        flag_prefix="forecast",
-    )
-    forecast_pyrenew_main(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
-        **fit_flags,
-        **forecast_flags,
-    )
-    return "pyrenew_hw"
+    return _run_pyrenew_model(context, config, "hw")
 
 
-# Pyrenew HEW
 @dg.asset(partitions_def=pyrenew_multi_partition_def)
 def pyrenew_hew(
     context: dg.AssetExecutionContext,
@@ -504,35 +428,9 @@ def pyrenew_hew(
     """
     Run Pyrenew-hew model and produce outputs.
     """
-    disease, location = get_partition_disease_location(context, model_letters="hew")
-    if disease is None or location is None:
-        return "pyrenew_hew"
-
-    fit_flags = flags_from_hew_letters("hew")
-    forecast_flags = flags_from_hew_letters(
-        f"hew{config.additional_forecast_letters}",
-        flag_prefix="forecast",
+    return _run_pyrenew_model(
+        context, config, "hew", timeseries_e, epiweekly_timeseries_e
     )
-    forecast_pyrenew_main(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
-        **fit_flags,
-        **forecast_flags,
-    )
-    return "pyrenew_hew"
 
 
 # ---------- Epi AutoGP Asset ----------

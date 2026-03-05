@@ -282,11 +282,6 @@ def _run_timeseries_e(
     """
     keys_by_dimension: dg.MultiPartitionKey = context.partition_key.keys_by_dimension
     location = keys_by_dimension["location"]
-    if location == "WY":
-        context.log.info(
-            "Timeseries models are not applicable for location WY. Skipping model run."
-        )
-        return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
 
     disease, location = get_partition_disease_location(context, model_letters="e")
     if disease is None or location is None:

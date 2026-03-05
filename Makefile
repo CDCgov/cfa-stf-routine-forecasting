@@ -88,6 +88,7 @@ ghcr_login:
 
 container_build:
 	$(ENGINE) build . -t $(CONTAINER_REMOTE_NAME) -f $(CONTAINERFILE) \
+	--platform linux/amd64 \
 	--build-arg GIT_COMMIT_SHA=$(GIT_COMMIT_SHA) \
 	--build-arg GIT_BRANCH_NAME=$(GIT_BRANCH_NAME)
 

@@ -312,6 +312,7 @@ def _run_timeseries_e(
     disease, location = get_partition_disease_location(context, model_letters="e")
 
     if disease is not None and location is not None:
+        context.log.debug(f"config: '{config}'")
         forecast_timeseries(
             disease=disease,
             loc=location,
@@ -365,6 +366,7 @@ def _run_pyrenew_model(
             f"{model_letters}{config.additional_forecast_letters}",
             flag_prefix="forecast",
         )
+        context.log.debug(f"config: '{config}'")
         forecast_pyrenew(
             disease=disease,
             loc=location,

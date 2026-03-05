@@ -306,8 +306,6 @@ def _run_timeseries_e(
     """
     Helper function to run timeseries-e model with optional epiweekly mode.
     """
-    keys_by_dimension: dg.MultiPartitionKey = context.partition_key.keys_by_dimension
-    location = keys_by_dimension["location"]
 
     disease, location = get_partition_disease_location(context, model_letters="e")
 

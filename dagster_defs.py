@@ -710,7 +710,7 @@ weekly_forecast_config = dg.RunConfig(
     ),
     config=weekly_forecast_config,
 )
-def weekly_pyrenew_via_backfill():
+def weekly_forecast_via_backfill():
     launch_forecast_pipeline()
 
 
@@ -725,14 +725,14 @@ def check_all_data():
 
 # ---------- Schedule Definitions ----------
 
-weekly_pyrenew_via_backfill_schedule = dg.ScheduleDefinition(
+weekly_forecast_via_backfill_schedule = dg.ScheduleDefinition(
     default_status=(
         dg.DefaultScheduleStatus.RUNNING
         # don't run locally by default
         if is_production
         else dg.DefaultScheduleStatus.STOPPED
     ),
-    job=weekly_pyrenew_via_backfill,
+    job=weekly_forecast_via_backfill,
     run_config=weekly_forecast_config,
     cron_schedule="0 8,14 * * WED",
     execution_timezone="America/New_York",

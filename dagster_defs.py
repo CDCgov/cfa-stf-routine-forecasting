@@ -245,7 +245,6 @@ class PyrenewConfig(ModelConfigBase):
     n_warmup: int = 200 if not is_production else 1000
     n_samples: int = 200 if not is_production else 500
     n_chains: int = 2 if not is_production else 4
-    n_total_samples: int = n_samples * n_chains
     rng_key: int = 12345
     additional_forecast_letters: str = ""
 

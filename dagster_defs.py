@@ -214,12 +214,10 @@ class CommonConfig(dg.Config):
     forecast_date: str = pydantic.Field(default_factory=current_date_str)
     _output_basedir: str = "output" if is_production else "test-output"
     # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
-    output_dir: str = pydantic.Field(
-        default_factory=lambda: (
-            f"{'output' if is_production else 'test-output'}/"
-            f"{current_date_str()}_forecasts"
-        )
-    )
+
+    @property
+    def output_dir(self) -> str:
+        return f"{self._output_basedir}/{self.forecast_date}_forecasts"
 
 
 class ModelConfigBase(CommonConfig):

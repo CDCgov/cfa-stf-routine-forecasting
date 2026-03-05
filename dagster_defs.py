@@ -254,16 +254,6 @@ class PipelineConfig(dg.Config):
     pyrenew: PyrenewConfig = PyrenewConfig()
 
 
-class ModelConfig(PyrenewConfig):
-    """
-    Unified configuration containing all model parameters.
-    Used for backward compatibility.
-    Inherits all PyrenewConfig parameters (which includes all needed for both model types).
-    """
-
-    pass
-
-
 class PostProcessConfig(CommonConfig):
     """
     Configuration for the Post-Processing asset.
@@ -463,16 +453,6 @@ def epiautogp(context: dg.AssetExecutionContext):
     # TODO: implement Epi AutoGP model and invoke its pipeline entrypoint.
     return "epiautogp"
 
-
-# Use this template for new models. If needed, add dependencies as an argument and overrides in the config
-
-# @dg.asset(
-#     partitions_def=pyrenew_multi_partition_def
-# )
-# def pyrenew_generic(context: dg.AssetExecutionContext, config: ModelConfig):
-#     disease, location = get_partition_disease_location(context, model_letters="<?>")
-#     forecast_pyrenew(...)
-#     return "pyrenew_generic"
 
 # ---------- Postprocessing Forecast Batches ----------
 # TODO: integrate this asset into the DAG fully, and trigger it via sensors

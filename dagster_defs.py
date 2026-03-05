@@ -50,6 +50,15 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
+# shared time helpers
+NY_TZ = timezone("America/New_York")
+DATE_FMT = "%Y-%m-%d"
+
+
+def current_date_str() -> str:
+    return dt.datetime.now(NY_TZ).strftime(DATE_FMT)
+
+
 # env variable set by Dagster CLI
 is_production = not os.getenv("DAGSTER_IS_DEV_CLI")
 
@@ -202,17 +211,13 @@ class CommonConfig(dg.Config):
     Both ModelConfigBase and PostProcessConfig inherit from this.
     """
 
-    forecast_date: str = pydantic.Field(
-        default_factory=lambda: dt.datetime.now(timezone("US/Eastern")).strftime(
-            "%Y-%m-%d"
-        )
-    )
+    forecast_date: str = pydantic.Field(default_factory=current_date_str)
     _output_basedir: str = "output" if is_production else "test-output"
     # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
     output_dir: str = pydantic.Field(
         default_factory=lambda: (
             f"{'output' if is_production else 'test-output'}/"
-            f"{dt.datetime.now(timezone('US/Eastern')).strftime('%Y-%m-%d')}_forecasts"
+            f"{current_date_str()}_forecasts"
         )
     )
 
@@ -505,7 +510,7 @@ def postprocess_forecasts(
 
 @dg.op
 def check_nhsn_data_availability():
-    current_date = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    current_date = current_date_str()
     nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
     try:
         resp = requests.get(nhsn_target_url, timeout=10)
@@ -534,7 +539,7 @@ def check_nhsn_data_availability():
 def check_nssp_gold_data_availability(
     account_name="cfaazurebatchprd", container_name="nssp-etl"
 ):
-    current_date = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    current_date = current_date_str()
     blob_name = f"gold/{current_date}.parquet"
     credential = DefaultAzureCredential()
     blob_service_client = BlobServiceClient(
@@ -560,7 +565,7 @@ def check_nssp_gold_data_availability(
 def check_nwss_gold_data_availability(
     account_name="cfaazurebatchprd", container_name="nwss-vintages"
 ):
-    current_date = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    current_date = current_date_str()
     folder_prefix = f"NWSS-ETL-covid-{current_date}/"
     credential = DefaultAzureCredential()
     blob_service_client = BlobServiceClient(

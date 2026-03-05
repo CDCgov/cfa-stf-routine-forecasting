@@ -5,6 +5,7 @@ from pathlib import Path
 
 # Dagster and cloud Imports
 import dagster as dg
+import pydantic
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -201,11 +202,19 @@ class CommonConfig(dg.Config):
     Both ModelConfigBase and PostProcessConfig inherit from this.
     """
 
-    forecast_date: str = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    forecast_date: str = pydantic.Field(
+        default_factory=lambda: dt.datetime.now(timezone("US/Eastern")).strftime(
+            "%Y-%m-%d"
+        )
+    )
     _output_basedir: str = "output" if is_production else "test-output"
     # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
-    _output_subdir: str = f"{forecast_date}_forecasts"
-    output_dir: str = f"{_output_basedir}/{_output_subdir}"
+    output_dir: str = pydantic.Field(
+        default_factory=lambda: (
+            f"{'output' if is_production else 'test-output'}/"
+            f"{dt.datetime.now(timezone('US/Eastern')).strftime('%Y-%m-%d')}_forecasts"
+        )
+    )
 
 
 class ModelConfigBase(CommonConfig):
@@ -250,8 +259,8 @@ class PipelineConfig(dg.Config):
     or use the default values which will be automatically initialized.
     """
 
-    timeseries: TimeseriesConfig = TimeseriesConfig()
-    pyrenew: PyrenewConfig = PyrenewConfig()
+    timeseries: TimeseriesConfig = pydantic.Field(default_factory=TimeseriesConfig)
+    pyrenew: PyrenewConfig = pydantic.Field(default_factory=PyrenewConfig)
 
 
 class PostProcessConfig(CommonConfig):

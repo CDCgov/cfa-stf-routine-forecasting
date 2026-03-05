@@ -284,21 +284,20 @@ def _run_timeseries_e(
     location = keys_by_dimension["location"]
 
     disease, location = get_partition_disease_location(context, model_letters="e")
-    if disease is None or location is None:
-        return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
 
-    forecast_timeseries(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_samples=config.n_total_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        epiweekly=epiweekly,
-        credentials_path=Path("config/creds.toml"),
-    )
+    if disease is not None and location is not None:
+        forecast_timeseries(
+            disease=disease,
+            loc=location,
+            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+            output_dir=Path(config.output_dir),
+            n_training_days=config.n_training_days,
+            n_forecast_days=28,
+            n_samples=config.n_total_samples,
+            exclude_last_n_days=config.exclude_last_n_days,
+            epiweekly=epiweekly,
+            credentials_path=Path("config/creds.toml"),
+        )
     return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
 
 
@@ -333,33 +332,32 @@ def _run_pyrenew_model(
     disease, location = get_partition_disease_location(
         context, model_letters=model_letters
     )
-    if disease is None or location is None:
-        return f"pyrenew_{model_letters}"
 
-    fit_flags = flags_from_hew_letters(model_letters)
-    forecast_flags = flags_from_hew_letters(
-        f"{model_letters}{config.additional_forecast_letters}",
-        flag_prefix="forecast",
-    )
-    forecast_pyrenew(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
-        n_training_days=config.n_training_days,
-        n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
-        **fit_flags,
-        **forecast_flags,
-    )
+    if disease is not None and location is not None:
+        fit_flags = flags_from_hew_letters(model_letters)
+        forecast_flags = flags_from_hew_letters(
+            f"{model_letters}{config.additional_forecast_letters}",
+            flag_prefix="forecast",
+        )
+        forecast_pyrenew(
+            disease=disease,
+            loc=location,
+            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+            nwss_data_dir=Path("nwss-vintages"),
+            param_data_dir=Path("params"),
+            priors_path=Path("pipelines/priors/prod_priors.py"),
+            output_dir=Path(config.output_dir),
+            n_training_days=config.n_training_days,
+            n_forecast_days=28,
+            n_chains=config.n_chains,
+            n_warmup=config.n_warmup,
+            n_samples=config.n_samples,
+            exclude_last_n_days=config.exclude_last_n_days,
+            credentials_path=Path("config/creds.toml"),
+            rng_key=config.rng_key,
+            **fit_flags,
+            **forecast_flags,
+        )
     return f"pyrenew_{model_letters}"
 
 

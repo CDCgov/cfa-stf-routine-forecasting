@@ -240,7 +240,7 @@ class PostProcessConfig(CommonConfig):
 
 
 # ============================================================================
-# MODEL HELPER FUNCTION
+# MODEL WORKER FUNCTION
 # ============================================================================
 # This helper is not an asset itself; assets call it to parse partition keys.
 # this needs to be updated for timeseries / other models based on signals, not letters

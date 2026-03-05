@@ -1,6 +1,6 @@
 # Basic Imports
+import datetime as dt
 import os
-from datetime import datetime
 from pathlib import Path
 
 # Dagster and cloud Imports
@@ -201,7 +201,7 @@ class CommonConfig(dg.Config):
     Both ModelConfigBase and PostProcessConfig inherit from this.
     """
 
-    forecast_date: str = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    forecast_date: str = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     _output_basedir: str = "output" if is_production else "test-output"
     # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
     _output_subdir: str = f"{forecast_date}_forecasts"
@@ -499,7 +499,7 @@ def postprocess_forecasts(
 
 @dg.op
 def check_nhsn_data_availability():
-    current_date = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    current_date = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
     try:
         resp = requests.get(nhsn_target_url, timeout=10)
@@ -508,9 +508,10 @@ def check_nhsn_data_availability():
         nhsn_update_date_raw = data.get("rowsUpdatedAt")
         if nhsn_update_date_raw is None:
             return {"exists": False, "reason": "Key 'rowsUpdatedAt' not found"}
-        nhsn_update_date = datetime.utcfromtimestamp(nhsn_update_date_raw).strftime(
-            "%Y-%m-%d"
-        )
+        nhsn_update_date = dt.datetime.fromtimestamp(
+            nhsn_update_date_raw, dt.UTC
+        ).strftime("%Y-%m-%d")
+
         nhsn_check = nhsn_update_date == current_date
         print(f"NHSN data available for date {current_date}: {nhsn_check}")
         return {
@@ -527,7 +528,7 @@ def check_nhsn_data_availability():
 def check_nssp_gold_data_availability(
     account_name="cfaazurebatchprd", container_name="nssp-etl"
 ):
-    current_date = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    current_date = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     blob_name = f"gold/{current_date}.parquet"
     credential = DefaultAzureCredential()
     blob_service_client = BlobServiceClient(
@@ -553,7 +554,7 @@ def check_nssp_gold_data_availability(
 def check_nwss_gold_data_availability(
     account_name="cfaazurebatchprd", container_name="nwss-vintages"
 ):
-    current_date = datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
+    current_date = dt.datetime.now(timezone("US/Eastern")).strftime("%Y-%m-%d")
     folder_prefix = f"NWSS-ETL-covid-{current_date}/"
     credential = DefaultAzureCredential()
     blob_service_client = BlobServiceClient(
@@ -576,7 +577,7 @@ def check_nwss_gold_data_availability(
 @dg.op
 def launch_forecast_pipeline(
     context: dg.OpExecutionContext, config: PipelineConfig
-) -> dg.Output[str]:
+) -> dg.Output[str] | None:
     # We are referencing the global pyrenew_multi_partition_def defined earlier
     partition_keys = pyrenew_multi_partition_def.get_partition_keys()
 

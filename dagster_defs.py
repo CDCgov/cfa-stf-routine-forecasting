@@ -594,7 +594,7 @@ def check_nwss_gold_data_availability(
 @dg.op
 def launch_forecast_pipeline(
     context: dg.OpExecutionContext, config: PipelineConfig
-) -> dg.Output[str] | None:
+) -> str | None:
     # We are referencing the global pyrenew_multi_partition_def defined earlier
     partition_keys = pyrenew_multi_partition_def.get_partition_keys()
 
@@ -695,10 +695,8 @@ def launch_forecast_pipeline(
         f"Launched backfill with id: '{backfill_id}'. "
         "Click the output metadata url to monitor"
     )
-    return dg.Output(
-        value=backfill_id,
-        metadata={"url": dg.MetadataValue.url(f"/runs/b/{backfill_id}")},
-    )
+    context.add_output_metadata({"url": dg.MetadataValue.url(f"/runs/b/{backfill_id}")})
+    return backfill_id
 
 
 # ---------- Job Definitions ----------

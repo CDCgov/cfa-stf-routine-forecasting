@@ -751,7 +751,7 @@ weekly_forecast_via_backfill_schedule = dg.ScheduleDefinition(
     ),
     job=weekly_forecast_via_backfill,
     run_config=weekly_forecast_config,
-    cron_schedule="0 8,14 * * WED",
+    cron_schedule="0 8,14 * * TUE,WED",
     execution_timezone="America/New_York",
 )
 

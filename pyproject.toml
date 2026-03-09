@@ -28,7 +28,7 @@ dependencies = [
     "rich>=14.0.0",
     "dotenv>=0.9.9",
     "polarbayes",
-    "jax<0.8.2",
+    "jax<0.9.2",
     "dagster-postgres>=0.27.4",
     "dagster-webserver==1.12.2",
     "dagster==1.12.2",

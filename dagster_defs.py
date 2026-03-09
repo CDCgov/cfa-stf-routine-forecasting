@@ -276,15 +276,40 @@ class PostProcessConfig(CommonConfig):
     postprocess_diseases: list[str] = ["COVID-19", "Influenza", "RSV"]
 
 
+# New cfa-dagster dyanmic_graph_asset example
+
+# class UpstreamConfig(dg.Config):
+#     diseases: List[str] = diseases
+#     states: List[str] = states
+#     base_output_prefix: str = "/draft"  # e.g. "abfss://container@acct.dfs.core.windows.net/model-output"
+
+# @dynamic_graph_asset(
+#     partitions_def=daily_partitions,
+#     mapping_keys=["states", "diseases"],
+#     output=lambda context, config: dg.Output(
+#         value=f"staging/{context.partition_key}",
+#         metadata={"container": config.base_output_prefix},
+#     )
+# )
+# def dynamo(context, config: UpstreamConfig):
+#     context.log.info(f"state: '{config.states.pop()}'")
+#     context.log.info(f"disease: '{config.diseases.pop()}'")
+
+
 # ============================================================================
-# MODEL WORKER FUNCTION
+# MODEL HELPER FUNCTIONS
 # ============================================================================
-# This helper is not an asset itself; assets call it to parse partition keys.
-# this needs to be updated for timeseries / other models based on signals, not letters
+# These helpers are not asset themselves
+
+
 def get_partition_disease_location(
     context: dg.AssetExecutionContext,
     model_letters: str,
 ) -> tuple[str | None, str | None]:
+    """
+    Function used by assets to parse partition keys.
+    TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
+    """
     keys_by_dimension: dg.MultiPartitionKey = context.partition_key.keys_by_dimension
     disease = keys_by_dimension["disease"]
     location = keys_by_dimension["location"]
@@ -301,14 +326,6 @@ def get_partition_disease_location(
         return None, None
 
     return disease, location
-
-
-# ============================================================================
-# ASSET DEFINITIONS
-# ============================================================================
-# These are the core of Dagster - functions that specify data
-
-# ---------- Pyrenew Assets ----------
 
 
 def _run_timeseries_e(
@@ -335,28 +352,6 @@ def _run_timeseries_e(
             credentials_path=Path("config/creds.toml"),
         )
     return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
-
-
-# Timeseries E
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
-)
-def timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
-    """
-    Run Timeseries-e model and produce outputs.
-    """
-    return _run_timeseries_e(context, config, epiweekly=False)
-
-
-# Epiweekly Timeseries E
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
-)
-def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
-    """
-    Run Epiweekly Timeseries-e model and produce outputs.
-    """
-    return _run_timeseries_e(context, config, epiweekly=True)
 
 
 def _run_pyrenew_model(
@@ -398,6 +393,37 @@ def _run_pyrenew_model(
     return f"pyrenew_{model_letters}"
 
 
+# ============================================================================
+# ASSET DEFINITIONS
+# ============================================================================
+# These are the core of Dagster - functions that specify data
+
+# ---------- Pyrenew Assets ----------
+
+
+# Timeseries E
+@dg.asset(
+    partitions_def=pyrenew_multi_partition_def,
+)
+def timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
+    """
+    Run Timeseries-e model and produce outputs.
+    """
+    return _run_timeseries_e(context, config, epiweekly=False)
+
+
+# Epiweekly Timeseries E
+@dg.asset(
+    partitions_def=pyrenew_multi_partition_def,
+)
+def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
+    """
+    Run Epiweekly Timeseries-e model and produce outputs.
+    """
+    return _run_timeseries_e(context, config, epiweekly=True)
+
+
+# Pyrenew E
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
     deps=["timeseries_e", "epiweekly_timeseries_e"],
@@ -409,6 +435,7 @@ def pyrenew_e(context: dg.AssetExecutionContext, config: PyrenewConfig):
     return _run_pyrenew_model(context, config, "e")
 
 
+# Pyrenew H
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
 )
@@ -419,6 +446,7 @@ def pyrenew_h(context: dg.AssetExecutionContext, config: PyrenewConfig):
     return _run_pyrenew_model(context, config, "h")
 
 
+# Pyrenew HE
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
     deps=["timeseries_e", "epiweekly_timeseries_e"],
@@ -430,6 +458,7 @@ def pyrenew_he(context: dg.AssetExecutionContext, config: PyrenewConfig):
     return _run_pyrenew_model(context, config, "he")
 
 
+# Pyrenew HW
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
 )
@@ -440,6 +469,7 @@ def pyrenew_hw(context: dg.AssetExecutionContext, config: PyrenewConfig):
     return _run_pyrenew_model(context, config, "hw")
 
 
+# Pyrenew HEW
 @dg.asset(
     partitions_def=pyrenew_multi_partition_def,
     deps=["timeseries_e", "epiweekly_timeseries_e"],
@@ -466,7 +496,7 @@ def epiautogp(context: dg.AssetExecutionContext):
 
 
 # ---------- Postprocessing Forecast Batches ----------
-# TODO: integrate this asset into the DAG fully, and trigger it via sensors
+# TODO: integrate this asset into the DAG fully, and/or trigger it via sensors
 
 
 @dg.asset(
@@ -476,8 +506,6 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_e",
         "pyrenew_h",
         "pyrenew_he",
-        # "pyrenew_hw",
-        # "pyrenew_hew",
     ],
 )
 def postprocess_forecasts(

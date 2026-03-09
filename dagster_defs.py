@@ -276,26 +276,6 @@ class PostProcessConfig(CommonConfig):
     postprocess_diseases: list[str] = ["COVID-19", "Influenza", "RSV"]
 
 
-# New cfa-dagster dyanmic_graph_asset example
-
-# class UpstreamConfig(dg.Config):
-#     diseases: List[str] = diseases
-#     states: List[str] = states
-#     base_output_prefix: str = "/draft"  # e.g. "abfss://container@acct.dfs.core.windows.net/model-output"
-
-# @dynamic_graph_asset(
-#     partitions_def=daily_partitions,
-#     mapping_keys=["states", "diseases"],
-#     output=lambda context, config: dg.Output(
-#         value=f"staging/{context.partition_key}",
-#         metadata={"container": config.base_output_prefix},
-#     )
-# )
-# def dynamo(context, config: UpstreamConfig):
-#     context.log.info(f"state: '{config.states.pop()}'")
-#     context.log.info(f"disease: '{config.diseases.pop()}'")
-
-
 # ============================================================================
 # MODEL HELPER FUNCTIONS
 # ============================================================================

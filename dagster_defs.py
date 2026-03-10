@@ -12,13 +12,14 @@ from azure.storage.blob import BlobServiceClient
 from cfa_dagster import (
     ADLS2PickleIOManager,
     AzureContainerAppJobRunLauncher,
+    DynamicGraphAssetExecutionContext,
     ExecutionConfig,
     SelectorConfig,
     azure_batch_executor,
     collect_definitions,
     docker_executor,
     dynamic_executor,
-    launch_asset_backfill,
+    dynamic_graph_asset,
     start_dev_env,
 )
 from dagster_azure.blob import (
@@ -187,7 +188,8 @@ azure_batch_config = ExecutionConfig(
 # ============================================================================
 # How are the data split and processed in Azure Batch?
 
-disease_partitions = dg.StaticPartitionsDefinition(SUPPORTED_DISEASES)
+DISEASES = SUPPORTED_DISEASES
+disease_partitions = dg.StaticPartitionsDefinition(DISEASES)
 
 # location Partitions
 LOCATIONS = location_table.get_column("short_name").to_list()
@@ -198,6 +200,11 @@ location_partitions = dg.StaticPartitionsDefinition(
 # Multi Partitions
 pyrenew_multi_partition_def = dg.MultiPartitionsDefinition(
     {"disease": disease_partitions, "location": location_partitions}
+)
+
+# Daily Partitions
+daily_partitions_def = dg.DailyPartitionsDefinition(
+    start_date="2026-01-01", end_date=current_date_str()
 )
 
 # ============================================================================
@@ -212,12 +219,8 @@ class CommonConfig(dg.Config):
     """
 
     forecast_date: str = pydantic.Field(default_factory=current_date_str)
-    _output_basedir: str = "output" if is_production else "test-output"
+    output_basedir: str = "output" if is_production else "test-output"
     # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
-
-    @property
-    def output_dir(self) -> str:
-        return f"{self._output_basedir}/{self.forecast_date}_forecasts"
 
 
 class ModelConfigBase(CommonConfig):
@@ -228,6 +231,8 @@ class ModelConfigBase(CommonConfig):
 
     n_training_days: int = 150
     exclude_last_n_days: int = 1
+    diseases: list[str] = DISEASES
+    locations: list[str] = LOCATIONS
 
 
 class TimeseriesConfig(ModelConfigBase):
@@ -282,17 +287,16 @@ class PostProcessConfig(CommonConfig):
 # These helpers are not asset themselves
 
 
-def get_partition_disease_location(
-    context: dg.AssetExecutionContext,
+def get_disease_location(
+    context: DynamicGraphAssetExecutionContext,
     model_letters: str,
 ) -> tuple[str | None, str | None]:
     """
-    Function used by assets to parse partition keys.
+    Function used by assets to parse which disease or location they should run as.
     TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
     """
-    keys_by_dimension: dg.MultiPartitionKey = context.partition_key.keys_by_dimension
-    disease = keys_by_dimension["disease"]
-    location = keys_by_dimension["location"]
+    disease = context.graph_dimension["disease"]
+    location = context.graph_dimension["location"]
 
     if "w" in model_letters and disease != "COVID-19":
         context.log.info(
@@ -309,13 +313,15 @@ def get_partition_disease_location(
 
 
 def _run_timeseries_e(
-    context: dg.AssetExecutionContext, config: TimeseriesConfig, epiweekly: bool
+    context: DynamicGraphAssetExecutionContext,
+    config: TimeseriesConfig,
+    epiweekly: bool,
 ) -> str:
     """
     Helper function to run timeseries-e model with optional epiweekly mode.
     """
 
-    disease, location = get_partition_disease_location(context, model_letters="e")
+    disease, location = get_disease_location(context, model_letters="e")
 
     if disease is not None and location is not None:
         context.log.debug(f"config: '{config}'")
@@ -335,14 +341,14 @@ def _run_timeseries_e(
 
 
 def _run_pyrenew_model(
-    context: dg.AssetExecutionContext, config: PyrenewConfig, model_letters: str
+    context: DynamicGraphAssetExecutionContext,
+    config: PyrenewConfig,
+    model_letters: str,
 ):
     """
     Helper to run Pyrenew models with common arguments.
     """
-    disease, location = get_partition_disease_location(
-        context, model_letters=model_letters
-    )
+    disease, location = get_disease_location(context, model_letters=model_letters)
 
     if disease is not None and location is not None:
         fit_flags = flags_from_hew_letters(model_letters)
@@ -382,10 +388,12 @@ def _run_pyrenew_model(
 
 
 # Timeseries E
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 8 * * *"),
 )
-def timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
+def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
     """
     Run Timeseries-e model and produce outputs.
     """
@@ -393,10 +401,16 @@ def timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
 
 
 # Epiweekly Timeseries E
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 8 * * TUE,WED"
+    ),
 )
-def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: TimeseriesConfig):
+def epiweekly_timeseries_e(
+    context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig
+):
     """
     Run Epiweekly Timeseries-e model and produce outputs.
     """
@@ -404,11 +418,17 @@ def epiweekly_timeseries_e(context: dg.AssetExecutionContext, config: Timeseries
 
 
 # Pyrenew E
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
-    deps=["timeseries_e", "epiweekly_timeseries_e"],
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    automation_condition=dg.AutomationCondition.on_missing(),
 )
-def pyrenew_e(context: dg.AssetExecutionContext, config: PyrenewConfig):
+def pyrenew_e(
+    context: DynamicGraphAssetExecutionContext,
+    config: PyrenewConfig,
+    timeseries_e,
+    epiweekly_timeseries_e,
+):
     """
     Run Pyrenew-e model and produce outputs.
     """
@@ -416,10 +436,14 @@ def pyrenew_e(context: dg.AssetExecutionContext, config: PyrenewConfig):
 
 
 # Pyrenew H
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 14 * * TUE,WED"
+    ),
 )
-def pyrenew_h(context: dg.AssetExecutionContext, config: PyrenewConfig):
+def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
     """
     Run Pyrenew-h model and produce outputs.
     """
@@ -427,11 +451,17 @@ def pyrenew_h(context: dg.AssetExecutionContext, config: PyrenewConfig):
 
 
 # Pyrenew HE
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
-    deps=["timeseries_e", "epiweekly_timeseries_e"],
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    automation_condition=dg.AutomationCondition.on_missing(),
 )
-def pyrenew_he(context: dg.AssetExecutionContext, config: PyrenewConfig):
+def pyrenew_he(
+    context: DynamicGraphAssetExecutionContext,
+    config: PyrenewConfig,
+    timeseries_e,
+    epiweekly_timeseries_e,
+):
     """
     Run Pyrenew-he model and produce outputs.
     """
@@ -439,10 +469,10 @@ def pyrenew_he(context: dg.AssetExecutionContext, config: PyrenewConfig):
 
 
 # Pyrenew HW
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def, graph_dimensions=["diseases", "locations"]
 )
-def pyrenew_hw(context: dg.AssetExecutionContext, config: PyrenewConfig):
+def pyrenew_hw(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
     """
     Run Pyrenew-hw model and produce outputs.
     """
@@ -450,11 +480,15 @@ def pyrenew_hw(context: dg.AssetExecutionContext, config: PyrenewConfig):
 
 
 # Pyrenew HEW
-@dg.asset(
-    partitions_def=pyrenew_multi_partition_def,
-    deps=["timeseries_e", "epiweekly_timeseries_e"],
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def, graph_dimensions=["diseases", "locations"]
 )
-def pyrenew_hew(context: dg.AssetExecutionContext, config: PyrenewConfig):
+def pyrenew_hew(
+    context: DynamicGraphAssetExecutionContext,
+    config: PyrenewConfig,
+    timeseries_e,
+    epiweekly_timeseries_e,
+):
     """
     Run Pyrenew-hew model and produce outputs.
     """
@@ -487,6 +521,7 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_h",
         "pyrenew_he",
     ],
+    automation_condition=dg.AutomationCondition.on_missing(),
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,
@@ -591,144 +626,144 @@ def check_nwss_gold_data_availability(
 # ---------- Pipeline Launch Op ----------
 
 
-@dg.op
-def launch_forecast_pipeline(
-    context: dg.OpExecutionContext, config: PipelineConfig
-) -> str | None:
-    # We are referencing the global pyrenew_multi_partition_def defined earlier
-    partition_keys = pyrenew_multi_partition_def.get_partition_keys()
+# @dg.op
+# def launch_forecast_pipeline(
+#     context: dg.OpExecutionContext, config: PipelineConfig
+# ) -> str | None:
+#     # We are referencing the global pyrenew_multi_partition_def defined earlier
+#     partition_keys = pyrenew_multi_partition_def.get_partition_keys()
 
-    asset_config_map = {
-        "timeseries_e": config.timeseries,
-        "epiweekly_timeseries_e": config.timeseries,
-        "pyrenew_e": config.pyrenew,
-        "pyrenew_h": config.pyrenew,
-        "pyrenew_he": config.pyrenew,
-        "pyrenew_hw": config.pyrenew,
-        "pyrenew_hew": config.pyrenew,
-    }
+#     asset_config_map = {
+#         "timeseries_e": config.timeseries,
+#         "epiweekly_timeseries_e": config.timeseries,
+#         "pyrenew_e": config.pyrenew,
+#         "pyrenew_h": config.pyrenew,
+#         "pyrenew_he": config.pyrenew,
+#         "pyrenew_hw": config.pyrenew,
+#         "pyrenew_hew": config.pyrenew,
+#     }
 
-    # Determine which assets to backfill based on data availability
-    nhsn_available = check_nhsn_data_availability()["exists"]  # H Data
-    nssp_available = check_nssp_gold_data_availability()["exists"]  # E Data
-    # nwss_available = check_nwss_gold_data_availability()["exists"] # W Data
+#     # Determine which assets to backfill based on data availability
+#     nhsn_available = check_nhsn_data_availability()["exists"]  # H Data
+#     nssp_available = check_nssp_gold_data_availability()["exists"]  # E Data
+#     # nwss_available = check_nwss_gold_data_availability()["exists"] # W Data
 
-    context.log.debug(f"NHSN available: {nhsn_available}")
-    context.log.debug(f"NSSP available: {nssp_available}")
-    # context.log.debug(f"NWSS available: {nwss_available}")
+#     context.log.debug(f"NHSN available: {nhsn_available}")
+#     context.log.debug(f"NSSP available: {nssp_available}")
+#     # context.log.debug(f"NWSS available: {nwss_available}")
 
-    # Determine which assets to backfill based on data availability
-    # if nhsn_available and nssp_available and nwss_available:
-    #     context.log.info("NHSN, NSSP gold, and NWSS gold data are all available - launching full pipeline.")
-    #     context.log.info("Launching full pyrenew_hew backfill.")
-    #     asset_selection = ("timeseries_e", "pyrenew_e", "pyrenew_h", "pyrenew_he", "pyrenew_hw", "pyrenew_hew")
+#     # Determine which assets to backfill based on data availability
+#     # if nhsn_available and nssp_available and nwss_available:
+#     #     context.log.info("NHSN, NSSP gold, and NWSS gold data are all available - launching full pipeline.")
+#     #     context.log.info("Launching full pyrenew_hew backfill.")
+#     #     asset_selection = ("timeseries_e", "pyrenew_e", "pyrenew_h", "pyrenew_he", "pyrenew_hw", "pyrenew_hew")
 
-    if nhsn_available and nssp_available:
-        # elif nhsn_available and nssp_available:
-        context.log.info(
-            "Both NHSN data and NSSP gold data are available, but NWSS gold data is not."
-        )
-        context.log.info(
-            "Launching a timeseries_e, pyrenew_e, pyrenew_h, and pyrenew_he backfill."
-        )
-        asset_selection = [
-            "epiweekly_timeseries_e",
-            "timeseries_e",
-            "pyrenew_e",
-            "pyrenew_h",
-            "pyrenew_he",
-        ]
+#     if nhsn_available and nssp_available:
+#         # elif nhsn_available and nssp_available:
+#         context.log.info(
+#             "Both NHSN data and NSSP gold data are available, but NWSS gold data is not."
+#         )
+#         context.log.info(
+#             "Launching a timeseries_e, pyrenew_e, pyrenew_h, and pyrenew_he backfill."
+#         )
+#         asset_selection = [
+#             "epiweekly_timeseries_e",
+#             "timeseries_e",
+#             "pyrenew_e",
+#             "pyrenew_h",
+#             "pyrenew_he",
+#         ]
 
-    # elif nhsn_available and nwss_available:
-    #     context.log.info("NHSN data and NWSS data are available, but NSSP gold data is not.")
-    #     context.log.info("Launching pyrenew_h and pyrenew_hw backfill.")
-    #     asset_selection = ("pyrenew_h", "pyrenew_hw")
+#     # elif nhsn_available and nwss_available:
+#     #     context.log.info("NHSN data and NWSS data are available, but NSSP gold data is not.")
+#     #     context.log.info("Launching pyrenew_h and pyrenew_hw backfill.")
+#     #     asset_selection = ("pyrenew_h", "pyrenew_hw")
 
-    elif nssp_available:
-        context.log.info("Only NSSP gold data are available.")
-        context.log.info("Launching a timeseries_e and pyrenew_e backfill.")
-        asset_selection = ["epiweekly_timeseries_e", "timeseries_e", "pyrenew_e"]
+#     elif nssp_available:
+#         context.log.info("Only NSSP gold data are available.")
+#         context.log.info("Launching a timeseries_e and pyrenew_e backfill.")
+#         asset_selection = ["epiweekly_timeseries_e", "timeseries_e", "pyrenew_e"]
 
-    elif nhsn_available:
-        context.log.info("Only NHSN data are available.")
-        context.log.info("Launching a pyrenew_h backfill.")
-        asset_selection = ["pyrenew_h"]
+#     elif nhsn_available:
+#         context.log.info("Only NHSN data are available.")
+#         context.log.info("Launching a pyrenew_h backfill.")
+#         asset_selection = ["pyrenew_h"]
 
-    else:
-        context.log.info("No required data is available.")
-        asset_selection = []
-        context.log.info("Execution will not be sent to Azure batch!")
-        return
+#     else:
+#         context.log.info("No required data is available.")
+#         asset_selection = []
+#         context.log.info("Execution will not be sent to Azure batch!")
+#         return
 
-    # Build ops config dict based on asset types using the joint config
-    ops_config: dict[str, TimeseriesConfig | PyrenewConfig] = {
-        asset: asset_config_map[asset] for asset in asset_selection
-    }
+#     # Build ops config dict based on asset types using the joint config
+#     ops_config: dict[str, TimeseriesConfig | PyrenewConfig] = {
+#         asset: asset_config_map[asset] for asset in asset_selection
+#     }
 
-    # Launch the backfill
-    # Returns: a backfill ID,
-    # side-effect: launches the backfill run in Dagster via a GraphQL query
-    backfill_id = launch_asset_backfill(
-        asset_selection,
-        partition_keys,
-        run_config=dg.RunConfig(
-            ops=ops_config,
-            execution=azure_batch_config.to_run_config(),
-        ),
-        tags={
-            "run": "pyrenew",
-            "available_data": str(
-                {
-                    "nhsn": nhsn_available,
-                    "nssp_gold": nssp_available,
-                    "nwss_gold": False,  # nwss_available,
-                }
-            ),
-            "user": user,
-            "models_attempted": ", ".join(asset_selection),
-            "forecast_date": config.pyrenew.forecast_date,
-            "output_dir": config.pyrenew.output_dir,
-            "git_commit_sha": git_commit_sha,
-        },
-    )
-    context.log.info(
-        f"Launched backfill with id: '{backfill_id}'. "
-        "Click the output metadata url to monitor"
-    )
-    context.add_output_metadata({"url": dg.MetadataValue.url(f"/runs/b/{backfill_id}")})
-    return backfill_id
+#     # Launch the backfill
+#     # Returns: a backfill ID,
+#     # side-effect: launches the backfill run in Dagster via a GraphQL query
+#     backfill_id = launch_asset_backfill(
+#         asset_selection,
+#         partition_keys,
+#         run_config=dg.RunConfig(
+#             ops=ops_config,
+#             execution=azure_batch_config.to_run_config(),
+#         ),
+#         tags={
+#             "run": "pyrenew",
+#             "available_data": str(
+#                 {
+#                     "nhsn": nhsn_available,
+#                     "nssp_gold": nssp_available,
+#                     "nwss_gold": False,  # nwss_available,
+#                 }
+#             ),
+#             "user": user,
+#             "models_attempted": ", ".join(asset_selection),
+#             "forecast_date": config.pyrenew.forecast_date,
+#             "output_dir": config.pyrenew.output_dir,
+#             "git_commit_sha": git_commit_sha,
+#         },
+#     )
+#     context.log.info(
+#         f"Launched backfill with id: '{backfill_id}'. "
+#         "Click the output metadata url to monitor"
+#     )
+#     context.add_output_metadata({"url": dg.MetadataValue.url(f"/runs/b/{backfill_id}")})
+#     return backfill_id
 
 
 # ---------- Job Definitions ----------
 
-# These specify the resources used to initially launch our backfill job.
-forecast_pipeline_caj_launch_config = {
-    "config": {
-        "launcher": {"AzureContainerAppJobRunLauncher": {"cpu": 2.0, "memory": 4.0}}
-    }
-}
-forecast_pipeline_local_launch_config = {
-    "config": {}
-}  # We can let the default take over
+# # These specify the resources used to initially launch our backfill job.
+# forecast_pipeline_caj_launch_config = {
+#     "config": {
+#         "launcher": {"AzureContainerAppJobRunLauncher": {"cpu": 2.0, "memory": 4.0}}
+#     }
+# }
+# forecast_pipeline_local_launch_config = {
+#     "config": {}
+# }  # We can let the default take over
 
-# Define run config for the backfil launcher and for the scheduler
-weekly_forecast_config = dg.RunConfig(
-    ops={"launch_forecast_pipeline": PipelineConfig()},
-    execution=forecast_pipeline_caj_launch_config
-    if is_production
-    else forecast_pipeline_local_launch_config,
-)
+# # Define run config for the backfil launcher and for the scheduler
+# weekly_forecast_config = dg.RunConfig(
+#     ops={"launch_forecast_pipeline": PipelineConfig()},
+#     execution=forecast_pipeline_caj_launch_config
+#     if is_production
+#     else forecast_pipeline_local_launch_config,
+# )
 
 
 # This wraps our launch_pipeline op in a job that can be scheduled or manually launched via the GUI
-@dg.job(
-    executor_def=dynamic_executor(
-        default_config=azure_caj_config if is_production else default_config
-    ),
-    config=weekly_forecast_config,
-)
-def weekly_forecast_via_backfill():
-    launch_forecast_pipeline()
+# @dg.job(
+#     executor_def=dynamic_executor(
+#         default_config=azure_caj_config if is_production else default_config
+#     ),
+#     config=weekly_forecast_config,
+# )
+# def weekly_forecast_via_backfill():
+#     launch_forecast_pipeline()
 
 
 @dg.job(
@@ -742,18 +777,18 @@ def check_all_data():
 
 # ---------- Schedule Definitions ----------
 
-weekly_forecast_via_backfill_schedule = dg.ScheduleDefinition(
-    default_status=(
-        dg.DefaultScheduleStatus.RUNNING
-        # don't run locally by default
-        if is_production
-        else dg.DefaultScheduleStatus.STOPPED
-    ),
-    job=weekly_forecast_via_backfill,
-    run_config=weekly_forecast_config,
-    cron_schedule="0 8,14 * * TUE,WED",
-    execution_timezone="America/New_York",
-)
+# weekly_forecast_via_backfill_schedule = dg.ScheduleDefinition(
+#     default_status=(
+#         dg.DefaultScheduleStatus.RUNNING
+#         # don't run locally by default
+#         if is_production
+#         else dg.DefaultScheduleStatus.STOPPED
+#     ),
+#     job=weekly_forecast_via_backfill,
+#     run_config=weekly_forecast_config,
+#     cron_schedule="0 8,14 * * TUE,WED",
+#     execution_timezone="America/New_York",
+# )
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

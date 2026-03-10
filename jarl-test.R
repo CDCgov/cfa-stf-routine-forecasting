@@ -1,0 +1,1 @@
+any(is.na(rnorm(100)))

@@ -43,3 +43,4 @@ repos:
     rev: main
     hooks:
       - id: jarl-check
+        args: ["--fix"]

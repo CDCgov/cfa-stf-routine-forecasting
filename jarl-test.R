@@ -1,1 +1,1 @@
-any(is.na(rnorm(100)))
+anyNA(rnorm(100))

@@ -586,7 +586,7 @@ wheels = [
 [[package]]
 name = "cfa-dagster"
 version = "0.1.0"
-source = { git = "https://github.com/cdcgov/cfa-dagster.git#ddbb5916f5506c8d6892928831b1e01c11588807" }
+source = { git = "https://github.com/cdcgov/cfa-dagster.git#9068432255ef009d1f3686c3bb12f02e31b8eff5" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },
@@ -662,7 +662,7 @@ requires-dist = [
     { name = "pygit2", specifier = ">=1.17.0" },
     { name = "pypdf", specifier = ">=5.1.0" },
     { name = "pyrenew" },
-    { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=v0.1.0" },
+    { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=8bd3071" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "tomli-w", specifier = ">=1.1.0" },
@@ -1155,11 +1155,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.25.1"
+version = "3.25.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b3/8b/4c32ecde6bea6486a2a5d05340e695174351ff6b06cf651a74c005f9df00/filelock-3.25.1.tar.gz", hash = "sha256:b9a2e977f794ef94d77cdf7d27129ac648a61f585bff3ca24630c1629f701aa9", size = 40319, upload-time = "2026-03-09T19:38:47.309Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/b8/00651a0f559862f3bb7d6f7477b192afe3f583cc5e26403b44e59a55ab34/filelock-3.25.2.tar.gz", hash = "sha256:b64ece2b38f4ca29dd3e810287aa8c48182bbecd1ae6e9ae126c9b35f1382694", size = 40480, upload-time = "2026-03-11T20:45:38.487Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/b8/2f664b56a3b4b32d28d3d106c71783073f712ba43ff6d34b9ea0ce36dc7b/filelock-3.25.1-py3-none-any.whl", hash = "sha256:18972df45473c4aa2c7921b609ee9ca4925910cc3a0fb226c96b92fc224ef7bf", size = 26720, upload-time = "2026-03-09T19:38:45.718Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/a5/842ae8f0c08b61d6484b52f99a03510a3a72d23141942d216ebe81fefbce/filelock-3.25.2-py3-none-any.whl", hash = "sha256:ca8afb0da15f229774c9ad1b455ed96e85a81373065fb10446672f64444ddf70", size = 26759, upload-time = "2026-03-11T20:45:37.437Z" },
 ]
 
 [[package]]
@@ -3015,7 +3015,7 @@ wheels = [
 [[package]]
 name = "pyrenew"
 version = "0.1.6"
-source = { git = "https://github.com/CDCgov/PyRenew?rev=v0.1.6#5c502bdc4227def615ec33a25e809ddaa43581ff" }
+source = { git = "https://github.com/CDCgov/PyRenew?rev=v0.1.7#4898c1d51dfaddf9c5b6e072eeb4aba6e183e91b" }
 dependencies = [
     { name = "jax" },
     { name = "numpy" },
@@ -3026,7 +3026,7 @@ dependencies = [
 [[package]]
 name = "pyrenew-multisignal"
 version = "0.1.0"
-source = { git = "https://github.com/CDCgov/pyrenew-multisignal?rev=v0.1.0#b57ff2def7ef056053b21a829f9c703f5d9f1cfd" }
+source = { git = "https://github.com/CDCgov/pyrenew-multisignal?rev=8bd3071#8bd307118bd8e6a92aeca6ff0fa5f4da47fa30d5" }
 dependencies = [
     { name = "jax" },
     { name = "numpy" },

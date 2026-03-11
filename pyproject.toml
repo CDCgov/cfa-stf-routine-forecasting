@@ -68,5 +68,5 @@ testpaths = ["pipelines/tests"]
 [tool.uv.sources]
 forecasttools = { git = "https://github.com/cdcgov/forecasttools-py" }
 azuretools = { git = "https://github.com/cdcgov/cfa-azuretools" }
-pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "v0.1.0"}
+pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "8bd3071"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }

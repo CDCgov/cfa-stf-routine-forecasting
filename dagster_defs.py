@@ -149,34 +149,32 @@ docker_config = ExecutionConfig(
     ),
 )
 
-stf_azure_batch_executor = (
-    SelectorConfig(
-        class_name=azure_batch_executor.__name__,
-        config={
-            "pool_name": "pyrenew-dagster-pool",
-            "image": image,
-            "env_vars": [
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
+stf_azure_batch_executor = SelectorConfig(
+    class_name=azure_batch_executor.__name__,
+    config={
+        "pool_name": "pyrenew-dagster-pool",
+        "image": image,
+        "env_vars": [
+            "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
+        ],
+        "container_kwargs": {
+            "volumes": [
+                # bind the ~/.azure folder for optional cli login
+                # f"/home/{user}/.azure:/root/.azure",
+                # bind current file so we don't have to rebuild
+                # the container image for workflow changes
+                # blob container mounts for cfa-stf-routine-forecasting
+                "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
+                "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
+                "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
+                "prod-param-estimates:/cfa-stf-routine-forecasting/params",
+                "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
+                "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
+                "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
             ],
-            "container_kwargs": {
-                "volumes": [
-                    # bind the ~/.azure folder for optional cli login
-                    # f"/home/{user}/.azure:/root/.azure",
-                    # bind current file so we don't have to rebuild
-                    # the container image for workflow changes
-                    # blob container mounts for cfa-stf-routine-forecasting
-                    "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                    "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
-                    "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
-                    "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
-                ],
-                "working_dir": "/cfa-stf-routine-forecasting",
-            },
+            "working_dir": "/cfa-stf-routine-forecasting",
         },
-    ),
+    },
 )
 
 default_azure_batch_config = ExecutionConfig(
@@ -311,6 +309,14 @@ def get_disease_location_date(
 
     # Date is the daily partition we use
     date = context.partition_key
+
+    # This is the critical piece that allows our graph asset strategy
+    context.register_output(
+        lambda: dg.Output(
+            value=(resolved_date := f"{date}"),
+            metadata={"resolved_date": resolved_date},
+        )
+    )
 
     if "w" in model_letters and disease != "COVID-19":
         context.log.info(

@@ -149,12 +149,8 @@ docker_config = ExecutionConfig(
     ),
 )
 
-# Config for full backfills - launches with container app jobs, sends execution to Azure Batch
-azure_batch_config = ExecutionConfig(
-    launcher=SelectorConfig(
-        class_name=AzureContainerAppJobRunLauncher.__name__, config={"image": image}
-    ),
-    executor=SelectorConfig(
+stf_azure_batch_executor = (
+    SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
             "pool_name": "pyrenew-dagster-pool",
@@ -181,6 +177,19 @@ azure_batch_config = ExecutionConfig(
             },
         },
     ),
+)
+
+default_azure_batch_config = ExecutionConfig(
+    launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
+    executor=stf_azure_batch_executor,
+)
+
+# Config for full backfills - launches with container app jobs, sends execution to Azure Batch
+caj_azure_batch_config = ExecutionConfig(
+    launcher=SelectorConfig(
+        class_name=AzureContainerAppJobRunLauncher.__name__, config={"image": image}
+    ),
+    executor=stf_azure_batch_executor,
 )
 
 # ============================================================================
@@ -839,6 +848,7 @@ defs = dg.Definitions(
     },
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
-        default_config=azure_batch_config  # if is_production else docker_config
+        default_config=default_azure_batch_config,
+        alternate_configs=[docker_config, caj_azure_batch_config],
     ),
 )

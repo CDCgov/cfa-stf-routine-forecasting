@@ -705,7 +705,6 @@ weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     target=dg.AssetSelection.groups("WeeklyForecast"),
     run_tags=default_config.to_run_tags(),
     minimum_interval_seconds=3600,
-    default_condition=dg.AutomationCondition.eager(),
 )
 
 # ---------- Epi AutoGP Asset ----------

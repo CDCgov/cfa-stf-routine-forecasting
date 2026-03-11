@@ -67,9 +67,9 @@ select = ["I", "E4", "E7", "E9", "F", "UP"]
 testpaths = ["pipelines/tests"]
 
 [tool.uv.sources]
-polarbayes = { git = "https://github.com/CDCgov/polarbayes" }
 pyrenew = { git = "https://github.com/CDCgov/PyRenew", rev = "v0.1.6" }
 forecasttools = { git = "https://github.com/cdcgov/forecasttools-py" }
 azuretools = { git = "https://github.com/cdcgov/cfa-azuretools" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "v0.1.0"}
 cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }
+polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }

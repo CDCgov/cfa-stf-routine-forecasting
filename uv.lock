@@ -3014,8 +3014,8 @@ wheels = [
 
 [[package]]
 name = "pyrenew"
-version = "0.1.6"
-source = { git = "https://github.com/CDCgov/PyRenew?rev=v0.1.7#4898c1d51dfaddf9c5b6e072eeb4aba6e183e91b" }
+version = "0.1.7"
+source = { git = "https://github.com/CDCgov/PyRenew?rev=v0.1.7#ef83fbb7f65d1131fd1f37935ce655a1268c8edf" }
 dependencies = [
     { name = "jax" },
     { name = "numpy" },

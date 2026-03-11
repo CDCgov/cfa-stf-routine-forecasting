@@ -711,13 +711,15 @@ forecast_pipeline_local_launch_config = {
     "config": {}
 }  # We can let the default take over
 
+
 # Define run config for the backfil launcher and for the scheduler
-weekly_forecast_config = dg.RunConfig(
-    ops={"launch_forecast_pipeline": PipelineConfig()},
-    execution=forecast_pipeline_caj_launch_config
-    if is_production
-    else forecast_pipeline_local_launch_config,
-)
+def get_weekly_forecast_config():
+    return dg.RunConfig(
+        ops={"launch_forecast_pipeline": PipelineConfig()},
+        execution=forecast_pipeline_caj_launch_config
+        if is_production
+        else forecast_pipeline_local_launch_config,
+    )
 
 
 # This wraps our launch_pipeline op in a job that can be scheduled or manually launched via the GUI
@@ -725,7 +727,7 @@ weekly_forecast_config = dg.RunConfig(
     executor_def=dynamic_executor(
         default_config=azure_caj_config if is_production else default_config
     ),
-    config=weekly_forecast_config,
+    config=get_weekly_forecast_config(),
 )
 def weekly_forecast_via_backfill():
     launch_forecast_pipeline()
@@ -750,7 +752,7 @@ weekly_forecast_via_backfill_schedule = dg.ScheduleDefinition(
         else dg.DefaultScheduleStatus.STOPPED
     ),
     job=weekly_forecast_via_backfill,
-    run_config=weekly_forecast_config,
+    run_config_fn=get_weekly_forecast_config,
     cron_schedule="0 8,14 * * WED",
     execution_timezone="America/New_York",
 )

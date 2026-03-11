@@ -191,7 +191,7 @@ caj_azure_batch_config = ExecutionConfig(
 )
 
 # ============================================================================
-# PARTITIONS
+# GRAPH DIMENSIONS AND PARTITIONS
 # ============================================================================
 # How are the data split and processed in Azure Batch?
 
@@ -199,15 +199,10 @@ DISEASES = SUPPORTED_DISEASES
 disease_partitions = dg.StaticPartitionsDefinition(DISEASES)
 
 # location Partitions
-LOCATIONS = location_table.get_column("short_name").to_list()
-location_partitions = dg.StaticPartitionsDefinition(
-    [location for location in LOCATIONS if location not in DEFAULT_EXCLUDED_LOCATIONS]
-)
-
-# Multi Partitions
-pyrenew_multi_partition_def = dg.MultiPartitionsDefinition(
-    {"disease": disease_partitions, "location": location_partitions}
-)
+RAW_LOCATIONS = location_table.get_column("short_name").to_list()
+LOCATIONS = [
+    location for location in RAW_LOCATIONS if location not in DEFAULT_EXCLUDED_LOCATIONS
+]
 
 # Daily Partitions
 daily_partitions_def = dg.DailyPartitionsDefinition(

@@ -299,8 +299,8 @@ def get_disease_location_date(
     """
 
     # Disease and Locations are our "Graph Dimensions".
-    disease = context.graph_dimension["disease"]
-    location = context.graph_dimension["location"]
+    disease = context.graph_dimension["diseases"]
+    location = context.graph_dimension["locations"]
 
     # Date is the daily partition we use
     date = context.partition_key

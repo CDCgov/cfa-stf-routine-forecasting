@@ -284,119 +284,11 @@ class PostProcessConfig(CommonConfig):
 
 
 # ============================================================================
-# MODEL HELPER FUNCTIONS
+# UPSTREAM DATA HELPER FUNCTIONS
 # ============================================================================
-# These helpers are not asset themselves
+# These helpers are not assets themselves
 
-
-def get_disease_location_date(
-    context: DynamicGraphAssetExecutionContext,
-    model_letters: str,
-) -> tuple[str | None, str | None]:
-    """
-    Function used by assets to parse which disease or location they should run as, and the daily partition.
-    TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
-    """
-
-    # Disease and Locations are our "Graph Dimensions".
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
-
-    # Date is the daily partition we use
-    date = context.partition_key
-
-    # This is the critical piece that allows our graph asset strategy
-    context.register_output(
-        lambda: dg.Output(
-            value=(resolved_date := f"{date}"),
-            metadata={"resolved_date": resolved_date},
-        )
-    )
-
-    if "w" in model_letters and disease != "COVID-19":
-        context.log.info(
-            f"Model letter 'w' is only applicable for COVID-19. Skipping model run for disease {disease}."
-        )
-        return None, None
-    if "e" in model_letters and location == "WY":
-        context.log.info(
-            "Model letter 'e' is not applicable for location WY. Skipping model run."
-        )
-        return None, None
-
-    return disease, location, date
-
-
-def _run_timeseries_e(
-    context: DynamicGraphAssetExecutionContext,
-    config: TimeseriesConfig,
-    epiweekly: bool,
-) -> str:
-    """
-    Helper function to run timeseries-e model with optional epiweekly mode.
-    """
-
-    disease, location, date = get_disease_location_date(context, model_letters="e")
-    output_dir = f"{config.output_basedir}/{date}_forecasts"
-
-    if disease is not None and location is not None:
-        context.log.debug(f"config: '{config}'")
-        forecast_timeseries(
-            disease=disease,
-            loc=location,
-            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-            output_dir=Path(output_dir),
-            n_training_days=config.n_training_days,
-            n_forecast_days=28,
-            n_samples=config.n_samples,
-            exclude_last_n_days=config.exclude_last_n_days,
-            epiweekly=epiweekly,
-            credentials_path=Path("config/creds.toml"),
-        )
-    return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
-
-
-def _run_pyrenew_model(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewConfig,
-    model_letters: str,
-):
-    """
-    Helper to run Pyrenew models with common arguments.
-    """
-    disease, location, date = get_disease_location_date(context, model_letters)
-    output_dir = f"{config.output_basedir}/{date}_forecasts"
-
-    if disease is not None and location is not None:
-        fit_flags = flags_from_hew_letters(model_letters)
-        forecast_flags = flags_from_hew_letters(
-            f"{model_letters}{config.additional_forecast_letters}",
-            flag_prefix="forecast",
-        )
-        context.log.debug(f"config: '{config}'")
-        forecast_pyrenew(
-            disease=disease,
-            loc=location,
-            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-            nwss_data_dir=Path("nwss-vintages"),
-            param_data_dir=Path("params"),
-            priors_path=Path("pipelines/priors/prod_priors.py"),
-            output_dir=Path(output_dir),
-            n_training_days=config.n_training_days,
-            n_forecast_days=28,
-            n_chains=config.n_chains,
-            n_warmup=config.n_warmup,
-            n_samples=config.n_samples,
-            exclude_last_n_days=config.exclude_last_n_days,
-            credentials_path=Path("config/creds.toml"),
-            rng_key=config.rng_key,
-            **fit_flags,
-            **forecast_flags,
-        )
-    return f"pyrenew_{model_letters}"
-
-
-# ---------- Data Availability Check Ops ----------
+# ---------- Data Availability Check Functions ----------
 
 
 def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
@@ -485,6 +377,120 @@ def _check_nwss_gold_data_availability(
 
 
 # ============================================================================
+# MODEL HELPER FUNCTIONS
+# ============================================================================
+# These helpers are not assets themselves
+
+
+def get_disease_location_date(
+    context: DynamicGraphAssetExecutionContext,
+    model_letters: str,
+) -> tuple[str | None, str | None]:
+    """
+    Function used by assets to parse which disease or location they should run as, and the daily partition.
+    TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
+    """
+
+    # Disease and Locations are our "Graph Dimensions".
+    disease = context.graph_dimension["diseases"]
+    location = context.graph_dimension["locations"]
+
+    # Date is the daily partition we use
+    date = context.partition_key
+
+    # This is the critical piece that allows our graph asset strategy
+    context.register_output(
+        lambda: dg.Output(
+            value=(resolved_date := f"{date}"),
+            metadata={"resolved_date": resolved_date},
+        )
+    )
+
+    if "w" in model_letters and disease != "COVID-19":
+        context.log.info(
+            f"Model letter 'w' is only applicable for COVID-19. Skipping model run for disease {disease}."
+        )
+        return None, None, None
+
+    if "e" in model_letters and location == "WY":
+        context.log.info(
+            "Model letter 'e' is not applicable for location WY. Skipping model run."
+        )
+        return None, None, None
+
+    return disease, location, date
+
+
+def _run_timeseries_e(
+    context: DynamicGraphAssetExecutionContext,
+    config: TimeseriesConfig,
+    epiweekly: bool,
+) -> str:
+    """
+    Helper function to run timeseries-e model with optional epiweekly mode.
+    """
+
+    disease, location, date = get_disease_location_date(context, model_letters="e")
+    output_dir = f"{config.output_basedir}/{date}_forecasts"
+
+    if disease is not None and location is not None:
+        context.log.debug(f"config: '{config}'")
+        forecast_timeseries(
+            disease=disease,
+            loc=location,
+            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+            output_dir=Path(output_dir),
+            n_training_days=config.n_training_days,
+            n_forecast_days=28,
+            n_samples=config.n_samples,
+            exclude_last_n_days=config.exclude_last_n_days,
+            epiweekly=epiweekly,
+            credentials_path=Path("config/creds.toml"),
+        )
+    return "epiweekly_timeseries_e" if epiweekly else "timeseries_e"
+
+
+def _run_pyrenew_model(
+    context: DynamicGraphAssetExecutionContext,
+    config: PyrenewConfig,
+    model_letters: str,
+):
+    """
+    Helper to run Pyrenew models with common arguments.
+    """
+    disease, location, date = get_disease_location_date(context, model_letters)
+    output_dir = f"{config.output_basedir}/{date}_forecasts"
+
+    if disease is not None and location is not None:
+        fit_flags = flags_from_hew_letters(model_letters)
+        forecast_flags = flags_from_hew_letters(
+            f"{model_letters}{config.additional_forecast_letters}",
+            flag_prefix="forecast",
+        )
+        context.log.debug(f"config: '{config}'")
+        forecast_pyrenew(
+            disease=disease,
+            loc=location,
+            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+            nwss_data_dir=Path("nwss-vintages"),
+            param_data_dir=Path("params"),
+            priors_path=Path("pipelines/priors/prod_priors.py"),
+            output_dir=Path(output_dir),
+            n_training_days=config.n_training_days,
+            n_forecast_days=28,
+            n_chains=config.n_chains,
+            n_warmup=config.n_warmup,
+            n_samples=config.n_samples,
+            exclude_last_n_days=config.exclude_last_n_days,
+            credentials_path=Path("config/creds.toml"),
+            rng_key=config.rng_key,
+            **fit_flags,
+            **forecast_flags,
+        )
+    return f"pyrenew_{model_letters}"
+
+
+# ============================================================================
 # ASSET DEFINITIONS
 # ============================================================================
 # These are the core of Dagster - functions that specify data
@@ -495,7 +501,9 @@ def _check_nwss_gold_data_availability(
 # NHSN
 @dg.asset(
     partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 * * * WED"),
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 10-15 * * WED-FRI", cron_timezone="America/New_York"
+    ),
     group_name="UpstreamData",
 )
 def nhsn_data_stf(context: dg.AssetExecutionContext):
@@ -509,7 +517,9 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
 # NSSP
 @dg.asset(
     partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 * * * *"),
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 6-14 * * MON-FRI", cron_timezone="America/New_York"
+    ),
     group_name="UpstreamData",
 )
 def nssp_gold_stf(context: dg.AssetExecutionContext):
@@ -523,7 +533,9 @@ def nssp_gold_stf(context: dg.AssetExecutionContext):
 # NWSS
 @dg.asset(
     partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 * * * WED"),
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 * * * WED", cron_timezone="America/New_York"
+    ),
     group_name="UpstreamData",
 )
 def nwss_gold_stf(context: dg.AssetExecutionContext):
@@ -534,11 +546,21 @@ def nwss_gold_stf(context: dg.AssetExecutionContext):
         raise RuntimeError(f"NWSS gold data not available: {result}")
 
 
+# ---------- Upstream Data Job and Sensor ----------
+
+
 # Job Definition that, most importantly, sets the executor - we don't need azure batch here.
 stf_upstream_data_check_job = dg.define_asset_job(
     name="STFUpstreamDataCheckJob",
-    executor_def=dg.multiprocess_executor,
+    config=dg.RunConfig(execution=default_config.to_run_config()),
     selection=["nhsn_data_stf", "nssp_gold_stf", "nwss_gold_stf"],
+)
+
+upstream_data_sensor = dg.AutomationConditionSensorDefinition(
+    "UpstreamDataSensor",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    minimum_interval_seconds=3600,
+    run_tags=default_config.to_run_tags(),
 )
 
 # ---------- Pyrenew Assets ----------
@@ -549,7 +571,7 @@ stf_upstream_data_check_job = dg.define_asset_job(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     # automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 8 * * *"),
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
 )
 def timeseries_e(
@@ -568,7 +590,7 @@ def timeseries_e(
     # automation_condition=dg.AutomationCondition.on_cron(
     #     cron_schedule="0 8 * * TUE,WED"
     # ),
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
 )
 def epiweekly_timeseries_e(
@@ -584,7 +606,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
 )
 def pyrenew_e(
@@ -603,9 +625,10 @@ def pyrenew_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_cron(
-        cron_schedule="0 14 * * TUE,WED"
-    ),
+    # automation_condition=dg.AutomationCondition.on_cron(
+    #     cron_schedule="0 14 * * TUE,WED"
+    # ),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
 )
 def pyrenew_h(
@@ -621,7 +644,7 @@ def pyrenew_h(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
 )
 def pyrenew_he(
@@ -675,6 +698,16 @@ def pyrenew_hew(
     return _run_pyrenew_model(context, config, "hew")
 
 
+# ---------- Weekly Forecast Sensor ----------
+
+weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
+    "WeeklyForecastSensor",
+    target=dg.AssetSelection.groups("WeeklyForecast"),
+    run_tags=default_config.to_run_tags(),
+    minimum_interval_seconds=3600,
+    default_condition=dg.AutomationCondition.eager(),
+)
+
 # ---------- Epi AutoGP Asset ----------
 
 
@@ -701,7 +734,7 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_h",
         "pyrenew_he",
     ],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
 )
 def postprocess_forecasts(
@@ -753,6 +786,6 @@ defs = dg.Definitions(
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
         default_config=default_azure_batch_config,
-        alternate_configs=[docker_config, caj_azure_batch_config],
+        alternate_configs=[default_config, docker_config, caj_azure_batch_config],
     ),
 )

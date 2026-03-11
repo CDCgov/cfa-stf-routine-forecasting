@@ -204,7 +204,7 @@ pyrenew_multi_partition_def = dg.MultiPartitionsDefinition(
 
 # Daily Partitions
 daily_partitions_def = dg.DailyPartitionsDefinition(
-    start_date="2026-01-01", end_date=current_date_str()
+    start_date="2026-01-01", end_offset=1, timezone="America/New_York"
 )
 
 # ============================================================================
@@ -220,7 +220,7 @@ class CommonConfig(dg.Config):
 
     forecast_date: str = pydantic.Field(default_factory=current_date_str)
     output_basedir: str = "output" if is_production else "test-output"
-    # _output_basedir: str = "test-output" # uncomment to force testing even on prod server
+    # output_basedir: str = "test-output" # uncomment to force testing even on prod server
 
 
 class ModelConfigBase(CommonConfig):
@@ -257,17 +257,17 @@ class PyrenewConfig(ModelConfigBase):
     additional_forecast_letters: str = ""
 
 
-class PipelineConfig(dg.Config):
-    """
-    Unified pipeline configuration containing configs for both model types.
-    This is used by the pipeline launcher to configure all model runs.
+# class PipelineConfig(dg.Config):
+#     """
+#     Unified pipeline configuration containing configs for both model types.
+#     This is used by the pipeline launcher to configure all model runs.
 
-    You can either provide nested 'timeseries' and 'pyrenew' configs directly,
-    or use the default values which will be automatically initialized.
-    """
+#     You can either provide nested 'timeseries' and 'pyrenew' configs directly,
+#     or use the default values which will be automatically initialized.
+#     """
 
-    timeseries: TimeseriesConfig = pydantic.Field(default_factory=TimeseriesConfig)
-    pyrenew: PyrenewConfig = pydantic.Field(default_factory=PyrenewConfig)
+#     timeseries: TimeseriesConfig = pydantic.Field(default_factory=TimeseriesConfig)
+#     pyrenew: PyrenewConfig = pydantic.Field(default_factory=PyrenewConfig)
 
 
 class PostProcessConfig(CommonConfig):
@@ -287,16 +287,21 @@ class PostProcessConfig(CommonConfig):
 # These helpers are not asset themselves
 
 
-def get_disease_location(
+def get_disease_location_date(
     context: DynamicGraphAssetExecutionContext,
     model_letters: str,
 ) -> tuple[str | None, str | None]:
     """
-    Function used by assets to parse which disease or location they should run as.
+    Function used by assets to parse which disease or location they should run as, and the daily partition.
     TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
     """
+
+    # Disease and Locations are our "Graph Dimensions".
     disease = context.graph_dimension["disease"]
     location = context.graph_dimension["location"]
+
+    # Date is the daily partition we use
+    date = context.partition_key
 
     if "w" in model_letters and disease != "COVID-19":
         context.log.info(
@@ -309,7 +314,7 @@ def get_disease_location(
         )
         return None, None
 
-    return disease, location
+    return disease, location, date
 
 
 def _run_timeseries_e(
@@ -321,7 +326,8 @@ def _run_timeseries_e(
     Helper function to run timeseries-e model with optional epiweekly mode.
     """
 
-    disease, location = get_disease_location(context, model_letters="e")
+    disease, location, date = get_disease_location_date(context, model_letters="e")
+    output_dir = f"{config.output_basedir}/{date}_forecasts"
 
     if disease is not None and location is not None:
         context.log.debug(f"config: '{config}'")
@@ -329,7 +335,7 @@ def _run_timeseries_e(
             disease=disease,
             loc=location,
             facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-            output_dir=Path(config.output_dir),
+            output_dir=Path(output_dir),
             n_training_days=config.n_training_days,
             n_forecast_days=28,
             n_samples=config.n_samples,
@@ -348,7 +354,8 @@ def _run_pyrenew_model(
     """
     Helper to run Pyrenew models with common arguments.
     """
-    disease, location = get_disease_location(context, model_letters=model_letters)
+    disease, location, date = get_disease_location_date(context, model_letters)
+    output_dir = f"{config.output_basedir}/{date}_forecasts"
 
     if disease is not None and location is not None:
         fit_flags = flags_from_hew_letters(model_letters)
@@ -364,7 +371,7 @@ def _run_pyrenew_model(
             nwss_data_dir=Path("nwss-vintages"),
             param_data_dir=Path("params"),
             priors_path=Path("pipelines/priors/prod_priors.py"),
-            output_dir=Path(config.output_dir),
+            output_dir=Path(output_dir),
             n_training_days=config.n_training_days,
             n_forecast_days=28,
             n_chains=config.n_chains,
@@ -392,6 +399,7 @@ def _run_pyrenew_model(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 8 * * *"),
+    group_name="WeeklyForecast",
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
     """
@@ -407,6 +415,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
     automation_condition=dg.AutomationCondition.on_cron(
         cron_schedule="0 8 * * TUE,WED"
     ),
+    group_name="WeeklyForecast",
 )
 def epiweekly_timeseries_e(
     context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig
@@ -422,6 +431,7 @@ def epiweekly_timeseries_e(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     automation_condition=dg.AutomationCondition.on_missing(),
+    group_name="WeeklyForecast",
 )
 def pyrenew_e(
     context: DynamicGraphAssetExecutionContext,
@@ -442,6 +452,7 @@ def pyrenew_e(
     automation_condition=dg.AutomationCondition.on_cron(
         cron_schedule="0 14 * * TUE,WED"
     ),
+    group_name="WeeklyForecast",
 )
 def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
     """
@@ -455,6 +466,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     automation_condition=dg.AutomationCondition.on_missing(),
+    group_name="WeeklyForecast",
 )
 def pyrenew_he(
     context: DynamicGraphAssetExecutionContext,
@@ -470,7 +482,9 @@ def pyrenew_he(
 
 # Pyrenew HW
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def, graph_dimensions=["diseases", "locations"]
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    group_name="WeeklyForecastArchived",
 )
 def pyrenew_hw(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
     """
@@ -481,7 +495,9 @@ def pyrenew_hw(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig
 
 # Pyrenew HEW
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def, graph_dimensions=["diseases", "locations"]
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    group_name="WeeklyForecastArchived",
 )
 def pyrenew_hew(
     context: DynamicGraphAssetExecutionContext,
@@ -498,7 +514,7 @@ def pyrenew_hew(
 # ---------- Epi AutoGP Asset ----------
 
 
-@dg.asset
+@dg.asset(group_name="ExperimentalEpiAutoGP")
 def epiautogp(context: dg.AssetExecutionContext):
     """
     Placeholder asset for Epi AutoGP forecasts.
@@ -522,6 +538,7 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_he",
     ],
     automation_condition=dg.AutomationCondition.on_missing(),
+    group_name="WeeklyForecast",
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,

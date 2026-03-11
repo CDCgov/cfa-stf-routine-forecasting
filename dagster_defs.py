@@ -559,7 +559,7 @@ stf_upstream_data_check_job = dg.define_asset_job(
 upstream_data_sensor = dg.AutomationConditionSensorDefinition(
     "UpstreamDataSensor",
     target=dg.AssetSelection.groups("UpstreamData"),
-    minimum_interval_seconds=3600,
+    minimum_interval_seconds=1800,
     run_tags=default_config.to_run_tags(),
 )
 
@@ -704,7 +704,7 @@ weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     "WeeklyForecastSensor",
     target=dg.AssetSelection.groups("WeeklyForecast"),
     run_tags=default_config.to_run_tags(),
-    minimum_interval_seconds=3600,
+    minimum_interval_seconds=1800,
 )
 
 # ---------- Epi AutoGP Asset ----------

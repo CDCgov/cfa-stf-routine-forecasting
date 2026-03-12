@@ -505,13 +505,15 @@ def _run_pyrenew_model(
         cron_schedule="0 10-15 * * WED-FRI", cron_timezone="America/New_York"
     ),
     group_name="UpstreamData",
+    output_required=False,
 )
 def nhsn_data_stf(context: dg.AssetExecutionContext):
     result = _check_nhsn_data_availability(context)
     if result["exists"]:
-        return "nhsn_data_stf"
+        yield dg.Output("nhsn_data_stf")
     else:
-        raise RuntimeError(f"NHSN data not available: {result}")
+        context.log.warning(f"NHSN data not available: {result}")
+        return
 
 
 # NSSP
@@ -521,13 +523,15 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
         cron_schedule="0 6-14 * * MON-FRI", cron_timezone="America/New_York"
     ),
     group_name="UpstreamData",
+    output_required=False,
 )
 def nssp_gold_stf(context: dg.AssetExecutionContext):
     result = _check_nssp_gold_data_availability(context)
     if result["exists"]:
-        return "nssp_gold_stf"
+        yield dg.Output("nssp_gold_stf")
     else:
-        raise RuntimeError(f"NSSP gold data not available: {result}")
+        context.log.warning(f"NSSP gold data not available: {result}")
+        return
 
 
 # NWSS
@@ -537,13 +541,15 @@ def nssp_gold_stf(context: dg.AssetExecutionContext):
         cron_schedule="0 * * * WED", cron_timezone="America/New_York"
     ),
     group_name="UpstreamData",
+    output_required=False,
 )
 def nwss_gold_stf(context: dg.AssetExecutionContext):
     result = _check_nwss_gold_data_availability(context)
     if result["exists"]:
-        return "nwss_gold_stf"
+        yield dg.Output("nwss_gold_stf")
     else:
-        raise RuntimeError(f"NWSS gold data not available: {result}")
+        context.log.warning(f"NWSS gold data not available: {result}")
+        return
 
 
 # ---------- Upstream Data Job and Sensor ----------
@@ -703,7 +709,7 @@ def pyrenew_hew(
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     "WeeklyForecastSensor",
     target=dg.AssetSelection.groups("WeeklyForecast"),
-    run_tags=default_config.to_run_tags(),
+    run_tags=caj_azure_batch_config.to_run_tags(),
     minimum_interval_seconds=1800,
 )
 

@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Literal
 
 import polars as pl
 from cfa.dataops import datacat
@@ -8,6 +9,8 @@ nhsn_disease_map = {
     "Influenza": "totalconfflunewadm",
     "RSV": "totalconfrsvnewadm",
 }
+
+NSSPDataset = Literal["nssp_gold", "nssp_latest_comprehensive"]
 
 
 def filter_nhsn(
@@ -73,17 +76,18 @@ def filter_nhsn(
     return filtered_dat
 
 
-def filter_nssp_gold(
+def filter_nssp(
     disease: str,
     loc_abbr: str,
+    dataset: NSSPDataset = "nssp_gold",
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
 ) -> pl.DataFrame:
     """
-    Retrieve and filter NSSP Gold emergency department data.
+    Retrieve and filter NSSP emergency department data.
 
-    This function retrieves vintages of NSSP Gold emergency department
+    This function retrieves vintages of NSSP emergency department
     visits data specified by the `as_of` date from the
     datacat.public.stf catalog. It filters data for a specific disease
     and location, within optional date boundaries, as available up to
@@ -95,6 +99,9 @@ def filter_nssp_gold(
         The disease to filter for ("COVID-19", "Influenza", or "RSV").
     loc_abbr : str
         Location abbreviation to filter for.
+    dataset : str, optional
+        One of the two datasets to retrieve from datacat: "nssp_gold" or 
+        "nssp_latest_comprehensive" (defaults to "nssp_gold").
     as_of : dt.date, optional
         Reference date for data availability. Only data available as of this date will be used.
         If None, all available data will be used (defaults to None).
@@ -112,7 +119,8 @@ def filter_nssp_gold(
     Raises
     ------
     ValueError
-        If the specified location abbreviation is not found in the data.
+        If the specified dataset is invalid or the specified location
+        abbreviation is not found in the data.
 
     Notes
     -----
@@ -121,6 +129,12 @@ def filter_nssp_gold(
     """
     if as_of is None:
         as_of = dt.date(3000, 1, 1)
+
+    allowed_datasets = {"nssp_gold", "nssp_latest_comprehensive"}
+    if dataset not in allowed_datasets:
+        raise ValueError(
+            f"Invalid dataset: {dataset}. Expected one of: {allowed_datasets}."
+        )
 
     filters = [
         pl.col("disease").is_in([disease, "Total"]),
@@ -134,7 +148,7 @@ def filter_nssp_gold(
     if loc_abbr != "US":
         filters.append(pl.col("geo_value") == loc_abbr)
 
-    dat = datacat.public.stf.nssp_gold.load.get_dataframe(
+    dat = getattr(datacat.public.stf, dataset).load.get_dataframe(
         output="pl", version=f"<={as_of.strftime('%Y-%m-%d')}"
     )
 

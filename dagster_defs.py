@@ -552,23 +552,6 @@ def nwss_gold_stf(context: dg.AssetExecutionContext):
         return
 
 
-# ---------- Upstream Data Job and Sensor ----------
-
-
-# Job Definition that, most importantly, sets the executor - we don't need azure batch here.
-stf_upstream_data_check_job = dg.define_asset_job(
-    name="STFUpstreamDataCheckJob",
-    config=dg.RunConfig(execution=default_config.to_run_config()),
-    selection=["nhsn_data_stf", "nssp_gold_stf", "nwss_gold_stf"],
-)
-
-upstream_data_sensor = dg.AutomationConditionSensorDefinition(
-    "UpstreamDataSensor",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    minimum_interval_seconds=1800,
-    run_tags=default_config.to_run_tags(),
-)
-
 # ---------- Pyrenew Assets ----------
 
 
@@ -577,7 +560,7 @@ upstream_data_sensor = dg.AutomationConditionSensorDefinition(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     # automation_condition=dg.AutomationCondition.on_cron(cron_schedule="0 8 * * *"),
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def timeseries_e(
@@ -596,7 +579,7 @@ def timeseries_e(
     # automation_condition=dg.AutomationCondition.on_cron(
     #     cron_schedule="0 8 * * TUE,WED"
     # ),
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def epiweekly_timeseries_e(
@@ -612,7 +595,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def pyrenew_e(
@@ -634,7 +617,7 @@ def pyrenew_e(
     # automation_condition=dg.AutomationCondition.on_cron(
     #     cron_schedule="0 14 * * TUE,WED"
     # ),
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def pyrenew_h(
@@ -650,7 +633,7 @@ def pyrenew_h(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def pyrenew_he(
@@ -704,15 +687,6 @@ def pyrenew_hew(
     return _run_pyrenew_model(context, config, "hew")
 
 
-# ---------- Weekly Forecast Sensor ----------
-
-weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
-    "WeeklyForecastSensor",
-    target=dg.AssetSelection.groups("WeeklyForecast"),
-    run_tags=caj_azure_batch_config.to_run_tags(),
-    minimum_interval_seconds=1800,
-)
-
 # ---------- Epi AutoGP Asset ----------
 
 
@@ -739,7 +713,7 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_h",
         "pyrenew_he",
     ],
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def postprocess_forecasts(
@@ -757,6 +731,30 @@ def postprocess_forecasts(
     )
     return "postprocess_forecasts"
 
+
+# =================
+# Automation
+# =================
+
+# ---------- Upstream Data Sensor ------------
+
+# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
+upstream_data_sensor = dg.AutomationConditionSensorDefinition(
+    "UpstreamDataSensor",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    minimum_interval_seconds=3600,
+    run_tags=default_config.to_run_tags(),
+)
+
+# ---------- Weekly Forecast Sensor ----------
+
+# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
+weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
+    "WeeklyForecastSensor",
+    target=dg.AssetSelection.groups("WeeklyForecast"),
+    minimum_interval_seconds=3600,
+    run_tags=default_azure_batch_config.to_run_tags(),
+)
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

@@ -100,7 +100,7 @@ def filter_nssp(
     loc_abbr : str
         Location abbreviation to filter for.
     dataset : str, optional
-        One of the two datasets to retrieve from datacat: "nssp_gold" or 
+        One of the two datasets to retrieve from datacat: "nssp_gold" or
         "nssp_latest_comprehensive" (defaults to "nssp_gold").
     as_of : dt.date, optional
         Reference date for data availability. Only data available as of this date will be used.

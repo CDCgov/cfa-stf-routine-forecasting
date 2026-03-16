@@ -12,11 +12,12 @@ import logging
 import shutil
 from pathlib import Path
 
+import polars as pl
+
 from pipelines.utils import collate_plots as cp
 from pipelines.utils.common_utils import (
     get_all_forecast_dirs,
     parse_model_batch_dir_name,
-    run_r_script,
 )
 
 
@@ -35,14 +36,15 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
 
     output_path = Path(model_batch_dir_path, output_file_name)
 
-    run_r_script(
-        "pipelines/utils/combine_hubverse_tables.R",
-        [
-            f"{model_batch_dir_path}",
-            f"{output_path}",
-        ],
-        function_name="combine_hubverse_tables",
+    parquet_files = sorted(
+        model_batch_dir_path.rglob("hubverse_table.parquet")
     )
+    if not parquet_files:
+        raise FileNotFoundError(
+            f"No hubverse_table.parquet files found under {model_batch_dir_path}"
+        )
+    combined = pl.concat([pl.read_parquet(f) for f in parquet_files])
+    combined.write_parquet(output_path)
     return None
 
 

@@ -17,7 +17,7 @@ if [ -d "$BASE_DIR" ]; then
 		exit 1
 	fi
 fi
-Rscript -e "pak::local_install('hewr', upgrade = FALSE)"
+Rscript -e "pak::local_install('hewr', dependencies = F, upgrade = FALSE)"
 
 if [ "$?" -ne 0 ]; then
 	echo "TEST-MODE FAIL: Installing hewr package failed"

@@ -85,7 +85,7 @@ def get_nhsn_hrd(
 
 def get_nssp(
     disease: str,
-    loc_abbr: str,
+    loc_abb: str,
     dataset: NSSPDataset = "gold",
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
@@ -104,7 +104,7 @@ def get_nssp(
     ----------
     disease
         The disease to filter for ("COVID-19", "Influenza", or "RSV").
-    loc_abbr
+    loc_abb
         Location abbreviation to filter for.
     dataset
         One of the two datasets to retrieve from datacat: "gold" or
@@ -157,8 +157,8 @@ def get_nssp(
         filters.append(pl.col("reference_date") >= start_date)
     if end_date is not None:
         filters.append(pl.col("reference_date") <= end_date)
-    if loc_abbr != "US":
-        filters.append(pl.col("geo_value") == loc_abbr)
+    if loc_abb != "US":
+        filters.append(pl.col("geo_value") == loc_abb)
 
     dat = datacat_dataset.load.get_dataframe(
         output="pl", version=f"<={as_of.strftime('%Y-%m-%d')}"
@@ -166,8 +166,8 @@ def get_nssp(
 
     valid_locs = dat.unique("geo_value").get_column("geo_value").to_list() + ["US"]
 
-    if loc_abbr not in valid_locs:
-        raise ValueError(f"Invalid location abbreviation: {loc_abbr}")
+    if loc_abb not in valid_locs:
+        raise ValueError(f"Invalid location abbreviation: {loc_abb}")
 
     dat_filtered = dat.with_columns(
         pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")

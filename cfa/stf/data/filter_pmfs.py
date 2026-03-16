@@ -43,9 +43,8 @@ def filter_pmfs(
         Location abbreviation (geo_value) to filter right_truncation parameters.
     as_of
         The date for which parameters should be valid. Parameters must have
-        start_date <= as_of <= end_date. Defaults to latest estimates.
+        start_date <= as_of < end_date. Defaults to latest estimates.
     reference_date
-        The reference date for right_truncation parameter filtering. Defaults to as_of value.
         The reference date for right_truncation parameter filtering. Defaults to as_of value.
         For right_truncation, selects the most recent parameter with reference_date <= this value.
 
@@ -82,7 +81,7 @@ def filter_pmfs(
         .filter(pl.col("disease") == disease)
         .filter(
             pl.col("start_date") <= as_of,
-            pl.col("end_date") >= as_of,
+            as_of < pl.col("end_date"),
         )
     )
 

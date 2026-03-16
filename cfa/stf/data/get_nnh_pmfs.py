@@ -110,12 +110,7 @@ def get_nnh_delay_pmf(
     dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of)
     delay_pmf = _extract_pmf(dat_filtered, "delay")
 
-    # ensure 0 first entry; we do not model the possibility
-    # of a zero infection-to-recorded-admission delay in Pyrenew-HEW
-    delay_pmf[0] = 0.0
-    delay_pmf = jnp.array(delay_pmf)
-    delay_pmf = delay_pmf / delay_pmf.sum()
-    return delay_pmf.tolist()
+    return delay_pmf
 
 
 def get_nnh_right_truncation_pmf(

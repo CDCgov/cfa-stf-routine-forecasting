@@ -10,20 +10,21 @@ nhsn_disease_map = {
     "RSV": "totalconfrsvnewadm",
 }
 
-NSSPDataset = Literal["nssp_gold", "nssp_latest_comprehensive"]
+NSSPDataset = Literal["gold", "latest_comprehensive"]
 
 
-def filter_nhsn(
+def get_nhsn_hrd(
     disease: str,
     loc_abbr: str,
+    prelim: bool = True,
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
 ) -> pl.DataFrame:
     """
-    Retrieve and filter hospital admission data based on specified criteria.
+    Retrieve and filter NHSN hospital respiratory data based on specified criteria.
 
-    This function retrieves vintages of hospital admissions data specified by
+    This function retrieves vintages of NHSN hrd data specified by
     the `as_of` date from the datacat.public.stf catalog, applies filters
     for a specific disease, location, and dates if provided.
 
@@ -33,6 +34,8 @@ def filter_nhsn(
         The disease to filter for ("COVID-19", "Influenza", or "RSV").
     loc_abbr
         The location abbreviation to filter for.
+    prelim
+        Whether to retrieve "nhsn_hrd_prelim" data as opposed to "nhsn_hrd" data (defaults to True).
     as_of
         The reference date for filtering. If None, the most recent 'as_of' date is used.
     start_date
@@ -60,7 +63,11 @@ def filter_nhsn(
     if as_of is None:
         as_of = dt.date(3000, 1, 1)
 
-    dat = datacat.public.stf.nhsn_hrd_prelim.load.get_dataframe(
+    datacat_dataset = (
+        datacat.public.stf.nhsn_hrd_prelim if prelim else datacat.public.stf.nhsn_hrd
+    )
+
+    dat = datacat_dataset.load.get_dataframe(
         output="pl", version=f"<={as_of.strftime('%Y-%m-%d')}"
     )
 
@@ -76,10 +83,10 @@ def filter_nhsn(
     return filtered_dat
 
 
-def filter_nssp(
+def get_nssp(
     disease: str,
     loc_abbr: str,
-    dataset: NSSPDataset = "nssp_gold",
+    dataset: NSSPDataset = "gold",
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
@@ -100,8 +107,8 @@ def filter_nssp(
     loc_abbr
         Location abbreviation to filter for.
     dataset
-        One of the two datasets to retrieve from datacat: "nssp_gold" or
-        "nssp_latest_comprehensive" (defaults to "nssp_gold").
+        One of the two datasets to retrieve from datacat: "gold" or
+        "latest_comprehensive" (defaults to "gold").
     as_of
         Reference date for data availability. Only data available as of this date will be used.
         If None, all available data will be used (defaults to None).
@@ -130,11 +137,16 @@ def filter_nssp(
     if as_of is None:
         as_of = dt.date(3000, 1, 1)
 
-    allowed_datasets = {"nssp_gold", "nssp_latest_comprehensive"}
-    if dataset not in allowed_datasets:
+    dataset_map = {
+        "gold": datacat.public.stf.nssp_gold,
+        "latest_comprehensive": datacat.public.stf.nssp_latest_comprehensive,
+    }
+    try:
+        datacat_dataset = dataset_map[dataset]
+    except KeyError as exc:
         raise ValueError(
-            f"Invalid dataset: {dataset}. Expected one of: {allowed_datasets}."
-        )
+            f"Invalid dataset: {dataset}. Expected one of: {set(dataset_map)}."
+        ) from exc
 
     filters = [
         pl.col("disease").is_in([disease, "Total"]),
@@ -148,7 +160,7 @@ def filter_nssp(
     if loc_abbr != "US":
         filters.append(pl.col("geo_value") == loc_abbr)
 
-    dat = getattr(datacat.public.stf, dataset).load.get_dataframe(
+    dat = datacat_dataset.load.get_dataframe(
         output="pl", version=f"<={as_of.strftime('%Y-%m-%d')}"
     )
 

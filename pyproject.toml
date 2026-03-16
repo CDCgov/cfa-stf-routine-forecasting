@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["pipelines"]
+packages = ["pipelines", "cfa"]
 
 [build-system]
 requires = ["hatchling"]

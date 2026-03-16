@@ -1,6 +1,5 @@
 import datetime as dt
 
-import jax.numpy as jnp
 import polars as pl
 from cfa.dataops import datacat
 

@@ -141,12 +141,11 @@ def get_nssp(
         "gold": datacat.public.stf.nssp_gold,
         "latest_comprehensive": datacat.public.stf.nssp_latest_comprehensive,
     }
-    try:
-        datacat_dataset = dataset_map[dataset]
-    except KeyError as exc:
+    if dataset not in dataset_map:
         raise ValueError(
-            f"Invalid dataset: {dataset}. Expected one of: {set(dataset_map)}."
-        ) from exc
+            f"Invalid dataset: {dataset!r}. Expected one of: {set(dataset_map)}."
+        )
+    datacat_dataset = dataset_map[dataset]
 
     filters = [
         pl.col("disease").is_in([disease, "Total"]),

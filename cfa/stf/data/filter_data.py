@@ -29,15 +29,15 @@ def filter_nhsn(
 
     Parameters
     ----------
-    disease : str
+    disease
         The disease to filter for ("COVID-19", "Influenza", or "RSV").
-    loc_abbr : str
+    loc_abbr
         The location abbreviation to filter for.
-    as_of : dt.date | None, default=None
+    as_of
         The reference date for filtering. If None, the most recent 'as_of' date is used.
-    start_date : dt.date | None, default=None
+    start_date
         The start date for the time period to include. If None, no lower bound is applied.
-    end_date : dt.date | None, default=None
+    end_date
         The end date for the time period to include. If None, no upper bound is applied.
 
     Returns
@@ -95,19 +95,19 @@ def filter_nssp(
 
     Parameters
     ----------
-    disease : str
+    disease
         The disease to filter for ("COVID-19", "Influenza", or "RSV").
-    loc_abbr : str
+    loc_abbr
         Location abbreviation to filter for.
-    dataset : str, optional
+    dataset
         One of the two datasets to retrieve from datacat: "nssp_gold" or
         "nssp_latest_comprehensive" (defaults to "nssp_gold").
-    as_of : dt.date, optional
+    as_of
         Reference date for data availability. Only data available as of this date will be used.
         If None, all available data will be used (defaults to None).
-    start_date : dt.date, optional
+    start_date
         Start date for filtering data (inclusive). If None, no lower bound is applied (defaults to None).
-    end_date : dt.date, optional
+    end_date
         End date for filtering data (inclusive). If None, no upper bound is applied (defaults to None).
 
     Returns

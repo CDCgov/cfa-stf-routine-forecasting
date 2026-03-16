@@ -43,8 +43,11 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
         raise FileNotFoundError(
             f"No hubverse_table.parquet files found under {model_batch_dir_path}"
         )
-    combined = pl.concat([pl.read_parquet(f) for f in parquet_files])
-    combined.write_parquet(output_path)
+    (
+        pl.scan_parquet([str(parquet_file) for parquet_file in parquet_files])
+        .collect()
+        .write_parquet(output_path)
+    )
     return None
 
 

@@ -21,7 +21,7 @@ from pipelines.utils.common_utils import (
 )
 
 
-def _hubverse_table_filename(report_date: str | dt.date, disease: str) -> None:
+def _hubverse_table_filename(report_date: str | dt.date, disease: str) -> str:
     return f"{report_date}-{disease.lower()}-hubverse-table.parquet"
 
 
@@ -35,23 +35,17 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
     )
 
     output_path = Path(model_batch_dir_path, output_file_name)
-
-    parquet_files = sorted(
-        model_batch_dir_path.rglob("hubverse_table.parquet")
-    )
+    expected_file_name = "hubverse_table.parquet"
+    parquet_files = list(model_batch_dir_path.rglob(expected_file_name))
     if not parquet_files:
         raise FileNotFoundError(
-            f"No hubverse_table.parquet files found under {model_batch_dir_path}"
+            f"No {expected_file_name} files found under {model_batch_dir_path}"
         )
-    (
-        pl.scan_parquet([str(parquet_file) for parquet_file in parquet_files])
-        .collect()
-        .write_parquet(output_path)
-    )
+    pl.scan_parquet(parquet_files).sink_parquet(output_path)
     return None
 
 
-def process_model_batch_dir(model_batch_dir_path: Path, plot_ext: str = "pdf") -> None:
+def process_model_batch_dir(model_batch_dir_path: Path) -> None:
     logger = logging.getLogger(__name__)
     logger.info("Collating plots...")
     cp.merge_and_save_pdfs(model_batch_dir_path)

@@ -157,6 +157,9 @@ def get_nssp(
     if end_date is not None:
         filters.append(pl.col("reference_date") <= end_date)
     if loc_abb != "US":
+        # National-level data (loc_abb == "US"), is obtained
+        # by aggregating state-level data. Therefore,
+        # we only filter by geo_value if loc_abb is not "US".
         filters.append(pl.col("geo_value") == loc_abb)
 
     dat = datacat_dataset.load.get_dataframe(

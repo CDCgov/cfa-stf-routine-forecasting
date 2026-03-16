@@ -28,7 +28,6 @@ dependencies = [
     "rich>=14.0.0",
     "dotenv>=0.9.9",
     "polarbayes",
-    "jax<0.8.2",
     "dagster-postgres>=0.27.4",
     "dagster-webserver==1.12.2",
     "dagster==1.12.2",
@@ -69,10 +68,9 @@ select = ["I", "E4", "E7", "E9", "F", "UP"]
 testpaths = ["pipelines/tests"]
 
 [tool.uv.sources]
-pyrenew = { git = "https://github.com/CDCgov/PyRenew", rev = "v0.1.6" }
 forecasttools = { git = "https://github.com/cdcgov/forecasttools-py" }
 azuretools = { git = "https://github.com/cdcgov/cfa-azuretools" }
-pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "v0.1.0"}
+pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }
 cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops.git"}
 cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub.git"}

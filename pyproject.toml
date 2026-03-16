@@ -33,6 +33,8 @@ dependencies = [
     "dagster==1.12.2",
     "dagster-graphql==1.12.2",
     "cfa-dagster @ git+https://github.com/cdcgov/cfa-dagster.git",
+    "cfa-dataops",
+    "cfa-catalog-public",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -70,3 +72,5 @@ forecasttools = { git = "https://github.com/cdcgov/forecasttools-py" }
 azuretools = { git = "https://github.com/cdcgov/cfa-azuretools" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }
+cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops.git"}
+cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub.git"}

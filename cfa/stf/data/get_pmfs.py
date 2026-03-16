@@ -12,9 +12,9 @@ def _validate_and_extract(
     df = df_lazy.filter(pl.col("parameter") == parameter_name).collect()
     if df.height != 1:
         error_msg = (
-            f"Expected exactly one {parameter_name} parameter row, "
+            f"Expected exactly one {parameter_name!r} parameter row, "
             f"but found {df.height}. "
-            f"Rows={df.to_dicts() if df.height > 0 else []}"
+            f"Rows={df.to_dicts()}"
         )
         raise ValueError(error_msg)
     return df.item(0, "value").to_list()

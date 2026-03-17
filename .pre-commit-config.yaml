@@ -37,8 +37,7 @@ repos:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
         exclude: package.lock.json
-  #####
-  # Detect misspellings
+  # Typos
   - repo: https://github.com/adhtruong/mirrors-typos
     rev: v1.44.0
     hooks:

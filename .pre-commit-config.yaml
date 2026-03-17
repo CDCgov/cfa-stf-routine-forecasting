@@ -39,8 +39,8 @@ repos:
         exclude: package.lock.json
   #####
   # Detect misspellings
-  - repo: https://github.com/crate-ci/typos
-    rev: v1
+  - repo: https://github.com/adhtruong/mirrors-typos
+    rev: v1.44.0
     hooks:
       - id: typos
         args: ["--force-exclude"]

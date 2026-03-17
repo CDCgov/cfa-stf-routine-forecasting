@@ -15,7 +15,7 @@ NSSPDataset = Literal["gold", "latest_comprehensive"]
 
 def get_nhsn_hrd(
     disease: str,
-    loc_abbr: str,
+    loc_abb: str,
     prelim: bool = True,
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
@@ -32,7 +32,7 @@ def get_nhsn_hrd(
     ----------
     disease
         The disease to filter for ("COVID-19", "Influenza", or "RSV").
-    loc_abbr
+    loc_abb
         The location abbreviation to filter for.
     prelim
         Whether to retrieve "nhsn_hrd_prelim" data as opposed to "nhsn_hrd" data (defaults to True).
@@ -53,7 +53,7 @@ def get_nhsn_hrd(
     disease_col = nhsn_disease_map[disease]
 
     filters = [
-        pl.col("jurisdiction") == loc_abbr,
+        pl.col("jurisdiction") == loc_abb,
     ]
     if start_date is not None:
         filters.append(pl.col("weekendingdate") >= start_date)

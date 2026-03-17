@@ -39,8 +39,8 @@ repos:
     rev: 0.8.2
     hooks:
       - id: air-format
-  - repo: https://github.com/damonbayer/jarl-pre-commit
-    rev: dmb_precommitci
+  - repo: https://github.com/etiennebacher/jarl-pre-commit
+    rev: 0.4.0
     hooks:
       - id: jarl-check
         args: ["--fix"]

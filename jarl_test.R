@@ -1,1 +1,0 @@
-anyNA(rnorm(100))

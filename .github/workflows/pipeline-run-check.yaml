@@ -32,7 +32,7 @@ jobs:
         run: uv run python pipelines/data/generate_test_data.py ${{ env.BASE_DIR }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
@@ -60,7 +60,7 @@ jobs:
           julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
@@ -71,12 +71,12 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP weekly NHSN model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nhsn epiweekly false
+                "$disease" "$location" nhsn epiweekly
             done
           done
 
       - name: Upload model fitting output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nhsn-epiweekly
           path: ${{ env.BASE_DIR }}
@@ -103,7 +103,7 @@ jobs:
           julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
@@ -114,12 +114,12 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP weekly NSSP percentage model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nssp epiweekly true
+                "$disease" "$location" nssp epiweekly pct
             done
           done
 
       - name: Upload model fitting output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nssp-epiweekly-pct
           path: ${{ env.BASE_DIR }}
@@ -146,7 +146,7 @@ jobs:
           julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
@@ -157,14 +157,14 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP daily NSSP count model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nssp daily false
+                "$disease" "$location" nssp daily observed
             done
           done
 
       - name: Upload model fitting output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: test-fit-epiautogp-nssp-daily
+          name: test-fit-epiautogp-nssp-daily-observed
           path: ${{ env.BASE_DIR }}
 
   fit-epiautogp-nssp-other-models:
@@ -189,7 +189,7 @@ jobs:
           julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
@@ -200,12 +200,12 @@ jobs:
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP daily NSSP other ED visits model for $disease, $location"
               uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
-                "$disease" "$location" nssp daily false other
+                "$disease" "$location" nssp daily other
             done
           done
 
       - name: Upload model fitting output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nssp-daily-other
           path: ${{ env.BASE_DIR }}
@@ -228,7 +228,7 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Download test data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
@@ -239,7 +239,7 @@ jobs:
           ${{ matrix.disease }} ${{ matrix.location }}
 
       - name: Upload model fitting output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: |
             test-fit-ts-${{ matrix.disease }}-${{ matrix.location }}-${{ matrix.model }}
@@ -286,14 +286,14 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Download test data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: test-data
           path: ${{ env.DATA_DIR }}
 
       - name: Download timeseries output
         if: ${{ matrix.model != 'hw' && matrix.model != 'h' }}
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: test-fit-ts-*
           path: ${{ env.BASE_DIR }}
@@ -305,7 +305,7 @@ jobs:
           ${{ matrix.disease }} ${{ matrix.location }} ${{ matrix.model }}
 
       - name: Upload model fitting output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: |
             test-fit-${{ matrix.disease }}-${{ matrix.location }}-${{ matrix.model }}
@@ -331,7 +331,7 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Download model fitting output
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: test-fit-*
           path: ${{ env.BASE_DIR }}

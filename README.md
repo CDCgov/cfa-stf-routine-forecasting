@@ -29,18 +29,58 @@ Container images pushed to the Azure Container Registry are automatically tagged
 
 ## Running Model Pipelines
 > [!NOTE]
->
-> Please contact a project maintainer if you believe you need access to pipelines.
-> CDC internal users can check regularly scheduled jobs at [PyRenew-Cron](https://github.com/cdcent/pyrenew-cron).
+> Azure Batch Forecasting Pipelines can only be run by CDC internal users on the CFA Virtual Analyst Platform.
 
+There are two ways to run Azure Batch Modeling Code:
+1. [The Azure Command Center](#3-azure-command-center) - interactive/manual.
+2. [Dagster Workflow Orchestration](#2-dagster-workflow-orchestration) - automated, feature rich GUI.
+
+### 1. Azure Command Center
 > Specific environment setup steps required can be found in the [Routine Forecasting Standard Operating Procedure](https://cdcent.github.io/cfa-stf-handbook/routine_forecast_sop.html).
 
-> Additionally, pipelines as written can only be run within CFA's Virtual Analyst Platform.
+You can run `uv run pipelines/azure_command_center.py` (or `make acc`) to launch the Azure Command Center.
+- The Azure Command Center will check for necessary data before offering to run pipelines.
+- You must have previously configured your Azure Credentials and Environment Variables. To do this, run `make config`, or follow the steps in the SOP.
+- The Azure Command Center is meant to be a streamlined interface for interactively running in production.
 
-Pipelines can be run interactively or non-interactively:
-- `pipelines/batch/azure_command_center.py` is now the preferred method of running model fit pipeline jobs interactively.
-- The `Makefile` also provides targets that will run pipelines non-interactively. Run `make help` for more information.
-- Pipelines are run through the command line python interface when scheduled using [Pyrenew-Cron](https://github.com/cdcent/pyrenew-cron).
+### 2. Dagster Workflow Orchestration
+To execute dagster workflows fully locally with this project, you'll need to have blobs mounted. However, you can also launch jobs locally and have them submit to Azure Batch.
+
+#### Makefile Targets for Local Testing
+If you'd like to test one or two model partitions at a time, you can have dagster execute on your machine. Take care not to run all model partitions or you will quickly put your VM into a coma.
+
+For convenience, you can use these makefile targets to get blobfuse setup on a fresh setup. Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
+- `make mount`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
+- `make unmount`: gracefully unmounts the pyrenew-relevant blobs.
+
+It is not necessary to mount blobs locally if submitting to Azure Batch.
+
+#### Local Development and Testing
+> Prerequisites:
+> - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
+> - Permissions to push to the container registry and both `$GH_USERNAME` and `$GH_PAT` set as environment variables in your shell.
+
+The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` to test using the local Docker Executor - this will require you to have setup Blobfuse.
+
+1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
+    - `make container_build` (requires Docker or Podman)
+    - `make container_push` to build and push (set `$GH_USERNAME` and `$GH_PAT` first)
+    - `make container_explore` for local testing
+2. Run `uv run dagster_defs.py` and open the terminal link (usually http://127.0.0.1:4000/)
+
+Dagster is now ready to use locally.
+
+- To run a full pyrenew model pipeline run: go to `Jobs` → `weekly_pyrenew_via_backfill`
+- To run individual models: navigate to `Lineage` and select specific assets, making sure to check the Launchpad config and make sure you've selected the appropriate partitions (State x Disease combination).
+
+In development, whenever you update code, rerun `make container_push` and then `Reload Definitions` from the dagster lineage page.
+Pushing your code to github will also re-build and push the container image, but will typically take longer and you will have to wait for completion in Github Actions.
+
+#### Production Scheduling
+
+Pushes to main will automatically update the central Dagster Code Location Github Actions Workflow. From the central code server, you can run and schedule model runs and see other projects' pipelines at CFA.
+
+To login to the production server, head to https://dagster.apps.edav.ext.cdc.gov/.
 
 ## General Disclaimer
 This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/organization/mission.htm).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise.

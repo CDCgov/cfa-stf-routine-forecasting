@@ -1,17 +1,17 @@
 
-function create_sample_input(output_path::String; n_weeks::Int = 30,
-        pathogen::String = "COVID-19", location::String = "CA")
+function create_sample_input(output_path::String; n_weeks::Int=30,
+    pathogen::String="COVID-19", location::String="CA")
     start_date = Date("2024-01-01")
-    dates = [start_date + Week(i) for i in 0:(n_weeks - 1)]
-    reports = [rand(20:100) + 10*sin(2π*i/7) + rand() * 5 for i in 1:n_weeks]  # Weekly pattern with noise
+    dates = [start_date + Week(i) for i in 0:(n_weeks-1)]
+    reports = [rand(20:100) + 10 * sin(2π * i / 7) + rand() * 5 for i in 1:n_weeks]  # Weekly pattern with noise
 
     forecast_date = dates[end]
     nowcast_dates = dates[max(1, end - 2):end]  # Last 3 days
-    nowcast_reports = [[reports[max(1, end - 2) + j - 1] + rand(-5:5) for j in 1:3]
+    nowcast_reports = [[reports[max(1, end - 2)+j-1] + rand(-5:5) for j in 1:3]
                        for _ in 1:10]  # 10 realizations, each with 3 values
 
     input_data = EpiAutoGPInput(
-        dates, reports, pathogen, location, "nhsn", "epiweekly", false, "observed",
+        dates, reports, pathogen, location, "nhsn", "epiweekly", "observed",
         forecast_date, nowcast_dates, nowcast_reports
     )
 
@@ -31,7 +31,7 @@ end
         nowcast_reports = [[50.0, 36.0], [52.0, 38.0]]
 
         input_data = EpiAutoGPInput(
-            dates, reports, "COVID-19", "CA", "nhsn", "daily", false, "observed",
+            dates, reports, "COVID-19", "CA", "nhsn", "daily", "observed",
             Date("2024-01-03"), dates[2:3], nowcast_reports
         )
 
@@ -50,7 +50,7 @@ end
         valid_data = EpiAutoGPInput(
             [Date("2024-01-01"), Date("2024-01-02")],
             [45.0, 52.0],
-            "COVID-19", "CA", "nhsn", "daily", false, "observed",
+            "COVID-19", "CA", "nhsn", "daily", "observed",
             Date("2024-01-02"),
             [Date("2024-01-02")],
             [[50.0], [52.0]]
@@ -59,7 +59,7 @@ end
 
         # Test without nowcasts
         no_nowcast = EpiAutoGPInput(
-            [Date("2024-01-01")], [10.0], "COVID-19", "TX", "nhsn", "daily", false, "observed",
+            [Date("2024-01-01")], [10.0], "COVID-19", "TX", "nhsn", "daily", "observed",
             Date("2024-01-01"), Date[], Vector{Real}[]
         )
         @test validate_input(no_nowcast) == true
@@ -69,29 +69,29 @@ end
         # Mismatched lengths
         @test_throws ArgumentError validate_input(EpiAutoGPInput(
             [Date("2024-01-01"), Date("2024-01-02")], [45.0],
-            "COVID-19", "CA", "nhsn", "daily", false, "observed", Date("2024-01-01"), Date[], Vector{Real}[]
+            "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
         ))
 
         # Empty data
         @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            Date[], Real[], "COVID-19", "CA", "nhsn", "daily", false, "observed", Date("2024-01-01"), Date[], Vector{Real}[]
+            Date[], Real[], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
         ))
 
         # Unsorted dates
         @test_throws ArgumentError validate_input(EpiAutoGPInput(
             [Date("2024-01-02"), Date("2024-01-01")], [45.0, 52.0],
-            "COVID-19", "CA", "nhsn", "daily", false, "observed", Date("2024-01-02"), Date[], Vector{Real}[]
+            "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-02"), Date[], Vector{Real}[]
         ))
 
         # Invalid nowcast structure
         @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            [Date("2024-01-01")], [45.0], "COVID-19", "CA", "nhsn", "daily", false, "observed", Date("2024-01-01"),
+            [Date("2024-01-01")], [45.0], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"),
             [Date("2024-01-01")], [[50.0, 55.0]]  # Wrong length
         ))
 
         # Negative values
         @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            [Date("2024-01-01")], [-5.0], "COVID-19", "CA", "nhsn", "daily", false, "observed", Date("2024-01-01"), Date[], Vector{Real}[]
+            [Date("2024-01-01")], [-5.0], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
         ))
     end
 
@@ -105,7 +105,6 @@ end
                 "location" => "CA",
                 "target" => "nhsn",
                 "frequency" => "daily",
-                "use_percentage" => false,
                 "ed_visit_type" => "observed",
                 "forecast_date" => "2024-01-02",
                 "nowcast_dates" => ["2024-01-02"],
@@ -128,7 +127,7 @@ end
         tmpdir = mktempdir()
         try
             json_path = joinpath(tmpdir, "sample.json")
-            sample = create_sample_input(json_path; n_weeks = 14, pathogen = "Influenza")
+            sample = create_sample_input(json_path; n_weeks=14, pathogen="Influenza")
 
             @test validate_input(sample) == true
             @test sample.pathogen == "Influenza"
@@ -138,7 +137,7 @@ end
             loaded = read_and_validate_data(json_path)
             @test loaded.pathogen == sample.pathogen
         finally
-            rm(tmpdir, recursive = true)
+            rm(tmpdir, recursive=true)
         end
     end
 end

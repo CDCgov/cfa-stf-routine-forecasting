@@ -2,12 +2,12 @@
 @testset "Modelling Functions Tests" begin
 
     # Helper function to create test input data
-    function create_test_input(; include_nowcasts = true)
-        dates = [Date(2024, 1, 1) + Week(i-1) for i in 1:10]
+    function create_test_input(; include_nowcasts=true)
+        dates = [Date(2024, 1, 1) + Week(i - 1) for i in 1:10]
         reports = Float64[1000, 1100, 1050, 1150, 1200, 1250, 1300, 1350, 1400, 1450]
 
         if include_nowcasts
-            nowcast_dates = dates[(end - 1):end]
+            nowcast_dates = dates[(end-1):end]
             nowcast_reports = [Float64[1350, 1400], Float64[1400, 1450]]
         else
             nowcast_dates = Date[]
@@ -15,14 +15,14 @@
         end
 
         return EpiAutoGPInput(
-            dates, reports, "COVID-19", "US", "nhsn", "epiweekly", false, "observed",
+            dates, reports, "COVID-19", "US", "nhsn", "epiweekly", "observed",
             dates[end], nowcast_dates, nowcast_reports
         )
     end
 
     @testset "prepare_for_modelling" begin
         # Test with nowcasts
-        input_with_nowcasts = create_test_input(include_nowcasts = true)
+        input_with_nowcasts = create_test_input(include_nowcasts=true)
         result = prepare_for_modelling(input_with_nowcasts, "boxcox", 4, 100)
 
         @test haskey(result, :stable_data_dates)
@@ -33,7 +33,7 @@
         @test ~isnothing(result.nowcast_data)  # Should have nowcast data
 
         # Test without nowcasts
-        input_no_nowcasts = create_test_input(include_nowcasts = false)
+        input_no_nowcasts = create_test_input(include_nowcasts=false)
         result_no_nowcast = prepare_for_modelling(input_no_nowcasts, "boxcox", 4, 100)
 
         @test haskey(result_no_nowcast, :nowcast_data)
@@ -42,26 +42,26 @@
     end
 
     @testset "fit_base_model" begin
-        input = create_test_input(include_nowcasts = true)
+        input = create_test_input(include_nowcasts=true)
         prep_result = prepare_for_modelling(input, "positive", 2, 50)
 
         model = fit_base_model(
             prep_result.stable_data_dates, prep_result.stable_data_values;
-            transformation = prep_result.transformation,
-            n_particles = 1, smc_data_proportion = 0.5, n_mcmc = 3, n_hmc = 3
+            transformation=prep_result.transformation,
+            n_particles=1, smc_data_proportion=0.5, n_mcmc=3, n_hmc=3
         )
 
         @test model !== nothing
     end
 
     @testset "forecast_with_epiautogp" begin
-        input = create_test_input(include_nowcasts = false)
+        input = create_test_input(include_nowcasts=false)
 
         forecast_dates,
         forecasts = forecast_with_epiautogp(input;
-            n_ahead = 2, n_forecasts = 10,
-            transformation_name = "positive",
-            n_particles = 1, smc_data_proportion = 0.5, n_mcmc = 3, n_hmc = 3
+            n_ahead=2, n_forecasts=10,
+            transformation_name="positive",
+            n_particles=1, smc_data_proportion=0.5, n_mcmc=3, n_hmc=3
         )
 
         @test length(forecast_dates) == 3  # 0, 1, 2 weeks ahead
@@ -72,19 +72,19 @@
 
     @testset "forecast_with_epiautogp - daily frequency" begin
         # Create daily frequency test data
-        dates = [Date(2024, 1, 1) + Day(i-1) for i in 1:30]
-        reports = Float64[100 + 10*sin(i/5) + 2*i for i in 1:30]
+        dates = [Date(2024, 1, 1) + Day(i - 1) for i in 1:30]
+        reports = Float64[100 + 10 * sin(i / 5) + 2 * i for i in 1:30]
 
         input = EpiAutoGPInput(
-            dates, reports, "COVID-19", "US", "nhsn", "daily", false, "observed",
+            dates, reports, "COVID-19", "US", "nhsn", "daily", "observed",
             dates[end], Date[], Vector{Float64}[]
         )
 
         forecast_dates,
         forecasts = forecast_with_epiautogp(input;
-            n_ahead = 7, n_forecasts = 10,
-            transformation_name = "positive",
-            n_particles = 1, smc_data_proportion = 0.5, n_mcmc = 3, n_hmc = 3
+            n_ahead=7, n_forecasts=10,
+            transformation_name="positive",
+            n_particles=1, smc_data_proportion=0.5, n_mcmc=3, n_hmc=3
         )
 
         @test length(forecast_dates) == 8  # 0, 1, 2, ..., 7 days ahead

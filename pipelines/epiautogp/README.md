@@ -33,7 +33,6 @@ Main entry point for the forecasting pipeline.
 **EpiAutoGP-Specific Parameters:**
 - `--target`: Data type (`nssp` or `nhsn`)
 - `--frequency`: Temporal frequency (`daily` or `epiweekly`)
-- `--use-percentage`: Convert ED visits to percentage of total visits
 - `--n-particles`: Number of particles for Sequential Monte Carlo (default: 24)
 - `--n-mcmc`: MCMC steps for GP kernel structure (default: 100)
 - `--n-hmc`: HMC steps for GP kernel hyperparameters (default: 50)

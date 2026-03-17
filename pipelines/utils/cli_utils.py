@@ -32,13 +32,6 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
     parser.add_argument(
-        "--param-data-dir",
-        type=Path,
-        default=Path("private_data", "prod_param_estimates"),
-        help="Directory in which to look for parameter estimates such as delay PMFs.",
-    )
-
-    parser.add_argument(
         "--output-dir",
         type=Path,
         default="private_data",

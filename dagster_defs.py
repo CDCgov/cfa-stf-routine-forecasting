@@ -558,7 +558,7 @@ def check_nssp_gold_data_availability(
     blobs_gold = list(container_client.list_blobs(name_starts_with="gold/"))
     if blobs_gold:
         latest_blob = max(blobs_gold, key=lambda b: b.last_modified).name
-    print(f"NSSP gold data avaialble for date {current_date}: {nssp_gold_check}")
+    print(f"NSSP gold data available for date {current_date}: {nssp_gold_check}")
     return {
         "exists": nssp_gold_check,
         "blob_name": blob_name,
@@ -580,7 +580,7 @@ def check_nwss_gold_data_availability(
     container_client = blob_service_client.get_container_client(container_name)
     blobs = list(container_client.list_blobs(name_starts_with=folder_prefix))
     nwss_gold_check = bool(blobs)
-    print(f"NWSS gold data avaialble for date {current_date}: {nwss_gold_check}")
+    print(f"NWSS gold data available for date {current_date}: {nwss_gold_check}")
     return {
         "exists": nwss_gold_check,
         "folder_prefix": folder_prefix,
@@ -712,7 +712,7 @@ forecast_pipeline_local_launch_config = {
 }  # We can let the default take over
 
 
-# Define run config for the backfil launcher and for the scheduler
+# Define run config for the backfill launcher and for the scheduler
 def get_weekly_forecast_config():
     return dg.RunConfig(
         ops={"launch_forecast_pipeline": PipelineConfig()},

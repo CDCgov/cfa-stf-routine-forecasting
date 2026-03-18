@@ -35,7 +35,7 @@ cmd_args=(
 	--n-particles 2
 	--n-mcmc 2
 	--n-hmc 2
-	--n-forecast-draws 100
+	--n-forecast-draws 500
 	--smc-data-proportion 0.1
 )
 

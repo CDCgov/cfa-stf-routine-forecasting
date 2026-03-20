@@ -12,12 +12,12 @@ if [ -d "$BASE_DIR" ]; then
 	else
 		# make the user delete the directory, to avoid accidental deletes of
 		# test output
-		echo "TEST-MODE FAIL: test output directory $BASE_DIR already exists. Delete the directory and re-run the test, or run with the --force flag".
+		echo "TEST-MODE FAIL: test output directory $BASE_DIR already exists. Delete the directory and re-run the test, or run with the --force flag"
 		echo "DETAILS: The test output directory persists after each run to allow the user to examine output. It must be deleted and recreated at the start of each new end-to-end test run to ensure that old output does not compromise test validity."
 		exit 1
 	fi
 fi
-Rscript -e "pak::local_install('hewr', upgrade = FALSE)"
+Rscript -e "pak::local_install('hewr', dependencies = F, upgrade = FALSE)"
 
 if [ "$?" -ne 0 ]; then
 	echo "TEST-MODE FAIL: Installing hewr package failed"

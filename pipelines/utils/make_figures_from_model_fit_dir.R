@@ -63,7 +63,7 @@ make_forecast_figure <- function(
   title <- glue::glue("{title_prefix} {core_name} in {geo_value}")
 
   tmp_ci <- left_join(for_plotting_tbl, ci)
-  facet_componenet <- if (n_distinct(tmp_ci[["lab_site_index"]]) > 1) {
+  facet_component <- if (n_distinct(tmp_ci[["lab_site_index"]]) > 1) {
     facet_wrap(~lab_site_index, scales = "free_y")
   } else {
     NULL
@@ -75,7 +75,7 @@ make_forecast_figure <- function(
   # need to add the variable
   # maybe bake this into the data
   ggplot(mapping = aes(x = date, y = .value)) +
-    facet_componenet +
+    facet_component +
     ggdist::geom_lineribbon(
       data = tmp_ci,
       mapping = ggplot2::aes(ymin = .data$.lower, ymax = .data$.upper),

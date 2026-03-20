@@ -323,7 +323,7 @@ def _check_nssp_gold_data_availability(
     blobs_gold = list(container_client.list_blobs(name_starts_with="gold/"))
     if blobs_gold:
         latest_blob = max(blobs_gold, key=lambda b: b.last_modified).name
-    print(f"NSSP gold data avaialble for date {current_date}: {nssp_gold_check}")
+    print(f"NSSP gold data available for date {current_date}: {nssp_gold_check}")
     result = {
         "exists": nssp_gold_check,
         "blob_name": blob_name,

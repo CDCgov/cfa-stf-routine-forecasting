@@ -1,5 +1,4 @@
 repos:
-  #####
   # Basic file cleanliness
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -10,28 +9,24 @@ repos:
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace
-  #####
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.6
     hooks:
       # Sort imports
       - id: ruff-check
         # Run the formatter
       - id: ruff-format
-  #####
-  # UV Pre-Commit Hook
+    # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.9
+    rev: 0.10.10
     hooks:
       - id: uv-lock
-  #####
   # Bash
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.12.0-2
     hooks:
       - id: shfmt
-  #####
   # Secrets
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
@@ -39,3 +34,19 @@ repos:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
         exclude: package.lock.json
+  # R
+  - repo: https://github.com/posit-dev/air-pre-commit
+    rev: 0.8.2
+    hooks:
+      - id: air-format
+  - repo: https://github.com/etiennebacher/jarl-pre-commit
+    rev: 0.4.0
+    hooks:
+      - id: jarl-check
+        args: ["--fix"]
+  # Typos
+  - repo: https://github.com/adhtruong/mirrors-typos
+    rev: v1.44.0
+    hooks:
+      - id: typos
+        args: ["--force-exclude"]

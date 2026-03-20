@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Dagster and cloud Imports
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Dagster and cloud Imports
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -729,14 +730,7 @@ def postprocess_forecasts(
 # SCHEDULES AND AUTOMATION CONDITION SENSORS
 # ============================================================================
 
-# --- legacy/classic schedule definitions ----
-
-optional_monday_schedule = dg.ScheduleDefinition(
-    name="optional_monday_schedule",
-    cron_schedule="0 6-16 * * MON",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    execution_timezone="America/New_York",  # Runs at midnight PT
-)
+# TODO: investigate use_user_code_server and custom/default automation conditions
 
 # ---------- Upstream Data Sensor ------------
 
@@ -749,12 +743,22 @@ upstream_data_sensor = dg.AutomationConditionSensorDefinition(
 
 # ---------- Weekly Forecast Sensor ----------
 
-# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     "WeeklyForecastSensor",
     target=dg.AssetSelection.groups("WeeklyForecast"),
     minimum_interval_seconds=1800,  # 3600 = hourly
     run_tags=default_azure_batch_config.to_run_tags(),
+)
+
+# --- legacy/classic schedule definitions ----
+# this serves as an override; in general, we want to use
+# automation conditions and their sensors, not legacy schedules
+
+optional_monday_schedule = dg.ScheduleDefinition(
+    name="optional_monday_schedule",
+    cron_schedule="0 6-16 * * MON",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    execution_timezone="America/New_York",  # Runs at midnight PT
 )
 
 

@@ -754,13 +754,26 @@ weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
 # this serves as an override; in general, we want to use
 # automation conditions and their sensors, not legacy schedules
 
-optional_monday_schedule = dg.ScheduleDefinition(
-    name="optional_monday",
-    cron_schedule="0 6-16 * * MON",
+# optional_monday_schedule = dg.ScheduleDefinition(
+#     name="optional_monday",
+#     cron_schedule="0 6-16 * * MON",
+#     target=dg.AssetSelection.groups("UpstreamData"),
+#     execution_timezone="America/New_York",  # Runs at midnight PT
+#     run_config=default_config.to_run_config(),
+# )
+
+
+@dg.schedule(
     target=dg.AssetSelection.groups("UpstreamData"),
-    execution_timezone="America/New_York",  # Runs at midnight PT
-    run_config=default_config.to_run_config(),
+    cron_schedule="0 6-16 * * MON",
 )
+def optional_monday(context: dg.ScheduleEvaluationContext):
+    scheduled_date = context.scheduled_execution_time.strftime("%Y-%m-%d")
+    return dg.RunRequest(
+        partition_key=scheduled_date,
+        tags={"partition": scheduled_date},
+        run_config=dg.RunConfig(execution=default_config.to_run_config()),
+    )
 
 
 # ============================================================================

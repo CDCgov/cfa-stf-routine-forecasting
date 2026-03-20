@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Dagster and cloud Imports
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Dagster and cloud Imports
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -265,9 +266,63 @@ class PostProcessConfig(dg.Config):
 
 
 # ============================================================================
-# UPSTREAM DATA HELPER FUNCTIONS
+# SCHEDULES AND AUTOMATION CONDITIONS
 # ============================================================================
-# These helpers are not assets themselves
+# Cron-formulas go here for simplificity
+
+upstream_automation_condition = (
+    # Check every hour 6am-4pm on Wednesday for new data;
+    dg.AutomationCondition.on_cron(
+        cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
+    )
+    &
+    # don't check if not-missing for that day
+    dg.AutomationCondition.on_missing()
+)
+
+forecast_automation_condition = (
+    # Simply execute when dependencies have been met and
+    # the daily partition is missing
+    dg.AutomationCondition.on_missing()
+)
+
+postprocess_automation_condition = (
+    # Re-run this anytime upstream data are updated
+    dg.AutomationCondition.eager()
+)
+
+optional_monday_schedule = dg.ScheduleDefinition(
+    name="optional_monday_schedule",
+    cron_schedule="0 6-16 * * MON",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    execution_timezone="America/Los_Angeles",  # Runs at midnight PT
+)
+
+
+# ---------- Upstream Data Sensor ------------
+
+upstream_data_sensor = dg.AutomationConditionSensorDefinition(
+    "UpstreamDataSensor",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    minimum_interval_seconds=3600,  # 3600 = hourly
+    run_tags=default_config.to_run_tags(),
+)
+
+# ---------- Weekly Forecast Sensor ----------
+
+# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
+weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
+    "WeeklyForecastSensor",
+    target=dg.AssetSelection.groups("WeeklyForecast"),
+    minimum_interval_seconds=3600,  # 3600 = hourly
+    run_tags=default_azure_batch_config.to_run_tags(),
+)
+
+# ============================================================================
+# ASSET DEFINITIONS
+# ============================================================================
+# These are the core of Dagster - functions that specify data
+
 
 # ---------- Data Availability Check Functions ----------
 
@@ -360,10 +415,58 @@ def _check_nwss_gold_data_availability(
     return result
 
 
-# ============================================================================
-# MODEL HELPER FUNCTIONS
-# ============================================================================
-# These helpers are not assets themselves
+# ----------- Upstream Data Availability Assets ----
+
+
+# NHSN
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=upstream_automation_condition,
+    group_name="UpstreamData",
+    output_required=False,
+)
+def nhsn_data_stf(context: dg.AssetExecutionContext):
+    result = _check_nhsn_data_availability(context)
+    if result["exists"]:
+        yield dg.Output("nhsn_data_stf")
+    else:
+        context.log.warning(f"NHSN data not available: {result}")
+        return
+
+
+# NSSP
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=upstream_automation_condition,
+    group_name="UpstreamData",
+    output_required=False,
+)
+def nssp_gold_stf(context: dg.AssetExecutionContext):
+    result = _check_nssp_gold_data_availability(context)
+    if result["exists"]:
+        yield dg.Output("nssp_gold_stf")
+    else:
+        context.log.warning(f"NSSP gold data not available: {result}")
+        return
+
+
+# NWSS
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=upstream_automation_condition,
+    group_name="UpstreamData",
+    output_required=False,
+)
+def nwss_gold_stf(context: dg.AssetExecutionContext):
+    result = _check_nwss_gold_data_availability(context)
+    if result["exists"]:
+        yield dg.Output("nwss_gold_stf")
+    else:
+        context.log.warning(f"NWSS gold data not available: {result}")
+        return
+
+
+# ----------- Model Constructor Functions --------------------------
 
 
 def _get_valid_date_disease_location(
@@ -478,68 +581,6 @@ def _run_pyrenew_model(
         return
 
 
-# ============================================================================
-# ASSET DEFINITIONS
-# ============================================================================
-# These are the core of Dagster - functions that specify data
-
-# ----------- Upstream Data Availability Assets ----
-
-
-# NHSN
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron(
-        cron_schedule="0 10-15 * * WED-FRI", cron_timezone="America/New_York"
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nhsn_data_stf(context: dg.AssetExecutionContext):
-    result = _check_nhsn_data_availability(context)
-    if result["exists"]:
-        yield dg.Output("nhsn_data_stf")
-    else:
-        context.log.warning(f"NHSN data not available: {result}")
-        return
-
-
-# NSSP
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron(
-        cron_schedule="0 6-14 * * MON-FRI", cron_timezone="America/New_York"
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nssp_gold_stf(context: dg.AssetExecutionContext):
-    result = _check_nssp_gold_data_availability(context)
-    if result["exists"]:
-        yield dg.Output("nssp_gold_stf")
-    else:
-        context.log.warning(f"NSSP gold data not available: {result}")
-        return
-
-
-# NWSS
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron(
-        cron_schedule="0 * * * WED", cron_timezone="America/New_York"
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nwss_gold_stf(context: dg.AssetExecutionContext):
-    result = _check_nwss_gold_data_availability(context)
-    if result["exists"]:
-        yield dg.Output("nwss_gold_stf")
-    else:
-        context.log.warning(f"NWSS gold data not available: {result}")
-        return
-
-
 # ---------- Pyrenew Assets ----------
 
 
@@ -547,7 +588,7 @@ def nwss_gold_stf(context: dg.AssetExecutionContext):
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=forecast_automation_condition,
     group_name="WeeklyForecast",
 )
 def timeseries_e(
@@ -563,7 +604,7 @@ def timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=forecast_automation_condition,
     group_name="WeeklyForecast",
 )
 def epiweekly_timeseries_e(
@@ -579,7 +620,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=forecast_automation_condition,
     group_name="WeeklyForecast",
 )
 def pyrenew_e(
@@ -598,10 +639,7 @@ def pyrenew_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # automation_condition=dg.AutomationCondition.on_cron(
-    #     cron_schedule="0 14 * * TUE,WED"
-    # ),
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=forecast_automation_condition,
     group_name="WeeklyForecast",
 )
 def pyrenew_h(
@@ -617,7 +655,7 @@ def pyrenew_h(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=forecast_automation_condition,
     group_name="WeeklyForecast",
 )
 def pyrenew_he(
@@ -637,6 +675,7 @@ def pyrenew_he(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
+    # automation_condition=forecast_automation_condition,
     group_name="WeeklyForecastArchived",
 )
 def pyrenew_hw(
@@ -655,6 +694,7 @@ def pyrenew_hw(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
+    # automation_condition=forecast_automation_condition,
     group_name="WeeklyForecastArchived",
 )
 def pyrenew_hew(
@@ -697,7 +737,7 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_h",
         "pyrenew_he",
     ],
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=postprocess_automation_condition,
     group_name="WeeklyForecast",
 )
 def postprocess_forecasts(
@@ -715,30 +755,6 @@ def postprocess_forecasts(
     )
     return "postprocess_forecasts"
 
-
-# =================
-# Automation
-# =================
-
-# ---------- Upstream Data Sensor ------------
-
-# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
-upstream_data_sensor = dg.AutomationConditionSensorDefinition(
-    "UpstreamDataSensor",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    minimum_interval_seconds=3600,
-    run_tags=default_config.to_run_tags(),
-)
-
-# ---------- Weekly Forecast Sensor ----------
-
-# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
-weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
-    "WeeklyForecastSensor",
-    target=dg.AssetSelection.groups("WeeklyForecast"),
-    minimum_interval_seconds=3600,
-    run_tags=default_azure_batch_config.to_run_tags(),
-)
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

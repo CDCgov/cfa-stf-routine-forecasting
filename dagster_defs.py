@@ -266,59 +266,6 @@ class PostProcessConfig(dg.Config):
 
 
 # ============================================================================
-# SCHEDULES AND AUTOMATION CONDITIONS
-# ============================================================================
-# Cron-formulas go here for simplificity
-
-upstream_automation_condition = (
-    # Check every hour 6am-4pm on Wednesday for new data;
-    dg.AutomationCondition.on_cron(
-        cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
-    )
-    &
-    # don't check if not-missing for that day
-    dg.AutomationCondition.on_missing()
-)
-
-forecast_automation_condition = (
-    # Simply execute when dependencies have been met and
-    # the daily partition is missing
-    dg.AutomationCondition.on_missing()
-)
-
-postprocess_automation_condition = (
-    # Re-run this anytime upstream data are updated
-    dg.AutomationCondition.eager()
-)
-
-optional_monday_schedule = dg.ScheduleDefinition(
-    name="optional_monday_schedule",
-    cron_schedule="0 6-16 * * MON",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    execution_timezone="America/Los_Angeles",  # Runs at midnight PT
-)
-
-
-# ---------- Upstream Data Sensor ------------
-
-upstream_data_sensor = dg.AutomationConditionSensorDefinition(
-    "UpstreamDataSensor",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    minimum_interval_seconds=3600,  # 3600 = hourly
-    run_tags=default_config.to_run_tags(),
-)
-
-# ---------- Weekly Forecast Sensor ----------
-
-# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
-weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
-    "WeeklyForecastSensor",
-    target=dg.AssetSelection.groups("WeeklyForecast"),
-    minimum_interval_seconds=3600,  # 3600 = hourly
-    run_tags=default_azure_batch_config.to_run_tags(),
-)
-
-# ============================================================================
 # ASSET DEFINITIONS
 # ============================================================================
 # These are the core of Dagster - functions that specify data
@@ -421,7 +368,15 @@ def _check_nwss_gold_data_availability(
 # NHSN
 @dg.asset(
     partitions_def=daily_partitions_def,
-    automation_condition=upstream_automation_condition,
+    automation_condition=(
+        # Check every hour 6am-4pm on Wednesday for new data;
+        dg.AutomationCondition.on_cron(
+            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
+        )
+        &
+        # don't check if not-missing for that day
+        dg.AutomationCondition.on_missing()
+    ),
     group_name="UpstreamData",
     output_required=False,
 )
@@ -430,14 +385,22 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
     if result["exists"]:
         yield dg.Output("nhsn_data_stf")
     else:
-        context.log.warning(f"NHSN data not available: {result}")
+        context.log.error(f"NHSN data not available: {result}")
         return
 
 
 # NSSP
 @dg.asset(
     partitions_def=daily_partitions_def,
-    automation_condition=upstream_automation_condition,
+    automation_condition=(
+        # Check every hour 6am-4pm on Wednesday for new data;
+        dg.AutomationCondition.on_cron(
+            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
+        )
+        &
+        # don't check if not-missing for that day
+        dg.AutomationCondition.on_missing()
+    ),
     group_name="UpstreamData",
     output_required=False,
 )
@@ -446,14 +409,22 @@ def nssp_gold_stf(context: dg.AssetExecutionContext):
     if result["exists"]:
         yield dg.Output("nssp_gold_stf")
     else:
-        context.log.warning(f"NSSP gold data not available: {result}")
+        context.log.error(f"NSSP gold data not available: {result}")
         return
 
 
 # NWSS
 @dg.asset(
     partitions_def=daily_partitions_def,
-    automation_condition=upstream_automation_condition,
+    automation_condition=(
+        # Check every hour 6am-4pm on Wednesday for new data;
+        dg.AutomationCondition.on_cron(
+            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
+        )
+        &
+        # don't check if not-missing for that day
+        dg.AutomationCondition.on_missing()
+    ),
     group_name="UpstreamData",
     output_required=False,
 )
@@ -462,7 +433,7 @@ def nwss_gold_stf(context: dg.AssetExecutionContext):
     if result["exists"]:
         yield dg.Output("nwss_gold_stf")
     else:
-        context.log.warning(f"NWSS gold data not available: {result}")
+        context.log.error(f"NWSS gold data not available: {result}")
         return
 
 
@@ -588,7 +559,8 @@ def _run_pyrenew_model(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=forecast_automation_condition,
+    # We materialize this asset whenever its deps are met and it is missing for a given day
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def timeseries_e(
@@ -604,7 +576,8 @@ def timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=forecast_automation_condition,
+    # We materialize this asset whenever its deps are met and it is missing for a given day
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def epiweekly_timeseries_e(
@@ -620,7 +593,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=forecast_automation_condition,
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def pyrenew_e(
@@ -639,7 +612,7 @@ def pyrenew_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=forecast_automation_condition,
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def pyrenew_h(
@@ -655,7 +628,7 @@ def pyrenew_h(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=forecast_automation_condition,
+    automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecast",
 )
 def pyrenew_he(
@@ -675,7 +648,7 @@ def pyrenew_he(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # automation_condition=forecast_automation_condition,
+    # automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecastArchived",
 )
 def pyrenew_hw(
@@ -694,7 +667,7 @@ def pyrenew_hw(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # automation_condition=forecast_automation_condition,
+    # automation_condition=dg.AutomationCondition.on_missing(),
     group_name="WeeklyForecastArchived",
 )
 def pyrenew_hew(
@@ -711,22 +684,7 @@ def pyrenew_hew(
     return _run_pyrenew_model(context, config, "hew")
 
 
-# ---------- Epi AutoGP Asset ----------
-
-
-@dg.asset(group_name="ExperimentalEpiAutoGP")
-def epiautogp(context: dg.AssetExecutionContext):
-    """
-    Placeholder asset for Epi AutoGP forecasts.
-    """
-    # Placeholder logic for Epi AutoGP forecasts
-    context.log.info("Epi AutoGP forecast asset executed.")
-    # TODO: implement Epi AutoGP model and invoke its pipeline entrypoint.
-    return "epiautogp"
-
-
 # ---------- Postprocessing Forecast Batches ----------
-# TODO: integrate this asset into the DAG fully, and/or trigger it via sensors
 
 
 @dg.asset(
@@ -737,8 +695,11 @@ def epiautogp(context: dg.AssetExecutionContext):
         "pyrenew_h",
         "pyrenew_he",
     ],
-    automation_condition=postprocess_automation_condition,
+    partitions_def=daily_partitions_def,
+    # Run if it can, whenever something upstream runs
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
+    output_required=False,
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,
@@ -747,13 +708,55 @@ def postprocess_forecasts(
     """
     Postprocess forecast batches.
     """
+
+    date = context.partition_key
+    if date < current_date_str():
+        context.log.error(
+            "Postprocessing does not support backfills. Skipping materialization."
+        )
+        return
+
     postprocess(
         base_forecast_dir=config.output_dir,
         diseases=config.postprocess_diseases,
         skip_existing=config.skip_existing,
         local_copy_dir=config.output_dir,
     )
-    return "postprocess_forecasts"
+
+    yield dg.Output("postprocess_forecasts")
+
+
+# ============================================================================
+# SCHEDULES AND AUTOMATION CONDITION SENSORS
+# ============================================================================
+
+# --- legacy/classic schedule definitions ----
+
+optional_monday_schedule = dg.ScheduleDefinition(
+    name="optional_monday_schedule",
+    cron_schedule="0 6-16 * * MON",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    execution_timezone="America/New_York",  # Runs at midnight PT
+)
+
+# ---------- Upstream Data Sensor ------------
+
+upstream_data_sensor = dg.AutomationConditionSensorDefinition(
+    "UpstreamDataSensor",
+    target=dg.AssetSelection.groups("UpstreamData"),
+    minimum_interval_seconds=1800,  # 3600 = hourly
+    run_tags=default_config.to_run_tags(),
+)
+
+# ---------- Weekly Forecast Sensor ----------
+
+# This will poll hourly to see if anything needs to be run based on automation conditions defined at the asset level
+weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
+    "WeeklyForecastSensor",
+    target=dg.AssetSelection.groups("WeeklyForecast"),
+    minimum_interval_seconds=1800,  # 3600 = hourly
+    run_tags=default_azure_batch_config.to_run_tags(),
+)
 
 
 # ============================================================================
@@ -789,6 +792,7 @@ defs = dg.Definitions(
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
         default_config=default_azure_batch_config,
+        # default_config=docker_config,
         alternate_configs=[default_config, docker_config, caj_azure_batch_config],
     ),
 )

@@ -735,7 +735,7 @@ def postprocess_forecasts(
 # ---------- Upstream Data Sensor ------------
 
 upstream_data_sensor = dg.AutomationConditionSensorDefinition(
-    "UpstreamDataSensor",
+    name="UpstreamData",
     target=dg.AssetSelection.groups("UpstreamData"),
     minimum_interval_seconds=1800,  # 3600 = hourly
     run_tags=default_config.to_run_tags(),
@@ -744,7 +744,7 @@ upstream_data_sensor = dg.AutomationConditionSensorDefinition(
 # ---------- Weekly Forecast Sensor ----------
 
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
-    "WeeklyForecastSensor",
+    name="WeeklyForecast",
     target=dg.AssetSelection.groups("WeeklyForecast"),
     minimum_interval_seconds=1800,  # 3600 = hourly
     run_tags=default_azure_batch_config.to_run_tags(),
@@ -755,7 +755,7 @@ weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
 # automation conditions and their sensors, not legacy schedules
 
 optional_monday_schedule = dg.ScheduleDefinition(
-    name="optional_monday_schedule",
+    name="optional_monday",
     cron_schedule="0 6-16 * * MON",
     target=dg.AssetSelection.groups("UpstreamData"),
     execution_timezone="America/New_York",  # Runs at midnight PT

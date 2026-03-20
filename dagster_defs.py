@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Dagster and cloud Imports
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Dagster and cloud Imports
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -758,6 +759,7 @@ optional_monday_schedule = dg.ScheduleDefinition(
     cron_schedule="0 6-16 * * MON",
     target=dg.AssetSelection.groups("UpstreamData"),
     execution_timezone="America/New_York",  # Runs at midnight PT
+    run_config=default_config.to_run_config(),
 )
 
 

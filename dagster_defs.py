@@ -3,7 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -29,6 +28,8 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -238,9 +239,8 @@ class PostProcessConfig(dg.Config):
     Configuration for the Post-Processing asset.
     """
 
-    _forecast_date: str = current_date_str()
     _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{_forecast_date}_forecasts"
+    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
     skip_existing: bool = True
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"

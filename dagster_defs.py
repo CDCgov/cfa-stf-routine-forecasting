@@ -3,14 +3,11 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Dagster and cloud Imports
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from cfa_dagster import (
     ADLS2PickleIOManager,
-    AzureContainerAppJobRunLauncher,
     DynamicGraphAssetExecutionContext,
     ExecutionConfig,
     SelectorConfig,
@@ -31,6 +28,8 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -103,20 +102,15 @@ image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
 # ---------- Execution Configuration ----------
 
 # Most basic execution - launches locally, runs locally
-default_config = ExecutionConfig(
+# Used for lightweight assets and jobs, etc.
+basic_execution_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
 )
 
-
-# Launches in a container app job, then executes in the same process
-azure_caj_config = ExecutionConfig(
-    launcher=SelectorConfig(class_name=AzureContainerAppJobRunLauncher.__name__),
-    executor=SelectorConfig(class_name=dg.in_process_executor.__name__),
-)
-
 # Launches locally, executes in a docker container as configured below
-docker_config = ExecutionConfig(
+# Allows for rapid local testing in a similar-to-batch environment
+docker_execution_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(
         class_name=docker_executor.__name__,
@@ -148,45 +142,36 @@ docker_config = ExecutionConfig(
     ),
 )
 
-stf_azure_batch_executor = SelectorConfig(
-    class_name=azure_batch_executor.__name__,
-    config={
-        "pool_name": "pyrenew-dagster-pool",
-        "image": image,
-        "env_vars": [
-            "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-        ],
-        "container_kwargs": {
-            "volumes": [
-                # bind the ~/.azure folder for optional cli login
-                # f"/home/{user}/.azure:/root/.azure",
-                # bind current file so we don't have to rebuild
-                # the container image for workflow changes
-                # blob container mounts for cfa-stf-routine-forecasting
-                "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
-                "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
-                "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
-            ],
-            "working_dir": "/cfa-stf-routine-forecasting",
-        },
-    },
-)
-
-default_azure_batch_config = ExecutionConfig(
+# Cloud execution. This is what we want for any model run.
+azure_batch_execution_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
-    executor=stf_azure_batch_executor,
-)
-
-# Config for full backfills - launches with container app jobs, sends execution to Azure Batch
-caj_azure_batch_config = ExecutionConfig(
-    launcher=SelectorConfig(
-        class_name=AzureContainerAppJobRunLauncher.__name__, config={"image": image}
+    executor=SelectorConfig(
+        class_name=azure_batch_executor.__name__,
+        config={
+            "pool_name": "pyrenew-dagster-pool",
+            "image": image,
+            "env_vars": [
+                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
+            ],
+            "container_kwargs": {
+                "volumes": [
+                    # bind the ~/.azure folder for optional cli login
+                    # f"/home/{user}/.azure:/root/.azure",
+                    # bind current file so we don't have to rebuild
+                    # the container image for workflow changes
+                    # blob container mounts for cfa-stf-routine-forecasting
+                    "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
+                    "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
+                    "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
+                    "prod-param-estimates:/cfa-stf-routine-forecasting/params",
+                    "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
+                    "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
+                    "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
+                ],
+                "working_dir": "/cfa-stf-routine-forecasting",
+            },
+        },
     ),
-    executor=stf_azure_batch_executor,
 )
 
 # ============================================================================
@@ -213,22 +198,21 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # ============================================================================
 
 
-class ModelConfigBase(dg.Config):
+class ModelBaseConfig(dg.Config):
     """
     Base configuration for all model assets.
     Contains parameters common to both Timeseries and Pyrenew models.
     """
 
-    _forecast_date: str = current_date_str()
     _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{_forecast_date}_forecasts"
+    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
     diseases: list[str] = DISEASES
     locations: list[str] = LOCATIONS
 
 
-class TimeseriesConfig(ModelConfigBase):
+class TimeseriesConfig(ModelBaseConfig):
     """
     Configuration for timeseries model assets (timeseries_e, epiweekly_timeseries_e).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -237,7 +221,7 @@ class TimeseriesConfig(ModelConfigBase):
     n_samples: int = 400 if not is_production else 2000  # Total samples for timeseries
 
 
-class PyrenewConfig(ModelConfigBase):
+class PyrenewConfig(ModelBaseConfig):
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -255,9 +239,8 @@ class PostProcessConfig(dg.Config):
     Configuration for the Post-Processing asset.
     """
 
-    _forecast_date: str = current_date_str()
     _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{_forecast_date}_forecasts"
+    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
     skip_existing: bool = True
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
@@ -423,7 +406,7 @@ def nssp_gold_stf(context: dg.AssetExecutionContext):
             cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
         )
         &
-        # don't check if not-missing for that day
+        # don't check if not missing for that day
         dg.AutomationCondition.on_missing()
     ),
     group_name="UpstreamData",
@@ -442,13 +425,20 @@ def nwss_gold_stf(context: dg.AssetExecutionContext):
 # ----------- Model Constructor Functions --------------------------
 
 
-def _get_valid_date_disease_location(
+def _run_stf_model(
     context: DynamicGraphAssetExecutionContext,
-    model_letters: str,
-) -> tuple[str, str, str, bool]:
+    config: TimeseriesConfig | PyrenewConfig,
+    model_family: str,
+    model_letters: str = "",
+    epiweekly: bool = False,
+) -> str | None:
     """
-    Function used by assets to parse which disease or location they should run as, and the daily partition.
-    TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
+    Unified helper to run timeseries or pyrenew models with common arguments.
+    Note - the assets here are dynamic graph assets.
+    ----
+    model_family: "timeseries" or "pyrenew"
+    model_letters: e.g. "e", "h", "he", etc. (used for pyrenew)
+    epiweekly: only used for timeseries
     """
 
     # Disease and Locations are our "Graph Dimensions".
@@ -460,39 +450,28 @@ def _get_valid_date_disease_location(
     if date < current_date_str():
         raise RuntimeError("STF forecast models do not support backfills.")
 
-    is_valid_to_proceed: bool = True
-
+    # Business logic for model applicability
     if "w" in model_letters and disease != "COVID-19":
-        context.log.warning(
+        context.log.error(
             f"Model letter 'w' is only applicable for COVID-19. Skipping model run for disease {disease}."
         )
-        is_valid_to_proceed: bool = False
+        return
 
     if "e" in model_letters and location == "WY":
-        context.log.warning(
+        context.log.error(
             "Model letter 'e' is not applicable for location WY. Skipping model run."
         )
-        is_valid_to_proceed: bool = False
+        return
 
-    return is_valid_to_proceed, date, disease, location
+    if model_family == "timeseries" and model_letters != "e":
+        context.log.error(
+            "Only model letter 'e' can be used with Timeseries models currently."
+        )
+        return
 
+    context.log.debug(f"config: '{config}'")
 
-def _run_timeseries_e(
-    context: DynamicGraphAssetExecutionContext,
-    config: TimeseriesConfig,
-    epiweekly: bool,
-) -> str | None:
-    """
-    Helper function to run timeseries-e model with optional epiweekly mode.
-    """
-
-    is_valid_to_proceed, date, disease, location = _get_valid_date_disease_location(
-        context, model_letters="e"
-    )
-
-    # We can have dagster skip execution if conditions don't apply
-    if is_valid_to_proceed:
-        context.log.debug(f"config: '{config}'")
+    if model_family == "timeseries":
         forecast_timeseries(
             disease=disease,
             loc=location,
@@ -506,30 +485,13 @@ def _run_timeseries_e(
             credentials_path=Path("config/creds.toml"),
         )
         yield dg.Output("epiweekly_timeseries_e" if epiweekly else "timeseries_e")
-    else:
-        return
 
-
-def _run_pyrenew_model(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewConfig,
-    model_letters: str,
-) -> str | None:
-    """
-    Helper to run Pyrenew models with common arguments.
-    """
-
-    is_valid_to_proceed, date, disease, location = _get_valid_date_disease_location(
-        context, model_letters
-    )
-
-    if is_valid_to_proceed:
+    elif model_family == "pyrenew":
         fit_flags = flags_from_hew_letters(model_letters)
         forecast_flags = flags_from_hew_letters(
             f"{model_letters}{config.additional_forecast_letters}",
             flag_prefix="forecast",
         )
-        context.log.debug(f"config: '{config}'")
         forecast_pyrenew(
             disease=disease,
             loc=location,
@@ -550,8 +512,9 @@ def _run_pyrenew_model(
             **forecast_flags,
         )
         yield dg.Output(f"pyrenew_{model_letters}")
+
     else:
-        return
+        raise ValueError(f"Unknown model_family: {model_family}")
 
 
 # ---------- Pyrenew Assets ----------
@@ -571,7 +534,7 @@ def timeseries_e(
     """
     Run Timeseries-e model and produce outputs.
     """
-    return _run_timeseries_e(context, config, epiweekly=False)
+    return _run_stf_model(context, config, epiweekly=False, model_family="timeseries")
 
 
 # Epiweekly Timeseries E
@@ -588,7 +551,7 @@ def epiweekly_timeseries_e(
     """
     Run Epiweekly Timeseries-e model and produce outputs.
     """
-    return _run_timeseries_e(context, config, epiweekly=True)
+    return _run_stf_model(context, config, epiweekly=True, model_family="timeseries")
 
 
 # Pyrenew E
@@ -607,7 +570,7 @@ def pyrenew_e(
     """
     Run Pyrenew-e model and produce outputs.
     """
-    return _run_pyrenew_model(context, config, "e")
+    return _run_stf_model(context, config, "e", model_family="pyrenew")
 
 
 # Pyrenew H
@@ -623,7 +586,7 @@ def pyrenew_h(
     """
     Run Pyrenew-h model and produce outputs.
     """
-    return _run_pyrenew_model(context, config, "h")
+    return _run_stf_model(context, config, "h", model_family="pyrenew")
 
 
 # Pyrenew HE
@@ -643,7 +606,7 @@ def pyrenew_he(
     """
     Run Pyrenew-he model and produce outputs.
     """
-    return _run_pyrenew_model(context, config, "he")
+    return _run_stf_model(context, config, "he", model_family="pyrenew")
 
 
 # Pyrenew HW
@@ -662,7 +625,7 @@ def pyrenew_hw(
     """
     Run Pyrenew-hw model and produce outputs.
     """
-    return _run_pyrenew_model(context, config, "hw")
+    return _run_stf_model(context, config, "hw", model_family="pyrenew")
 
 
 # Pyrenew HEW
@@ -683,7 +646,7 @@ def pyrenew_hew(
     """
     Run Pyrenew-hew model and produce outputs.
     """
-    return _run_pyrenew_model(context, config, "hew")
+    return _run_stf_model(context, config, "hew", model_family="pyrenew")
 
 
 # ---------- Postprocessing Forecast Batches ----------
@@ -739,7 +702,7 @@ def postprocess_forecasts(
 upstream_data_sensor = dg.AutomationConditionSensorDefinition(
     name="UpstreamData",
     target=dg.AssetSelection.groups("UpstreamData"),
-    run_tags=default_config.to_run_tags(),
+    run_tags=basic_execution_config.to_run_tags(),
 )
 
 # ---------- Weekly Forecast Sensor ----------
@@ -747,7 +710,7 @@ upstream_data_sensor = dg.AutomationConditionSensorDefinition(
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecast",
     target=dg.AssetSelection.groups("WeeklyForecast"),
-    run_tags=default_azure_batch_config.to_run_tags(),
+    run_tags=azure_batch_execution_config.to_run_tags(),
 )
 
 # --- legacy/classic schedule definitions ----
@@ -766,7 +729,7 @@ def optional_monday(context: dg.ScheduleEvaluationContext):
         partition_key=scheduled_date,
         tags={"partition": scheduled_date},
         run_config=dg.RunConfig(
-            execution=default_config.to_run_config(),
+            execution=basic_execution_config.to_run_config(),
         ),
     )
 
@@ -803,8 +766,8 @@ defs = dg.Definitions(
     },
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
-        default_config=default_azure_batch_config,
-        # default_config=docker_config,
-        alternate_configs=[default_config, docker_config, caj_azure_batch_config],
+        default_config=azure_batch_execution_config,
+        # default_config=docker_execution_config,
+        alternate_configs=[basic_execution_config, docker_execution_config],
     ),
 )

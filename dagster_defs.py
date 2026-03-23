@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Dagster and cloud Imports
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Dagster and cloud Imports
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -382,6 +383,7 @@ def _check_nwss_gold_data_availability(
 def nhsn_data_stf(context: dg.AssetExecutionContext):
     result = _check_nhsn_data_availability(context)
     if result["exists"]:
+        context.log.info(f"NHSN data available: {result}")
         yield dg.Output("nhsn_data_stf")
     else:
         context.log.error(f"NHSN data not available: {result}")
@@ -406,6 +408,7 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
 def nssp_gold_stf(context: dg.AssetExecutionContext):
     result = _check_nssp_gold_data_availability(context)
     if result["exists"]:
+        context.log.info(f"NSSP gold data available: {result}")
         yield dg.Output("nssp_gold_stf")
     else:
         context.log.error(f"NSSP gold data not available: {result}")
@@ -430,6 +433,7 @@ def nssp_gold_stf(context: dg.AssetExecutionContext):
 def nwss_gold_stf(context: dg.AssetExecutionContext):
     result = _check_nwss_gold_data_availability(context)
     if result["exists"]:
+        context.log.info(f"NWSS gold data available: {result}")
         yield dg.Output("nwss_gold_stf")
     else:
         context.log.error(f"NWSS gold data not available: {result}")
@@ -736,7 +740,6 @@ def postprocess_forecasts(
 upstream_data_sensor = dg.AutomationConditionSensorDefinition(
     name="UpstreamData",
     target=dg.AssetSelection.groups("UpstreamData"),
-    minimum_interval_seconds=1800,  # 3600 = hourly
     run_tags=default_config.to_run_tags(),
 )
 
@@ -745,23 +748,15 @@ upstream_data_sensor = dg.AutomationConditionSensorDefinition(
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecast",
     target=dg.AssetSelection.groups("WeeklyForecast"),
-    minimum_interval_seconds=1800,  # 3600 = hourly
     run_tags=default_azure_batch_config.to_run_tags(),
 )
 
 # --- legacy/classic schedule definitions ----
 # this serves as an override; in general, we want to use
-# automation conditions and their sensors, not legacy schedules
-
-# optional_monday_schedule = dg.ScheduleDefinition(
-#     name="optional_monday",
-#     cron_schedule="0 6-16 * * MON",
-#     target=dg.AssetSelection.groups("UpstreamData"),
-#     execution_timezone="America/New_York",  # Runs at midnight PT
-#     run_config=default_config.to_run_config(),
-# )
+# automation conditions and their sensors, not top-down schedules
 
 
+# Launches upstream jobs; will run anything downstream by virtue of automation conditions
 @dg.schedule(
     target=dg.AssetSelection.groups("UpstreamData"),
     cron_schedule="0 6-16 * * MON",
@@ -771,7 +766,9 @@ def optional_monday(context: dg.ScheduleEvaluationContext):
     return dg.RunRequest(
         partition_key=scheduled_date,
         tags={"partition": scheduled_date},
-        run_config=dg.RunConfig(execution=default_config.to_run_config()),
+        run_config=dg.RunConfig(
+            execution=default_config.to_run_config(),
+        ),
     )
 
 

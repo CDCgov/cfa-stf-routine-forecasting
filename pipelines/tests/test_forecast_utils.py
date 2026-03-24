@@ -336,8 +336,8 @@ class TestPostprocessForecast:
         assert mock_make_figures.call_args[1]["save_figs"] is True
         assert mock_make_figures.call_args[1]["save_ci"] is True
 
-        # Verify model_fit_dir_to_hub_tbl was called with model_run_dir
-        assert mock_hubverse.call_args[0][0] == context.model_run_dir
+        # Verify model_fit_dir_to_hub_tbl was called with expected_model_fit_dir
+        assert mock_hubverse.call_args[0][0] == expected_model_fit_dir
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.model_fit_dir_to_hub_tbl")
     @patch(

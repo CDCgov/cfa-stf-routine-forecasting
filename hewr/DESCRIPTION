@@ -24,6 +24,7 @@ Imports:
     glue,
     here,
     htmltools,
+    hubUtils,
     jsonlite,
     knitr,
     latex2exp,

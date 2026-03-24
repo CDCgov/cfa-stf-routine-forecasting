@@ -65,48 +65,6 @@ raw_samples_to_prelim <- function(samples_path) {
     dplyr::mutate(model_id = !!model_id)
 }
 
-#' Convert preliminary samples to Hub format as quantiles
-#'
-#' @param prelim_samples A data frame of preliminary samples, in the format output by `raw_samples_to_prelim()`
-#'
-#' @returns A data frame in the format required by the Hub, with quantiles as the output type.
-#'
-#' @export
-prelim_to_hub_quantiles <- function(prelim_samples) {
-  prelim_samples |>
-    dplyr::collect() |>
-    forecasttools::trajectories_to_quantiles(
-      timepoint_cols = "date",
-      value_col = ".value",
-      id_cols = setdiff(
-        colnames(prelim_samples),
-        c(
-          "date",
-          ".value",
-          ".draw",
-          ".chain",
-          ".iteration"
-        )
-      )
-    ) |>
-    dplyr::mutate(model_id = model_id) |>
-    dplyr::mutate(
-      output_type = "quantile",
-      output_type_id = round(.data$quantile_level, digits = 4)
-    ) |>
-    dplyr::rename(
-      value = "quantile_value",
-      target_end_date = "date",
-      location = "geo_value"
-    ) |>
-    dplyr::select(
-      dplyr::all_of(forecasttools::cdc_hub_std_colnames),
-      "horizon_timescale",
-      "resolution",
-      "disease"
-    )
-}
-
 #' Convert preliminary samples to Hub format as samples
 #'
 #' @param prelim_samples A data frame of preliminary samples, in the format output by `raw_samples_to_prelim()`
@@ -128,6 +86,29 @@ prelim_to_hub_samples <- function(prelim_samples) {
       "horizon_timescale",
       "resolution",
       "disease"
+    )
+}
+
+#' Convert preliminary samples to Hub format as quantiles
+#'
+#' @param prelim_samples A data frame of preliminary samples, in the format output by `raw_samples_to_prelim()`
+#'
+#' @returns A data frame in the format required by the Hub, with quantiles as the output type.
+#'
+#' @export
+prelim_to_hub_quantiles <- function(prelim_samples) {
+  default_hub_quantiles <- c(
+    0.01,
+    0.025,
+    1:19 / 20,
+    0.975,
+    0.99
+  )
+  prelim_samples |>
+    prelim_to_hub_samples() |>
+    hubUtils::convert_output_type(
+      smht_deduped,
+      to = list("quantile" = default_hub_quantiles)
     )
 }
 

@@ -106,10 +106,7 @@ prelim_to_hub_quantiles <- function(prelim_samples) {
   )
   prelim_samples |>
     prelim_to_hub_samples() |>
-    hubUtils::convert_output_type(
-      smht_deduped,
-      to = list("quantile" = default_hub_quantiles)
-    )
+    hubUtils::convert_output_type(to = list("quantile" = default_hub_quantiles))
 }
 
 

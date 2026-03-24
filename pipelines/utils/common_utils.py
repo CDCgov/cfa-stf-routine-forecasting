@@ -465,27 +465,30 @@ def py_scalar_to_r_scalar(py_scalar):
     return f"'{str(py_scalar)}'"
 
 
-def create_hubverse_table(model_fit_path: Path) -> None:
-    """Create hubverse table from model fit using R script.
+def model_fit_dir_to_hub_tbl(
+    model_fit_dir: Path | str,
+    output_type: str = "samples",
+) -> None:
+    """Create a hubverse table from a model fit directory using an R script.
 
     Parameters
     ----------
-    model_fit_path : Path
-        Path to the model fit directory.
+    model_fit_dir : Path | str
+        Directory containing model fit data and output.
+    output_type : str, optional
+        Type of output to create. One of "quantiles", "samples", or "both".
+        Defaults to "samples".
 
     Returns
     -------
     None
     """
-    run_r_code(
-        f"""
-            forecasttools::write_tabular(
-            hewr::model_fit_dir_to_hub_q_tbl('{model_fit_path}'),
-            fs::path('{model_fit_path}', "hubverse_table", ext = "parquet")
-            )
-            """,
-        function_name="create_hubverse_table",
-        text=True,
+    args = [str(model_fit_dir), "--output-type", output_type]
+
+    run_r_script(
+        "pipelines/utils/model_fit_dir_to_hub_tbl.R",
+        args,
+        function_name="model_fit_dir_to_hub_tbl",
     )
     return None
 

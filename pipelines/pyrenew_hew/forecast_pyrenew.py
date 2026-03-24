@@ -25,7 +25,7 @@ from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    create_hubverse_table,
+    model_fit_dir_to_hub_tbl,
     create_prop_samples,
     get_available_reports,
     load_credentials,
@@ -289,7 +289,7 @@ def main(
         save_figs=True,
         save_ci=True,
     )
-    create_hubverse_table(model_dir)
+    model_fit_dir_to_hub_tbl(model_dir)
 
     if fit_ed_visits:
         if Path(model_run_dir, "daily_ts_ensemble_e").exists():
@@ -309,7 +309,7 @@ def main(
                 save_figs=True,
                 save_ci=True,
             )
-            create_hubverse_table(tmp_model_fit_dir)
+            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
 
         else:
             logger.warning(
@@ -335,7 +335,7 @@ def main(
                 save_figs=True,
                 save_ci=True,
             )
-            create_hubverse_table(tmp_model_fit_dir)
+            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
 
         else:
             logger.warning(
@@ -358,7 +358,7 @@ def main(
                 save_figs=True,
                 save_ci=True,
             )
-            create_hubverse_table(tmp_model_fit_dir)
+            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
 
             logger.info(
                 "Creating epiweekly proportions from epiautogp_nssp_daily_other..."
@@ -378,7 +378,7 @@ def main(
                 save_figs=True,
                 save_ci=True,
             )
-            create_hubverse_table(tmp_model_fit_dir)
+            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
         else:
             logger.warning(
                 "epiautogp_nssp_daily_other not found, skipping creation of proportions for comparison with epiautogp model."

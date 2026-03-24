@@ -297,7 +297,7 @@ class TestPrepareModelData:
 class TestPostprocessForecast:
     """Tests for the postprocess_forecast function."""
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.create_hubverse_table")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.model_fit_dir_to_hub_tbl")
     @patch(
         "pipelines.epiautogp.epiautogp_forecast_utils.make_figures_from_model_fit_dir"
     )
@@ -336,10 +336,10 @@ class TestPostprocessForecast:
         assert mock_make_figures.call_args[1]["save_figs"] is True
         assert mock_make_figures.call_args[1]["save_ci"] is True
 
-        # Verify create_hubverse_table was called with model_run_dir
+        # Verify model_fit_dir_to_hub_tbl was called with model_run_dir
         assert mock_hubverse.call_args[0][0] == context.model_run_dir
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.create_hubverse_table")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.model_fit_dir_to_hub_tbl")
     @patch(
         "pipelines.epiautogp.epiautogp_forecast_utils.make_figures_from_model_fit_dir"
     )

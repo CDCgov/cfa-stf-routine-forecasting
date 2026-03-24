@@ -18,11 +18,11 @@ from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    create_hubverse_table,
     generate_epiweekly_data,
     get_available_reports,
     load_credentials,
     make_figures_from_model_fit_dir,
+    model_fit_dir_to_hub_tbl,
     run_r_script,
 )
 
@@ -161,7 +161,7 @@ class ForecastPipelineContext:
 
         # Create hubverse table from processed outputs
         self.logger.info("Creating hubverse table...")
-        create_hubverse_table(self.model_run_dir)
+        model_fit_dir_to_hub_tbl(model_fit_dir)
         self.logger.info("Postprocessing complete.")
 
 

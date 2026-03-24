@@ -10,11 +10,11 @@ from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    create_hubverse_table,
     generate_epiweekly_data,
     get_available_reports,
     load_credentials,
     make_figures_from_model_fit_dir,
+    model_fit_dir_to_hub_tbl,
     run_r_script,
 )
 
@@ -129,7 +129,7 @@ def main(
         save_ci=True,
     )
 
-    create_hubverse_table(ensemble_model_output_dir)
+    model_fit_dir_to_hub_tbl(ensemble_model_output_dir)
 
     logger.info("Postprocessing complete.")
 

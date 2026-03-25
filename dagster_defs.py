@@ -439,7 +439,6 @@ def _get_valid_date_disease_location(
     Function used by assets to parse which disease or location they should run as, and the daily partition.
     TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
     """
-
     # Disease and Locations are our "Graph Dimensions".
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
@@ -481,6 +480,7 @@ def _run_timeseries_e(
         context, model_letters="e"
     )
 
+    context.log.debug(f"is_valid_to_proceed: '{is_valid_to_proceed}'")
     # We can have dagster skip execution if conditions don't apply
     if is_valid_to_proceed:
         context.log.debug(f"config: '{config}'")
@@ -496,9 +496,6 @@ def _run_timeseries_e(
             epiweekly=epiweekly,
             credentials_path=Path("config/creds.toml"),
         )
-        yield dg.Output("epiweekly_timeseries_e" if epiweekly else "timeseries_e")
-    else:
-        return
 
 
 def _run_pyrenew_model(
@@ -514,6 +511,7 @@ def _run_pyrenew_model(
         context, model_letters
     )
 
+    context.log.debug(f"is_valid_to_proceed: '{is_valid_to_proceed}'")
     if is_valid_to_proceed:
         fit_flags = flags_from_hew_letters(model_letters)
         forecast_flags = flags_from_hew_letters(
@@ -540,9 +538,6 @@ def _run_pyrenew_model(
             **fit_flags,
             **forecast_flags,
         )
-        yield dg.Output(f"pyrenew_{model_letters}")
-    else:
-        return
 
 
 # ---------- Pyrenew Assets ----------
@@ -559,10 +554,8 @@ def _run_pyrenew_model(
 def timeseries_e(
     context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig, nssp_gold_stf
 ):
-    """
-    Run Timeseries-e model and produce outputs.
-    """
-    return _run_timeseries_e(context, config, epiweekly=False)
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_timeseries_e(context, config, epiweekly=False)
 
 
 # Epiweekly Timeseries E
@@ -576,10 +569,8 @@ def timeseries_e(
 def epiweekly_timeseries_e(
     context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig, nssp_gold_stf
 ):
-    """
-    Run Epiweekly Timeseries-e model and produce outputs.
-    """
-    return _run_timeseries_e(context, config, epiweekly=True)
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_timeseries_e(context, config, epiweekly=True)
 
 
 # Pyrenew E
@@ -595,10 +586,8 @@ def pyrenew_e(
     timeseries_e,
     epiweekly_timeseries_e,
 ):
-    """
-    Run Pyrenew-e model and produce outputs.
-    """
-    return _run_pyrenew_model(context, config, "e")
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_pyrenew_model(context, config, "e")
 
 
 # Pyrenew H
@@ -611,10 +600,8 @@ def pyrenew_e(
 def pyrenew_h(
     context: DynamicGraphAssetExecutionContext, config: PyrenewConfig, nhsn_data_stf
 ):
-    """
-    Run Pyrenew-h model and produce outputs.
-    """
-    return _run_pyrenew_model(context, config, "h")
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_pyrenew_model(context, config, "h")
 
 
 # Pyrenew HE
@@ -631,10 +618,8 @@ def pyrenew_he(
     epiweekly_timeseries_e,
     nhsn_data_stf,
 ):
-    """
-    Run Pyrenew-he model and produce outputs.
-    """
-    return _run_pyrenew_model(context, config, "he")
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_pyrenew_model(context, config, "he")
 
 
 # Pyrenew HW
@@ -650,10 +635,8 @@ def pyrenew_hw(
     nhsn_data_stf,
     nwss_gold_stf,
 ):
-    """
-    Run Pyrenew-hw model and produce outputs.
-    """
-    return _run_pyrenew_model(context, config, "hw")
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_pyrenew_model(context, config, "hw")
 
 
 # Pyrenew HEW
@@ -671,10 +654,8 @@ def pyrenew_hew(
     nhsn_data_stf,
     nwss_gold_stf,
 ):
-    """
-    Run Pyrenew-hew model and produce outputs.
-    """
-    return _run_pyrenew_model(context, config, "hew")
+    context.register_output(lambda: dg.Output("dummy_return"))
+    _run_pyrenew_model(context, config, "hew")
 
 
 # ---------- Postprocessing Forecast Batches ----------
@@ -688,9 +669,7 @@ def pyrenew_hew(
     ],
     partitions_def=daily_partitions_def,
     # Run if it can, whenever something upstream runs
-    automation_condition=dg.AutomationCondition.eager()
-    .without(~dg.AutomationCondition.any_deps_missing())
-    .with_label("eager_allow_missing"),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
     output_required=False,
 )

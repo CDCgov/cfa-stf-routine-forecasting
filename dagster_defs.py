@@ -101,11 +101,16 @@ image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
 
 # ---------- Execution Configuration ----------
 
-# Most basic execution - launches locally, runs locally
-# Used for lightweight assets and jobs, etc.
+# Most basic execution - in dev, launches and runs locally
+# In prod, launches on the code location but runs in Azure Container App Jobs
+# Used for lightweight assets and jobs, etc. where volume mounts are not needed
 basic_execution_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
-    executor=SelectorConfig(class_name=dg.in_process_executor.__name__),
+    executor=SelectorConfig(
+        class_name=azure_container_app_job_executor.__name__
+        if is_production
+        else dg.multiprocess_executor.__name__
+    ),
 )
 
 # Launches locally, executes in a docker container as configured below

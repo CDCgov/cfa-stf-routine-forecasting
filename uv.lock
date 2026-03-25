@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = "==3.13.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -756,7 +756,7 @@ dependencies = [
 [[package]]
 name = "cfa-dagster"
 version = "0.1.0"
-source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#cf172f537659e244d3a6b6d0f066396fb410b13d" }
+source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#093c2f719894707d7293d56c16069eb7c337500a" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },

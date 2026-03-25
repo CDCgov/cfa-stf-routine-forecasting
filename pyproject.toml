@@ -33,7 +33,7 @@ dependencies = [
     "dagster==1.12.2",
     "dagster-graphql==1.12.2",
     "cfa-dagster",
-    "cfa-dataops",
+    # "cfa-dataops",
     "cfa-catalog-public",
 ]
 

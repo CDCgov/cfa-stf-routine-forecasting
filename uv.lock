@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.13.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -756,7 +756,7 @@ dependencies = [
 [[package]]
 name = "cfa-dagster"
 version = "0.1.0"
-source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#ec62fef86a1e54aa167622456307ac7ee52ddff4" }
+source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#cf172f537659e244d3a6b6d0f066396fb410b13d" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },
@@ -812,7 +812,6 @@ dependencies = [
     { name = "azuretools" },
     { name = "cfa-catalog-public" },
     { name = "cfa-dagster" },
-    { name = "cfa-dataops" },
     { name = "dagster" },
     { name = "dagster-graphql" },
     { name = "dagster-postgres" },
@@ -851,7 +850,6 @@ requires-dist = [
     { name = "azuretools", git = "https://github.com/cdcgov/cfa-azuretools" },
     { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub.git" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
-    { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops.git" },
     { name = "dagster", specifier = "==1.12.2" },
     { name = "dagster-graphql", specifier = "==1.12.2" },
     { name = "dagster-postgres", specifier = ">=0.27.4" },
@@ -3061,7 +3059,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [

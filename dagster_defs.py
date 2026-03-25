@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Direct use of dagster
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -14,6 +12,7 @@ from cfa_dagster import (
     ExecutionConfig,
     SelectorConfig,
     azure_batch_executor,
+    azure_container_app_job_executor,
     collect_definitions,
     docker_executor,
     dynamic_executor,
@@ -30,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Direct use of dagster
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (

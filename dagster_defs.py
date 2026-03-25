@@ -439,7 +439,7 @@ def _get_valid_date_disease_location(
     Function used by assets to parse which disease or location they should run as, and the daily partition.
     TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
     """
-
+    context.register_output(lambda: dg.Output("dummy_return"))
     # Disease and Locations are our "Graph Dimensions".
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
@@ -688,9 +688,7 @@ def pyrenew_hew(
     ],
     partitions_def=daily_partitions_def,
     # Run if it can, whenever something upstream runs
-    automation_condition=dg.AutomationCondition.eager()
-    .without(~dg.AutomationCondition.any_deps_missing())
-    .with_label("eager_allow_missing"),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
     output_required=False,
 )

@@ -774,8 +774,8 @@ defs = dg.Definitions(
     },
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
-        # default_config=azure_batch_execution_config,
-        default_config=docker_execution_config,
+        default_config=azure_batch_execution_config,
+        # default_config=docker_execution_config,
         alternate_configs=[basic_execution_config, docker_execution_config],
     ),
 )

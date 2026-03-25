@@ -107,7 +107,8 @@ def main(
         "--output-dir {output_dir} "
         "--credentials-path config/creds.toml "
         f"--exclude-last-n-days {exclude_last_n_days} "
-        f"{additional_args}"
+        f"{additional_args} "
+        "--epiweekly"
         "'"
     )
 

@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Direct use of dagster
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Direct use of dagster
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -439,6 +440,8 @@ def _get_valid_date_disease_location(
     Function used by assets to parse which disease or location they should run as, and the daily partition.
     TODO: Update for signals in addition to (in alternative to) model letters for timeseries.
     """
+
+    context.register_output(lambda: dg.Output("dummy_return"))
 
     # Disease and Locations are our "Graph Dimensions".
     disease = context.graph_dimension["diseases"]

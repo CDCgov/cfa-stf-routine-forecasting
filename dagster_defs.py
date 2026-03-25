@@ -691,9 +691,7 @@ def pyrenew_hew(
     ],
     partitions_def=daily_partitions_def,
     # Run if it can, whenever something upstream runs
-    automation_condition=dg.AutomationCondition.eager()
-    .without(~dg.AutomationCondition.any_deps_missing())
-    .with_label("eager_allow_missing"),
+    automation_condition=dg.AutomationCondition.eager(),
     group_name="WeeklyForecast",
     output_required=False,
 )

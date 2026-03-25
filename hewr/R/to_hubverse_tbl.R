@@ -29,7 +29,7 @@ raw_samples_to_prelim <- function(samples_path) {
 
   batch_params <- samples_path |>
     path_up_to("model_runs") |>
-    path_dir() |>
+    fs::path_dir() |>
     parse_model_batch_dir_path()
 
   report_date <- batch_params$report_date

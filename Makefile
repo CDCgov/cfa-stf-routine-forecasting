@@ -56,8 +56,6 @@ help:
 	@echo "  container_push	     : Push the container image"
 	@echo "  container_explore   : Run the last locally-built container interactively in your shell"
 	@echo ""
-# 	@echo "Dagster Targets: "
-# 	@echo "  dagster_push_prod   : Push the dagster container image to the Azure Container Registry and code location for production"
 	@echo ""
 	@echo "Model Fit Targets: "
 	@echo "  config              : Source the azureconfig.sh file to set environment variables for Azure access"
@@ -103,12 +101,6 @@ container_explore:
 
 config:
 	bash -c "source ./azureconfig.sh"
-
-# dagster_push_prod:
-# 	docker build . -t ghcr.io/cdcgov/cfa-stf-routine-forecasting:latest -f Containerfile && \
-# 	docker push ghcr.io/cdcgov/cfa-stf-routine-forecasting:latest && \
-# 	uv run https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py \
-#     	--registry_image ghcr.io/cdcgov/cfa-stf-routine-forecasting:latest
 
 # ---------------- #
 # Model Fit Targets

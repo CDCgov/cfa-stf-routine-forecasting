@@ -756,7 +756,7 @@ dependencies = [
 [[package]]
 name = "cfa-dagster"
 version = "0.1.0"
-source = { git = "https://github.com/cdcgov/cfa-dagster.git#cfa7be27b5a8a0e06c0f3e64dd27a20f26c94331" }
+source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#ec62fef86a1e54aa167622456307ac7ee52ddff4" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },
@@ -850,7 +850,7 @@ test = [
 requires-dist = [
     { name = "azuretools", git = "https://github.com/cdcgov/cfa-azuretools" },
     { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub.git" },
-    { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git" },
+    { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
     { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops.git" },
     { name = "dagster", specifier = "==1.12.2" },
     { name = "dagster-graphql", specifier = "==1.12.2" },

@@ -105,7 +105,7 @@ image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
 # Used for lightweight assets and jobs, etc.
 basic_execution_config = ExecutionConfig(
     launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
-    executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
+    executor=SelectorConfig(class_name=dg.in_process_executor.__name__),
 )
 
 # Launches locally, executes in a docker container as configured below

@@ -46,7 +46,7 @@ You can run `uv run pipelines/azure_command_center.py` (or `make acc`) to launch
 ### 2. Dagster Workflow Orchestration
 To execute dagster workflows fully locally with this project, you'll need to have blobs mounted. However, you can also launch jobs locally and have them submit to Azure Batch.
 
-#### Local Development and Testing 
+#### Local Development and Testing
 > Prerequisites:
 > - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
 > - Permissions to push to the container registry and both `$GH_USERNAME` and `$GH_PAT` set as environment variables in your shell.
@@ -81,8 +81,8 @@ When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/`
 
 #### Production Scheduling
 
-From our [production dagster server]( https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA. 
-- Pushes to main will automatically update this server via a Github Actions Workflow. 
+From our [production dagster server]( https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA.
+- Pushes to main will automatically update this server via a Github Actions Workflow.
 - Before pushing to `main`, make sure you have thoroughly tested your own branch and gotten a PR review.
 - It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date. `cfa-dagster`, our own implementation of dagster, updates frequently. To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.
 

@@ -46,21 +46,12 @@ You can run `uv run pipelines/azure_command_center.py` (or `make acc`) to launch
 ### 2. Dagster Workflow Orchestration
 To execute dagster workflows fully locally with this project, you'll need to have blobs mounted. However, you can also launch jobs locally and have them submit to Azure Batch.
 
-#### Makefile Targets for Local Testing
-If you'd like to test one or two model partitions at a time, you can have dagster execute on your machine. Take care not to run all model partitions or you will quickly put your VM into a coma.
-
-For convenience, you can use these makefile targets to get blobfuse setup on a fresh setup. Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
-- `make mount`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
-- `make unmount`: gracefully unmounts the pyrenew-relevant blobs.
-
-It is not necessary to mount blobs locally if submitting to Azure Batch.
-
-#### Local Development and Testing
+#### Local Development and Testing 
 > Prerequisites:
 > - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
 > - Permissions to push to the container registry and both `$GH_USERNAME` and `$GH_PAT` set as environment variables in your shell.
 
-The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` to test using the local Docker Executor - this will require you to have setup Blobfuse.
+The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` to test using the local Docker Executor - this will require you to have setup Blobfuse. See [Using the local docker executor](#using-the-local-docker-executor).
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
     - `make container_build` (requires Docker or Podman)
@@ -70,17 +61,30 @@ The following instructions will set up Dagster on your VAP. However, based on th
 
 Dagster is now ready to use locally.
 
+> [!NOTE]
+> The following process has been changing frequently. We will work to firm it up over the coming weeks and months.
+
 - To run a full pyrenew model pipeline run: go to `Jobs` → `weekly_pyrenew_via_backfill`
 - To run individual models: navigate to `Lineage` and select specific assets, making sure to check the Launchpad config and make sure you've selected the appropriate partitions (State x Disease combination).
 
 In development, whenever you update code, rerun `make container_push` and then `Reload Definitions` from the dagster lineage page.
 Pushing your code to github will also re-build and push the container image, but will typically take longer and you will have to wait for completion in Github Actions.
 
+By default, on this repository, Dagster will submit tasks to Azure Batch for execution.
+
+#### Using the local docker executor
+If you'd like to test a few "tasks" locally, you can have dagster execute on your machine, which is much faster than waiting for Azure Batch to pick up jobs. Dagster can leverage your VM's own docker daemon to emulate Azure Batch. When doing this, take care not to run more than two or three state x disease combinations at a time or you will quickly put your VM into a coma.
+
+When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
+- `make mount`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
+- `make unmount`: gracefully unmounts the pyrenew-relevant blobs.
+
 #### Production Scheduling
 
-Pushes to main will automatically update the central Dagster Code Location Github Actions Workflow. From the central code server, you can run and schedule model runs and see other projects' pipelines at CFA.
-
-To login to the production server, head to https://dagster.apps.edav.ext.cdc.gov/.
+From our [production dagster server]( https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA. 
+- Pushes to main will automatically update this server via a Github Actions Workflow. 
+- Before pushing to `main`, make sure you have thoroughly tested your own branch and gotten a PR review.
+- It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date. `cfa-dagster`, our own implementation of dagster, updates frequently. To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.
 
 ## General Disclaimer
 This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/organization/mission.htm).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise.

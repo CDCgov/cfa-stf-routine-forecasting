@@ -10,7 +10,7 @@ nhsn_disease_map = {
     "RSV": "totalconfrsvnewadm",
 }
 
-NSSPDataset = Literal["gold", "latest_comprehensive"]
+NSSPDataset = Literal["gold", "comprehensive"]
 
 
 def get_nhsn_hrd(
@@ -108,7 +108,7 @@ def get_nssp(
         Location abbreviation to filter for.
     dataset
         One of the two datasets to retrieve from datacat: "gold" or
-        "latest_comprehensive" (defaults to "gold").
+        "comprehensive" (defaults to "gold").
     as_of
         Reference date for data availability. Only data available as of this date will be used.
         If None, all available data will be used (defaults to None).
@@ -139,7 +139,7 @@ def get_nssp(
 
     dataset_map = {
         "gold": datacat.public.stf.nssp_gold,
-        "latest_comprehensive": datacat.public.stf.nssp_latest_comprehensive,
+        "comprehensive": datacat.public.stf.comprehensive_nssp_gold,
     }
     if dataset not in dataset_map:
         raise ValueError(

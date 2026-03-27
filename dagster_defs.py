@@ -106,7 +106,6 @@ image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
 # In prod, launches on the code location but runs in Azure Container App Jobs
 # Used for lightweight assets and jobs, etc. where volume mounts are not needed
 basic_execution_config = ExecutionConfig(
-    launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(
         class_name=azure_container_app_job_executor.__name__
         if is_production
@@ -117,7 +116,6 @@ basic_execution_config = ExecutionConfig(
 # Launches locally, executes in a docker container as configured below
 # Allows for rapid local testing in a similar-to-batch environment
 docker_execution_config = ExecutionConfig(
-    launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(
         class_name=docker_executor.__name__,
         config={
@@ -150,12 +148,15 @@ docker_execution_config = ExecutionConfig(
 
 # Cloud execution. This is what we want for any model run.
 azure_batch_execution_config = ExecutionConfig(
-    launcher=SelectorConfig(class_name=dg.DefaultRunLauncher.__name__),
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
             "pool_name": "pyrenew-dagster-pool",
-            "image": image,
+            **(
+                {}
+                if is_production  # image will come from the code location in prod
+                else {"image": image}
+            ),
             "env_vars": [
                 "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
             ],

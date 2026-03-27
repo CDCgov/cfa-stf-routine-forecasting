@@ -25,7 +25,10 @@ var_to_target <- function(variable, disease) {
 #'
 #' @export
 raw_samples_to_prelim <- function(samples_path) {
-  raw_samples <- duckplyr::read_parquet_duckdb(samples_path)
+  raw_samples <- duckplyr::read_parquet_duckdb(
+    samples_path,
+    prudence = "lavish"
+  )
 
   batch_params <- samples_path |>
     path_up_to("model_runs") |>

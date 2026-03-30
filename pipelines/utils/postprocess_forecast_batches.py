@@ -41,7 +41,9 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
         raise FileNotFoundError(
             f"No {expected_file_name} files found under {model_batch_dir_path}"
         )
-    pl.scan_parquet(parquet_files).sink_parquet(output_path)
+    pl.scan_parquet(
+        parquet_files, cast_options=pl.ScanCastOptions(integer_cast="allow-float")
+    ).sink_parquet(output_path)
     return None
 
 

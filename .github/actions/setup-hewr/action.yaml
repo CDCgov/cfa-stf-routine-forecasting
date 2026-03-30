@@ -20,5 +20,5 @@ runs:
         extra-packages: any::covr, any::xml2
 
     - name: Install hewr
-      run: pak::local_install("hewr", ask = FALSE)
+      run: pak::local_install("hewr", ask = FALSE, upgrade = FALSE)
       shell: Rscript {0}

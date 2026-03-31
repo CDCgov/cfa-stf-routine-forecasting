@@ -33,7 +33,7 @@ jobs:
             --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml .
 
       - name: Upload results to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           env_vars: OS,PYTHON
           fail_ci_if_error: true
@@ -65,7 +65,7 @@ jobs:
           covr::to_cobertura(cov)
         shell: Rscript {0}
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           fail_ci_if_error: true
           files: ./cobertura.xml
@@ -109,7 +109,7 @@ jobs:
           directories: EpiAutoGP/src
 
       - name: Upload results to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           env_vars: OS,PYTHON
           fail_ci_if_error: true

@@ -79,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nhsn-epiweekly
-          path: ${{ env.BASE_DIR }}
+          path: ${{ env.FORECAST_DIR }}/*/model_runs/*/epiautogp_nhsn_epiweekly
 
   fit-epiautogp-nssp-percentage-models:
     needs: generate-data
@@ -122,7 +122,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nssp-epiweekly-pct
-          path: ${{ env.BASE_DIR }}
+          path: ${{ env.FORECAST_DIR }}/*/model_runs/*/epiautogp_nssp_epiweekly_pct
 
   fit-epiautogp-nssp-daily-models:
     needs: generate-data
@@ -165,7 +165,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nssp-daily-observed
-          path: ${{ env.BASE_DIR }}
+          path: ${{ env.FORECAST_DIR }}/*/model_runs/*/epiautogp_nssp_daily
 
   fit-epiautogp-nssp-other-models:
     needs: generate-data
@@ -208,7 +208,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-fit-epiautogp-nssp-daily-other
-          path: ${{ env.BASE_DIR }}
+          path: ${{ env.FORECAST_DIR }}/*/model_runs/*/epiautogp_nssp_daily_other
 
   fit-timeseries-models:
     needs: generate-data
@@ -243,7 +243,9 @@ jobs:
         with:
           name: |
             test-fit-ts-${{ matrix.disease }}-${{ matrix.location }}-${{ matrix.model }}
-          path: ${{ env.BASE_DIR }}
+          path: |
+            ${{ env.FORECAST_DIR }}/*/model_runs/${{ matrix.location }}/daily_ts_ensemble_${{ matrix.model }}
+            ${{ env.FORECAST_DIR }}/*/model_runs/${{ matrix.location }}/epiweekly_ts_ensemble_${{ matrix.model }}
 
   fit-pyrenew-models:
     needs: fit-timeseries-models
@@ -295,8 +297,8 @@ jobs:
         if: ${{ matrix.model != 'hw' && matrix.model != 'h' }}
         uses: actions/download-artifact@v8
         with:
-          pattern: test-fit-ts-*
-          path: ${{ env.BASE_DIR }}
+          pattern: test-fit-ts-${{ matrix.disease }}-${{ matrix.location }}-e
+          path: ${{ env.FORECAST_DIR }}
           merge-multiple: true
 
       - name: Fit model
@@ -309,7 +311,9 @@ jobs:
         with:
           name: |
             test-fit-${{ matrix.disease }}-${{ matrix.location }}-${{ matrix.model }}
-          path: ${{ env.BASE_DIR }}
+          path: |
+            ${{ env.FORECAST_DIR }}/*/model_runs/${{ matrix.location }}/pyrenew_${{ matrix.model }}
+            ${{ env.FORECAST_DIR }}/*/model_runs/${{ matrix.location }}/prop_*pyrenew_${{ matrix.model }}_*
 
   postprocess-models:
     needs:
@@ -334,7 +338,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: test-fit-*
-          path: ${{ env.BASE_DIR }}
+          path: ${{ env.FORECAST_DIR }}
           merge-multiple: true
 
       - name: Run postprocessing

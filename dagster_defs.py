@@ -351,13 +351,6 @@ on_missing = dg.AutomationCondition.on_missing().replace(
 )
 # on_missing = dg.AutomationCondition.on_missing()
 
-# production nssp gold data
-nssp_gold_v1 = dg.AssetSpec(
-    key="nssp_gold_v1",
-    partitions_def=daily_partitions_def,
-    group_name="UpstreamData",
-)
-
 
 # NHSN
 @dg.asset(
@@ -365,11 +358,11 @@ nssp_gold_v1 = dg.AssetSpec(
     automation_condition=(
         # Check every hour 6am-4pm on Wednesday for new data;
         dg.AutomationCondition.on_cron(
-            cron_schedule="0 6-16 * * MON,WED", cron_timezone="America/New_York"
+            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
         )
         &
         # don't check if not-missing for that day
-        on_missing
+        dg.AutomationCondition.missing()
     ),
     group_name="UpstreamData",
     output_required=False,
@@ -390,11 +383,11 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
     automation_condition=(
         # Check every hour 6am-4pm on Wednesday for new data;
         dg.AutomationCondition.on_cron(
-            cron_schedule="0 6-16 * * MON,WED", cron_timezone="America/New_York"
+            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
         )
         &
         # don't check if not-missing for that day
-        on_missing
+        dg.AutomationCondition.missing()
     ),
     group_name="UpstreamData",
     output_required=False,
@@ -497,12 +490,12 @@ def _run_pyrenew_model(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # We materialize this asset whenever its deps are met and it is missing for a given day
+    # only run on Mondays and Wednesdays as soon as the nssp_gold data is available
     automation_condition=(
-        on_missing
-        & dg.AutomationCondition.on_cron(
-            "* * * * MON,WED", cron_timezone="America/New_York"
+        dg.AutomationCondition.cron_tick_passed(
+            "* * * * WED", cron_timezone="America/New_York"
         )
+        & on_missing
     ),
     group_name="WeeklyForecast",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
@@ -515,12 +508,12 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # We materialize this asset whenever its deps are met and it is missing for a given day
+    # only run on Mondays and Wednesdays as soon as the nssp_gold data is available
     automation_condition=(
-        on_missing
-        & dg.AutomationCondition.on_cron(
-            "* * * * MON,WED", cron_timezone="America/New_York"
+        dg.AutomationCondition.cron_tick_passed(
+            "* * * * WED", cron_timezone="America/New_York"
         )
+        & on_missing
     ),
     group_name="WeeklyForecast",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
@@ -676,7 +669,6 @@ upstream_data_sensor = dg.AutomationConditionSensorDefinition(
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecast",
     target=dg.AssetSelection.groups("WeeklyForecast"),
-    run_tags=azure_batch_execution_config.to_run_tags(),
 )
 
 # ============================================================================

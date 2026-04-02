@@ -349,7 +349,6 @@ on_missing = dg.AutomationCondition.on_missing().replace(
     "handled",
     dg.AutomationCondition.newly_requested() | dg.AutomationCondition.newly_updated(),
 )
-# on_missing = dg.AutomationCondition.on_missing()
 
 
 # NHSN
@@ -493,7 +492,7 @@ def _run_pyrenew_model(
     # only run on Mondays and Wednesdays as soon as the nssp_gold data is available
     automation_condition=(
         dg.AutomationCondition.cron_tick_passed(
-            "* * * * WED", cron_timezone="America/New_York"
+            "0 0 * * WED", cron_timezone="America/New_York"
         )
         & on_missing
     ),
@@ -511,7 +510,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
     # only run on Mondays and Wednesdays as soon as the nssp_gold data is available
     automation_condition=(
         dg.AutomationCondition.cron_tick_passed(
-            "* * * * WED", cron_timezone="America/New_York"
+            "0 0 * * WED", cron_timezone="America/New_York"
         )
         & on_missing
     ),

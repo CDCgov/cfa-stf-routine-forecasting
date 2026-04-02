@@ -44,7 +44,8 @@ Imports:
     urca
 Remotes:
     github::cdcgov/forecasttools,
-    github::mjskay/ggdist
+    github::mjskay/ggdist,
+    hubUtils=github::damonbayer/hubUtils@dmb_faster_convert_output_type
 Suggests:
     checkmate,
     rcmdcheck,

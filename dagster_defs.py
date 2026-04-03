@@ -341,27 +341,17 @@ def _check_nwss_gold_data_availability(
 
 # ----------- Upstream Data Availability Assets ----
 
-# modified AutomationCondition.on_missing() to allow materializions even if the partition
-# was missing when the sensor was first activated
-# the default `handled` condition is made of: newly_requested | newly_updated | initial_evaluation
-# this change just removes the `initial_evaluation` condition
-on_missing = dg.AutomationCondition.on_missing().replace(
-    "handled",
-    dg.AutomationCondition.newly_requested() | dg.AutomationCondition.newly_updated(),
-)
-
-
 # NHSN
 @dg.asset(
     partitions_def=daily_partitions_def,
     automation_condition=(
         # Check every hour 6am-4pm on Wednesday for new data;
-        dg.AutomationCondition.on_cron(
+        dg.AutomationCondition.cron_tick_passed(
             cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
         )
-        &
         # don't check if not-missing for that day
-        dg.AutomationCondition.missing()
+        & dg.AutomationCondition.in_latest_time_window()
+        & dg.AutomationCondition.missing()
     ),
     group_name="UpstreamData",
     output_required=False,
@@ -373,7 +363,6 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
         yield dg.Output("nhsn_data_stf")
     else:
         context.log.error(f"NHSN data not available: {result}")
-        return
 
 
 # NWSS
@@ -381,12 +370,12 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
     partitions_def=daily_partitions_def,
     automation_condition=(
         # Check every hour 6am-4pm on Wednesday for new data;
-        dg.AutomationCondition.on_cron(
+        dg.AutomationCondition.cron_tick_passed(
             cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
         )
-        &
         # don't check if not-missing for that day
-        dg.AutomationCondition.missing()
+        & dg.AutomationCondition.in_latest_time_window()
+        & dg.AutomationCondition.missing()
     ),
     group_name="UpstreamData",
     output_required=False,
@@ -398,7 +387,6 @@ def nwss_gold_stf(context: dg.AssetExecutionContext):
         yield dg.Output("nwss_gold_stf")
     else:
         context.log.error(f"NWSS gold data not available: {result}")
-        return
 
 
 # ----------- Model Constructor Functions --------------------------
@@ -482,6 +470,11 @@ def _run_pyrenew_model(
     )
 
 
+# ---------- Automation Conditions ----------
+# A condition that will run as soon as all dependencies are available, but only
+# if the asset has not been materialized yet for that day
+eager_once = dg.AutomationCondition.eager() & dg.AutomationCondition.missing()
+
 # ---------- Pyrenew Assets ----------
 
 
@@ -489,12 +482,12 @@ def _run_pyrenew_model(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # only run on Mondays and Wednesdays as soon as the nssp_gold data is available
+    # Run as soon as the nssp gold data is available only on Wednesdays
     automation_condition=(
         dg.AutomationCondition.cron_tick_passed(
-            "0 0 * * WED", cron_timezone="America/New_York"
+            "* * * * WED", cron_timezone="America/New_York"
         )
-        & on_missing
+        & eager_once
     ),
     group_name="WeeklyForecast",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
@@ -507,12 +500,12 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # only run on Mondays and Wednesdays as soon as the nssp_gold data is available
+    # Run as soon as the nssp gold data is available only on Wednesdays
     automation_condition=(
         dg.AutomationCondition.cron_tick_passed(
-            "0 0 * * WED", cron_timezone="America/New_York"
+            "* * * * WED", cron_timezone="America/New_York"
         )
-        & on_missing
+        & eager_once
     ),
     group_name="WeeklyForecast",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
@@ -527,7 +520,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=on_missing,
+    automation_condition=eager_once,
     group_name="WeeklyForecast",
     ins={
         "timeseries_e": dg.In(dg.Nothing),
@@ -545,7 +538,7 @@ def pyrenew_e(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=on_missing,
+    automation_condition=eager_once,
     group_name="WeeklyForecast",
     ins={
         "nhsn_data_stf": dg.In(dg.Nothing),
@@ -559,7 +552,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    automation_condition=on_missing,
+    automation_condition=eager_once,
     group_name="WeeklyForecast",
     ins={
         "timeseries_e": dg.In(dg.Nothing),
@@ -578,7 +571,7 @@ def pyrenew_he(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # automation_condition=on_missing,
+    # automation_condition=eager_once,
     group_name="WeeklyForecastArchived",
     ins={
         "nwss_gold_stf": dg.In(dg.Nothing),
@@ -596,7 +589,7 @@ def pyrenew_hw(
 @dynamic_graph_asset(
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
-    # automation_condition=on_missing,
+    # automation_condition=eager_once,
     group_name="WeeklyForecastArchived",
     ins={
         "timeseries_e": dg.In(dg.Nothing),
@@ -622,10 +615,11 @@ def pyrenew_hew(
         "pyrenew_he",
     ],
     partitions_def=daily_partitions_def,
-    # Run if it can, whenever something upstream runs
+    # Runs when any dependency has been updated as long as at least one exists
     automation_condition=(
-        dg.AutomationCondition.eager().without(
-            ~dg.AutomationCondition.any_deps_missing()
+        dg.AutomationCondition.eager().replace(
+            ~dg.AutomationCondition.any_deps_missing(),
+            ~dg.AutomationCondition.all_deps_match(dg.AutomationCondition.missing())
         )
     ),
     group_name="WeeklyForecast",

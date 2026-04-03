@@ -265,7 +265,7 @@ class PostProcessConfig(dg.Config):
 
     _output_basedir: str = "output" if is_production else "test-output"
     output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
-    skip_existing: bool = True
+    skip_existing: bool = False
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
     postprocess_diseases: list[str] = ["COVID-19", "Influenza", "RSV"]

@@ -37,6 +37,7 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
     output_path = Path(model_batch_dir_path, output_file_name)
     expected_file_name = "hubverse_table.parquet"
     parquet_files = list(model_batch_dir_path.rglob(expected_file_name))
+    parquet_files.sort()
     if not parquet_files:
         raise FileNotFoundError(
             f"No {expected_file_name} files found under {model_batch_dir_path}"

@@ -483,11 +483,8 @@ eager_once = dg.AutomationCondition.eager() & dg.AutomationCondition.missing()
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     # Run as soon as the nssp gold data is available only on Wednesdays
-    automation_condition=(
-        dg.AutomationCondition.cron_tick_passed(
-            "* * * * WED", cron_timezone="America/New_York"
-        )
-        & eager_once
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
     ),
     group_name="WeeklyForecast",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
@@ -501,11 +498,8 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
     partitions_def=daily_partitions_def,
     graph_dimensions=["diseases", "locations"],
     # Run as soon as the nssp gold data is available only on Wednesdays
-    automation_condition=(
-        dg.AutomationCondition.cron_tick_passed(
-            "* * * * WED", cron_timezone="America/New_York"
-        )
-        & eager_once
+    automation_condition=dg.AutomationCondition.on_cron(
+        cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
     ),
     group_name="WeeklyForecast",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},

@@ -11,6 +11,7 @@ runs:
       with:
         r-version: "release"
         use-public-rspm: true
+        extra-repositories: https://hubverse-org.r-universe.dev
 
     - name: "Set up dependencies for hewr"
       uses: r-lib/actions/setup-r-dependencies@v2

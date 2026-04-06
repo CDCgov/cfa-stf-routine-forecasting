@@ -341,6 +341,7 @@ def _check_nwss_gold_data_availability(
 
 # ----------- Upstream Data Availability Assets ----
 
+
 # NHSN
 @dg.asset(
     partitions_def=daily_partitions_def,
@@ -613,7 +614,7 @@ def pyrenew_hew(
     automation_condition=(
         dg.AutomationCondition.eager().replace(
             ~dg.AutomationCondition.any_deps_missing(),
-            ~dg.AutomationCondition.all_deps_match(dg.AutomationCondition.missing())
+            ~dg.AutomationCondition.all_deps_match(dg.AutomationCondition.missing()),
         )
     ),
     group_name="WeeklyForecast",

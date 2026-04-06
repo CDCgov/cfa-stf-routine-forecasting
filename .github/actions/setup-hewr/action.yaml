@@ -12,14 +12,13 @@ runs:
         r-version: "release"
         use-public-rspm: true
 
-    - name: Install pak
-      run: install.packages("pak")
-      shell: Rscript {0}
+    - name: "Set up dependencies for hewr"
+      uses: r-lib/actions/setup-r-dependencies@v2
+      with:
+        working-directory: hewr
+        needs: check, coverage
+        extra-packages: any::covr, any::xml2
 
-    - name: Install hewr dependencies and package
-      env:
-        GITHUB_PAT: ${{ github.token }}
-      run: |
-        pak::pkg_install(c("any::covr", "any::xml2"), ask = FALSE, upgrade = FALSE)
-        pak::local_install("hewr", dependencies = TRUE, ask = FALSE, upgrade = FALSE)
+    - name: Install hewr
+      run: pak::local_install("hewr", ask = FALSE, upgrade = FALSE)
       shell: Rscript {0}

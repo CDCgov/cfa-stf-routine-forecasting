@@ -615,8 +615,9 @@ def pyrenew_hew(
         dg.AutomationCondition.eager().replace(
             ~dg.AutomationCondition.any_deps_missing(),
             dg.AutomationCondition.any_deps_match(
-                ~dg.AutomationCondition.missing() | dg.AutomationCondition.will_be_requested()
-            )
+                ~dg.AutomationCondition.missing()
+                | dg.AutomationCondition.will_be_requested()
+            ),
         )
     ),
     group_name="WeeklyForecast",

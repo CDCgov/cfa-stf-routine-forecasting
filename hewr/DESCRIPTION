@@ -42,9 +42,11 @@ Imports:
     tidyr,
     tidyselect,
     urca
+Additional_repositories: https://hubverse-org.r-universe.dev
 Remotes:
     github::cdcgov/forecasttools,
-    github::mjskay/ggdist
+    github::mjskay/ggdist,
+    hubUtils=github::damonbayer/hubUtils@dmb_faster_convert_output_type
 Suggests:
     checkmate,
     rcmdcheck,

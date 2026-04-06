@@ -42,6 +42,7 @@ Imports:
     tidyr,
     tidyselect,
     urca
+Additional_repositories: https://hubverse-org.r-universe.dev
 Remotes:
     github::cdcgov/forecasttools,
     github::mjskay/ggdist,

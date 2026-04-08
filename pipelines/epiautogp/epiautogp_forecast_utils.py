@@ -20,6 +20,7 @@ from pipelines.utils.common_utils import (
     calculate_training_dates,
     generate_epiweekly_data,
     get_available_reports,
+    get_model_batch_dir_name,
     load_credentials,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -266,9 +267,11 @@ def setup_forecast_pipeline(
     )
 
     # Create model batch directory structure
-    model_batch_dir_name = (
-        f"{disease.lower()}_r_{report_date_parsed}_f_"
-        f"{first_training_date}_t_{last_training_date}"
+    model_batch_dir_name = get_model_batch_dir_name(
+        disease=disease,
+        report_date=report_date_parsed,
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
     )
     model_batch_dir = Path(output_dir, model_batch_dir_name)
     model_run_dir = Path(model_batch_dir, "model_runs", loc)

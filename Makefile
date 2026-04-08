@@ -59,7 +59,6 @@ help:
 	@echo ""
 	@echo "Model Fit Targets: "
 	@echo "  config              : Source the azureconfig.sh file to set environment variables for Azure access"
-	@echo "  acc                 : Run the Azure Command Center for routine production jobs"
 	@echo "  post_process        : Post-process model outputs."
 	@echo "Passing a flag through ARGS will also override the flags set previously."
 
@@ -105,9 +104,6 @@ config:
 # ---------------- #
 # Model Fit Targets
 # ---------------- #
-
-acc: mount config
-	uv run pipelines/batch/azure_command_center.py
 
 post_process: config
 	uv run python pipelines/utils/postprocess_forecast_batches.py \

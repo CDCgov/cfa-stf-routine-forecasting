@@ -32,12 +32,6 @@ from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
 
-# Local constant imports
-from pipelines.batch.common_batch_utils import (
-    DEFAULT_EXCLUDED_LOCATIONS,
-    SUPPORTED_DISEASES,
-)
-
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
@@ -53,6 +47,8 @@ start_dev_env(__name__)
 # shared time helpers
 NY_TZ = timezone("America/New_York")
 DATE_FMT = "%Y-%m-%d"
+DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
+SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
 
 
 def current_date_str() -> str:

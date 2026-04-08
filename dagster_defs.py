@@ -3,8 +3,6 @@ import datetime as dt
 import os
 from pathlib import Path
 
-# Direct use of dagster
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pytz import timezone
+
+# Direct use of dagster
+import dagster as dg
 
 # Local constant imports
 from pipelines.batch.common_batch_utils import (
@@ -211,8 +212,7 @@ class ModelBaseConfig(dg.Config):
     Contains parameters common to both Timeseries and Pyrenew models.
     """
 
-    _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
+    output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
     diseases: list[str] = DISEASES
@@ -263,8 +263,7 @@ class PostProcessConfig(dg.Config):
     Configuration for the Post-Processing asset.
     """
 
-    _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
+    output_basedir: str = "output" if is_production else "test-output"
     skip_existing: bool = False
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
@@ -421,7 +420,7 @@ def _run_timeseries_e(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        output_dir=Path(config.output_dir),
+        output_dir=Path(f"{config.output_basedir}/{context.partition_key}_forecasts"),
         n_training_days=config.n_training_days,
         n_forecast_days=28,
         n_samples=config.n_samples,
@@ -457,7 +456,7 @@ def _run_pyrenew_model(
         nwss_data_dir=Path("nwss-vintages"),
         param_data_dir=Path("params"),
         priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
+        output_dir=Path(f"{config.output_basedir}/{context.partition_key}_forecasts"),
         n_training_days=config.n_training_days,
         n_forecast_days=28,
         n_chains=config.n_chains,
@@ -634,10 +633,10 @@ def postprocess_forecasts(
 
     context.log.debug(f"config: '{config}'")
     postprocess(
-        base_forecast_dir=config.output_dir,
+        base_forecast_dir=f"{config.output_basedir}/{context.partition_key}_forecasts",
         diseases=config.postprocess_diseases,
         skip_existing=config.skip_existing,
-        local_copy_dir=config.output_dir,
+        local_copy_dir=f"{config.output_basedir}/{context.partition_key}_forecasts",
     )
 
 

@@ -208,6 +208,19 @@ def calculate_training_dates(
     return first_training_date, last_training_date
 
 
+def get_model_batch_dir_name(
+    disease: str,
+    report_date: dt.date,
+    first_training_date: dt.date,
+    last_training_date: dt.date,
+) -> str:
+    """Build the standard model batch directory name."""
+    return (
+        f"{disease.lower()}_r_{report_date}_f_"
+        f"{first_training_date}_t_{last_training_date}"
+    )
+
+
 def run_r_script(
     script_name: str,
     args: list[str],

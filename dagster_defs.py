@@ -28,7 +28,6 @@ from dagster_azure.blob import (
 from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
-from pytz import timezone
 
 # Direct use of dagster
 import dagster as dg
@@ -46,15 +45,8 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 start_dev_env(__name__)
 
 # shared time helpers
-NY_TZ = timezone("America/New_York")
-DATE_FMT = "%Y-%m-%d"
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
 SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
-
-
-def current_date_str() -> str:
-    return dt.datetime.now(NY_TZ).strftime(DATE_FMT)
-
 
 # env variable set by Dagster CLI
 is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")

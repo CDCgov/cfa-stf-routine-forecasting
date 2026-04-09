@@ -415,12 +415,19 @@ def _run_timeseries_e(
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
 
+    # we let the user potentially override the basedir,
+    # but subdir is locked to the partition date
+    daily_forecast_output_dir: Path = Path(
+        f"{config.output_basedir}/{context.partition_key}_forecasts"
+    )
+
     context.log.debug(f"config: '{config}'")
+    context.log.debug(f"Will write to: {daily_forecast_output_dir}")
     forecast_timeseries(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        output_dir=Path(f"{config.output_basedir}/{context.partition_key}_forecasts"),
+        output_dir=daily_forecast_output_dir,
         n_training_days=config.n_training_days,
         n_forecast_days=28,
         n_samples=config.n_samples,
@@ -443,12 +450,19 @@ def _run_pyrenew_model(
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
 
+    # we let the user potentially override the basedir,
+    # but subdir is locked to the partition date
+    daily_forecast_output_dir: Path = Path(
+        f"{config.output_basedir}/{context.partition_key}_forecasts"
+    )
+
     fit_flags = flags_from_hew_letters(model_letters)
     forecast_flags = flags_from_hew_letters(
         f"{model_letters}{config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
     context.log.debug(f"config: '{config}'")
+    context.log.debug(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
         disease=disease,
         loc=location,
@@ -456,7 +470,7 @@ def _run_pyrenew_model(
         nwss_data_dir=Path("nwss-vintages"),
         param_data_dir=Path("params"),
         priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(f"{config.output_basedir}/{context.partition_key}_forecasts"),
+        output_dir=daily_forecast_output_dir,
         n_training_days=config.n_training_days,
         n_forecast_days=28,
         n_chains=config.n_chains,
@@ -626,17 +640,21 @@ def postprocess_forecasts(
     config: PostProcessConfig,
 ):
     """
-    Postprocess forecast batches.
+    Postprocess forecast batches
     """
 
     _throw_if_backfill(context, daily_partitions_def)
 
+    daily_forecast_output_dir: Path = Path(
+        f"{config.output_basedir}/{context.partition_key}_forecasts"
+    )
+
     context.log.debug(f"config: '{config}'")
     postprocess(
-        base_forecast_dir=f"{config.output_basedir}/{context.partition_key}_forecasts",
+        base_forecast_dir=daily_forecast_output_dir,
         diseases=config.postprocess_diseases,
         skip_existing=config.skip_existing,
-        local_copy_dir=f"{config.output_basedir}/{context.partition_key}_forecasts",
+        local_copy_dir=daily_forecast_output_dir,
     )
 
 
@@ -693,9 +711,9 @@ defs = dg.Definitions(
     },
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
-        default_config=azure_batch_execution_config,
+        # default_config=azure_batch_execution_config,
         # default_config=basic_execution_config,
-        # default_config=docker_execution_config,
+        default_config=docker_execution_config,
         alternate_configs=[basic_execution_config, docker_execution_config],
     ),
 )

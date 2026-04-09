@@ -3,6 +3,8 @@ import datetime as dt
 import os
 from pathlib import Path
 
+# Direct use of dagster
+import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -28,9 +30,6 @@ from dagster_azure.blob import (
 from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
-
-# Direct use of dagster
-import dagster as dg
 
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries

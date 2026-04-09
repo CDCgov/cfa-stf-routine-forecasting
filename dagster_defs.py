@@ -30,7 +30,6 @@ from dagster_azure.blob import (
 from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
-from pytz import timezone
 
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
@@ -45,15 +44,8 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 start_dev_env(__name__)
 
 # shared time helpers
-NY_TZ = timezone("America/New_York")
-DATE_FMT = "%Y-%m-%d"
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
 SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
-
-
-def current_date_str() -> str:
-    return dt.datetime.now(NY_TZ).strftime(DATE_FMT)
-
 
 # env variable set by Dagster CLI
 is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
@@ -207,8 +199,7 @@ class ModelBaseConfig(dg.Config):
     Contains parameters common to both Timeseries and Pyrenew models.
     """
 
-    _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
+    output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
     diseases: list[str] = DISEASES
@@ -259,8 +250,7 @@ class PostProcessConfig(dg.Config):
     Configuration for the Post-Processing asset.
     """
 
-    _output_basedir: str = "output" if is_production else "test-output"
-    output_dir: str = f"{_output_basedir}/{current_date_str()}_forecasts"
+    output_basedir: str = "output" if is_production else "test-output"
     skip_existing: bool = False
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
@@ -412,12 +402,19 @@ def _run_timeseries_e(
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
 
+    # we let the user potentially override the basedir,
+    # but subdir is locked to the partition date
+    daily_forecast_output_dir: Path = Path(
+        f"{config.output_basedir}/{context.partition_key}_forecasts"
+    )
+
     context.log.debug(f"config: '{config}'")
+    context.log.debug(f"Will write to: {daily_forecast_output_dir}")
     forecast_timeseries(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        output_dir=Path(config.output_dir),
+        output_dir=daily_forecast_output_dir,
         n_training_days=config.n_training_days,
         n_forecast_days=28,
         n_samples=config.n_samples,
@@ -440,12 +437,19 @@ def _run_pyrenew_model(
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
 
+    # we let the user potentially override the basedir,
+    # but subdir is locked to the partition date
+    daily_forecast_output_dir: Path = Path(
+        f"{config.output_basedir}/{context.partition_key}_forecasts"
+    )
+
     fit_flags = flags_from_hew_letters(model_letters)
     forecast_flags = flags_from_hew_letters(
         f"{model_letters}{config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
     context.log.debug(f"config: '{config}'")
+    context.log.debug(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
         disease=disease,
         loc=location,
@@ -453,7 +457,7 @@ def _run_pyrenew_model(
         nwss_data_dir=Path("nwss-vintages"),
         param_data_dir=Path("params"),
         priors_path=Path("pipelines/priors/prod_priors.py"),
-        output_dir=Path(config.output_dir),
+        output_dir=daily_forecast_output_dir,
         n_training_days=config.n_training_days,
         n_forecast_days=28,
         n_chains=config.n_chains,
@@ -623,17 +627,21 @@ def postprocess_forecasts(
     config: PostProcessConfig,
 ):
     """
-    Postprocess forecast batches.
+    Postprocess forecast batches
     """
 
     _throw_if_backfill(context, daily_partitions_def)
 
+    daily_forecast_output_dir: Path = Path(
+        f"{config.output_basedir}/{context.partition_key}_forecasts"
+    )
+
     context.log.debug(f"config: '{config}'")
     postprocess(
-        base_forecast_dir=config.output_dir,
+        base_forecast_dir=daily_forecast_output_dir,
         diseases=config.postprocess_diseases,
         skip_existing=config.skip_existing,
-        local_copy_dir=config.output_dir,
+        local_copy_dir=daily_forecast_output_dir,
     )
 
 

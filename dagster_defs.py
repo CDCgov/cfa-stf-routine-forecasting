@@ -291,7 +291,6 @@ def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
             "update_date": nhsn_update_date,
             "current_date": current_date,
         }
-        context.log.info(result)
         return result
     except Exception as e:
         print(f"Error checking NHSN data availability: {e}")
@@ -322,7 +321,6 @@ def _check_nwss_gold_data_availability(
         "target_blob": target_blob,
         "current_date": current_date,
     }
-    context.log.info(result)
     return result
 
 

@@ -341,3 +341,9 @@ jobs:
         run: |
           uv run python pipelines/utils/postprocess_forecast_batches.py \
           ${{ env.FORECAST_DIR }}
+
+      - name: Upload postprocessed forecasts
+        uses: actions/upload-artifact@v7
+        with:
+          name: postprocessed-forecasts
+          path: ${{ env.FORECAST_DIR }}

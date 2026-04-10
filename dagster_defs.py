@@ -31,9 +31,20 @@ from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
+# Local constant imports
+from pipelines.batch.common_batch_utils import (
+    DEFAULT_EXCLUDED_LOCATIONS,
+    SUPPORTED_DISEASES,
+)
+
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
+from pipelines.utils.common_utils import (
+    create_prop_samples,
+    make_figures_from_model_fit_dir,
+    model_fit_dir_to_hub_tbl,
+)
 from pipelines.utils.postprocess_forecast_batches import main as postprocess
 
 # ============================================================================
@@ -44,8 +55,6 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 start_dev_env(__name__)
 
 # shared time helpers
-DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
 
 # env variable set by Dagster CLI
 is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
@@ -213,6 +222,10 @@ class TimeseriesConfig(ModelBaseConfig):
     """
 
     n_samples: int = 400 if not is_production else 2000  # Total samples for timeseries
+
+
+class FusionConfig(dg.config):
+    pass
 
 
 class PyrenewConfig(ModelBaseConfig):
@@ -387,6 +400,49 @@ def _throw_if_backfill(
     latest_partition = partition_def.get_last_partition_key()
     if current_partition != latest_partition:
         raise RuntimeError("STF forecast models do not support backfills")
+
+
+def _run_fusion_model(
+    context: DynamicGraphAssetExecutionContext,
+    config: FusionConfig,
+    num_model_name,
+    other_model_name,
+    aggregate_num,
+    aggregate_other,
+    fusion_model_name,
+) -> str | None:
+    """
+    Helper function to run fusion model.
+    """
+    _throw_if_backfill(context, daily_partitions_def)
+
+    disease = context.graph_dimension["diseases"]
+    location = context.graph_dimension["locations"]
+    model_run_dir = Path(
+        config.output_dir
+    )  # this isn't right and should be constructed from disease and location
+
+    create_prop_samples(
+        model_run_dir=model_run_dir,
+        num_model_name=num_model_name,
+        other_model_name=other_model_name,
+        aggregate_num=aggregate_num,
+        aggregate_other=aggregate_other,
+        save=True,
+    )
+
+    fusion_model_fit_dir = Path(model_run_dir, fusion_model_name)
+
+    make_figures_from_model_fit_dir(Path(config.output_dir))
+
+    make_figures_from_model_fit_dir(
+        fusion_model_fit_dir,
+        save_figs=True,
+        save_ci=True,
+    )
+    model_fit_dir_to_hub_tbl(fusion_model_fit_dir)
+
+    context.log.debug(f"config: '{config}'")
 
 
 def _run_timeseries_e(

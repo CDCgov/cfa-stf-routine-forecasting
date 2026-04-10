@@ -22,15 +22,13 @@ def _filter_param_estimates(
     disease: str,
     as_of: dt.date | None = None,
 ) -> pl.DataFrame:
-    min_as_of = dt.date(1000, 1, 1)
-    max_as_of = dt.date(3000, 1, 1)
-    as_of = as_of or max_as_of - dt.timedelta(days=1)
+    as_of = as_of or dt.date.max - dt.timedelta(days=1)
 
     dat = datacat.public.stf.param_estimates.load.get_dataframe(output="pl")
     return (
         dat.with_columns(
-            pl.col("start_date").fill_null(min_as_of),
-            pl.col("end_date").fill_null(max_as_of),
+            pl.col("start_date").fill_null(dt.date.min),
+            pl.col("end_date").fill_null(dt.date.max),
         )
         .filter(pl.col("disease") == disease)
         .filter(
@@ -150,8 +148,12 @@ def get_nnh_right_truncation_pmf(
     ValueError
         If exactly one right_truncation row is not found when required.
     """
+    if loc_abb == "GA":
+        if as_of is None or as_of > dt.date(2025, 10, 14):
+            as_of = dt.date(2025, 10, 14)
+
     dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of)
-    reference_date = reference_date or as_of or dt.date(3000, 1, 1)
+    reference_date = reference_date or as_of or dt.date.max
 
     right_truncation_df = (
         dat_filtered.filter(pl.col("geo_value") == loc_abb)

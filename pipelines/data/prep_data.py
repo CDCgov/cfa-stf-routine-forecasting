@@ -429,14 +429,14 @@ def get_pmfs(
       parameter name, and validity date range.
     - For right_truncation: additionally filters by location.
     """
-    min_as_of = dt.date(1000, 1, 1)
-    max_as_of = dt.date(3000, 1, 1)
-    as_of = as_of or max_as_of
+    as_of = as_of or dt.date.max
+    if loc_abb == "GA" and as_of > dt.date(2025, 10, 14):
+        as_of = dt.date(2025, 10, 14)
 
     filtered_estimates = (
         param_estimates.with_columns(
-            pl.col("start_date").fill_null(min_as_of),
-            pl.col("end_date").fill_null(max_as_of),
+            pl.col("start_date").fill_null(dt.date.min),
+            pl.col("end_date").fill_null(dt.date.max),
         )
         .filter(pl.col("disease") == disease)
         .filter(
@@ -626,7 +626,7 @@ def process_and_save_loc_param(
         loc_abb=loc_abb,
         disease=disease,
         right_truncation_required=fit_ed_visits,
-        as_of=dt.date(2025, 10, 14),
+        as_of=None,
     )
 
     inf_to_hosp_admit_lognormal_loc, inf_to_hosp_admit_lognormal_scale = approx_lognorm(

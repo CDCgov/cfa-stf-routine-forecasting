@@ -12,6 +12,7 @@ from pipelines.utils.common_utils import (
     calculate_training_dates,
     generate_epiweekly_data,
     get_available_reports,
+    get_model_batch_dir_name,
     load_credentials,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -81,9 +82,11 @@ def main(
         Path(facility_level_nssp_data_dir, facility_datafile)
     )
 
-    model_batch_dir_name = (
-        f"{disease.lower()}_r_{report_date}_f_"
-        f"{first_training_date}_t_{last_training_date}"
+    model_batch_dir_name = get_model_batch_dir_name(
+        disease=disease,
+        report_date=report_date,
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
     )
     model_batch_dir = Path(output_dir, model_batch_dir_name)
 

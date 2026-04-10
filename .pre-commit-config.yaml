@@ -11,7 +11,7 @@ repos:
       - id: trailing-whitespace
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.8
+    rev: v0.15.9
     hooks:
       # Sort imports
       - id: ruff-check
@@ -19,7 +19,7 @@ repos:
       - id: ruff-format
     # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.2
+    rev: 0.11.3
     hooks:
       - id: uv-lock
   # Bash
@@ -36,7 +36,7 @@ repos:
         exclude: package.lock.json
   # R
   - repo: https://github.com/posit-dev/air-pre-commit
-    rev: 0.8.2
+    rev: 0.9.0
     hooks:
       - id: air-format
   - repo: https://github.com/etiennebacher/jarl-pre-commit
@@ -46,7 +46,7 @@ repos:
         args: ["--fix"]
   # Typos
   - repo: https://github.com/adhtruong/mirrors-typos
-    rev: v1.44.0
+    rev: v1.45.0
     hooks:
       - id: typos
         args: ["--force-exclude"]

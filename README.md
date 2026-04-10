@@ -27,23 +27,10 @@ ENGINE=podman make container_build
 
 Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch). After a branch is deleted, the image tag is remove from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
 
-## Running Model Pipelines
+## Running Model Pipelines with Dagster
 > [!NOTE]
 > Azure Batch Forecasting Pipelines can only be run by CDC internal users on the CFA Virtual Analyst Platform.
 
-There are two ways to run Azure Batch Modeling Code:
-1. [The Azure Command Center](#3-azure-command-center) - interactive/manual.
-2. [Dagster Workflow Orchestration](#2-dagster-workflow-orchestration) - automated, feature rich GUI.
-
-### 1. Azure Command Center
-> Specific environment setup steps required can be found in the [Routine Forecasting Standard Operating Procedure](https://cdcent.github.io/cfa-stf-handbook/routine_forecast_sop.html).
-
-You can run `uv run pipelines/azure_command_center.py` (or `make acc`) to launch the Azure Command Center.
-- The Azure Command Center will check for necessary data before offering to run pipelines.
-- You must have previously configured your Azure Credentials and Environment Variables. To do this, run `make config`, or follow the steps in the SOP.
-- The Azure Command Center is meant to be a streamlined interface for interactively running in production.
-
-### 2. Dagster Workflow Orchestration
 To execute dagster workflows fully locally with this project, you'll need to have blobs mounted. However, you can also launch jobs locally and have them submit to Azure Batch.
 
 #### Local Development and Testing

@@ -429,7 +429,7 @@ def get_pmfs(
       parameter name, and validity date range.
     - For right_truncation: additionally filters by location.
     """
-    as_of = as_of or dt.date.max
+    as_of = as_of or dt.date.max - dt.timedelta(days=1)
     if loc_abb == "GA" and as_of > dt.date(2025, 10, 14):
         as_of = dt.date(2025, 10, 14)
 

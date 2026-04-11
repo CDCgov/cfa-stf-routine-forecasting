@@ -185,10 +185,11 @@ LOCATIONS = [
 ]
 
 # Daily Partitions
+tz = "America/New_York"
 daily_partitions_def = dg.DailyPartitionsDefinition(
-    start_date=dt.datetime.now(ZoneInfo("America/New_York")) - dt.timedelta(days=1),
+    start_date=dt.datetime.now(ZoneInfo(tz)) - dt.timedelta(days=1),
     end_offset=1,
-    timezone="America/New_York",
+    timezone=tz,
 )
 
 # ============================================================================

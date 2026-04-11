@@ -2,6 +2,7 @@
 import datetime as dt
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # Direct use of dagster
 import dagster as dg
@@ -185,7 +186,9 @@ LOCATIONS = [
 
 # Daily Partitions
 daily_partitions_def = dg.DailyPartitionsDefinition(
-    start_date="2026-01-01", end_offset=1, timezone="America/New_York"
+    start_date=dt.datetime.now(ZoneInfo("America/New_York")) - dt.timedelta(days=1),
+    end_offset=1,
+    timezone="America/New_York",
 )
 
 # ============================================================================

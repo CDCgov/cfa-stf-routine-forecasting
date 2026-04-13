@@ -61,7 +61,7 @@ def get_nhsn_hrd(
         filters.append(pl.col("weekendingdate") <= end_date)
 
     if as_of is None:
-        as_of = dt.date(3000, 1, 1)
+        as_of = dt.date.max
 
     datacat_dataset = (
         datacat.public.stf.nhsn_hrd_prelim if prelim else datacat.public.stf.nhsn_hrd
@@ -135,7 +135,7 @@ def get_nssp(
     - The function only includes data from parquet files with dates up to and including the as_of date.
     """
     if as_of is None:
-        as_of = dt.date(3000, 1, 1)
+        as_of = dt.date.max
 
     dataset_map = {
         "gold": datacat.public.stf.nssp_gold,

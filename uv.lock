@@ -815,7 +815,7 @@ requires-dist = [
     { name = "dagster", specifier = "==1.12.2" },
     { name = "forecasttools", git = "https://github.com/cdcgov/forecasttools-py" },
     { name = "polarbayes", git = "https://github.com/cdcgov/polarbayes?rev=2f07215" },
-    { name = "polars", extras = ["pyarrow", "numpy"], specifier = ">=1.36" },
+    { name = "polars", extras = ["pyarrow", "numpy"], specifier = ">=1.39.3" },
     { name = "pygit2", specifier = ">=1.17.0" },
     { name = "pypdf", specifier = ">=5.1.0" },
     { name = "pyrenew" },

@@ -18,7 +18,7 @@ dependencies = [
     "dagster==1.12.2",
     "forecasttools",
     "polarbayes",
-    "polars[pyarrow,numpy]>=1.36",
+    "polars[pyarrow,numpy]>=1.39.3",
     "pygit2>=1.17.0",
     "pyrenew",
     "pyrenew-multisignal",

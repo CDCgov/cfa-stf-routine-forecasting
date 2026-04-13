@@ -30,10 +30,6 @@ from dagster_azure.blob import (
 from forecasttools import location_table
 
 # Local constant imports
-from pipelines.batch.common_batch_utils import (
-    DEFAULT_EXCLUDED_LOCATIONS,
-    SUPPORTED_DISEASES,
-)
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
@@ -54,7 +50,8 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
-# shared time helpers
+DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
+SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
 
 # env variable set by Dagster CLI
 is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
@@ -173,7 +170,7 @@ azure_batch_execution_config = ExecutionConfig(
                     "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
                 ],
                 "working_dir": "/cfa-stf-routine-forecasting",
-            },
+            },common_batch_utils
         },
     ),
 )

@@ -37,7 +37,9 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from pipelines.utils.common_utils import (
+    calculate_training_dates,
     create_prop_samples,
+    get_model_batch_dir_name,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
 )
@@ -170,7 +172,7 @@ azure_batch_execution_config = ExecutionConfig(
                     "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
                 ],
                 "working_dir": "/cfa-stf-routine-forecasting",
-            },common_batch_utils
+            },
         },
     ),
 )
@@ -399,6 +401,37 @@ def _throw_if_backfill(
         raise RuntimeError("STF forecast models do not support backfills")
 
 
+def get_model_loc_dir(
+    context: dg.DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+) -> Path:
+    disease = context.graph_dimension["diseases"]
+    location = context.graph_dimension["locations"]
+
+    report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    first_training_date, last_training_date = calculate_training_dates(
+        report_date=report_date,
+        n_training_days=config.n_training_days,
+        exclude_last_n_days=config.exclude_last_n_days,
+        logger=context.log,
+    )
+
+    model_batch_dir_name = get_model_batch_dir_name(
+        disease=disease,
+        report_date=report_date,
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+    )
+
+    model_loc_dir = Path(
+        config.output_basedir,
+        f"{context.partition_key}_forecasts",
+        model_batch_dir_name,
+        "model_runs",
+        location,
+    )
+    return model_loc_dir
+
+
 def _run_fusion_model(
     context: DynamicGraphAssetExecutionContext,
     config: FusionConfig,
@@ -412,15 +445,9 @@ def _run_fusion_model(
     Helper function to run fusion model.
     """
     _throw_if_backfill(context, daily_partitions_def)
-
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
-    model_run_dir = Path(
-        config.output_dir
-    )  # this isn't right and should be constructed from disease and location
-
+    model_loc_dir = get_model_loc_dir(context, config)
     create_prop_samples(
-        model_run_dir=model_run_dir,
+        model_run_dir=model_loc_dir,
         num_model_name=num_model_name,
         other_model_name=other_model_name,
         aggregate_num=aggregate_num,
@@ -428,7 +455,7 @@ def _run_fusion_model(
         save=True,
     )
 
-    fusion_model_fit_dir = Path(model_run_dir, fusion_model_name)
+    fusion_model_fit_dir = Path(model_loc_dir, fusion_model_name)
 
     make_figures_from_model_fit_dir(Path(config.output_dir))
 
@@ -458,7 +485,8 @@ def _run_timeseries_e(
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        f"{config.output_basedir}/{context.partition_key}_forecasts"
+        config.output_basedir,
+        f"{context.partition_key}_forecasts",
     )
 
     context.log.debug(f"config: '{config}'")
@@ -493,7 +521,7 @@ def _run_pyrenew_model(
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        f"{config.output_basedir}/{context.partition_key}_forecasts"
+        config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
@@ -686,7 +714,7 @@ def postprocess_forecasts(
     _throw_if_backfill(context, daily_partitions_def)
 
     daily_forecast_output_dir: Path = Path(
-        f"{config.output_basedir}/{context.partition_key}_forecasts"
+        config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     context.log.debug(f"config: '{config}'")

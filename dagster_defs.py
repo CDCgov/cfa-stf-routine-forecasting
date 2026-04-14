@@ -2,6 +2,7 @@
 import datetime as dt
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # Direct use of dagster
 import dagster as dg
@@ -192,8 +193,11 @@ LOCATIONS = [
 ]
 
 # Daily Partitions
+tz = "America/New_York"
 daily_partitions_def = dg.DailyPartitionsDefinition(
-    start_date="2026-01-01", end_offset=1, timezone="America/New_York"
+    start_date=dt.datetime.now(ZoneInfo(tz)) - dt.timedelta(days=1),
+    end_offset=1,
+    timezone=tz,
 )
 
 # ============================================================================
@@ -302,7 +306,6 @@ def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
             "update_date": nhsn_update_date,
             "current_date": current_date,
         }
-        context.log.debug(result)
         return result
     except Exception as e:
         print(f"Error checking NHSN data availability: {e}")
@@ -333,7 +336,6 @@ def _check_nwss_gold_data_availability(
         "target_blob": target_blob,
         "current_date": current_date,
     }
-    context.log.debug(result)
     return result
 
 
@@ -489,8 +491,8 @@ def _run_timeseries_e(
         f"{context.partition_key}_forecasts",
     )
 
-    context.log.debug(f"config: '{config}'")
-    context.log.debug(f"Will write to: {daily_forecast_output_dir}")
+    context.log.info(f"config: '{config}'")
+    context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_timeseries(
         disease=disease,
         loc=location,
@@ -529,8 +531,8 @@ def _run_pyrenew_model(
         f"{model_letters}{config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
-    context.log.debug(f"config: '{config}'")
-    context.log.debug(f"Will write to: {daily_forecast_output_dir}")
+    context.log.info(f"config: '{config}'")
+    context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
         disease=disease,
         loc=location,
@@ -717,7 +719,7 @@ def postprocess_forecasts(
         config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
-    context.log.debug(f"config: '{config}'")
+    context.log.info(f"config: '{config}'")
     postprocess(
         base_forecast_dir=daily_forecast_output_dir,
         diseases=config.postprocess_diseases,

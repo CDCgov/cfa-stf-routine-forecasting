@@ -3,15 +3,17 @@
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [![hewr](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/branch/main/graph/badge.svg?flag=hewr)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![EpiAutoGP](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=epiautogp)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![pipelines](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=pipelines)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) |
 
-The PyRenew-HEW project aims to create short-term forecasts of respiratory disease burden using the [PyRenew library](https://github.com/CDCgov/PyRenew) and several data sources:
+The STF Routine Forecasting project contains code for producing short-term forecasts of respiratory disease burden using several models:
+- [EpiAutoGp](pipelines/epiautogp)
+- [fable](pipelines/fable)
+- [pyrenew_hew](pipelines/pyrenew_hew)
 
-- [x] **H**ospital Admissions from the [National Healthcare Safety Network](https://www.cdc.gov/nhsn/index.html)
-- [x] **E**mergency Department Visits from the [National Syndromic Surveillance Program](https://www.cdc.gov/nssp/index.html)
-- [x] **W**astewater virus concentration from the [National Wastewater Surveillance System](https://www.cdc.gov/nwss/index.html)
+These forecasts are submitted to CDC's forecasting hubs:
+- [RSV Forecast Hub](https://github.com/CDCgov/rsv-forecast-hub/)
+- [FluSight Forecast Hub](https://github.com/cdcepi/FluSight-forecast-hub)
+- [COVID-19 Forecast Hub](https://github.com/CDCgov/covid19-forecast-hub)
 
-This is a work in progress, and not all data sources are currently integrated into the model.
-
-This repository contains code for the [PyRenew-HEW model](pyrenew_hew/pyrenew_hew_model.py) itself, as well as [pipelines](pipelines) for running the model in production, and [utilities](hewr) for working with model outputs.
+The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
 
 ## Containers
 

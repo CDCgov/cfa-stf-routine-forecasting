@@ -770,7 +770,7 @@ def fuse_pyrenew_hew_ts_epiweekly(
 
 
 @dg.asset(
-    deps=[  # need to update this
+    deps=[
         "fuse_pyrenew_e_ts",
         "fuse_pyrenew_e_ts_epiweekly",
         "fuse_pyrenew_he_ts",

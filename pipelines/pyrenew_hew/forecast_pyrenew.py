@@ -25,7 +25,6 @@ from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    create_prop_samples,
     get_available_reports,
     get_model_batch_dir_name,
     load_credentials,

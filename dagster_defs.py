@@ -471,6 +471,102 @@ def _run_fusion_model(
     context.log.debug(f"config: '{config}'")
 
 
+def fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: bool):
+    other_model_name = "epiweekly_ts_ensemble_e" if epiweekly else "daily_ts_ensemble_e"
+    fusion_model_name = (
+        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
+        if epiweekly
+        else f"prop_{pyrenew_model_name}_daily_ts_ensemble_e"
+    )
+    aggregate_num = epiweekly
+    _run_fusion_model(
+        context=context,
+        config=config,
+        num_model_name=pyrenew_model_name,
+        other_model_name=other_model_name,
+        aggregate_num=aggregate_num,
+        aggregate_other=False,
+        fusion_model_name=fusion_model_name,
+    )
+
+
+weekly_forecast_fusion = {
+    "partitions_def": daily_partitions_def,
+    "graph_dimensions": ["diseases", "locations"],
+    "group_name": "WeeklyForecast",
+}
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion,
+    ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
+    fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion,
+    ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_e_ts_epiweekly(
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+):
+    fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_e", epiweekly=True
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion,
+    ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_he_ts(
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+):
+    fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_he", epiweekly=False
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion,
+    ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_he_ts_epiweekly(
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+):
+    fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_he", epiweekly=True
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion,
+    ins={"pyrenew_hew": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_hew_ts(
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+):
+    fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_hew", epiweekly=False
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion,
+    ins={"pyrenew_hew": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_hew_ts_epiweekly(
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+):
+    fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_hew", epiweekly=True
+    )
+
+
 def _run_timeseries_e(
     context: DynamicGraphAssetExecutionContext,
     config: TimeseriesConfig,
@@ -677,9 +773,11 @@ def pyrenew_hew(
 
 @dg.asset(
     deps=[  # need to update this
-        "pyrenew_e",
+        "fuse_pyrenew_e_ts",
+        "fuse_pyrenew_e_ts_epiweekly",
+        "fuse_pyrenew_he_ts",
+        "fuse_pyrenew_he_ts_epiweekly",
         "pyrenew_h",
-        "pyrenew_he",
     ],
     partitions_def=daily_partitions_def,
     # Runs when any dependency has been updated as long as at least one exists

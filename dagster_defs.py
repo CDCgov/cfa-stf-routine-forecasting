@@ -544,7 +544,9 @@ def fuse_pyrenew_he_ts_epiweekly(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion,
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    group_name="WeeklyForecastArchived",
     ins={"pyrenew_hew": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_hew_ts(
@@ -556,7 +558,9 @@ def fuse_pyrenew_hew_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion,
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    group_name="WeeklyForecastArchived",
     ins={"pyrenew_hew": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_hew_ts_epiweekly(

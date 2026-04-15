@@ -227,7 +227,7 @@ class TimeseriesConfig(ModelBaseConfig):
     n_samples: int = 400 if not is_production else 2000  # Total samples for timeseries
 
 
-class FusionConfig(dg.config):
+class FusionConfig(ModelBaseConfig):
     pass
 
 
@@ -404,7 +404,7 @@ def _throw_if_backfill(
 
 
 def get_model_loc_dir(
-    context: dg.DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
 ) -> Path:
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]

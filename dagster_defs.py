@@ -459,7 +459,7 @@ def _run_fusion_model(
 
     fusion_model_fit_dir = Path(model_loc_dir, fusion_model_name)
 
-    make_figures_from_model_fit_dir(Path(config.output_dir))
+    make_figures_from_model_fit_dir(Path(config.output_basedir))
 
     make_figures_from_model_fit_dir(
         fusion_model_fit_dir,

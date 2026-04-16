@@ -77,7 +77,6 @@ def _filter_param_estimates(
 def get_nnh_generation_interval_pmf(
     disease: str,
     as_of: dt.date | None = None,
-    lazy: bool = True,
 ) -> list[float]:
     """
     Filter and extract the generation interval probability mass function (PMF)
@@ -106,15 +105,11 @@ def get_nnh_generation_interval_pmf(
     ValueError
         If exactly one generation_interval row is not found.
     """
-    dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of, lazy=lazy)
+    dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of)
     return _extract_pmf(dat_filtered, "generation_interval")
 
 
-def get_nnh_delay_pmf(
-    disease: str,
-    as_of: dt.date | None = None,
-    lazy: bool = True,
-) -> list[float]:
+def get_nnh_delay_pmf(disease: str, as_of: dt.date | None = None) -> list[float]:
     """
     Filter and extract the delay probability mass function (PMF)
     based on disease and date filters.
@@ -146,7 +141,7 @@ def get_nnh_delay_pmf(
     -----
     The first entry is forced to 0 and the distribution is renormalized.
     """
-    dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of, lazy=lazy)
+    dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of)
     delay_pmf = _extract_pmf(dat_filtered, "delay")
 
     return delay_pmf
@@ -157,7 +152,6 @@ def get_nnh_right_truncation_pmf(
     disease: str,
     as_of: dt.date | None = None,
     reference_date: dt.date | None = None,
-    lazy: bool = True,
 ) -> list[float]:
     """
     Filter and extract the right truncation probability mass function (PMF)
@@ -197,7 +191,7 @@ def get_nnh_right_truncation_pmf(
         if as_of is None or as_of > dt.date(2025, 10, 14):
             as_of = dt.date(2025, 10, 14)
 
-    dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of, lazy=lazy)
+    dat_filtered = _filter_param_estimates(disease=disease, as_of=as_of)
     reference_date = reference_date or as_of or dt.date.max
 
     right_truncation_df = (

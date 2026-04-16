@@ -49,9 +49,9 @@ def _filter_param_estimates(
     as_of = as_of or dt.date.max - dt.timedelta(days=1)
 
     output = "pl_lazy" if lazy else "pl"
-    dat = datacat.public.stf.param_estimates.load.get_dataframe(output=output)
     result = (
-        dat.with_columns(
+        datacat.public.stf.param_estimates.load.get_dataframe(output=output)
+        .with_columns(
             pl.col("start_date").fill_null(dt.date.min),
             pl.col("end_date").fill_null(dt.date.max),
         )

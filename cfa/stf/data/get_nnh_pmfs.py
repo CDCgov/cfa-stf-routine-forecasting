@@ -4,11 +4,9 @@ from typing import Literal, overload
 import polars as pl
 from cfa.dataops import datacat
 
-FrameType = pl.DataFrame | pl.LazyFrame
-
 
 def _extract_pmf(
-    df: FrameType,
+    df: pl.DataFrame | pl.LazyFrame,
     parameter_name: str,
 ) -> list[float]:
     pmf_df = df.filter(pl.col("parameter") == parameter_name)
@@ -43,19 +41,11 @@ def _filter_param_estimates(
 ) -> pl.DataFrame: ...
 
 
-@overload
 def _filter_param_estimates(
     disease: str,
     as_of: dt.date | None = None,
     lazy: bool = True,
-) -> FrameType: ...
-
-
-def _filter_param_estimates(
-    disease: str,
-    as_of: dt.date | None = None,
-    lazy: bool = True,
-) -> FrameType:
+) -> pl.DataFrame | pl.LazyFrame:
     as_of = as_of or dt.date.max - dt.timedelta(days=1)
 
     output = "pl_lazy" if lazy else "pl"

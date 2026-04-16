@@ -225,7 +225,9 @@ def get_nssp(
     )
 
     valid_locs = (
-        dat.select("geo_value").unique().collect() if lazy else dat.unique("geo_value")
+        dat.select("geo_value").unique().collect()
+        if lazy
+        else dat.select("geo_value").unique()
     ).get_column("geo_value").to_list() + ["US"]
 
     if loc_abb not in valid_locs:

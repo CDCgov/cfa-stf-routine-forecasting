@@ -28,7 +28,8 @@ Configuration for quantile-based forecast outputs compatible with hubverse speci
 @kwdef struct QuantileOutput <: AbstractHubverseOutput
     quantile_levels::Vector{Float64} = [
         0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
-        0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.975, 0.99]
+        0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.975, 0.99,
+    ]
 end
 
 """
@@ -78,16 +79,20 @@ function create_forecast_df(results::NamedTuple, output_type::QuantileOutput)
     forecast_dates = results.forecast_dates
     forecasts = results.forecasts
     # Create a DataFrame with columns: output_type_id, value, target_end_date, output_type
-    forecast_df = DataFrame(output_type_id=Float64[], value=Float64[], target_end_date=Date[])
+    forecast_df = DataFrame(output_type_id = Float64[], value = Float64[], target_end_date = Date[])
     # Populate the DataFrame row by row
     for (date_idx, target_end_date) in enumerate(forecast_dates)
         date_samples = forecasts[date_idx, :]
         for q_level in output_type.quantile_levels
             q_value = quantile(date_samples, q_level)
-            push!(forecast_df,
-                (output_type_id=q_level,
-                    value=q_value,
-                    target_end_date=target_end_date))
+            push!(
+                forecast_df,
+                (
+                    output_type_id = q_level,
+                    value = q_value,
+                    target_end_date = target_end_date,
+                )
+            )
         end
     end
     # Add constant column for output_type, this method is specifically for quantiles
@@ -146,16 +151,16 @@ hubverse table, optionally saving it to disk.
   - `location`: Geographic location identifier
 """
 function create_forecast_output(
-    input::EpiAutoGPInput,
-    results::NamedTuple,
-    output_dir::String,
-    output_type::AbstractHubverseOutput;
-    save_output::Bool,
-    disease_abbr::Dict{String,String}=DEFAULT_PATHOGEN_DICT,
-    target_abbr::Dict{String,String}=DEFAULT_TARGET_DICT,
-    group_name::String=DEFAULT_GROUP_NAME,
-    model_name::String=DEFAULT_MODEL_NAME
-)
+        input::EpiAutoGPInput,
+        results::NamedTuple,
+        output_dir::String,
+        output_type::AbstractHubverseOutput;
+        save_output::Bool,
+        disease_abbr::Dict{String, String} = DEFAULT_PATHOGEN_DICT,
+        target_abbr::Dict{String, String} = DEFAULT_TARGET_DICT,
+        group_name::String = DEFAULT_GROUP_NAME,
+        model_name::String = DEFAULT_MODEL_NAME
+    )
     # Extract relevant data
     forecast_date = input.forecast_date
     location = input.location
@@ -174,9 +179,11 @@ function create_forecast_output(
     # Add horizon column
     @transform!(forecast_df, :horizon = _make_horizon_col(:target_end_date, forecast_date))
     # Reorder columns and check all required columns are present
-    @select!(forecast_df,
+    @select!(
+        forecast_df,
         :output_type, :output_type_id, :value, :reference_date, :target, :horizon, :target_end_date,
-        :location)
+        :location
+    )
 
     # Save as CSV to match expected format
     if save_output
@@ -192,16 +199,16 @@ function create_forecast_output(
 end
 
 function create_forecast_output(
-    input::EpiAutoGPInput,
-    results::NamedTuple,
-    output_dir::String,
-    output_type::PipelineOutput;
-    save_output::Bool,
-    disease_abbr::Dict{String,String}=DEFAULT_PATHOGEN_DICT,
-    target_abbr::Dict{String,String}=DEFAULT_TARGET_DICT,
-    group_name::String=DEFAULT_GROUP_NAME,
-    model_name::String=DEFAULT_MODEL_NAME
-)
+        input::EpiAutoGPInput,
+        results::NamedTuple,
+        output_dir::String,
+        output_type::PipelineOutput;
+        save_output::Bool,
+        disease_abbr::Dict{String, String} = DEFAULT_PATHOGEN_DICT,
+        target_abbr::Dict{String, String} = DEFAULT_TARGET_DICT,
+        group_name::String = DEFAULT_GROUP_NAME,
+        model_name::String = DEFAULT_MODEL_NAME
+    )
     # Create basic forecast DataFrame with date, .draw, .value
     forecast_df = create_forecast_df(results, output_type)
 

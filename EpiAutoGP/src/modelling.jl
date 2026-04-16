@@ -22,8 +22,10 @@ A NamedTuple containing:
 - `transformation::Function`: Forward transformation function
 - `inv_transformation::Function`: Inverse transformation function
 """
-function prepare_for_modelling(input::EpiAutoGPInput, transformation_name::String,
-        n_ahead::Int, n_forecasts::Int)
+function prepare_for_modelling(
+        input::EpiAutoGPInput, transformation_name::String,
+        n_ahead::Int, n_forecasts::Int
+    )
     # Extract stable confirmed data, excluding recent uncertain dates with nowcasts
     stable_data_idxs = findall(d -> !(d in input.nowcast_dates), input.dates)
     stable_data_dates = input.dates[stable_data_idxs]
@@ -32,14 +34,14 @@ function prepare_for_modelling(input::EpiAutoGPInput, transformation_name::Strin
     # Get transformation functions
     # Convert reports to Float64 to ensure concrete type for get_transformations
     transformation,
-    inv_transformation = get_transformations(transformation_name, Float64.(input.reports))
+        inv_transformation = get_transformations(transformation_name, Float64.(input.reports))
 
     # Format nowcast data (only if nowcasts exist)
     nowcast_data = isempty(input.nowcast_dates) ?
-                   # Return nothing when no nowcasts
-                   nothing :
-                   # Create nowcast data structure when nowcasts exist
-                   create_nowcast_data(input.nowcast_reports, input.nowcast_dates; transformation)
+        # Return nothing when no nowcasts
+        nothing :
+        # Create nowcast data structure when nowcasts exist
+        create_nowcast_data(input.nowcast_reports, input.nowcast_dates; transformation)
 
     # Calculate forecasting dates (starting from forecast_date and going n_ahead time steps forward)
     # Use Day or Week based on frequency
@@ -48,11 +50,13 @@ function prepare_for_modelling(input::EpiAutoGPInput, transformation_name::Strin
 
     # Calculate number of forecasts per nowcast sample
     n_forecasts_per_nowcast = isnothing(nowcast_data) ?
-                              n_forecasts :
-                              max(1, n_forecasts ÷ length(nowcast_data))
+        n_forecasts :
+        max(1, n_forecasts ÷ length(nowcast_data))
 
-    return (; stable_data_dates, stable_data_values, nowcast_data, forecast_dates,
-        n_forecasts_per_nowcast, transformation, inv_transformation)
+    return (;
+        stable_data_dates, stable_data_values, nowcast_data, forecast_dates,
+        n_forecasts_per_nowcast, transformation, inv_transformation,
+    )
 end
 
 """
@@ -81,22 +85,26 @@ combination with nowcast scenarios.
 # Returns
 - Fitted AutoGP model ready for forecasting
 """
-function fit_base_model(dates::Vector{Date}, values::Vector{<:Real};
+function fit_base_model(
+        dates::Vector{Date}, values::Vector{<:Real};
         transformation::Function,
         n_particles::Int = 24,
         smc_data_proportion::Float64 = 0.1,
         n_mcmc::Int = 50,
-        n_hmc::Int = 50)
+        n_hmc::Int = 50
+    )
 
     # Create transformed data
     transformed_data = create_transformed_data(dates, values; transformation)
 
     # Fit the model
-    model = make_and_fit_model(transformed_data;
+    model = make_and_fit_model(
+        transformed_data;
         n_particles = n_particles,
         smc_data_proportion = smc_data_proportion,
         n_mcmc = n_mcmc,
-        n_hmc = n_hmc)
+        n_hmc = n_hmc
+    )
 
     return model
 end
@@ -107,19 +115,26 @@ end
 
 Internal function to handle forecasting with or without nowcast data by dispatching on nowcast_data type.
 """
-function _do_forecasts(nowcast_data, base_model, forecast_dates,
-        n_forecasts_per_nowcast::Int; inv_transformation::Function)
-    forecast_with_nowcasts(
+function _do_forecasts(
+        nowcast_data, base_model, forecast_dates,
+        n_forecasts_per_nowcast::Int; inv_transformation::Function
+    )
+    return forecast_with_nowcasts(
         base_model, nowcast_data, forecast_dates,
         n_forecasts_per_nowcast;
-        inv_transformation = inv_transformation)
+        inv_transformation = inv_transformation
+    )
 end
 
-function _do_forecasts(nowcast_data::Nothing, base_model, forecast_dates,
-        n_forecasts_per_nowcast::Int; inv_transformation::Function)
-    forecast(base_model, forecast_dates,
+function _do_forecasts(
+        nowcast_data::Nothing, base_model, forecast_dates,
+        n_forecasts_per_nowcast::Int; inv_transformation::Function
+    )
+    return forecast(
+        base_model, forecast_dates,
         n_forecasts_per_nowcast;
-        inv_transformation = inv_transformation)
+        inv_transformation = inv_transformation
+    )
 end
 
 """
@@ -157,14 +172,16 @@ A NamedTuple containing:
 - `location::String`: The location identifier (from input.location)
 - `disease::String`: The disease name (from input.disease)
 """
-function forecast_with_epiautogp(input::EpiAutoGPInput;
+function forecast_with_epiautogp(
+        input::EpiAutoGPInput;
         n_ahead::Int = 8,
         n_forecasts::Int = 20,
         transformation_name::String = "boxcox",
         n_particles::Int = 24,
         smc_data_proportion::Float64 = 0.1,
         n_mcmc::Int = 50,
-        n_hmc::Int = 50)
+        n_hmc::Int = 50
+    )
 
     # Prepare training data, nowcasting data and forecasting dates
     model_info = prepare_for_modelling(input, transformation_name, n_ahead, n_forecasts)
@@ -184,11 +201,12 @@ function forecast_with_epiautogp(input::EpiAutoGPInput;
     forecasts = _do_forecasts(
         model_info.nowcast_data, base_model,
         model_info.forecast_dates, model_info.n_forecasts_per_nowcast;
-        inv_transformation = model_info.inv_transformation)
+        inv_transformation = model_info.inv_transformation
+    )
 
     return (;
         forecast_dates = model_info.forecast_dates,
-        forecasts = forecasts
+        forecasts = forecasts,
     )
 end
 
@@ -217,7 +235,8 @@ with parsed command-line arguments to execute the full nowcasting and forecastin
 - `"n-hmc"`: Number of HMC samples
 """
 function forecast_with_epiautogp(input::EpiAutoGPInput, args::Dict{String, Any})
-    return forecast_with_epiautogp(input;
+    return forecast_with_epiautogp(
+        input;
         n_ahead = args["n-ahead"],
         n_forecasts = args["n-forecast-draws"],
         transformation_name = args["transformation"],

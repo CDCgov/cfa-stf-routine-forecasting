@@ -32,7 +32,7 @@ function main()
     """
     Main execution function
     """
-    try
+    return try
         @info "Starting EpiAutoGP model run"
 
         # Parse command line arguments
@@ -71,7 +71,7 @@ function main()
 
     catch e
         @error "EpiAutoGP model run failed: $e"
-        @error "Stack trace:" exception=(e, catch_backtrace())
+        @error "Stack trace:" exception = (e, catch_backtrace())
         rethrow(e)
     end
 end

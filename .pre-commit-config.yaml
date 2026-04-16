@@ -44,6 +44,11 @@ repos:
     hooks:
       - id: jarl-check
         args: ["--fix"]
+  # Julia
+  - repo: https://github.com/fredrikekre/runic-pre-commit
+    rev: v2.1.0
+    hooks:
+      - id: runic
   # Typos
   - repo: https://github.com/adhtruong/mirrors-typos
     rev: v1.45.0

@@ -28,16 +28,16 @@ def _extract_pmf(
 @overload
 def _filter_param_estimates(
     disease: str,
-    as_of: dt.date | None = None,
-    lazy: Literal[True] = True,
+    as_of: dt.date | None = ...,
+    lazy: Literal[True] = ...,
 ) -> pl.LazyFrame: ...
 
 
 @overload
 def _filter_param_estimates(
     disease: str,
-    as_of: dt.date | None = None,
-    lazy: Literal[False] = False,
+    as_of: dt.date | None = ...,
+    lazy: Literal[False] = ...,
 ) -> pl.DataFrame: ...
 
 

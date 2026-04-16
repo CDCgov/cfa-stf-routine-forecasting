@@ -3,19 +3,27 @@ import datetime as dt
 import polars as pl
 from cfa.dataops import datacat
 
+FrameType = pl.DataFrame | pl.LazyFrame
+
 
 def _extract_pmf(
-    df: pl.DataFrame,
+    df: FrameType,
     parameter_name: str,
-) -> list:
-    df = df.filter(pl.col("parameter") == parameter_name)
-    if df.height != 1:
+) -> list[float]:
+    pmf_df = df.filter(pl.col("parameter") == parameter_name)
+
+    if isinstance(pmf_df, pl.LazyFrame):
+        pmf_df = pmf_df.collect()
+
+    if pmf_df.height != 1:
         raise ValueError(
             f"Expected exactly one {parameter_name!r} parameter row, "
-            f"but found {df.height}. "
-            f"Rows={df.to_dicts()}"
+            f"but found {pmf_df.height}. "
+            f"Rows={pmf_df.to_dicts()}"
         )
-    return df.item(0, "value").to_list()
+
+    pmf = pmf_df.item(0, "value").to_list()
+    return pmf
 
 
 def _filter_param_estimates(

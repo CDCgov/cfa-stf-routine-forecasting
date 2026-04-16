@@ -82,8 +82,6 @@ def get_nnh_generation_interval_pmf(
     as_of
         The date for which parameters should be valid. Parameters must have
         start_date <= as_of < end_date. Defaults to latest estimates.
-    lazy
-        Whether to load data lazily (defaults to True).
 
     Returns
     -------
@@ -114,8 +112,6 @@ def get_nnh_delay_pmf(disease: str, as_of: dt.date | None = None) -> list[float]
     as_of
         The date for which parameters should be valid. Parameters must have
         start_date <= as_of < end_date. Defaults to latest estimates.
-    lazy
-        Whether to load data lazily (defaults to True).
 
     Returns
     -------
@@ -164,8 +160,6 @@ def get_nnh_right_truncation_pmf(
         The reference date for filtering. Defaults to as_of value.
         Selects the most recent parameter with
         reference_date <= this value.
-    lazy
-        Whether to load data lazily (defaults to True).
 
     Returns
     -------

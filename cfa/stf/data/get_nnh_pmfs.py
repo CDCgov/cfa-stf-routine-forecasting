@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Literal, overload
 
 import polars as pl
 from cfa.dataops import datacat
@@ -26,11 +27,35 @@ def _extract_pmf(
     return pmf
 
 
+@overload
+def _filter_param_estimates(
+    disease: str,
+    as_of: dt.date | None = None,
+    lazy: Literal[True] = True,
+) -> pl.LazyFrame: ...
+
+
+@overload
+def _filter_param_estimates(
+    disease: str,
+    as_of: dt.date | None = None,
+    lazy: Literal[False] = False,
+) -> pl.DataFrame: ...
+
+
+@overload
 def _filter_param_estimates(
     disease: str,
     as_of: dt.date | None = None,
     lazy: bool = True,
-) -> pl.DataFrame:
+) -> FrameType: ...
+
+
+def _filter_param_estimates(
+    disease: str,
+    as_of: dt.date | None = None,
+    lazy: bool = True,
+) -> FrameType:
     as_of = as_of or dt.date.max - dt.timedelta(days=1)
 
     output = "pl_lazy" if lazy else "pl"
@@ -46,7 +71,7 @@ def _filter_param_estimates(
             as_of < pl.col("end_date"),
         )
     )
-    return result.collect() if lazy else result
+    return result
 
 
 def get_nnh_generation_interval_pmf(

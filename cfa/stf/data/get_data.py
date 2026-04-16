@@ -20,7 +20,8 @@ def get_nhsn_hrd(
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
-) -> pl.DataFrame:
+    lazy: bool = True,
+) -> pl.DataFrame | pl.LazyFrame:
     """
     Retrieve and filter NHSN hospital respiratory data based on specified criteria.
 
@@ -42,10 +43,13 @@ def get_nhsn_hrd(
         The start date for the time period to include. If None, no lower bound is applied.
     end_date
         The end date for the time period to include. If None, no upper bound is applied.
+    lazy
+        Whether to return a lazy frame (defaults to True). If True, returns a
+        `pl.LazyFrame`; if False, returns a `pl.DataFrame`.
 
     Returns
     -------
-    pl.DataFrame
+    pl.DataFrame | pl.LazyFrame
         Filtered data with columns:
         `weekendingdate`, `jurisdiction`, and `hospital_admissions`.
     """
@@ -67,8 +71,9 @@ def get_nhsn_hrd(
         datacat.public.stf.nhsn_hrd_prelim if prelim else datacat.public.stf.nhsn_hrd
     )
 
+    output = "pl_lazy" if lazy else "pl"
     dat = datacat_dataset.load.get_dataframe(
-        output="pl", version=f"<={as_of.strftime('%Y-%m-%d')}"
+        output=output, version=f"<={as_of.strftime('%Y-%m-%d')}"
     )
 
     filtered_dat = (
@@ -90,7 +95,8 @@ def get_nssp(
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
-) -> pl.DataFrame:
+    lazy: bool = True,
+) -> pl.DataFrame | pl.LazyFrame:
     """
     Retrieve and filter NSSP emergency department data.
 
@@ -116,10 +122,13 @@ def get_nssp(
         Start date for filtering data (inclusive). If None, no lower bound is applied (defaults to None).
     end_date
         End date for filtering data (inclusive). If None, no upper bound is applied (defaults to None).
+    lazy
+        Whether to return a lazy frame (defaults to True). If True, returns a
+        `pl.LazyFrame`; if False, returns a `pl.DataFrame`.
 
     Returns
     -------
-    pl.DataFrame
+    pl.DataFrame | pl.LazyFrame
         Aggregated ED counts with columns:
         `reference_date`, `disease`, and `value`.
 
@@ -162,11 +171,14 @@ def get_nssp(
         # we only filter by geo_value if loc_abb is not "US".
         filters.append(pl.col("geo_value") == loc_abb)
 
+    output = "pl_lazy" if lazy else "pl"
     dat = datacat_dataset.load.get_dataframe(
-        output="pl", version=f"<={as_of.strftime('%Y-%m-%d')}"
+        output=output, version=f"<={as_of.strftime('%Y-%m-%d')}"
     )
 
-    valid_locs = dat.unique("geo_value").get_column("geo_value").to_list() + ["US"]
+    valid_locs = (
+        dat.select("geo_value").unique().collect() if lazy else dat.unique("geo_value")
+    ).get_column("geo_value").to_list() + ["US"]
 
     if loc_abb not in valid_locs:
         raise ValueError(f"Invalid location abbreviation: {loc_abb}")

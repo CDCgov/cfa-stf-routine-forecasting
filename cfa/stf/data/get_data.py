@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Literal
+from typing import Literal, overload
 
 import polars as pl
 from cfa.dataops import datacat
@@ -11,6 +11,30 @@ nhsn_disease_map = {
 }
 
 NSSPDataset = Literal["gold", "comprehensive"]
+
+
+@overload
+def get_nhsn_hrd(
+    disease: str,
+    loc_abb: str,
+    prelim: bool = ...,
+    as_of: dt.date | None = ...,
+    start_date: dt.date | None = ...,
+    end_date: dt.date | None = ...,
+    lazy: Literal[True] = ...,
+) -> pl.LazyFrame: ...
+
+
+@overload
+def get_nhsn_hrd(
+    disease: str,
+    loc_abb: str,
+    prelim: bool = ...,
+    as_of: dt.date | None = ...,
+    start_date: dt.date | None = ...,
+    end_date: dt.date | None = ...,
+    lazy: Literal[False] = ...,
+) -> pl.DataFrame: ...
 
 
 def get_nhsn_hrd(
@@ -86,6 +110,30 @@ def get_nhsn_hrd(
         )
     )
     return filtered_dat
+
+
+@overload
+def get_nssp(
+    disease: str,
+    loc_abb: str,
+    dataset: NSSPDataset = ...,
+    as_of: dt.date | None = ...,
+    start_date: dt.date | None = ...,
+    end_date: dt.date | None = ...,
+    lazy: Literal[True] = ...,
+) -> pl.LazyFrame: ...
+
+
+@overload
+def get_nssp(
+    disease: str,
+    loc_abb: str,
+    dataset: NSSPDataset = ...,
+    as_of: dt.date | None = ...,
+    start_date: dt.date | None = ...,
+    end_date: dt.date | None = ...,
+    lazy: Literal[False] = ...,
+) -> pl.DataFrame: ...
 
 
 def get_nssp(

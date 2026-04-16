@@ -195,7 +195,7 @@ def get_nssp(
         as_of = dt.date.max
 
     dataset_map = {
-        "gold": datacat.public.stf.nssp_gold,
+        "gold": datacat.public.stf.nssp_gold_v1,
         "comprehensive": datacat.public.stf.comprehensive_nssp_gold,
     }
     if dataset not in dataset_map:

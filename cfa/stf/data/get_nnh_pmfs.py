@@ -21,8 +21,7 @@ def _extract_pmf(
             f"Rows={pmf_df.to_dicts()}"
         )
 
-    pmf = pmf_df.item(0, "value").to_list()
-    return pmf
+    return pmf_df.item(0, "value").to_list()
 
 
 @overload

@@ -55,7 +55,7 @@ Performs comprehensive validation including:
 # Returns
 - `Bool`: Returns `true` if validation passes
 """
-function validate_input(data::EpiAutoGPInput; valid_targets=["nhsn", "nssp"])
+function validate_input(data::EpiAutoGPInput; valid_targets = ["nhsn", "nssp"])
     @assert data.target in valid_targets "Target must be one of $(valid_targets), got '$(data.target)'"
     # Check array length consistency
     if length(data.dates) != length(data.reports)

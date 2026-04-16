@@ -1,14 +1,17 @@
-
-function create_sample_input(output_path::String; n_weeks::Int=30,
-    pathogen::String="COVID-19", location::String="CA")
+function create_sample_input(
+        output_path::String; n_weeks::Int = 30,
+        pathogen::String = "COVID-19", location::String = "CA"
+    )
     start_date = Date("2024-01-01")
-    dates = [start_date + Week(i) for i in 0:(n_weeks-1)]
+    dates = [start_date + Week(i) for i in 0:(n_weeks - 1)]
     reports = [rand(20:100) + 10 * sin(2π * i / 7) + rand() * 5 for i in 1:n_weeks]  # Weekly pattern with noise
 
     forecast_date = dates[end]
     nowcast_dates = dates[max(1, end - 2):end]  # Last 3 days
-    nowcast_reports = [[reports[max(1, end - 2)+j-1] + rand(-5:5) for j in 1:3]
-                       for _ in 1:10]  # 10 realizations, each with 3 values
+    nowcast_reports = [
+        [reports[max(1, end - 2) + j - 1] + rand(-5:5) for j in 1:3]
+            for _ in 1:10
+    ]  # 10 realizations, each with 3 values
 
     input_data = EpiAutoGPInput(
         dates, reports, pathogen, location, "nhsn", "epiweekly", "observed",
@@ -67,32 +70,42 @@ end
 
     @testset "Data Validation - Invalid Cases" begin
         # Mismatched lengths
-        @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            [Date("2024-01-01"), Date("2024-01-02")], [45.0],
-            "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
-        ))
+        @test_throws ArgumentError validate_input(
+            EpiAutoGPInput(
+                [Date("2024-01-01"), Date("2024-01-02")], [45.0],
+                "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
+            )
+        )
 
         # Empty data
-        @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            Date[], Real[], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
-        ))
+        @test_throws ArgumentError validate_input(
+            EpiAutoGPInput(
+                Date[], Real[], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
+            )
+        )
 
         # Unsorted dates
-        @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            [Date("2024-01-02"), Date("2024-01-01")], [45.0, 52.0],
-            "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-02"), Date[], Vector{Real}[]
-        ))
+        @test_throws ArgumentError validate_input(
+            EpiAutoGPInput(
+                [Date("2024-01-02"), Date("2024-01-01")], [45.0, 52.0],
+                "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-02"), Date[], Vector{Real}[]
+            )
+        )
 
         # Invalid nowcast structure
-        @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            [Date("2024-01-01")], [45.0], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"),
-            [Date("2024-01-01")], [[50.0, 55.0]]  # Wrong length
-        ))
+        @test_throws ArgumentError validate_input(
+            EpiAutoGPInput(
+                [Date("2024-01-01")], [45.0], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"),
+                [Date("2024-01-01")], [[50.0, 55.0]]  # Wrong length
+            )
+        )
 
         # Negative values
-        @test_throws ArgumentError validate_input(EpiAutoGPInput(
-            [Date("2024-01-01")], [-5.0], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
-        ))
+        @test_throws ArgumentError validate_input(
+            EpiAutoGPInput(
+                [Date("2024-01-01")], [-5.0], "COVID-19", "CA", "nhsn", "daily", "observed", Date("2024-01-01"), Date[], Vector{Real}[]
+            )
+        )
     end
 
     @testset "File I/O" begin
@@ -127,7 +140,7 @@ end
         tmpdir = mktempdir()
         try
             json_path = joinpath(tmpdir, "sample.json")
-            sample = create_sample_input(json_path; n_weeks=14, pathogen="Influenza")
+            sample = create_sample_input(json_path; n_weeks = 14, pathogen = "Influenza")
 
             @test validate_input(sample) == true
             @test sample.pathogen == "Influenza"
@@ -137,7 +150,7 @@ end
             loaded = read_and_validate_data(json_path)
             @test loaded.pathogen == sample.pathogen
         finally
-            rm(tmpdir, recursive=true)
+            rm(tmpdir, recursive = true)
         end
     end
 end

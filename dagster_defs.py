@@ -4,11 +4,6 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# Direct use of dagster
-import dagster as dg
-import requests
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
 from cfa_dagster import (
     ADLS2PickleIOManager,
     DynamicGraphAssetExecutionContext,
@@ -31,6 +26,9 @@ from dagster_azure.blob import (
 from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
+
+# Direct use of dagster
+import dagster as dg
 
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
@@ -266,118 +264,6 @@ class PostProcessConfig(dg.Config):
 # ============================================================================
 # These are the core of Dagster - functions that specify data
 
-
-# ---------- Data Availability Check Functions ----------
-
-# TODO: either add these to pipelines/utils or deprecate altogether by virtue
-# of having these upstream data materialized in dagster directly
-
-
-def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
-    current_date = context.partition_key
-    nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
-    try:
-        resp = requests.get(nhsn_target_url, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        nhsn_update_date_raw = data.get("rowsUpdatedAt")
-        if nhsn_update_date_raw is None:
-            return {"exists": False, "reason": "Key 'rowsUpdatedAt' not found"}
-        nhsn_update_date = dt.datetime.fromtimestamp(
-            nhsn_update_date_raw, dt.UTC
-        ).strftime("%Y-%m-%d")
-
-        nhsn_check = nhsn_update_date == current_date
-        print(f"NHSN data available for date {current_date}: {nhsn_check}")
-        result = {
-            "exists": nhsn_check,
-            "update_date": nhsn_update_date,
-            "current_date": current_date,
-        }
-        return result
-    except Exception as e:
-        print(f"Error checking NHSN data availability: {e}")
-        return {"exists": False, "reason": str(e)}
-
-
-def _check_nwss_gold_data_availability(
-    context: dg.AssetExecutionContext,
-    account_name="cfaazurebatchprd",
-    container_name="nwss-vintages",
-):
-    current_date = context.partition_key
-    folder_prefix = "NWSS-ETL-covid-"
-    target_folder = f"{folder_prefix}{current_date}/"
-    credential = DefaultAzureCredential()
-    blob_service_client = BlobServiceClient(
-        f"https://{account_name}.blob.core.windows.net", credential=credential
-    )
-    container_client = blob_service_client.get_container_client(container_name)
-    all_blobs = list(container_client.list_blobs(name_starts_with=folder_prefix))
-    latest_blob = max(all_blobs, key=lambda b: b.last_modified).name
-    target_blob = list(container_client.list_blobs(name_starts_with=target_folder))
-    nwss_gold_check = latest_blob == target_blob
-    result = {
-        "exists": nwss_gold_check,
-        "latest_blob": latest_blob,
-        "target_folder": target_folder,
-        "target_blob": target_blob,
-        "current_date": current_date,
-    }
-    return result
-
-
-# ----------- Upstream Data Availability Assets ----
-
-
-# NHSN
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=(
-        # Check every hour 6am-4pm on Wednesday for new data;
-        dg.AutomationCondition.cron_tick_passed(
-            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
-        )
-        # don't check if not-missing for that day
-        & dg.AutomationCondition.in_latest_time_window()
-        & dg.AutomationCondition.missing()
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nhsn_data_stf(context: dg.AssetExecutionContext):
-    result = _check_nhsn_data_availability(context)
-    if result["exists"]:
-        context.log.info(f"NHSN data available: {result}")
-        yield dg.Output("nhsn_data_stf")
-    else:
-        context.log.error(f"NHSN data not available: {result}")
-
-
-# NWSS
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=(
-        # Check every hour 6am-4pm on Wednesday for new data;
-        dg.AutomationCondition.cron_tick_passed(
-            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
-        )
-        # don't check if not-missing for that day
-        & dg.AutomationCondition.in_latest_time_window()
-        & dg.AutomationCondition.missing()
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nwss_gold_stf(context: dg.AssetExecutionContext):
-    result = _check_nwss_gold_data_availability(context)
-    if result["exists"]:
-        context.log.info(f"NWSS gold data available: {result}")
-        yield dg.Output("nwss_gold_stf")
-    else:
-        context.log.error(f"NWSS gold data not available: {result}")
-
-
 # ----------- Model Constructor Functions --------------------------
 
 
@@ -474,6 +360,7 @@ def _run_pyrenew_model(
 
 
 # ---------- Automation Conditions ----------
+
 # A condition that will run as soon as all dependencies are available, but only
 # if the asset has not been materialized yet for that day
 eager_once = dg.AutomationCondition.eager() & dg.AutomationCondition.missing()
@@ -538,7 +425,7 @@ def pyrenew_e(
     automation_condition=eager_once,
     group_name="WeeklyForecast",
     ins={
-        "nhsn_data_stf": dg.In(dg.Nothing),
+        "nhsn_hrd": dg.In(dg.Nothing),
     },
 )
 def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
@@ -554,7 +441,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
     ins={
         "timeseries_e": dg.In(dg.Nothing),
         "epiweekly_timeseries_e": dg.In(dg.Nothing),
-        "nhsn_data_stf": dg.In(dg.Nothing),
+        "nhsn_hrd": dg.In(dg.Nothing),
     },
 )
 def pyrenew_he(
@@ -571,8 +458,8 @@ def pyrenew_he(
     # automation_condition=eager_once,
     group_name="WeeklyForecastArchived",
     ins={
-        "nwss_gold_stf": dg.In(dg.Nothing),
-        "nhsn_data_stf": dg.In(dg.Nothing),
+        "nwss": dg.In(dg.Nothing),
+        "nhsn_hrd": dg.In(dg.Nothing),
     },
 )
 def pyrenew_hw(
@@ -591,8 +478,8 @@ def pyrenew_hw(
     ins={
         "timeseries_e": dg.In(dg.Nothing),
         "epiweekly_timeseries_e": dg.In(dg.Nothing),
-        "nwss_gold_stf": dg.In(dg.Nothing),
-        "nhsn_data_stf": dg.In(dg.Nothing),
+        "nwss": dg.In(dg.Nothing),
+        "nhsn_hrd": dg.In(dg.Nothing),
     },
 )
 def pyrenew_hew(
@@ -652,14 +539,6 @@ def postprocess_forecasts(
 # ============================================================================
 
 # TODO: investigate use_user_code_server and custom/default automation conditions
-
-# ---------- Upstream Data Sensor ------------
-
-upstream_data_sensor = dg.AutomationConditionSensorDefinition(
-    name="UpstreamData",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    run_tags=basic_execution_config.to_run_tags(),
-)
 
 # ---------- Weekly Forecast Sensor ----------
 

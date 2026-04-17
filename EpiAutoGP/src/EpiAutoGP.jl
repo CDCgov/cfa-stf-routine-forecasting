@@ -9,23 +9,23 @@ export parse_arguments
 
 # Export input data structures and functions
 export EpiAutoGPInput,
-       validate_input,
-       read_data,
-       read_and_validate_data
+    validate_input,
+    read_data,
+    read_and_validate_data
 
 # Export modeling functions
 export prepare_for_modelling,
-       fit_base_model,
-       forecast_with_epiautogp,
-       forecast_with_epiautogp
+    fit_base_model,
+    forecast_with_epiautogp,
+    forecast_with_epiautogp
 
 # Export output functions and types
 export AbstractForecastOutput,
-       AbstractHubverseOutput,
-       QuantileOutput,
-       PipelineOutput,
-       create_forecast_df,
-       create_forecast_output
+    AbstractHubverseOutput,
+    QuantileOutput,
+    PipelineOutput,
+    create_forecast_df,
+    create_forecast_output
 
 # constants for default pathogen and target abbreviations
 const DEFAULT_PATHOGEN_DICT = Dict(

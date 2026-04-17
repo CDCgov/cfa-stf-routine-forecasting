@@ -22,7 +22,7 @@ dependencies = [
     "pygit2>=1.17.0",
     "pyrenew",
     "pyrenew-multisignal",
-    "pypdf>=5.1.0",
+    "pypdf>=6.10.1",
     "tomli-w>=1.1.0",
 ]
 

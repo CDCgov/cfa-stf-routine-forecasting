@@ -3,7 +3,7 @@
         # Mock command line arguments with only required arguments
         test_args = [
             "--json-input", "path/to/json",
-            "--output-dir", "/path/to/output"
+            "--output-dir", "/path/to/output",
         ]
 
         old_args = copy(ARGS)

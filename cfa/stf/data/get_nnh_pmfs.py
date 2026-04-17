@@ -1,32 +1,56 @@
 import datetime as dt
+from typing import Literal, overload
 
 import polars as pl
 from cfa.dataops import datacat
 
 
 def _extract_pmf(
-    df: pl.DataFrame,
+    df: pl.DataFrame | pl.LazyFrame,
     parameter_name: str,
-) -> list:
-    df = df.filter(pl.col("parameter") == parameter_name)
-    if df.height != 1:
+) -> list[float]:
+    pmf_df = df.filter(pl.col("parameter") == parameter_name)
+
+    if isinstance(pmf_df, pl.LazyFrame):
+        pmf_df = pmf_df.collect()
+
+    if pmf_df.height != 1:
         raise ValueError(
             f"Expected exactly one {parameter_name!r} parameter row, "
-            f"but found {df.height}. "
-            f"Rows={df.to_dicts()}"
+            f"but found {pmf_df.height}. "
+            f"Rows={pmf_df.to_dicts()}"
         )
-    return df.item(0, "value").to_list()
+
+    return pmf_df.item(0, "value").to_list()
+
+
+@overload
+def _filter_param_estimates(
+    disease: str,
+    as_of: dt.date | None = ...,
+    lazy: Literal[True] = ...,
+) -> pl.LazyFrame: ...
+
+
+@overload
+def _filter_param_estimates(
+    disease: str,
+    as_of: dt.date | None = ...,
+    lazy: Literal[False] = ...,
+) -> pl.DataFrame: ...
 
 
 def _filter_param_estimates(
     disease: str,
     as_of: dt.date | None = None,
-) -> pl.DataFrame:
+    lazy: bool = True,
+) -> pl.DataFrame | pl.LazyFrame:
     as_of = as_of or dt.date.max - dt.timedelta(days=1)
 
-    dat = datacat.public.stf.param_estimates.load.get_dataframe(output="pl")
-    return (
-        dat.with_columns(
+    output = "pl_lazy" if lazy else "pl"
+    result = (
+        datacat.public.stf.param_estimates.load.get_dataframe(output=output)
+        .with_columns(
             pl.col("start_date").fill_null(dt.date.min),
             pl.col("end_date").fill_null(dt.date.max),
         )
@@ -36,6 +60,7 @@ def _filter_param_estimates(
             as_of < pl.col("end_date"),
         )
     )
+    return result
 
 
 def get_nnh_generation_interval_pmf(
@@ -71,10 +96,7 @@ def get_nnh_generation_interval_pmf(
     return _extract_pmf(dat_filtered, "generation_interval")
 
 
-def get_nnh_delay_pmf(
-    disease: str,
-    as_of: dt.date | None = None,
-) -> list[float]:
+def get_nnh_delay_pmf(disease: str, as_of: dt.date | None = None) -> list[float]:
     """
     Filter and extract the delay probability mass function (PMF)
     based on disease and date filters.

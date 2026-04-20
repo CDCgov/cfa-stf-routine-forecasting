@@ -25,7 +25,6 @@ from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    create_prop_samples,
     get_available_reports,
     get_model_batch_dir_name,
     load_credentials,
@@ -293,101 +292,6 @@ def main(
         save_ci=True,
     )
     model_fit_dir_to_hub_tbl(model_dir)
-
-    if fit_ed_visits:
-        if Path(model_run_dir, "daily_ts_ensemble_e").exists():
-            logger.info("Creating daily proportions from daily_ts_ensemble_e...")
-            create_prop_samples(
-                model_run_dir=model_run_dir,
-                num_model_name=pyrenew_model_name,
-                other_model_name="daily_ts_ensemble_e",
-                aggregate_num=False,
-                aggregate_other=False,
-                save=True,
-            )
-            tmp_model_name = f"prop_{pyrenew_model_name}_daily_ts_ensemble_e"
-            tmp_model_fit_dir = Path(model_run_dir, tmp_model_name)
-            make_figures_from_model_fit_dir(
-                tmp_model_fit_dir,
-                save_figs=True,
-                save_ci=True,
-            )
-            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
-
-        else:
-            logger.warning(
-                "daily_ts_ensemble_e not found, skipping creation of daily proportions for comparison with pyrenew model."
-            )
-        if Path(model_run_dir, "epiweekly_ts_ensemble_e").exists():
-            logger.info(
-                "Creating epiweekly proportions from epiweekly_ts_ensemble_e..."
-            )
-            create_prop_samples(
-                model_run_dir=model_run_dir,
-                num_model_name=pyrenew_model_name,
-                other_model_name="epiweekly_ts_ensemble_e",
-                aggregate_num=True,
-                aggregate_other=False,
-                save=True,
-            )
-            tmp_model_name = f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
-            tmp_model_fit_dir = Path(model_run_dir, tmp_model_name)
-
-            make_figures_from_model_fit_dir(
-                tmp_model_fit_dir,
-                save_figs=True,
-                save_ci=True,
-            )
-            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
-
-        else:
-            logger.warning(
-                "epiweekly_ts_ensemble_e not found, skipping creation of epiweekly proportions for comparison with pyrenew model."
-            )
-        if Path(model_run_dir, "epiautogp_nssp_daily_other").exists():
-            logger.info("Creating daily proportions from epiautogp_nssp_daily_other...")
-            create_prop_samples(
-                model_run_dir=model_run_dir,
-                num_model_name=pyrenew_model_name,
-                other_model_name="epiautogp_nssp_daily_other",
-                aggregate_num=False,
-                aggregate_other=False,
-                save=True,
-            )
-            tmp_model_name = f"prop_{pyrenew_model_name}_epiautogp_nssp_daily_other"
-            tmp_model_fit_dir = Path(model_run_dir, tmp_model_name)
-            make_figures_from_model_fit_dir(
-                tmp_model_fit_dir,
-                save_figs=True,
-                save_ci=True,
-            )
-            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
-
-            logger.info(
-                "Creating epiweekly proportions from epiautogp_nssp_daily_other..."
-            )
-            create_prop_samples(
-                model_run_dir=model_run_dir,
-                num_model_name=pyrenew_model_name,
-                other_model_name="epiautogp_nssp_daily_other",
-                aggregate_num=True,
-                aggregate_other=True,
-                save=True,
-            )
-            tmp_model_name = f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_aggregated_epiautogp_nssp_daily_other"
-            tmp_model_fit_dir = Path(model_run_dir, tmp_model_name)
-            make_figures_from_model_fit_dir(
-                tmp_model_fit_dir,
-                save_figs=True,
-                save_ci=True,
-            )
-            model_fit_dir_to_hub_tbl(tmp_model_fit_dir)
-        else:
-            logger.warning(
-                "epiautogp_nssp_daily_other not found, skipping creation of proportions for comparison with epiautogp model."
-            )
-
-    logger.info("Postprocessing complete.")
 
     logger.info(
         "Single-location pipeline complete "

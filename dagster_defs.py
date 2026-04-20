@@ -35,6 +35,13 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
+from pipelines.utils.common_utils import (
+    calculate_training_dates,
+    create_prop_samples,
+    get_model_batch_dir_name,
+    make_figures_from_model_fit_dir,
+    model_fit_dir_to_hub_tbl,
+)
 from pipelines.utils.postprocess_forecast_batches import main as postprocess
 
 # ============================================================================
@@ -44,7 +51,6 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
-# shared time helpers
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
 SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
 
@@ -407,7 +413,8 @@ def _run_timeseries_e(
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        f"{config.output_basedir}/{context.partition_key}_forecasts"
+        config.output_basedir,
+        f"{context.partition_key}_forecasts",
     )
 
     context.log.info(f"config: '{config}'")
@@ -442,7 +449,7 @@ def _run_pyrenew_model(
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        f"{config.output_basedir}/{context.partition_key}_forecasts"
+        config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
@@ -473,23 +480,114 @@ def _run_pyrenew_model(
     )
 
 
+def get_model_loc_dir(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+) -> Path:
+    disease = context.graph_dimension["diseases"]
+    location = context.graph_dimension["locations"]
+
+    report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    first_training_date, last_training_date = calculate_training_dates(
+        report_date=report_date,
+        n_training_days=config.n_training_days,
+        exclude_last_n_days=config.exclude_last_n_days,
+        logger=context.log,
+    )
+
+    model_batch_dir_name = get_model_batch_dir_name(
+        disease=disease,
+        report_date=report_date,
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+    )
+
+    model_loc_dir = Path(
+        config.output_basedir,
+        f"{context.partition_key}_forecasts",
+        model_batch_dir_name,
+        "model_runs",
+        location,
+    )
+    return model_loc_dir
+
+
+def _run_fusion_model(
+    context: DynamicGraphAssetExecutionContext,
+    config: ModelBaseConfig,
+    num_model_name,
+    other_model_name,
+    aggregate_num,
+    aggregate_other,
+    fusion_model_name,
+) -> str | None:
+    """
+    Helper function to run fusion model.
+    """
+    _throw_if_backfill(context, daily_partitions_def)
+    model_loc_dir = get_model_loc_dir(context, config)
+    create_prop_samples(
+        model_run_dir=model_loc_dir,
+        num_model_name=num_model_name,
+        other_model_name=other_model_name,
+        aggregate_num=aggregate_num,
+        aggregate_other=aggregate_other,
+        save=True,
+    )
+
+    fusion_model_fit_dir = Path(model_loc_dir, fusion_model_name)
+
+    make_figures_from_model_fit_dir(fusion_model_fit_dir)
+
+    make_figures_from_model_fit_dir(
+        fusion_model_fit_dir,
+        save_figs=True,
+        save_ci=True,
+    )
+    model_fit_dir_to_hub_tbl(fusion_model_fit_dir)
+
+    context.log.debug(f"config: '{config}'")
+
+
+def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: bool):
+    other_model_name = "epiweekly_ts_ensemble_e" if epiweekly else "daily_ts_ensemble_e"
+    fusion_model_name = (
+        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
+        if epiweekly
+        else f"prop_{pyrenew_model_name}_daily_ts_ensemble_e"
+    )
+    aggregate_num = epiweekly
+    _run_fusion_model(
+        context=context,
+        config=config,
+        num_model_name=pyrenew_model_name,
+        other_model_name=other_model_name,
+        aggregate_num=aggregate_num,
+        aggregate_other=False,
+        fusion_model_name=fusion_model_name,
+    )
+
+
 # ---------- Automation Conditions ----------
 # A condition that will run as soon as all dependencies are available, but only
 # if the asset has not been materialized yet for that day
 eager_once = dg.AutomationCondition.eager() & dg.AutomationCondition.missing()
 
-# ---------- Pyrenew Assets ----------
+weekly_forecast_initial_args = {
+    "partitions_def": daily_partitions_def,
+    "graph_dimensions": ["diseases", "locations"],
+    "automation_condition": dg.AutomationCondition.on_cron(
+        cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
+    ),
+    "group_name": "WeeklyForecast",
+}
+
+
+# ---------- Initial Forecast Assets ----------
 
 
 # Timeseries E
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def,
-    graph_dimensions=["diseases", "locations"],
-    # Run as soon as the nssp gold data is available only on Wednesdays
-    automation_condition=dg.AutomationCondition.on_cron(
-        cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
-    ),
-    group_name="WeeklyForecast",
+    **weekly_forecast_initial_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -498,13 +596,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def,
-    graph_dimensions=["diseases", "locations"],
-    # Run as soon as the nssp gold data is available only on Wednesdays
-    automation_condition=dg.AutomationCondition.on_cron(
-        cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
-    ),
-    group_name="WeeklyForecast",
+    **weekly_forecast_initial_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -515,13 +607,9 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def,
-    graph_dimensions=["diseases", "locations"],
-    automation_condition=eager_once,
-    group_name="WeeklyForecast",
+    **weekly_forecast_initial_args,
     ins={
-        "timeseries_e": dg.In(dg.Nothing),
-        "epiweekly_timeseries_e": dg.In(dg.Nothing),
+        "nssp_gold_v1": dg.In(dg.Nothing),
     },
 )
 def pyrenew_e(
@@ -533,10 +621,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def,
-    graph_dimensions=["diseases", "locations"],
-    automation_condition=eager_once,
-    group_name="WeeklyForecast",
+    **weekly_forecast_initial_args,
     ins={
         "nhsn_data_stf": dg.In(dg.Nothing),
     },
@@ -547,13 +632,9 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    partitions_def=daily_partitions_def,
-    graph_dimensions=["diseases", "locations"],
-    automation_condition=eager_once,
-    group_name="WeeklyForecast",
+    **weekly_forecast_initial_args,
     ins={
-        "timeseries_e": dg.In(dg.Nothing),
-        "epiweekly_timeseries_e": dg.In(dg.Nothing),
+        "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_data_stf": dg.In(dg.Nothing),
     },
 )
@@ -589,8 +670,7 @@ def pyrenew_hw(
     # automation_condition=eager_once,
     group_name="WeeklyForecastArchived",
     ins={
-        "timeseries_e": dg.In(dg.Nothing),
-        "epiweekly_timeseries_e": dg.In(dg.Nothing),
+        "nssp_gold_v1": dg.In(dg.Nothing),
         "nwss_gold_stf": dg.In(dg.Nothing),
         "nhsn_data_stf": dg.In(dg.Nothing),
     },
@@ -602,14 +682,101 @@ def pyrenew_hew(
     _run_pyrenew_model(context, config, "hew")
 
 
+# ---------- Fusion Forecasts ----------
+
+weekly_forecast_fusion_args = {
+    "partitions_def": daily_partitions_def,
+    "graph_dimensions": ["diseases", "locations"],
+    "group_name": "WeeklyForecast",
+}
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion_args,
+    ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_e_ts(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
+    _fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion_args,
+    ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_e_ts_epiweekly(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
+    _fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_e", epiweekly=True
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion_args,
+    ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_he_ts(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
+    _fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_he", epiweekly=False
+    )
+
+
+@dynamic_graph_asset(
+    **weekly_forecast_fusion_args,
+    ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_he_ts_epiweekly(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
+    _fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_he", epiweekly=True
+    )
+
+
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    group_name="WeeklyForecastArchived",
+    ins={"pyrenew_hew": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_hew_ts(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
+    _fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_hew", epiweekly=False
+    )
+
+
+@dynamic_graph_asset(
+    partitions_def=daily_partitions_def,
+    graph_dimensions=["diseases", "locations"],
+    group_name="WeeklyForecastArchived",
+    ins={"pyrenew_hew": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+)
+def fuse_pyrenew_hew_ts_epiweekly(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
+    _fuse_pyrenew_timeseries(
+        context, config, pyrenew_model_name="pyrenew_hew", epiweekly=True
+    )
+
+
 # ---------- Postprocessing Forecast Batches ----------
 
 
 @dg.asset(
     deps=[
-        "pyrenew_e",
+        "fuse_pyrenew_e_ts",
+        "fuse_pyrenew_e_ts_epiweekly",
+        "fuse_pyrenew_he_ts",
+        "fuse_pyrenew_he_ts_epiweekly",
         "pyrenew_h",
-        "pyrenew_he",
     ],
     partitions_def=daily_partitions_def,
     # Runs when any dependency has been updated as long as at least one exists
@@ -635,7 +802,7 @@ def postprocess_forecasts(
     _throw_if_backfill(context, daily_partitions_def)
 
     daily_forecast_output_dir: Path = Path(
-        f"{config.output_basedir}/{context.partition_key}_forecasts"
+        config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     context.log.info(f"config: '{config}'")

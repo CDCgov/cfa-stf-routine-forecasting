@@ -1,0 +1,13 @@
+load_from:
+  # local defs
+  - python_file: dagster_defs.py
+  # dataops
+  - grpc_server:
+      host: 172.31.64.204 # private ip
+      port: 4000
+      location_name: 'cfa-dataops-scheduler'
+  # nssp-etl
+  - grpc_server:
+      host: 172.31.64.199 # private ip
+      port: 4000
+      location_name: "cfa-nssp-etl"

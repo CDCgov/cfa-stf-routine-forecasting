@@ -4,8 +4,6 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# Direct use of dagster
-import dagster as dg
 import requests
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -31,6 +29,9 @@ from dagster_azure.blob import (
 from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
+
+# Direct use of dagster
+import dagster as dg
 
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
@@ -576,7 +577,7 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
 # if the asset has not been materialized yet for that day
 eager_once = dg.AutomationCondition.eager() & dg.AutomationCondition.missing()
 
-weekly_forecast_initial = {
+weekly_forecast_initial_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "automation_condition": dg.AutomationCondition.on_cron(
@@ -586,9 +587,12 @@ weekly_forecast_initial = {
 }
 
 
+# ---------- Initial Forecast Assets ----------
+
+
 # Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_initial,
+    **weekly_forecast_initial_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -597,7 +601,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_initial,
+    **weekly_forecast_initial_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -608,7 +612,7 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_initial,
+    **weekly_forecast_initial_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -622,7 +626,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_initial,
+    **weekly_forecast_initial_args,
     ins={
         "nhsn_data_stf": dg.In(dg.Nothing),
     },
@@ -633,7 +637,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_initial,
+    **weekly_forecast_initial_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_data_stf": dg.In(dg.Nothing),
@@ -685,7 +689,7 @@ def pyrenew_hew(
 
 # ---------- Fusion Forecasts ----------
 
-weekly_forecast_fusion = {
+weekly_forecast_fusion_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "group_name": "WeeklyForecast",
@@ -693,7 +697,7 @@ weekly_forecast_fusion = {
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion,
+    **weekly_forecast_fusion_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
@@ -703,7 +707,7 @@ def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: Fusion
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion,
+    **weekly_forecast_fusion_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts_epiweekly(
@@ -715,7 +719,7 @@ def fuse_pyrenew_e_ts_epiweekly(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion,
+    **weekly_forecast_fusion_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
@@ -727,7 +731,7 @@ def fuse_pyrenew_he_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion,
+    **weekly_forecast_fusion_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts_epiweekly(

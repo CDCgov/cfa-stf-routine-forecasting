@@ -458,7 +458,7 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
 
 # ---------- Shared Asset Decorator Arguments ----------
 
-# All of our forecast assets should materialize with the same 
+# All of our forecast assets should materialize with the same
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
 
@@ -468,18 +468,18 @@ weekly_forecast_asset_args = {
     "automation_condition": (
         # Check every half hour on Wednesdays
         dg.AutomationCondition.on_cron(
-            cron_schedule="0,30 * * * *", 
-            cron_timezone="America/New_York"
+            cron_schedule="0,30 * * * *", cron_timezone="America/New_York"
         )
-        & dg.AutomationCondition.any_deps_updated() # but only trigger when something upstream updates
-        & ~dg.AutomationCondition.any_deps_missing() # and DON'T trigger if any deps missing
-        & ~dg.AutomationCondition.any_deps_in_progress() # and DON'T trigger if any deps are materializing now
+        & dg.AutomationCondition.any_deps_updated()  # but only trigger when something upstream updates
+        & ~dg.AutomationCondition.any_deps_missing()  # and DON'T trigger if any deps missing
+        & ~dg.AutomationCondition.any_deps_in_progress()  # and DON'T trigger if any deps are materializing now
     ),
     "group_name": "WeeklyForecast",
 }
 
 
 # ---------- Initial Forecast Assets ----------
+
 
 # Timeseries E
 @dynamic_graph_asset(
@@ -544,6 +544,7 @@ def pyrenew_he(
 
 # ---------- Fusion Forecasts ----------
 
+
 @dynamic_graph_asset(
     **weekly_forecast_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
@@ -588,6 +589,7 @@ def fuse_pyrenew_he_ts_epiweekly(
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_he", epiweekly=True
     )
+
 
 # ---------- Postprocessing Forecast Batches ----------
 

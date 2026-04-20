@@ -161,7 +161,7 @@ azure_batch_execution_config = ExecutionConfig(
                     # f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    # get_ blob container mounts for cfa-stf-routine-forecasting
+                    # blob container mounts for cfa-stf-routine-forecasting
                     "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
                     "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
                     "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",

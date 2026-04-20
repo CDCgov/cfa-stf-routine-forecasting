@@ -1,3 +1,0 @@
-[lint]
-default-exclude = true
-assignment = "<-"

@@ -15,7 +15,7 @@ repos:
       - id: trailing-whitespace
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.10
+    rev: v0.15.11
     hooks:
       # Sort imports
       - id: ruff-check
@@ -23,7 +23,7 @@ repos:
       - id: ruff-format
     # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.6
+    rev: 0.11.7
     hooks:
       - id: uv-lock
   # Bash
@@ -55,7 +55,7 @@ repos:
       - id: runic
   # Typos
   - repo: https://github.com/adhtruong/mirrors-typos
-    rev: v1.45.0
+    rev: v1.45.1
     hooks:
       - id: typos
         args: ["--force-exclude"]

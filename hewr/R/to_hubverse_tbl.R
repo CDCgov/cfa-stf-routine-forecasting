@@ -77,7 +77,7 @@ raw_samples_to_prelim <- function(samples_path) {
 #' @export
 prelim_to_hub_samples <- function(prelim_samples) {
   prelim_samples |>
-    dplyr::mutate(output_type = "sample") |>
+    dplyr::mutate(output_type = "sample", .value = as.numeric(.data$.value)) |>
     dplyr::rename(
       value = ".value",
       target_end_date = "date",

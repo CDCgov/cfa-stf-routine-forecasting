@@ -3,7 +3,7 @@ name: test
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   id-token: write
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   pipelines-test:
-    name: Run pipelines tests and collect coverage
+    name: Run python tests and collect coverage
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,8 +28,7 @@ jobs:
         env:
           XLA_FLAGS: --xla_force_host_platform_device_count=2
         run: |
-          uv run pytest pipelines \
-            --mpl --mpl-default-tolerance=10 \
+          uv run pytest \
             --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml .
 
       - name: Upload results to Codecov

@@ -33,7 +33,7 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 
-from cfa.stf.forecasttools.ft_lite import get_us_loc_pop_tbl
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.data.generate_test_data_lib import (
     FACILITY_LEVEL_NSSP_DATA_COLS,
     LOC_LEVEL_NSSP_DATA_COLS,

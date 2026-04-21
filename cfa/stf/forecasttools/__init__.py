@@ -1,33 +1,23 @@
 """Forecasttools helpers exposed through the cfa.stf.forecasttools namespace."""
 
-from collections.abc import MutableSequence
+from importlib import import_module
 
-from . import arviz_helpers as arviz
-from .location_table import LOCATION_LIST, get_us_loc_pop_tbl
-
-
-def ensure_listlike(x):
-    """
-    Ensure that an object either behaves like a
-    :class:`MutableSequence` and if not return a
-    one-item :class:`list` containing the object.
-    Useful for handling list-of-strings inputs
-    alongside single strings.
-    Based on this _`StackOverflow approach
-    <https://stackoverflow.com/a/66485952>`.
-
-    Parameters
-    ----------
-    x
-        The item to ensure is :class:`list`-like.
-    Returns
-    -------
-    MutableSequence
-        ``x`` if ``x`` is a :class:`MutableSequence`
-        otherwise ``[x]`` (i.e. a one-item list containing
-        ``x``.
-    """
-    return x if isinstance(x, MutableSequence) else [x]
+from .location_constants import LOCATION_LIST
+from .utils import coalesce_common_columns, ensure_listlike
 
 
-__all__ = ["ensure_listlike", "get_us_loc_pop_tbl", "LOCATION_LIST", "arviz"]
+def __getattr__(name):
+    if name == "arviz":
+        return import_module(".arviz_helpers", __name__)
+    if name == "get_us_loc_pop_tbl":
+        return import_module(".location_table", __name__).get_us_loc_pop_tbl
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "coalesce_common_columns",
+    "ensure_listlike",
+    "get_us_loc_pop_tbl",
+    "LOCATION_LIST",
+    "arviz",
+]

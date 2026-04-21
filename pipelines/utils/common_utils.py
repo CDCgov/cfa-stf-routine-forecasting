@@ -10,9 +10,9 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from forecasttools import ensure_listlike, location_table
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
+from cfa.stf.forecasttools import LOCATION_LIST, ensure_listlike
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations
@@ -21,7 +21,7 @@ disease_map_lower_ = {
     "covid-19": "COVID-19",
     "rsv": "RSV",
 }
-loc_abbrs_ = location_table["short_name"].to_list()
+loc_abbrs_ = LOCATION_LIST
 
 
 def load_credentials(

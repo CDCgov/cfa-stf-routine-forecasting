@@ -468,12 +468,12 @@ weekly_forecast_asset_args = {
     "automation_condition": (
         # In production, execute on Wednesdays.
         dg.AutomationCondition.on_cron(
-            cron_schedule="* * * * WED", 
-            cron_timezone="America/New_York"
-        ) if is_production 
+            cron_schedule="* * * * WED", cron_timezone="America/New_York"
+        )
+        if is_production
         # In dev, execute when it can, legally
         else dg.AutomationCondition.eager()
-    ), 
+    ),
     "group_name": "WeeklyForecast",
 }
 
@@ -484,15 +484,11 @@ weekly_forecast_asset_args = {
 # without needing to actually colocate the assets.
 
 nssp_gold_v1 = dg.AssetSpec(
-    "nssp_gold_v1", 
-    partitions_def=daily_partitions_def, 
-    group_name="Upstream"
+    "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
 ).with_io_manager_key("prod_io_manager")
 
 nhsn_hrd = dg.AssetSpec(
-    "nhsn_hrd", 
-    partitions_def=daily_partitions_def, 
-    group_name="Upstream"
+    "nhsn_hrd", partitions_def=daily_partitions_def, group_name="Upstream"
 ).with_io_manager_key("prod_io_manager")
 
 # ---------- Initial Forecast Assets ----------

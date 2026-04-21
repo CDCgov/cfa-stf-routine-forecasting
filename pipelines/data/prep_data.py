@@ -5,12 +5,12 @@ import os
 import tempfile
 from pathlib import Path
 
-import forecasttools
 import jax.numpy as jnp
 import polars as pl
 import polars.selectors as cs
 from pyrenew_multisignal.hew import approx_lognorm
 
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.utils.common_utils import py_scalar_to_r_scalar, run_r_code
 
 _disease_map = {
@@ -257,8 +257,8 @@ def process_loc_level_nssp_data(
 
     if loc_abb == "US":
         locations_to_aggregate = (
-            loc_pop_df.filter(pl.col("abb") != "US")
-            .get_column("abb")
+            loc_pop_df.filter(pl.col("abbr") != "US")
+            .get_column("abbr")
             .unique()
             .to_list()
         )
@@ -319,7 +319,7 @@ def aggregate_facility_level_nssp_to_loc(
     if loc_abb == "US":
         logger.info("Aggregating facility-level data to national")
         locations_to_aggregate = (
-            loc_pop_df.filter(pl.col("abb") != "US").get_column("abb").unique()
+            loc_pop_df.filter(pl.col("abbr") != "US").get_column("abbr").unique()
         )
         facility_level_nssp_data = aggregate_nssp_to_national(
             facility_level_nssp_data,
@@ -345,14 +345,6 @@ def aggregate_facility_level_nssp_to_loc(
         .sort(["date", "disease"])
         .select(["date", "geo_value", "disease", "ed_visits"])
         .collect()
-    )
-
-
-def get_loc_pop_df():
-    return forecasttools.location_table.select(
-        pl.col("short_name").alias("abb"),
-        pl.col("long_name").alias("name"),
-        pl.col("population"),
     )
 
 
@@ -494,9 +486,9 @@ def process_and_save_loc_data(
 
     os.makedirs(save_dir, exist_ok=True)
 
-    loc_pop_df = get_loc_pop_df()
+    loc_pop_df = get_us_loc_pop_tbl()
 
-    loc_pop = loc_pop_df.filter(pl.col("abb") == loc_abb).item(0, "population")
+    loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
 
     right_truncation_offset = (report_date - last_training_date).days - 1
     # First entry of source right truncation PMFs corresponds to reports
@@ -598,8 +590,8 @@ def process_and_save_loc_param(
     fit_ed_visits,
     save_dir,
 ) -> None:
-    loc_pop_df = get_loc_pop_df()
-    loc_pop = loc_pop_df.filter(pl.col("abb") == loc_abb).item(0, "population")
+    loc_pop_df = get_us_loc_pop_tbl()
+    loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
 
     if loc_level_nwss_data is None:
         pop_fraction = jnp.array([1])

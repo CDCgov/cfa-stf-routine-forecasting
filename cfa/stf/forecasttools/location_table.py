@@ -2,7 +2,6 @@ import polars as pl
 
 from pipelines.utils.common_utils import run_r_code
 
-
 __all__ = ["get_us_loc_pop_tbl", "LOCATION_LIST"]
 
 

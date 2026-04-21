@@ -16,7 +16,6 @@ dependencies = [
     "cfa-dagster",
     "cfa-dataops",
     "dagster==1.12.2",
-    "forecasttools",
     "polarbayes",
     "polars[pyarrow,numpy]>=1.36",
     "pygit2>=1.17.0",
@@ -59,10 +58,9 @@ fix = true
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
 [tool.pytest.ini_options]
-testpaths = ["pipelines/tests"]
+testpaths = ["pipelines/tests", "cfa"]
 
 [tool.uv.sources]
-forecasttools = { git = "https://github.com/cdcgov/forecasttools-py" }
 cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }

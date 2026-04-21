@@ -27,10 +27,10 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelines", "cfa"]
-include = ["cfa/stf/forecasttools/testdata/*.nc"]
+include = ["cfa/stf/forecasttools/test_data/*.nc"]
 
 [tool.hatch.build.targets.sdist]
-include = ["cfa/stf/forecasttools/testdata/*.nc"]
+include = ["cfa/stf/forecasttools/test_data/*.nc"]
 
 [build-system]
 requires = ["hatchling"]

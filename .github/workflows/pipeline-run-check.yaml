@@ -51,7 +51,7 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: "1.11"
 
@@ -94,7 +94,7 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: "1.11"
 
@@ -137,7 +137,7 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: "1.11"
 
@@ -180,7 +180,7 @@ jobs:
         uses: ./.github/actions/setup-hewr
 
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
           version: "1.11"
 

@@ -466,17 +466,34 @@ weekly_forecast_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "automation_condition": (
-        # Check every half hour on Wednesdays
+        # In production, execute on Wednesdays.
         dg.AutomationCondition.on_cron(
-            cron_schedule="0,30 * * * *", cron_timezone="America/New_York"
-        )
-        & dg.AutomationCondition.any_deps_updated()  # but only trigger when something upstream updates
-        & ~dg.AutomationCondition.any_deps_missing()  # and DON'T trigger if any deps missing
-        & ~dg.AutomationCondition.any_deps_in_progress()  # and DON'T trigger if any deps are materializing now
-    ),
+            cron_schedule="* * * * WED", 
+            cron_timezone="America/New_York"
+        ) if is_production 
+        # In dev, execute when it can, legally
+        else dg.AutomationCondition.eager()
+    ), 
     "group_name": "WeeklyForecast",
 }
 
+# ---------- External Asset Specs -------------
+
+# These are pointers, using our prod io manager, to other assets
+# in our catalog. This allows us to see the status of upstream dependency data
+# without needing to actually colocate the assets.
+
+nssp_gold_v1 = dg.AssetSpec(
+    "nssp_gold_v1", 
+    partitions_def=daily_partitions_def, 
+    group_name="Upstream"
+).with_io_manager_key("prod_io_manager")
+
+nhsn_hrd = dg.AssetSpec(
+    "nhsn_hrd", 
+    partitions_def=daily_partitions_def, 
+    group_name="Upstream"
+).with_io_manager_key("prod_io_manager")
 
 # ---------- Initial Forecast Assets ----------
 
@@ -666,15 +683,12 @@ collected_defs = collect_definitions(globals())
 
 # Create Definitions object
 defs = dg.Definitions(
-    assets=collected_defs["assets"],
-    asset_checks=collected_defs["asset_checks"],
-    jobs=collected_defs["jobs"],
-    sensors=collected_defs["sensors"],
-    schedules=collected_defs["schedules"],
+    **collected_defs,
     resources={
-        # This IOManager lets Dagster serialize asset outputs and store them
+        # These IOManagers let Dagster serialize asset outputs and store them
         # in Azure to pass between assets
         "io_manager": ADLS2PickleIOManager(),
+        "prod_io_manager": ADLS2PickleIOManager(use_production=True),
         # an example storage account
         "azure_blob_storage": AzureBlobStorageResource(
             account_url=f"{storage_account}.blob.core.windows.net",

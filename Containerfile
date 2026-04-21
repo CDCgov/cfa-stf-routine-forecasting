@@ -68,7 +68,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY pipelines ./pipelines
 COPY README.md ./README.md
 
-# Install the local project now that pipelines/ sources are present
+# Install the local project now that pipelines / sources are present
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
 

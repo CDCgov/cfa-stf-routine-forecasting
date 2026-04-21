@@ -73,7 +73,7 @@ def test_replace_all_dim_suffix_empty_suffixes():
 
 
 def test_assign_coords_from_start_step_basic():
-    dim_name = "beta_coeffs_dim_0"
+    dim_name = "latent_infections_dim_0"
     start = dt.date(2020, 1, 1)
     interval = dt.timedelta(days=1)
 
@@ -94,7 +94,7 @@ def test_assign_coords_from_start_step_basic():
 
 def test_assign_coords_from_start_step_inplace():
     idata_copy = copy.deepcopy(IDATA_WO_DATES)
-    dim_name = "beta_coeffs_dim_0"
+    dim_name = "latent_infections_dim_0"
     start = dt.date(2019, 9, 29)
     interval = dt.timedelta(days=7)
 
@@ -133,7 +133,7 @@ def test_write_to_netcdf_after_operations():
 
     ft.arviz.assign_coords_from_start_step(
         out,
-        "beta_coeffs_time",
+        "latent_infections_time",
         dt.date(2020, 1, 1),
         interval=dt.timedelta(days=1),
         inplace=True,

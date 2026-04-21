@@ -10,8 +10,9 @@ import xarray as xr
 
 import cfa.stf.forecasttools as ft
 
+TESTDATA_DIR = Path(__file__).resolve().parent / "testdata"
 IDATA_WO_DATES = az.from_netcdf(
-    "pipelines/tests/end_to_end_test_output/2024-12-21_forecasts/covid-19_r_2024-12-21_f_2024-09-22_t_2024-12-20/model_runs/MT/pyrenew_hew/mcmc_output/original_inference_data.nc"
+    TESTDATA_DIR / "original_inference_data.nc"
 )
 
 

@@ -12,6 +12,7 @@
 *.rds
 *.pickle
 *.nc
+!cfa/stf/forecasttools/testdata/original_inference_data.nc
 
 # Documents
 *.doc

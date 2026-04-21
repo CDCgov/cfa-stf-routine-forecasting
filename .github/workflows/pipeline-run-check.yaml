@@ -2,11 +2,11 @@ name: Pipeline Run Check
 
 on:
   pull_request:
-    branches: [main]
+    branches: [ main ]
     paths-ignore:
       - "pipelines/batch/**"
   push:
-    branches: [main]
+    branches: [ main ]
     paths-ignore:
       - "pipelines/batch/**"
 
@@ -27,6 +27,9 @@ jobs:
 
       - name: Set up Pyrenew-HEW via UV
         uses: ./.github/actions/setup-pyrenew-hew
+
+      - name: Set up R with hewr package
+        uses: ./.github/actions/setup-hewr
 
       - name: Generate test data
         run: uv run python pipelines/data/generate_test_data.py ${{ env.BASE_DIR }}
@@ -215,9 +218,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        model: [e]
-        disease: [COVID-19, Influenza, RSV]
-        location: [US, CA, MT, DC]
+        model: [ e ]
+        disease: [ COVID-19, Influenza, RSV ]
+        location: [ US, CA, MT, DC ]
     steps:
       - uses: actions/checkout@v6
 
@@ -254,9 +257,9 @@ jobs:
       XLA_FLAGS: --xla_force_host_platform_device_count=2
     strategy:
       matrix:
-        model: [h, e, he, hw, ew, hew]
-        disease: [COVID-19, Influenza, RSV]
-        location: [US, CA, MT, DC]
+        model: [ h, e, he, hw, ew, hew ]
+        disease: [ COVID-19, Influenza, RSV ]
+        location: [ US, CA, MT, DC ]
         exclude:
           - model: hw
             disease: Influenza

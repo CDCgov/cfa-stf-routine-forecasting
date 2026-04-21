@@ -11,9 +11,7 @@ import xarray as xr
 import cfa.stf.forecasttools as ft
 
 TESTDATA_DIR = Path(__file__).resolve().parent / "testdata"
-IDATA_WO_DATES = az.from_netcdf(
-    TESTDATA_DIR / "original_inference_data.nc"
-)
+IDATA_WO_DATES = az.from_netcdf(TESTDATA_DIR / "original_inference_data.nc")
 
 
 def test_replace_all_dim_suffix_basic():

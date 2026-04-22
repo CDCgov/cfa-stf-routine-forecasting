@@ -28,12 +28,12 @@ import argparse
 import datetime as dt
 from pathlib import Path
 
-import forecasttools
 import jax.random as jr
 import numpy as np
 import polars as pl
 import polars.selectors as cs
 
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.data.generate_test_data_lib import (
     FACILITY_LEVEL_NSSP_DATA_COLS,
     LOC_LEVEL_NSSP_DATA_COLS,
@@ -259,9 +259,9 @@ def main(base_dir: Path, clean: bool):
         .group_by("wwtp_jurisdiction")
         .agg("wwtp_id")
         .join(
-            forecasttools.location_table.rename(
-                {"short_name": "wwtp_jurisdiction"}
-            ).select("wwtp_jurisdiction", "population"),
+            get_us_loc_pop_tbl()
+            .rename({"abbr": "wwtp_jurisdiction"})
+            .select("wwtp_jurisdiction", "population"),
             on="wwtp_jurisdiction",
         )
         .with_columns(

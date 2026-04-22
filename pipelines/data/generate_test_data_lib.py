@@ -13,7 +13,6 @@ import shutil
 from pathlib import Path
 
 import arviz as az
-import forecasttools
 import jax.random as jr
 import numpy as np
 import polars as pl
@@ -22,6 +21,7 @@ from jax._src.typing import Array
 from pyrenew_multisignal.hew import PyrenewHEWData
 from scipy.stats import expon, norm
 
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.data.prep_data import (
     process_and_save_loc_data,
     process_and_save_loc_param,
@@ -336,9 +336,9 @@ def simulate_data_from_bootstrap(
         .group_by("wwtp_jurisdiction")
         .agg("wwtp_id")
         .join(
-            forecasttools.location_table.rename(
-                {"short_name": "wwtp_jurisdiction"}
-            ).select("wwtp_jurisdiction", "population"),
+            get_us_loc_pop_tbl()
+            .rename({"abbr": "wwtp_jurisdiction"})
+            .select("wwtp_jurisdiction", "population"),
             on="wwtp_jurisdiction",
         )
         .with_columns(

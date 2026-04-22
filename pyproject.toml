@@ -12,11 +12,11 @@ authors = [
 ]
 
 dependencies = [
+    "arviz<1.0.0",
     "cfa-catalog-public>=2026.3.23.0",
     "cfa-dagster",
     "cfa-dataops",
     "dagster==1.12.2",
-    "forecasttools",
     "polarbayes",
     "polars[pyarrow,numpy]>=1.36",
     "pygit2>=1.17.0",
@@ -28,6 +28,10 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelines", "cfa"]
+include = ["cfa/stf/forecasttools/test_data/*.nc"]
+
+[tool.hatch.build.targets.sdist]
+include = ["cfa/stf/forecasttools/test_data/*.nc"]
 
 [build-system]
 requires = ["hatchling"]
@@ -59,10 +63,9 @@ fix = true
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
 [tool.pytest.ini_options]
-testpaths = ["pipelines/tests"]
+testpaths = ["pipelines", "cfa"]
 
 [tool.uv.sources]
-forecasttools = { git = "https://github.com/cdcgov/forecasttools-py" }
 cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }

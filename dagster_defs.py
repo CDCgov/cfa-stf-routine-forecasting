@@ -26,11 +26,11 @@ from dagster_azure.blob import (
     AzureBlobStorageDefaultCredential,
     AzureBlobStorageResource,
 )
-
-# Helper Libraries
-from forecasttools import location_table
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
+
+# Helper Libraries
+from cfa.stf.forecasttools import LOCATION_LIST
 
 # Model Code
 from pipelines.fable.forecast_timeseries import main as forecast_timeseries
@@ -185,9 +185,8 @@ azure_batch_execution_config = ExecutionConfig(
 DISEASES = SUPPORTED_DISEASES
 
 # Location dimensions
-RAW_LOCATIONS = location_table.get_column("short_name").to_list()
 LOCATIONS = [
-    location for location in RAW_LOCATIONS if location not in DEFAULT_EXCLUDED_LOCATIONS
+    location for location in LOCATION_LIST if location not in DEFAULT_EXCLUDED_LOCATIONS
 ]
 
 # Daily Partitions

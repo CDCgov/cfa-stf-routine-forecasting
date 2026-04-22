@@ -65,6 +65,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 #
 
 # Project files
+COPY cfa ./cfa
 COPY pipelines ./pipelines
 COPY README.md ./README.md
 

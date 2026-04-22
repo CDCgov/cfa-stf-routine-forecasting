@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:4.5.2
+FROM rocker/tidyverse:4.5.3
 
 ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 
@@ -31,13 +31,16 @@ COPY ./EpiAutoGP /cfa-stf-routine-forecasting/EpiAutoGP
 # Set working directory
 WORKDIR /cfa-stf-routine-forecasting
 
-# Install hewr
-RUN Rscript -e "install.packages('pak')"
-RUN Rscript -e "pak::repo_add(hubverse = 'https://hubverse-org.r-universe.dev'); pak::local_install('hewr', upgrade = FALSE)"
-
 # Cache Julia packages and artifacts
 RUN --mount=type=cache,target=/root/.julia \
     julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+
+# Install hewr
+RUN Rscript -e "install.packages('pak')"
+RUN Rscript -e "\
+    pak::repo_add(hubverse = 'https://hubverse-org.r-universe.dev'); \
+    pak::local_install('hewr', upgrade = FALSE) \
+"
 
 #
 # Bring in python project dependency information and set the virtual env

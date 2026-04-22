@@ -455,48 +455,56 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
         fusion_model_name=fusion_model_name,
     )
 
+# ---------- External Asset Specs -------------
+
+# These are pointers, using our prod io manager, to other assets
+# in our catalog. This allows us to see the status of upstream dependency data
+# without needing to actually colocate the assets. We only do this on the dev server
+
+if not is_production:
+
+    nssp_gold_v1 = dg.AssetSpec(
+        "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
+    ).with_io_manager_key("prod_io_manager")
+
+    nhsn_hrd = dg.AssetSpec(
+        "nhsn_hrd", partitions_def=daily_partitions_def, group_name="Upstream"
+    ).with_io_manager_key("prod_io_manager")
+
 
 # ---------- Shared Asset Decorator Arguments ----------
 
 # All of our forecast assets should materialize with the same
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
+wednesday_at_midnight_condition = dg.AutomationCondition.on_cron(
+        cron_schedule="0 0 * * WED",
+        cron_timezone="America/New_York"
+)
 
-weekly_forecast_asset_args = {
+weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
-    "automation_condition": (
-        # In production, execute on Wednesdays.
-        dg.AutomationCondition.on_cron(
-            cron_schedule="* * * * WED", cron_timezone="America/New_York"
-        )
-        if is_production
-        # In dev, execute when it can, legally
-        else dg.AutomationCondition.eager()
-    ),
     "group_name": "WeeklyForecast",
+    "automation_condition": 
+        wednesday_at_midnight_condition if is_production 
+        else wednesday_at_midnight_condition.ignore(
+            dg.AssetSelection.assets("nssp_gold_v1", "nhsn_hrd")
+        ),
 }
 
-# ---------- External Asset Specs -------------
-
-# These are pointers, using our prod io manager, to other assets
-# in our catalog. This allows us to see the status of upstream dependency data
-# without needing to actually colocate the assets.
-
-nssp_gold_v1 = dg.AssetSpec(
-    "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
-).with_io_manager_key("prod_io_manager")
-
-nhsn_hrd = dg.AssetSpec(
-    "nhsn_hrd", partitions_def=daily_partitions_def, group_name="Upstream"
-).with_io_manager_key("prod_io_manager")
+weekly_forecast_fusion_asset_args = {
+    "partitions_def": daily_partitions_def,
+    "graph_dimensions": ["diseases", "locations"],
+    "group_name": "WeeklyForecast",
+    "automation_condition": dg.AutomationCondition.eager(),
+}
 
 # ---------- Initial Forecast Assets ----------
 
-
 # Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -505,7 +513,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -516,7 +524,7 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -530,7 +538,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={
         "nhsn_hrd": dg.In(dg.Nothing),
     },
@@ -541,10 +549,8 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={
-        "timeseries_e": dg.In(dg.Nothing),
-        "epiweekly_timeseries_e": dg.In(dg.Nothing),
         "nhsn_hrd": dg.In(dg.Nothing),
     },
 )
@@ -559,7 +565,7 @@ def pyrenew_he(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
@@ -569,7 +575,7 @@ def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: Fusion
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts_epiweekly(
@@ -581,7 +587,7 @@ def fuse_pyrenew_e_ts_epiweekly(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
@@ -593,7 +599,7 @@ def fuse_pyrenew_he_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_asset_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts_epiweekly(
@@ -605,7 +611,6 @@ def fuse_pyrenew_he_ts_epiweekly(
 
 
 # ---------- Postprocessing Forecast Batches ----------
-
 
 @dg.asset(
     deps=[
@@ -619,8 +624,8 @@ def fuse_pyrenew_he_ts_epiweekly(
     # Runs when any dependency has been updated as long as at least one exists
     automation_condition=(
         dg.AutomationCondition.eager().replace(
-            ~dg.AutomationCondition.any_deps_missing(),
-            dg.AutomationCondition.any_deps_match(
+           old = ~dg.AutomationCondition.any_deps_missing(),
+           new = dg.AutomationCondition.any_deps_match(
                 ~dg.AutomationCondition.missing()
                 | dg.AutomationCondition.will_be_requested()
             ),

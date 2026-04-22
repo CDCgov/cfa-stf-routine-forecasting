@@ -455,6 +455,7 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
         fusion_model_name=fusion_model_name,
     )
 
+
 # ---------- External Asset Specs -------------
 
 # These are pointers, using our prod io manager, to other assets
@@ -462,7 +463,6 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
 # without needing to actually colocate the assets. We only do this on the dev server
 
 if not is_production:
-
     nssp_gold_v1 = dg.AssetSpec(
         "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
     ).with_io_manager_key("prod_io_manager")
@@ -478,19 +478,18 @@ if not is_production:
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
 wednesday_at_midnight_condition = dg.AutomationCondition.on_cron(
-        cron_schedule="0 0 * * WED",
-        cron_timezone="America/New_York"
+    cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
 )
 
 weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "group_name": "WeeklyForecast",
-    "automation_condition": 
-        wednesday_at_midnight_condition if is_production 
-        else wednesday_at_midnight_condition.ignore(
-            dg.AssetSelection.assets("nssp_gold_v1", "nhsn_hrd")
-        ),
+    "automation_condition": wednesday_at_midnight_condition
+    if is_production
+    else wednesday_at_midnight_condition.ignore(
+        dg.AssetSelection.assets("nssp_gold_v1", "nhsn_hrd")
+    ),
 }
 
 weekly_forecast_fusion_asset_args = {
@@ -501,6 +500,7 @@ weekly_forecast_fusion_asset_args = {
 }
 
 # ---------- Initial Forecast Assets ----------
+
 
 # Timeseries E
 @dynamic_graph_asset(
@@ -612,6 +612,7 @@ def fuse_pyrenew_he_ts_epiweekly(
 
 # ---------- Postprocessing Forecast Batches ----------
 
+
 @dg.asset(
     deps=[
         "fuse_pyrenew_e_ts",
@@ -624,8 +625,8 @@ def fuse_pyrenew_he_ts_epiweekly(
     # Runs when any dependency has been updated as long as at least one exists
     automation_condition=(
         dg.AutomationCondition.eager().replace(
-           old = ~dg.AutomationCondition.any_deps_missing(),
-           new = dg.AutomationCondition.any_deps_match(
+            old=~dg.AutomationCondition.any_deps_missing(),
+            new=dg.AutomationCondition.any_deps_match(
                 ~dg.AutomationCondition.missing()
                 | dg.AutomationCondition.will_be_requested()
             ),

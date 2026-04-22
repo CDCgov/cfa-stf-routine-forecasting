@@ -776,6 +776,7 @@ name = "cfa-stf-routine-forecasting"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "arviz" },
     { name = "cfa-catalog-public" },
     { name = "cfa-dagster" },
     { name = "cfa-dataops" },
@@ -808,6 +809,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "arviz", specifier = "<1.0.0" },
     { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub.git" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
     { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops.git?rev=main" },

@@ -12,6 +12,7 @@ authors = [
 ]
 
 dependencies = [
+    "arviz<1.0.0",
     "cfa-catalog-public>=2026.3.23.0",
     "cfa-dagster",
     "cfa-dataops",

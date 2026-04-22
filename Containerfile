@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:4.5.2
+FROM rocker/tidyverse:4.5.3
 
 ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 

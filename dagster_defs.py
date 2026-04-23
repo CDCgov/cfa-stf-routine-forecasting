@@ -485,12 +485,15 @@ weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "group_name": "WeeklyForecast",
-    "automation_condition": (dg.AutomationCondition.eager() & dg.AutomationCondition.cron_tick_passed(
-        # half-hour minute windows prevent over/under evaluation
-        # 6AM-8PM is a liberal working hour window
-        cron_schedule="0,30 6-20 * * WED", 
-        cron_timezone="America/New_York"
-    )).with_label("eager_on_wednesday_work_hrs")
+    "automation_condition": (
+        dg.AutomationCondition.eager()
+        & dg.AutomationCondition.cron_tick_passed(
+            # half-hour minute windows prevent over/under evaluation
+            # 6AM-8PM is a liberal working hour window
+            cron_schedule="0,30 6-20 * * WED",
+            cron_timezone="America/New_York",
+        )
+    ).with_label("eager_on_wednesday_work_hrs"),
 }
 
 weekly_forecast_fusion_asset_args = {

@@ -485,10 +485,13 @@ weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "group_name": "WeeklyForecast",
-    "automation_condition": (dg.AutomationCondition.eager() & dg.AutomationCondition.cron_tick_passed(
-        cron_schedule="0,30 * * * WED", # half-hour windows prevent over/under evaluation
-        cron_timezone="America/New_York"
-    )).with_label("eager_on_wednesday")
+    "automation_condition": (
+        dg.AutomationCondition.eager()
+        & dg.AutomationCondition.cron_tick_passed(
+            cron_schedule="0,30 * * * WED",  # half-hour windows prevent over/under evaluation
+            cron_timezone="America/New_York",
+        )
+    ).with_label("eager_on_wednesday"),
 }
 
 weekly_forecast_fusion_asset_args = {
@@ -499,6 +502,7 @@ weekly_forecast_fusion_asset_args = {
 }
 
 # ---------------- Weekly Forecasts --------------
+
 
 # Timeseries E
 @dynamic_graph_asset(
@@ -560,6 +564,7 @@ def pyrenew_he(
 
 
 # ---------- Fusion Forecasts ----------
+
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,

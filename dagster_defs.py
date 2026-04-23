@@ -563,7 +563,9 @@ def pyrenew_he(
     **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
-def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig):
+def fuse_pyrenew_e_ts(
+    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+):
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
     )

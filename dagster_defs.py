@@ -7,8 +7,6 @@ from zoneinfo import ZoneInfo
 # Direct use of dagster
 import dagster as dg
 import requests
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
 from cfa_dagster import (
     ADLS2PickleIOManager,
     DynamicGraphAssetExecutionContext,
@@ -277,6 +275,7 @@ class PostProcessConfig(dg.Config):
 # TODO: either add these to pipelines/utils or deprecate altogether by virtue
 # of having these upstream data materialized in dagster directly
 
+
 def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
     current_date = context.partition_key
     nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
@@ -305,6 +304,7 @@ def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
 
 
 # ----------- Upstream Data Availability Assets ----
+
 
 # NHSN
 @dg.asset(
@@ -582,6 +582,7 @@ def pyrenew_he(
     config: PyrenewEConfig,
 ):
     _run_pyrenew_model(context, config, "he")
+
 
 # ---------- Fusion Forecasts ----------
 

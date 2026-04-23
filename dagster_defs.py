@@ -479,19 +479,16 @@ if not is_production:
 # All of our forecast assets should materialize with the same
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
-wednesday_at_midnight_condition = dg.AutomationCondition.on_cron(
-    cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
-)
+
 
 weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "group_name": "WeeklyForecast",
-    "automation_condition": wednesday_at_midnight_condition
-    if is_production
-    else wednesday_at_midnight_condition.ignore(
-        dg.AssetSelection.assets("nssp_gold_v1", "nhsn_hrd")
-    ),
+    "automation_condition": (dg.AutomationCondition.eager() & dg.AutomationCondition.cron_tick_passed(
+        cron_schedule="0,30 * * * WED", # half-hour windows prevent over/under evaluation
+        cron_timezone="America/New_York"
+    )).with_label("eager_on_wednesday")
 }
 
 weekly_forecast_fusion_asset_args = {
@@ -500,6 +497,8 @@ weekly_forecast_fusion_asset_args = {
     "group_name": "WeeklyForecast",
     "automation_condition": dg.AutomationCondition.eager(),
 }
+
+# ---------------- Weekly Forecasts --------------
 
 # Timeseries E
 @dynamic_graph_asset(

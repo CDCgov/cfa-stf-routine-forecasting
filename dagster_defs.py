@@ -277,7 +277,6 @@ class PostProcessConfig(dg.Config):
 # TODO: either add these to pipelines/utils or deprecate altogether by virtue
 # of having these upstream data materialized in dagster directly
 
-
 def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
     current_date = context.partition_key
     nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
@@ -305,35 +304,7 @@ def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
         return {"exists": False, "reason": str(e)}
 
 
-def _check_nwss_gold_data_availability(
-    context: dg.AssetExecutionContext,
-    account_name="cfaazurebatchprd",
-    container_name="nwss-vintages",
-):
-    current_date = context.partition_key
-    folder_prefix = "NWSS-ETL-covid-"
-    target_folder = f"{folder_prefix}{current_date}/"
-    credential = DefaultAzureCredential()
-    blob_service_client = BlobServiceClient(
-        f"https://{account_name}.blob.core.windows.net", credential=credential
-    )
-    container_client = blob_service_client.get_container_client(container_name)
-    all_blobs = list(container_client.list_blobs(name_starts_with=folder_prefix))
-    latest_blob = max(all_blobs, key=lambda b: b.last_modified).name
-    target_blob = list(container_client.list_blobs(name_starts_with=target_folder))
-    nwss_gold_check = latest_blob == target_blob
-    result = {
-        "exists": nwss_gold_check,
-        "latest_blob": latest_blob,
-        "target_folder": target_folder,
-        "target_blob": target_blob,
-        "current_date": current_date,
-    }
-    return result
-
-
 # ----------- Upstream Data Availability Assets ----
-
 
 # NHSN
 @dg.asset(
@@ -357,30 +328,6 @@ def nhsn_data_stf(context: dg.AssetExecutionContext):
         yield dg.Output("nhsn_data_stf")
     else:
         context.log.error(f"NHSN data not available: {result}")
-
-
-# NWSS
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=(
-        # Check every hour 6am-4pm on Wednesday for new data;
-        dg.AutomationCondition.cron_tick_passed(
-            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
-        )
-        # don't check if not-missing for that day
-        & dg.AutomationCondition.in_latest_time_window()
-        & dg.AutomationCondition.missing()
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nwss_gold_stf(context: dg.AssetExecutionContext):
-    result = _check_nwss_gold_data_availability(context)
-    if result["exists"]:
-        context.log.info(f"NWSS gold data available: {result}")
-        yield dg.Output("nwss_gold_stf")
-    else:
-        context.log.error(f"NWSS gold data not available: {result}")
 
 
 # ----------- Model Constructor Functions --------------------------

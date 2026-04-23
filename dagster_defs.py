@@ -512,12 +512,9 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
         fusion_model_name=fusion_model_name,
     )
 
+# ---------- Initial Forecast Assets ----------
 
-# ---------- Automation Conditions ----------
-# A condition that will run as soon as all dependencies are available, but only
-# if the asset has not been materialized yet for that day
-eager_once = dg.AutomationCondition.eager() & dg.AutomationCondition.missing()
-
+# Asset decorator arguments for all initial forecast models
 weekly_forecast_initial_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
@@ -526,10 +523,6 @@ weekly_forecast_initial_args = {
     ),
     "group_name": "WeeklyForecast",
 }
-
-
-# ---------- Initial Forecast Assets ----------
-
 
 # Timeseries E
 @dynamic_graph_asset(
@@ -592,11 +585,12 @@ def pyrenew_he(
 
 # ---------- Fusion Forecasts ----------
 
+# Asset decorator arguments for all fusion forecast models
 weekly_forecast_fusion_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
-    "group_name": "WeeklyForecast",
-    "automation_condition": dg.AutomationCondition.eager()
+    "automation_condition": dg.AutomationCondition.eager(),
+    "group_name": "WeeklyForecast"
 }
 
 

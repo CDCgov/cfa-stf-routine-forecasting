@@ -235,6 +235,11 @@ class PyrenewConfig(ModelBaseConfig):
     additional_forecast_letters: str = ""
 
 
+class FusionConfig(ModelBaseConfig):
+    # filter out WY
+    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+
+
 class PyrenewEConfig(PyrenewConfig):
     # filter out WY
     locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
@@ -427,7 +432,7 @@ def _run_pyrenew_model(
 
 
 def get_model_loc_dir(
-    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ) -> Path:
     disease = context.graph_dimension["diseases"]
     location = context.graph_dimension["locations"]
@@ -459,7 +464,7 @@ def get_model_loc_dir(
 
 def _run_fusion_model(
     context: DynamicGraphAssetExecutionContext,
-    config: ModelBaseConfig,
+    config: FusionConfig,
     num_model_name,
     other_model_name,
     aggregate_num,
@@ -494,7 +499,9 @@ def _run_fusion_model(
     context.log.debug(f"config: '{config}'")
 
 
-def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: bool):
+def _fuse_pyrenew_timeseries(
+    context, config: FusionConfig, pyrenew_model_name, epiweekly: bool
+):
     other_model_name = "epiweekly_ts_ensemble_e" if epiweekly else "daily_ts_ensemble_e"
     fusion_model_name = (
         f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
@@ -601,9 +608,7 @@ weekly_forecast_fusion_args = {
     **weekly_forecast_fusion_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
-def fuse_pyrenew_e_ts(
-    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
-):
+def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
     )
@@ -614,7 +619,7 @@ def fuse_pyrenew_e_ts(
     ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts_epiweekly(
-    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ):
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_e", epiweekly=True
@@ -626,7 +631,7 @@ def fuse_pyrenew_e_ts_epiweekly(
     ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
-    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ):
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_he", epiweekly=False
@@ -638,7 +643,7 @@ def fuse_pyrenew_he_ts(
     ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts_epiweekly(
-    context: DynamicGraphAssetExecutionContext, config: ModelBaseConfig
+    context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ):
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_he", epiweekly=True

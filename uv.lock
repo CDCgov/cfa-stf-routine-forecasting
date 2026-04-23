@@ -776,11 +776,11 @@ name = "cfa-stf-routine-forecasting"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "arviz" },
     { name = "cfa-catalog-public" },
     { name = "cfa-dagster" },
     { name = "cfa-dataops" },
     { name = "dagster" },
-    { name = "forecasttools" },
     { name = "polarbayes" },
     { name = "polars", extra = ["numpy", "pyarrow"] },
     { name = "pygit2" },
@@ -809,11 +809,11 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "arviz", specifier = "<1.0.0" },
     { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub.git" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
     { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops.git?rev=main" },
     { name = "dagster", specifier = "==1.12.2" },
-    { name = "forecasttools", git = "https://github.com/cdcgov/forecasttools-py" },
     { name = "polarbayes", git = "https://github.com/cdcgov/polarbayes?rev=2f07215" },
     { name = "polars", extras = ["pyarrow", "numpy"], specifier = ">=1.36" },
     { name = "pygit2", specifier = ">=1.17.0" },
@@ -838,14 +838,6 @@ test = [
     { name = "pytest", specifier = ">=8.3.2" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-mpl", specifier = ">=0.17.0" },
-]
-
-[[package]]
-name = "cfasodapy"
-version = "0.1.1"
-source = { git = "https://github.com/CDCgov/cfasodapy.git#d78dc7d320196920c4d35a6f700f0cdab5b1b363" }
-dependencies = [
-    { name = "requests" },
 ]
 
 [[package]]
@@ -1314,15 +1306,6 @@ wheels = [
 ]
 
 [[package]]
-name = "epiweeks"
-version = "2.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/78/51/8b749e2756cc739cf2a5009ae8d4dbf6ca110e2ac59916351a5c2948ba82/epiweeks-2.4.0.tar.gz", hash = "sha256:0096132a50cfc4b52b2bfc8cf841d278740414d01cac303df05146db8b526539", size = 21004, upload-time = "2026-01-07T19:01:37.139Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/cf/66d80e94012fedb1ad9edb3053281685ad920b14dcd5e7166a48bbd1f168/epiweeks-2.4.0-py3-none-any.whl", hash = "sha256:a40cdde09b47530e7703d3d75248bb4ae2eb340f23af7c4c50e708b2e733e101", size = 5826, upload-time = "2026-01-07T19:01:35.669Z" },
-]
-
-[[package]]
 name = "executing"
 version = "2.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1399,25 +1382,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/f6/53a1e9469331a23dcc400970a27a4caa3d9f6edbf5baab0260285238b884/fonttools-4.62.1-cp313-cp313-win32.whl", hash = "sha256:93c316e0f5301b2adbe6a5f658634307c096fd5aae60a5b3412e4f3e1728ab24", size = 2279928, upload-time = "2026-03-13T13:53:32.352Z" },
     { url = "https://files.pythonhosted.org/packages/38/60/35186529de1db3c01f5ad625bde07c1f576305eab6d86bbda4c58445f721/fonttools-4.62.1-cp313-cp313-win_amd64.whl", hash = "sha256:7aa21ff53e28a9c2157acbc44e5b401149d3c9178107130e82d74ceb500e5056", size = 2330514, upload-time = "2026-03-13T13:53:34.991Z" },
     { url = "https://files.pythonhosted.org/packages/fd/ba/56147c165442cc5ba7e82ecf301c9a68353cede498185869e6e02b4c264f/fonttools-4.62.1-py3-none-any.whl", hash = "sha256:7487782e2113861f4ddcc07c3436450659e3caa5e470b27dc2177cade2d8e7fd", size = 1152647, upload-time = "2026-03-13T13:54:22.735Z" },
-]
-
-[[package]]
-name = "forecasttools"
-version = "0.0.1"
-source = { git = "https://github.com/cdcgov/forecasttools-py#b995f0b310a513df43aa563f5f46a64e2db148f7" }
-dependencies = [
-    { name = "arviz" },
-    { name = "cfasodapy" },
-    { name = "epiweeks" },
-    { name = "jax" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "numpyro" },
-    { name = "polars" },
-    { name = "pyarrow" },
-    { name = "scipy" },
-    { name = "tqdm" },
-    { name = "xarray" },
 ]
 
 [[package]]

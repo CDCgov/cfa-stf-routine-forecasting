@@ -4,7 +4,6 @@ import pickle
 from pathlib import Path
 
 import arviz as az
-import forecasttools as ft
 import jax
 import numpy as np
 import polarbayes as pb
@@ -14,6 +13,7 @@ from pyrenew_multisignal.hew import (
     flags_from_pyrenew_model_name,
 )
 
+import cfa.stf.forecasttools as ft
 from pipelines.utils.common_utils import build_pyrenew_hew_model_from_dir
 
 

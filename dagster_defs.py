@@ -460,9 +460,10 @@ def _fuse_pyrenew_timeseries(
 
 # ---------- External Asset Specs -------------
 
-# These are pointers, using our prod io manager, to other assets
-# in our catalog. This allows us to see the status of upstream dependency data
-# without needing to actually colocate the assets. We only do this on the dev server
+# These allow us to model external assets we do not have locally
+# while in development. They do not materialize.
+# They are replaced with true assets in production where
+# other code locations are able to be referenced.
 
 if not is_production:
     nssp_gold_v1 = dg.AssetSpec(

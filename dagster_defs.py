@@ -502,6 +502,7 @@ weekly_forecast_fusion_asset_args = {
 
 # ---------------- Weekly Forecasts --------------
 
+
 # Timeseries E
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
@@ -562,6 +563,7 @@ def pyrenew_he(
 
 
 # ---------- Fusion Forecasts ----------
+
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,

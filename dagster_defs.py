@@ -234,6 +234,7 @@ class PyrenewConfig(ModelBaseConfig):
     rng_key: int = 12345
     additional_forecast_letters: str = ""
 
+
 class FusionConfig(ModelBaseConfig):
     # filter out WY
     locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
@@ -498,7 +499,9 @@ def _run_fusion_model(
     context.log.debug(f"config: '{config}'")
 
 
-def _fuse_pyrenew_timeseries(context, config: FusionConfig, pyrenew_model_name, epiweekly: bool):
+def _fuse_pyrenew_timeseries(
+    context, config: FusionConfig, pyrenew_model_name, epiweekly: bool
+):
     other_model_name = "epiweekly_ts_ensemble_e" if epiweekly else "daily_ts_ensemble_e"
     fusion_model_name = (
         f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
@@ -605,9 +608,7 @@ weekly_forecast_fusion_args = {
     **weekly_forecast_fusion_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
-def fuse_pyrenew_e_ts(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
-):
+def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
     _fuse_pyrenew_timeseries(
         context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
     )

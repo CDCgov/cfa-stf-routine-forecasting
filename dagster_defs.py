@@ -512,6 +512,7 @@ def _fuse_pyrenew_timeseries(context, config, pyrenew_model_name, epiweekly: boo
         fusion_model_name=fusion_model_name,
     )
 
+
 # ---------- Initial Forecast Assets ----------
 
 # Asset decorator arguments for all initial forecast models
@@ -523,6 +524,7 @@ weekly_forecast_initial_args = {
     ),
     "group_name": "WeeklyForecast",
 }
+
 
 # Timeseries E
 @dynamic_graph_asset(
@@ -591,7 +593,7 @@ weekly_forecast_fusion_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
     "automation_condition": dg.AutomationCondition.eager(),
-    "group_name": "WeeklyForecast"
+    "group_name": "WeeklyForecast",
 }
 
 

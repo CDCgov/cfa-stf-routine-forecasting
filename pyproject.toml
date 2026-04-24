@@ -12,7 +12,8 @@ authors = [
 ]
 
 dependencies = [
-    "arviz<1.0.0",
+    "jax<0.10",
+    "arviz[h5netcdf]>=1.0",
     "cfa-catalog-public>=2026.3.23.0",
     "cfa-dagster",
     "cfa-dataops",
@@ -68,6 +69,6 @@ testpaths = ["pipelines", "cfa"]
 [tool.uv.sources]
 cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
-polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "2f07215" }
+polarbayes = { git = "https://github.com/cdcgov/polarbayes" }
 cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops.git", rev = "main"}
 cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub.git"}

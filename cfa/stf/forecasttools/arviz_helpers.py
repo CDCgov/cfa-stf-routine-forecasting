@@ -185,10 +185,11 @@ def prune_chains_by_rel_diff(
     falling back to log_likelihood data if available. The relative difference is
     calculated as: 1 - (best_chain_value - chain_value) / |best_chain_value|
     """
-    if "sample_stats" in idata.groups() and "lp" in idata["sample_stats"]:
-        l_data = idata["sample_stats"]["lp"]
-    elif "log_likelihood" in idata.groups():
-        l_data = idata["log_likelihood"]
+    out = idata if inplace else idata.copy()
+    if "/sample_stats" in out.groups and "lp" in out["sample_stats"]:
+        l_data = out["sample_stats"]["lp"]
+    elif "/log_likelihood" in out.groups:
+        l_data = out["log_likelihood"].to_dataset()
     else:
         raise ValueError(
             "Neither log_prob ('lp') nor log_likelihood data found in DataTree"
@@ -213,4 +214,8 @@ def prune_chains_by_rel_diff(
         .get_column("chain")
         .to_list()
     )
-    return idata.sel(chain=chains_to_keep, inplace=inplace)
+    out.update(out.sel(chain=chains_to_keep))
+    if inplace:
+        return None
+    else:
+        return out

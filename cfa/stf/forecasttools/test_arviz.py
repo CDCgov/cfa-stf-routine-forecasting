@@ -52,7 +52,7 @@ def test_replace_all_dim_suffix_custom_prefix():
     data = xr.Dataset(
         {"obs": (["test_0", "test_1"], np.random.rand(3, 2))}, coords=coords
     )
-    idata = az.InferenceData(posterior=data)
+    idata = xr.DataTree.from_dict({"posterior": data})
 
     new_suffixes = ["time", "location"]
     result = ft.arviz.replace_all_dim_suffix(idata, new_suffixes, dim_prefix="test_")

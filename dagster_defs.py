@@ -466,7 +466,6 @@ def _fuse_pyrenew_timeseries(
 # other code locations are able to be referenced.
 
 if not is_production:
-
     nssp_gold_v1 = dg.AssetSpec(
         "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
     )

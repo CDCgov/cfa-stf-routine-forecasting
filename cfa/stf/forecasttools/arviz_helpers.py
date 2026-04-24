@@ -71,7 +71,7 @@ def replace_all_dim_suffix(
         return ds.rename(name_dict)
 
     out.update(  # I think you could filter here to only re-process the datasets that have the relevant dimensions, but this is probably fine for now
-        out.map_over_datasets(lambda ds: _replace_all_dim_suffix(ds))
+        out.map_over_datasets(_replace_all_dim_suffix)
     )
     if inplace:
         return None

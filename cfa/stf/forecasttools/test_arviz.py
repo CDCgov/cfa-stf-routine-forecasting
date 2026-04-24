@@ -81,11 +81,10 @@ def test_assign_coords_from_start_step_basic():
         IDATA_WO_DATES, dim_name, start, interval=interval, inplace=False
     )
 
-    assert isinstance(result, az.InferenceData)
+    assert isinstance(result, xr.DataTree)
     assert result is not IDATA_WO_DATES
 
-    for group in result.groups():
-        ds = getattr(result, group)
+    for ds in result.values():
         if dim_name in ds.dims:
             result_coords = ds.coords[dim_name]
             assert result_coords[0] == np.datetime64(start)
@@ -93,7 +92,7 @@ def test_assign_coords_from_start_step_basic():
 
 
 def test_assign_coords_from_start_step_inplace():
-    idata_copy = copy.deepcopy(IDATA_WO_DATES)
+    idata_copy = IDATA_WO_DATES.copy()
     dim_name = "latent_infections_dim_0"
     start = dt.date(2019, 9, 29)
     interval = dt.timedelta(days=7)
@@ -103,8 +102,7 @@ def test_assign_coords_from_start_step_inplace():
     )
     assert result is None
 
-    for group in idata_copy.groups():
-        ds = getattr(idata_copy, group)
+    for ds in idata_copy.values():
         if dim_name in ds.dims:
             result_coords = ds.coords[dim_name]
             assert result_coords[0] == np.datetime64(start)
@@ -119,10 +117,11 @@ def test_assign_coords_from_start_step_no_matching_dim():
         IDATA_WO_DATES, dim_name, start, inplace=False
     )
 
-    for group in IDATA_WO_DATES.groups():
-        original_ds = getattr(IDATA_WO_DATES, group)
-        result_ds = getattr(result, group)
-        assert original_ds.equals(result_ds)
+    for group in IDATA_WO_DATES.groups:
+        original_ds = IDATA_WO_DATES.get(group)
+        if original_ds:
+            result_ds = result.get(group)
+            assert original_ds.equals(result_ds)
 
 
 def test_write_to_netcdf_after_operations():

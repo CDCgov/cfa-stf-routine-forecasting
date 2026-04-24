@@ -125,16 +125,18 @@ def assign_coords_from_start_step(
     dates starting from `start_date` and incrementing by `interval` for
     each position in the dimension.
     """
-    out = idata if inplace else deepcopy(idata)
-    for group in list(out.groups()):
-        ds = getattr(out, group)
-        if dim_name in ds.dims:
-            n = ds.sizes[dim_name]
-            coords = np.arange(start_date, start_date + interval * n, interval).astype(
-                "datetime64[D]"
-            )
-            new_ds = ds.assign_coords({dim_name: coords})
-            setattr(out, group, new_ds)
+    out = idata if inplace else idata.copy()
+
+    def _assign_coords_from_start_step(ds):
+        n = ds.sizes.get(dim_name, None)
+        if not n:
+            return ds
+        coords = np.arange(start_date, start_date + interval * n, interval).astype(
+            "datetime64[D]"
+        )
+        return ds.assign_coords({dim_name: coords})
+
+    out.update(out.map_over_datasets(_assign_coords_from_start_step))
     if inplace:
         return None
     else:

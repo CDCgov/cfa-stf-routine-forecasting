@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 
 # Direct use of dagster
 import dagster as dg
-import requests
 from cfa_dagster import (
     ADLS2PickleIOManager,
     DynamicGraphAssetExecutionContext,
@@ -274,67 +273,6 @@ class PostProcessConfig(dg.Config):
 # ============================================================================
 # These are the core of Dagster - functions that specify data
 
-
-# ---------- Data Availability Check Functions ----------
-
-# TODO: either add these to pipelines/utils or deprecate altogether by virtue
-# of having these upstream data materialized in dagster directly
-
-
-def _check_nhsn_data_availability(context: dg.AssetExecutionContext):
-    current_date = context.partition_key
-    nhsn_target_url = "https://data.cdc.gov/api/views/mpgq-jmmr.json"
-    try:
-        resp = requests.get(nhsn_target_url, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        nhsn_update_date_raw = data.get("rowsUpdatedAt")
-        if nhsn_update_date_raw is None:
-            return {"exists": False, "reason": "Key 'rowsUpdatedAt' not found"}
-        nhsn_update_date = dt.datetime.fromtimestamp(
-            nhsn_update_date_raw, dt.UTC
-        ).strftime("%Y-%m-%d")
-
-        nhsn_check = nhsn_update_date == current_date
-        print(f"NHSN data available for date {current_date}: {nhsn_check}")
-        result = {
-            "exists": nhsn_check,
-            "update_date": nhsn_update_date,
-            "current_date": current_date,
-        }
-        return result
-    except Exception as e:
-        print(f"Error checking NHSN data availability: {e}")
-        return {"exists": False, "reason": str(e)}
-
-
-# ----------- Upstream Data Availability Assets ----
-
-
-# NHSN
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=(
-        # Check every hour 6am-4pm on Wednesday for new data;
-        dg.AutomationCondition.cron_tick_passed(
-            cron_schedule="0 6-16 * * WED", cron_timezone="America/New_York"
-        )
-        # don't check if not-missing for that day
-        & dg.AutomationCondition.in_latest_time_window()
-        & dg.AutomationCondition.missing()
-    ),
-    group_name="UpstreamData",
-    output_required=False,
-)
-def nhsn_data_stf(context: dg.AssetExecutionContext):
-    result = _check_nhsn_data_availability(context)
-    if result["exists"]:
-        context.log.info(f"NHSN data available: {result}")
-        yield dg.Output("nhsn_data_stf")
-    else:
-        context.log.error(f"NHSN data not available: {result}")
-
-
 # ----------- Model Constructor Functions --------------------------
 
 
@@ -520,22 +458,59 @@ def _fuse_pyrenew_timeseries(
     )
 
 
-# ---------- Initial Forecast Assets ----------
+# ---------- External Asset Specs -------------
 
-# Asset decorator arguments for all initial forecast models
-weekly_forecast_initial_args = {
+# These allow us to model external assets we do not have locally
+# while in development. They do not materialize.
+# They are replaced with true assets in production where
+# other code locations are able to be referenced.
+
+if not is_production:
+    nssp_gold_v1 = dg.AssetSpec(
+        "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
+    )
+
+    nhsn_hrd_prelim = dg.AssetSpec(
+        "nhsn_hrd_prelim", partitions_def=daily_partitions_def, group_name="Upstream"
+    )
+
+
+# ---------- Shared Asset Decorator Arguments ----------
+
+# All of our forecast assets should materialize with the same
+# partitions, graph_dimensions, automation conditions, and asset groups
+# The only thing that differs between them are their dependencies
+
+
+weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
-    "automation_condition": dg.AutomationCondition.on_cron(
-        cron_schedule="0 0 * * WED", cron_timezone="America/New_York"
-    ),
     "group_name": "WeeklyForecast",
+    "automation_condition": (
+        dg.AutomationCondition.eager()
+        & dg.AutomationCondition.cron_tick_passed(
+            # half-hour minute windows prevent over/under evaluation
+            # 6AM-8PM is a liberal working hour window
+            cron_schedule="0,30 6-20 * * WED",
+            cron_timezone="America/New_York",
+        )
+    ).with_label("eager_on_wednesday_work_hrs"),
 }
+
+weekly_forecast_fusion_asset_args = {
+    "partitions_def": daily_partitions_def,
+    "graph_dimensions": ["diseases", "locations"],
+    "group_name": "WeeklyForecast",
+    "automation_condition": dg.AutomationCondition.eager(),
+}
+
+
+# ---------------- Weekly Forecasts --------------
 
 
 # Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_args,
+    **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -544,7 +519,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_args,
+    **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -555,7 +530,7 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_args,
+    **weekly_forecast_initial_asset_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -569,9 +544,9 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_initial_args,
+    **weekly_forecast_initial_asset_args,
     ins={
-        "nhsn_data_stf": dg.In(dg.Nothing),
+        "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
 )
 def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
@@ -580,10 +555,9 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_initial_args,
+    **weekly_forecast_initial_asset_args,
     ins={
-        "nssp_gold_v1": dg.In(dg.Nothing),
-        "nhsn_data_stf": dg.In(dg.Nothing),
+        "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
 )
 def pyrenew_he(
@@ -595,17 +569,9 @@ def pyrenew_he(
 
 # ---------- Fusion Forecasts ----------
 
-# Asset decorator arguments for all fusion forecast models
-weekly_forecast_fusion_args = {
-    "partitions_def": daily_partitions_def,
-    "graph_dimensions": ["diseases", "locations"],
-    "automation_condition": dg.AutomationCondition.eager(),
-    "group_name": "WeeklyForecast",
-}
-
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
@@ -615,7 +581,7 @@ def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: Fusion
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts_epiweekly(
@@ -627,7 +593,7 @@ def fuse_pyrenew_e_ts_epiweekly(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
@@ -639,7 +605,7 @@ def fuse_pyrenew_he_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_args,
+    **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts_epiweekly(
@@ -665,8 +631,8 @@ def fuse_pyrenew_he_ts_epiweekly(
     # Runs when any dependency has been updated as long as at least one exists
     automation_condition=(
         dg.AutomationCondition.eager().replace(
-            ~dg.AutomationCondition.any_deps_missing(),
-            dg.AutomationCondition.any_deps_match(
+            old=~dg.AutomationCondition.any_deps_missing(),
+            new=dg.AutomationCondition.any_deps_match(
                 ~dg.AutomationCondition.missing()
                 | dg.AutomationCondition.will_be_requested()
             ),
@@ -703,14 +669,6 @@ def postprocess_forecasts(
 
 # TODO: investigate use_user_code_server and custom/default automation conditions
 
-# ---------- Upstream Data Sensor ------------
-
-upstream_data_sensor = dg.AutomationConditionSensorDefinition(
-    name="UpstreamData",
-    target=dg.AssetSelection.groups("UpstreamData"),
-    run_tags=basic_execution_config.to_run_tags(),
-)
-
 # ---------- Weekly Forecast Sensor ----------
 
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
@@ -733,15 +691,12 @@ collected_defs = collect_definitions(globals())
 
 # Create Definitions object
 defs = dg.Definitions(
-    assets=collected_defs["assets"],
-    asset_checks=collected_defs["asset_checks"],
-    jobs=collected_defs["jobs"],
-    sensors=collected_defs["sensors"],
-    schedules=collected_defs["schedules"],
+    **collected_defs,
     resources={
-        # This IOManager lets Dagster serialize asset outputs and store them
+        # These IOManagers let Dagster serialize asset outputs and store them
         # in Azure to pass between assets
         "io_manager": ADLS2PickleIOManager(),
+        "prod_io_manager": ADLS2PickleIOManager(use_production=True),
         # an example storage account
         "azure_blob_storage": AzureBlobStorageResource(
             account_url=f"{storage_account}.blob.core.windows.net",

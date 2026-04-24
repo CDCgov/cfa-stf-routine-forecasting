@@ -53,9 +53,6 @@ Dagster is now ready to use locally.
 > [!NOTE]
 > The following process has been changing frequently. We will work to firm it up over the coming weeks and months.
 
-- To run a full pyrenew model pipeline run: go to `Jobs` → `weekly_pyrenew_via_backfill`
-- To run individual models: navigate to `Lineage` and select specific assets, making sure to check the Launchpad config and make sure you've selected the appropriate partitions (State x Disease combination).
-
 In development, whenever you update code, rerun `make container_push` and then `Reload Definitions` from the dagster lineage page.
 Pushing your code to github will also re-build and push the container image, but will typically take longer and you will have to wait for completion in Github Actions.
 
@@ -70,7 +67,7 @@ When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/`
 
 #### Production Scheduling
 
-From our [production dagster server]( https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA.
+From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA.
 - Pushes to main will automatically update this server via a Github Actions Workflow.
 - Before pushing to `main`, make sure you have thoroughly tested your own branch and gotten a PR review.
 - It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date. `cfa-dagster`, our own implementation of dagster, updates frequently. To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.

@@ -17,6 +17,7 @@ import jax.random as jr
 import numpy as np
 import polars as pl
 import polars.selectors as cs
+import xarray as xr
 from jax._src.typing import Array
 from pyrenew_multisignal.hew import PyrenewHEWData
 from scipy.stats import expon, norm
@@ -115,12 +116,12 @@ def dirichlet_integer_split(n: int, k: int, alpha: float = 1.0) -> np.ndarray:
 
 
 def create_var_df(
-    idata: az.InferenceData, var: str, state_disease_key: pl.DataFrame
+    idata: xr.DataTree, var: str, state_disease_key: pl.DataFrame
 ) -> pl.DataFrame:
-    """Create a DataFrame from InferenceData for a specific variable.
+    """Create a DataFrame from DataTree for a specific variable.
 
     Args:
-        idata: ArviZ InferenceData object
+        idata: ArviZ DataTree object
         var: Variable name to extract
         state_disease_key: DataFrame mapping draws to state/disease combinations
 
@@ -523,7 +524,7 @@ def create_default_param_estimates(
 
 def update_json_with_prior_predictive(
     json_file_path: Path,
-    idata: az.InferenceData,
+    idata: xr.DataTree,
     state_disease_key: pl.DataFrame,
     bootstrap_loc: str,
     bootstrap_disease: str,
@@ -533,7 +534,7 @@ def update_json_with_prior_predictive(
 
     Args:
         json_file_path: Path to the JSON file to update
-        idata: ArviZ InferenceData containing prior predictive samples
+        idata: ArviZ DataTree containing prior predictive samples
         state_disease_key: DataFrame mapping draws to state/disease combinations
         bootstrap_loc: State abbreviation used for bootstrap
         bootstrap_disease: Disease name used for bootstrap
@@ -606,7 +607,7 @@ def update_json_with_prior_predictive(
 
 def update_tsv_with_prior_predictive(
     tsv_file_path: Path,
-    idata: az.InferenceData,
+    idata: xr.DataTree,
     state_disease_key: pl.DataFrame,
     bootstrap_loc: str,
     bootstrap_disease: str,
@@ -615,7 +616,7 @@ def update_tsv_with_prior_predictive(
 
     Args:
         tsv_file_path: Path to the combined_data.tsv file to update
-        idata: ArviZ InferenceData containing prior predictive samples
+        idata: ArviZ DataTree containing prior predictive samples
         state_disease_key: DataFrame mapping draws to state/disease combinations
         bootstrap_loc: State abbreviation used for bootstrap
         bootstrap_disease: Disease name used for bootstrap

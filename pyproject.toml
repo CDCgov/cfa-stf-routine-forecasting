@@ -64,7 +64,7 @@ fix = true
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
 [tool.pytest.ini_options]
-testpaths = ["pipelines/tests", "cfa/stf/forecasttools"]
+testpaths = ["pipelines/tests", "cfa"]
 
 [tool.uv.sources]
 cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }

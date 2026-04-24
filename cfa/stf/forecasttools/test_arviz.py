@@ -68,7 +68,7 @@ def test_replace_all_dim_suffix_empty_suffixes():
     all_dims_original = ft.arviz.get_all_dims(IDATA_WO_DATES)
     result = ft.arviz.replace_all_dim_suffix(IDATA_WO_DATES, new_suffixes)
     all_dims_result = ft.arviz.get_all_dims(result)
-    # Should return unchanged InferenceData
+    # Should return unchanged DataTree
     assert all_dims_result == all_dims_original
 
 

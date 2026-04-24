@@ -470,8 +470,8 @@ if not is_production:
         "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
     ).with_io_manager_key("prod_io_manager")
 
-    nhsn_hrd = dg.AssetSpec(
-        "nhsn_hrd", partitions_def=daily_partitions_def, group_name="Upstream"
+    nhsn_hrd_prelim = dg.AssetSpec(
+        "nhsn_hrd_prelim", partitions_def=daily_partitions_def, group_name="Upstream"
     ).with_io_manager_key("prod_io_manager")
 
 
@@ -503,6 +503,7 @@ weekly_forecast_fusion_asset_args = {
     "group_name": "WeeklyForecast",
     "automation_condition": dg.AutomationCondition.eager(),
 }
+
 
 # ---------------- Weekly Forecasts --------------
 
@@ -545,7 +546,7 @@ def pyrenew_e(
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={
-        "nhsn_hrd": dg.In(dg.Nothing),
+        "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
 )
 def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
@@ -556,7 +557,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={
-        "nhsn_hrd": dg.In(dg.Nothing),
+        "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
 )
 def pyrenew_he(

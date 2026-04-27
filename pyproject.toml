@@ -13,7 +13,7 @@ authors = [
 
 dependencies = [
     "jax<0.10",
-    "arviz[h5netcdf]>=1.0",
+    "arviz[h5netcdf]>=1.1.0",
     "cfa-catalog-public>=2026.3.23.0",
     "cfa-dagster",
     "cfa-dataops",

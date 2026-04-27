@@ -853,7 +853,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "arviz", extras = ["h5netcdf"], specifier = ">=1.0" },
+    { name = "arviz", extras = ["h5netcdf"], specifier = ">=1.1.0" },
     { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub.git" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
     { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops.git?rev=main" },

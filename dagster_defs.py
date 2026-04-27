@@ -505,6 +505,130 @@ weekly_forecast_fusion_asset_args = {
     "automation_condition": dg.AutomationCondition.eager(),
 }
 
+# CUSTOM CONDITION TESTING
+same_as_eager=(
+    dg.AutomationCondition.in_latest_time_window()
+            & (
+                dg.AutomationCondition.newly_missing() | 
+                dg.AutomationCondition.any_deps_updated()
+            ).since(
+                dg.AutomationCondition.newly_requested() | 
+                dg.AutomationCondition.newly_updated() | 
+                dg.AutomationCondition.initial_evaluation()
+            )
+            & ~dg.AutomationCondition.any_deps_missing()
+            & ~dg.AutomationCondition.any_deps_in_progress()
+            & ~dg.AutomationCondition.in_progress()
+    ).with_label("same_as_eager")
+
+eager_no_initial_eval=(
+    dg.AutomationCondition.in_latest_time_window()
+            & (
+                dg.AutomationCondition.newly_missing() | 
+                dg.AutomationCondition.any_deps_updated()
+            ).since(
+                dg.AutomationCondition.newly_requested() | 
+                dg.AutomationCondition.newly_updated()
+            )
+            & ~dg.AutomationCondition.any_deps_missing()
+            & ~dg.AutomationCondition.any_deps_in_progress()
+            & ~dg.AutomationCondition.in_progress()
+    ).with_label("eager_no_since_initial_eval")
+
+eager_no_since_at_all=(
+    dg.AutomationCondition.in_latest_time_window()
+            & (
+                dg.AutomationCondition.newly_missing() | 
+                dg.AutomationCondition.any_deps_updated()
+            )
+            & ~dg.AutomationCondition.any_deps_missing()
+            & ~dg.AutomationCondition.any_deps_in_progress()
+            & ~dg.AutomationCondition.in_progress()
+    ).with_label("eager_no_since_at_all")
+
+
+def same_as_on_cron(_cron_schedule="* * * * *",_cron_timezone="America/New_York")->dg.AutomationCondition:
+    return (
+        dg.AutomationCondition.in_latest_time_window()
+            & dg.AutomationCondition.cron_tick_passed(
+                _cron_schedule, _cron_timezone
+           ).since_last_handled()
+            & dg.AutomationCondition.all_deps_updated_since_cron(_cron_schedule, _cron_timezone)
+    ).with_label(f"on_cron({_cron_schedule}, {_cron_timezone}")
+
+def cron_no_since_at_all(_cron_schedule="* * * * *",_cron_timezone="America/New_York")->dg.AutomationCondition:
+    return (
+        dg.AutomationCondition.in_latest_time_window()
+            & dg.AutomationCondition.cron_tick_passed(
+                _cron_schedule, _cron_timezone
+           )
+            & dg.AutomationCondition.all_deps_updated_since_cron(_cron_schedule, _cron_timezone)
+    ).with_label(f"on_cron({_cron_schedule}, {_cron_timezone}_no_since")
+
+# Associated Assets
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=dg.AutomationCondition.on_cron("* * * * *")
+)
+def every_minute():
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=(
+        eager_no_since_at_all   
+        & dg.AutomationCondition.cron_tick_passed(
+            # half-hour minute windows prevent over/under evaluation
+            # 6AM-8PM is a liberal working hour window
+            cron_schedule="* 6-20 * * *",
+            cron_timezone="America/New_York",
+        )).with_label("eager_on_anyday_work_hrs")
+)
+def cron_eager_asset(every_minute):
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=eager_no_since_at_all,
+)
+def eager_no_since(every_minute):
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=same_as_eager
+)
+def same_as_eager(every_minute):
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=eager_no_initial_eval
+)
+def eager_no_initial_eval(every_minute):
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=eager_no_since_at_all
+)
+def eager_no_since_at_all(every_minute):
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=same_as_on_cron("0,30 6-20 * * WED", "America/New_York")
+)
+def same_as_on_cron(every_minute):
+    return
+
+@dg.asset(
+    partitions_def=daily_partitions_def,
+    automation_condition=cron_no_since_at_all("0,30 6-20 * * WED", "America/New_York")
+)
+def cron_no_since_at_all(every_minute):
+    return
 
 # ---------------- Weekly Forecasts --------------
 
@@ -706,8 +830,8 @@ defs = dg.Definitions(
     },
     # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
-        default_config=azure_batch_execution_config,
-        # default_config=basic_execution_config,
+        # default_config=azure_batch_execution_config,
+        default_config=basic_execution_config,
         # default_config=docker_execution_config,
         alternate_configs=[basic_execution_config, docker_execution_config],
     ),

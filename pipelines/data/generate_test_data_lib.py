@@ -659,9 +659,7 @@ def update_tsv_with_prior_predictive(
         idata, "observed_hospital_admissions", bootstrap_draw
     )
     ed_samples = get_prior_draw_series(idata, "observed_ed_visits", bootstrap_draw)
-    ww_samples = get_prior_draw_values(
-        idata, "site_level_log_ww_conc", bootstrap_draw
-    )
+    ww_samples = get_prior_draw_values(idata, "site_level_log_ww_conc", bootstrap_draw)
     if ww_samples.ndim == 1:
         ww_samples = ww_samples[:, np.newaxis]
 

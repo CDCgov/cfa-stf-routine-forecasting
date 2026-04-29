@@ -465,6 +465,7 @@ weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
+
 # Custom Automation Condition. Relies on use_user_code_server=True on the sensor
 class IsWeekday(dg.AutomationCondition):
     def __init__(self, weekday: int):
@@ -481,7 +482,7 @@ class IsWeekday(dg.AutomationCondition):
         super().__init__()
 
     def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
-        # If the current weekday is equal to the desired weekday, 
+        # If the current weekday is equal to the desired weekday,
         # return the candidate_subset -> a dagster context's "true" case
         if context.evaluation_time.weekday() == self.weekday:
             true_subset = context.candidate_subset

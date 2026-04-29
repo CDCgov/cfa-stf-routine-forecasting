@@ -15,7 +15,7 @@ repos:
       - id: trailing-whitespace
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.11
+    rev: v0.15.12
     hooks:
       # Sort imports
       - id: ruff-check
@@ -23,7 +23,7 @@ repos:
       - id: ruff-format
     # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.7
+    rev: 0.11.8
     hooks:
       - id: uv-lock
   # Bash
@@ -50,7 +50,7 @@ repos:
         args: ["--fix"]
   # Julia
   - repo: https://github.com/fredrikekre/runic-pre-commit
-    rev: v2.1.0
+    rev: v2.2.0
     hooks:
       - id: runic
   # Typos

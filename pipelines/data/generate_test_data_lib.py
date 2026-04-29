@@ -17,6 +17,7 @@ import jax.random as jr
 import numpy as np
 import polars as pl
 import polars.selectors as cs
+import xarray as xr
 from jax._src.typing import Array
 from pyrenew_multisignal.hew import PyrenewHEWData
 from scipy.stats import expon, norm
@@ -115,12 +116,12 @@ def dirichlet_integer_split(n: int, k: int, alpha: float = 1.0) -> np.ndarray:
 
 
 def create_var_df(
-    idata: az.InferenceData, var: str, state_disease_key: pl.DataFrame
+    idata: xr.DataTree, var: str, state_disease_key: pl.DataFrame
 ) -> pl.DataFrame:
-    """Create a DataFrame from InferenceData for a specific variable.
+    """Create a DataFrame from DataTree for a specific variable.
 
     Args:
-        idata: ArviZ InferenceData object
+        idata: ArviZ DataTree object
         var: Variable name to extract
         state_disease_key: DataFrame mapping draws to state/disease combinations
 
@@ -153,6 +154,24 @@ def create_var_df(
         cs.by_name([dim_0_col, dim_1_col], require_all=False),
     ).rename(rename_dict)
     return renamed_df
+
+
+def get_prior_draw_values(
+    idata: xr.DataTree, var: str, draw: int, *, drop_chain: bool = True
+) -> np.ndarray:
+    """Extract one prior draw while tolerating chain/draw and draw-only data."""
+    data_array = idata.prior[var]
+    if "chain" in data_array.dims and drop_chain:
+        data_array = data_array.isel(chain=0)
+    if "draw" in data_array.dims:
+        data_array = data_array.isel(draw=draw)
+    return np.asarray(data_array.values)
+
+
+def get_prior_draw_series(idata: xr.DataTree, var: str, draw: int) -> np.ndarray:
+    """Extract a one-dimensional prior draw, dropping singleton site axes."""
+    values = get_prior_draw_values(idata, var, draw)
+    return np.atleast_1d(np.squeeze(values))
 
 
 def create_param_estimates(
@@ -446,6 +465,7 @@ def simulate_data_from_bootstrap(
 
     idata = az.from_numpyro(
         prior=prior_predictive_samples,
+        sample_dims=["draw"],
     ).sel(draw=slice(0, max_draw - 1))
 
     result = {
@@ -523,7 +543,7 @@ def create_default_param_estimates(
 
 def update_json_with_prior_predictive(
     json_file_path: Path,
-    idata: az.InferenceData,
+    idata: xr.DataTree,
     state_disease_key: pl.DataFrame,
     bootstrap_loc: str,
     bootstrap_disease: str,
@@ -533,7 +553,7 @@ def update_json_with_prior_predictive(
 
     Args:
         json_file_path: Path to the JSON file to update
-        idata: ArviZ InferenceData containing prior predictive samples
+        idata: ArviZ DataTree containing prior predictive samples
         state_disease_key: DataFrame mapping draws to state/disease combinations
         bootstrap_loc: State abbreviation used for bootstrap
         bootstrap_disease: Disease name used for bootstrap
@@ -556,9 +576,9 @@ def update_json_with_prior_predictive(
         "nhsn_training_data" in data
         and "hospital_admissions" in data["nhsn_training_data"]
     ):
-        hosp_samples = idata.prior["observed_hospital_admissions"].values[
-            0, bootstrap_draw, :
-        ]
+        hosp_samples = get_prior_draw_series(
+            idata, "observed_hospital_admissions", bootstrap_draw
+        )
         data["nhsn_training_data"]["hospital_admissions"] = [
             int(x.item()) for x in hosp_samples
         ]
@@ -568,7 +588,7 @@ def update_json_with_prior_predictive(
         "nssp_training_data" in data
         and "observed_ed_visits" in data["nssp_training_data"]
     ):
-        ed_samples = idata.prior["observed_ed_visits"].values[0, bootstrap_draw, :]
+        ed_samples = get_prior_draw_series(idata, "observed_ed_visits", bootstrap_draw)
         data["nssp_training_data"]["observed_ed_visits"] = [
             int(x.item()) for x in ed_samples
         ]
@@ -584,9 +604,11 @@ def update_json_with_prior_predictive(
 
         # Get wastewater samples from prior predictive
         # Shape is (chain, draw, time, site)
-        ww_samples = idata.prior["site_level_log_ww_conc"].values[
-            0, bootstrap_draw, :, :
-        ]
+        ww_samples = get_prior_draw_values(
+            idata, "site_level_log_ww_conc", bootstrap_draw
+        )
+        if ww_samples.ndim == 1:
+            ww_samples = ww_samples[:, np.newaxis]
         n_times, n_sites = ww_samples.shape
 
         # Flatten in the same order as the original data (site-major order based on the site list)
@@ -606,7 +628,7 @@ def update_json_with_prior_predictive(
 
 def update_tsv_with_prior_predictive(
     tsv_file_path: Path,
-    idata: az.InferenceData,
+    idata: xr.DataTree,
     state_disease_key: pl.DataFrame,
     bootstrap_loc: str,
     bootstrap_disease: str,
@@ -615,7 +637,7 @@ def update_tsv_with_prior_predictive(
 
     Args:
         tsv_file_path: Path to the combined_data.tsv file to update
-        idata: ArviZ InferenceData containing prior predictive samples
+        idata: ArviZ DataTree containing prior predictive samples
         state_disease_key: DataFrame mapping draws to state/disease combinations
         bootstrap_loc: State abbreviation used for bootstrap
         bootstrap_disease: Disease name used for bootstrap
@@ -633,11 +655,13 @@ def update_tsv_with_prior_predictive(
     )["draw"].to_list()[0]
 
     # Get the prior predictive samples
-    hosp_samples = idata.prior["observed_hospital_admissions"].values[
-        0, bootstrap_draw, :
-    ]
-    ed_samples = idata.prior["observed_ed_visits"].values[0, bootstrap_draw, :]
-    ww_samples = idata.prior["site_level_log_ww_conc"].values[0, bootstrap_draw, :, :]
+    hosp_samples = get_prior_draw_series(
+        idata, "observed_hospital_admissions", bootstrap_draw
+    )
+    ed_samples = get_prior_draw_series(idata, "observed_ed_visits", bootstrap_draw)
+    ww_samples = get_prior_draw_values(idata, "site_level_log_ww_conc", bootstrap_draw)
+    if ww_samples.ndim == 1:
+        ww_samples = ww_samples[:, np.newaxis]
 
     # Get date information from the TSV
     dates_df = (

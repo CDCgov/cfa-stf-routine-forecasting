@@ -25,16 +25,18 @@ MAX_DATE = dt.date(2024, 1, 31)
 
 
 def create_idata_from_values(hosp_vals, ed_vals, ww_vals):
-    """Helper function to create InferenceData from value lists."""
+    """Helper function to create DataTree from value lists."""
     hosp_data = np.array([[[[v] for v in hosp_vals]]])
     ed_data = np.array([[[[v] for v in ed_vals]]])
     ww_data = np.array([[[[v] for v in ww_vals]]])
 
     return az.from_dict(
-        prior={
-            "observed_hospital_admissions": hosp_data,
-            "observed_ed_visits": ed_data,
-            "site_level_log_ww_conc": ww_data,
+        {
+            "prior": {
+                "observed_hospital_admissions": hosp_data,
+                "observed_ed_visits": ed_data,
+                "site_level_log_ww_conc": ww_data,
+            }
         }
     )
 
@@ -122,12 +124,14 @@ class TestUpdateJsonWithPriorPredictive:
 
     @pytest.fixture
     def sample_idata_minimal(self):
-        """Create minimal InferenceData for basic tests."""
+        """Create minimal DataTree for basic tests."""
         return az.from_dict(
-            prior={
-                "observed_hospital_admissions": np.array([[[[10.0]]]]),
-                "observed_ed_visits": np.array([[[[5.0]]]]),
-                "site_level_log_ww_conc": np.array([[[[4.0]]]]),
+            {
+                "prior": {
+                    "observed_hospital_admissions": np.array([[[[10.0]]]]),
+                    "observed_ed_visits": np.array([[[[5.0]]]]),
+                    "site_level_log_ww_conc": np.array([[[[4.0]]]]),
+                }
             }
         )
 
@@ -182,7 +186,7 @@ class TestUpdateJsonWithPriorPredictive:
             with open(json_path, "w") as f:
                 json.dump(initial_data, f)
 
-            # Create mock InferenceData using helper function
+            # Create mock DataTree using helper function
             idata = create_idata_from_values(hosp_vals, ed_vals, ww_vals)
 
             # Create state_disease_key
@@ -270,16 +274,18 @@ class TestUpdateTsvWithPriorPredictive:
             )
             initial_df.write_csv(tsv_path, separator="\t")
 
-            # Create mock InferenceData with correct shape
+            # Create mock DataTree with correct shape
             hosp_data = np.array([[[[10.0]]]])  # (1, 1, 1, 1)
             ed_data = np.array([[[[25.0], [30.0]]]])  # (1, 1, 2, 1)
             ww_data = np.array([[[[4.5], [5.5]]]])  # (1, 1, 2, 1)
 
             idata = az.from_dict(
-                prior={
-                    "observed_hospital_admissions": hosp_data,
-                    "observed_ed_visits": ed_data,
-                    "site_level_log_ww_conc": ww_data,
+                {
+                    "prior": {
+                        "observed_hospital_admissions": hosp_data,
+                        "observed_ed_visits": ed_data,
+                        "site_level_log_ww_conc": ww_data,
+                    }
                 }
             )
 
@@ -324,10 +330,10 @@ class TestCreateVarDf:
         ],
     )
     def test_creates_dataframe_from_idata(self, n_draws, n_times, n_sites, var_name):
-        """Test that a DataFrame is created from InferenceData."""
-        # Create mock InferenceData
+        """Test that a DataFrame is created from DataTree."""
+        # Create mock DataTree
         data = np.random.randn(1, n_draws, n_times, n_sites)
-        idata = az.from_dict(prior={var_name: data})
+        idata = az.from_dict({"prior": {var_name: data}})
 
         state_disease_key = pl.DataFrame(
             {
@@ -363,7 +369,7 @@ class TestCreateVarDf:
     def test_correct_dimensions(self, n_draws, n_times, n_sites):
         """Test that output DataFrame has correct dimensions."""
         data = np.random.randn(1, n_draws, n_times, n_sites)
-        idata = az.from_dict(prior={"test_var": data})
+        idata = az.from_dict({"prior": {"test_var": data}})
 
         state_disease_key = pl.DataFrame(
             {

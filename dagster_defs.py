@@ -272,6 +272,7 @@ class PostProcessConfig(dg.Config):
 # MODEL CONSTRUCTOR FUNCTIONS - these are used later, in Asset Definitions
 # ============================================================================
 
+
 def _throw_if_backfill(
     context: DynamicGraphAssetExecutionContext | dg.AssetExecutionContext,
     partition_def: dg.PartitionsDefinition,
@@ -453,6 +454,7 @@ def _fuse_pyrenew_timeseries(
         fusion_model_name=fusion_model_name,
     )
 
+
 # ============================================================================
 # SCHEDULES AND AUTOMATION CONDITION SENSORS
 # ============================================================================
@@ -460,18 +462,19 @@ def _fuse_pyrenew_timeseries(
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecast",
     target=dg.AssetSelection.groups("WeeklyForecast"),
-    use_user_code_server=True # allows for custom automation conditions
+    use_user_code_server=True,  # allows for custom automation conditions
 )
+
 
 class IsWeekday(dg.AutomationCondition):
     def __init__(self, weekday: int):
         """
         Check if evaluation time falls on a specific weekday.
-        This is is a simple evaluation, rather than a stateful operation, 
+        This is is a simple evaluation, rather than a stateful operation,
         such as with cron_tick_passed().
-        
+
         Args:
-            weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 
+            weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday,
                     4=Friday, 5=Saturday, 6=Sunday
         """
         self.weekday = weekday
@@ -479,18 +482,26 @@ class IsWeekday(dg.AutomationCondition):
 
     def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
         if context.evaluation_time.weekday() == 2:
-            true_subset = context.candidate_subset 
-        else: 
+            true_subset = context.candidate_subset
+        else:
             true_subset = context.get_empty_subset()
-        
+
         return dg.AutomationResult(true_subset=true_subset, context=context)
 
     @property
     def name(self) -> str:
         """Define the label that will appear in the UI"""
-        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 
-                'Friday', 'Saturday', 'Sunday']
+        days = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
         return f"is_{days[self.weekday].lower()}"
+
 
 # ---------- Shared Asset Decorator Arguments ----------
 
@@ -504,7 +515,7 @@ weekly_forecast_initial_asset_args = {
     "group_name": "WeeklyForecast",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
-        IsWeekday(2) & dg.AutomationCondition.eager() 
+        IsWeekday(2) & dg.AutomationCondition.eager()
     ).with_label("eager_on_wednesday"),
 }
 
@@ -538,12 +549,13 @@ if not is_production:
 
 # ---------------- Weekly Forecasts --------------
 
+
 # Timeseries E
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
-def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig): 
+def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
     _run_timeseries_e(context, config, epiweekly=False)
 
 
@@ -691,6 +703,7 @@ def postprocess_forecasts(
         skip_existing=config.skip_existing,
         local_copy_dir=daily_forecast_output_dir,
     )
+
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

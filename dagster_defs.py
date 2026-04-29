@@ -269,12 +269,8 @@ class PostProcessConfig(dg.Config):
 
 
 # ============================================================================
-# ASSET DEFINITIONS
+# MODEL CONSTRUCTOR FUNCTIONS - these are used later, in Asset Definitions
 # ============================================================================
-# These are the core of Dagster - functions that specify data
-
-# ----------- Model Constructor Functions --------------------------
-
 
 def _throw_if_backfill(
     context: DynamicGraphAssetExecutionContext | dg.AssetExecutionContext,
@@ -457,6 +453,71 @@ def _fuse_pyrenew_timeseries(
         fusion_model_name=fusion_model_name,
     )
 
+# ============================================================================
+# SCHEDULES AND AUTOMATION CONDITION SENSORS
+# ============================================================================
+
+weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyForecast",
+    target=dg.AssetSelection.groups("WeeklyForecast"),
+    use_user_code_server=True # allows for custom automation conditions
+)
+
+class IsWeekday(dg.AutomationCondition):
+    def __init__(self, weekday: int):
+        """
+        Check if evaluation time falls on a specific weekday.
+        This is is a simple evaluation, rather than a stateful operation, 
+        such as with cron_tick_passed().
+        
+        Args:
+            weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 
+                    4=Friday, 5=Saturday, 6=Sunday
+        """
+        self.weekday = weekday
+        super().__init__()
+
+    def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
+        if context.evaluation_time.weekday() == 2:
+            true_subset = context.candidate_subset 
+        else: 
+            true_subset = context.get_empty_subset()
+        
+        return dg.AutomationResult(true_subset=true_subset, context=context)
+
+    @property
+    def name(self) -> str:
+        """Define the label that will appear in the UI"""
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 
+                'Friday', 'Saturday', 'Sunday']
+        return f"is_{days[self.weekday].lower()}"
+
+# ---------- Shared Asset Decorator Arguments ----------
+
+# All of our forecast assets should materialize with the same
+# partitions, graph_dimensions, automation conditions, and asset groups
+# The only thing that differs between them are their dependencies
+
+weekly_forecast_initial_asset_args = {
+    "partitions_def": daily_partitions_def,
+    "graph_dimensions": ["diseases", "locations"],
+    "group_name": "WeeklyForecast",
+    "automation_condition": (
+        # We specifically don't want these to run unless it's Wednesday
+        IsWeekday(2) & dg.AutomationCondition.eager() 
+    ).with_label("eager_on_wednesday"),
+}
+
+weekly_forecast_fusion_asset_args = {
+    **weekly_forecast_initial_asset_args,
+    # we want vanilla eager for the fusion assets and post-processing
+    "automation_condition": dg.AutomationCondition.eager(),
+}
+
+# ============================================================================
+# ASSET DEFINITIONS
+# ============================================================================
+# These are the core of Dagster - functions that specify data
 
 # ---------- External Asset Specs -------------
 
@@ -475,160 +536,6 @@ if not is_production:
     )
 
 
-# ---------- Shared Asset Decorator Arguments ----------
-
-# All of our forecast assets should materialize with the same
-# partitions, graph_dimensions, automation conditions, and asset groups
-# The only thing that differs between them are their dependencies
-
-
-weekly_forecast_initial_asset_args = {
-    "partitions_def": daily_partitions_def,
-    "graph_dimensions": ["diseases", "locations"],
-    "group_name": "WeeklyForecast",
-    "automation_condition": (
-        dg.AutomationCondition.eager()
-        & dg.AutomationCondition.cron_tick_passed(
-            # half-hour minute windows prevent over/under evaluation
-            # 6AM-8PM is a liberal working hour window
-            cron_schedule="0,30 6-20 * * WED",
-            cron_timezone="America/New_York",
-        )
-    ).with_label("eager_on_wednesday_work_hrs"),
-}
-
-weekly_forecast_fusion_asset_args = {
-    "partitions_def": daily_partitions_def,
-    "graph_dimensions": ["diseases", "locations"],
-    "group_name": "WeeklyForecast",
-    "automation_condition": dg.AutomationCondition.eager(),
-}
-
-# CUSTOM CONDITION TESTING
-same_as_eager=(
-    dg.AutomationCondition.in_latest_time_window()
-            & (
-                dg.AutomationCondition.newly_missing() | 
-                dg.AutomationCondition.any_deps_updated()
-            ).since(
-                dg.AutomationCondition.newly_requested() | 
-                dg.AutomationCondition.newly_updated() | 
-                dg.AutomationCondition.initial_evaluation()
-            )
-            & ~dg.AutomationCondition.any_deps_missing()
-            & ~dg.AutomationCondition.any_deps_in_progress()
-            & ~dg.AutomationCondition.in_progress()
-    ).with_label("same_as_eager")
-
-eager_no_initial_eval=(
-    dg.AutomationCondition.in_latest_time_window()
-            & (
-                dg.AutomationCondition.newly_missing() | 
-                dg.AutomationCondition.any_deps_updated()
-            ).since(
-                dg.AutomationCondition.newly_requested() | 
-                dg.AutomationCondition.newly_updated()
-            )
-            & ~dg.AutomationCondition.any_deps_missing()
-            & ~dg.AutomationCondition.any_deps_in_progress()
-            & ~dg.AutomationCondition.in_progress()
-    ).with_label("eager_no_since_initial_eval")
-
-eager_no_since_at_all=(
-    dg.AutomationCondition.in_latest_time_window()
-            & (
-                dg.AutomationCondition.newly_missing() | 
-                dg.AutomationCondition.any_deps_updated()
-            )
-            & ~dg.AutomationCondition.any_deps_missing()
-            & ~dg.AutomationCondition.any_deps_in_progress()
-            & ~dg.AutomationCondition.in_progress()
-    ).with_label("eager_no_since_at_all")
-
-
-def same_as_on_cron(_cron_schedule="* * * * *",_cron_timezone="America/New_York")->dg.AutomationCondition:
-    return (
-        dg.AutomationCondition.in_latest_time_window()
-            & dg.AutomationCondition.cron_tick_passed(
-                _cron_schedule, _cron_timezone
-           ).since_last_handled()
-            & dg.AutomationCondition.all_deps_updated_since_cron(_cron_schedule, _cron_timezone)
-    ).with_label(f"on_cron({_cron_schedule}, {_cron_timezone}")
-
-def cron_no_since_at_all(_cron_schedule="* * * * *",_cron_timezone="America/New_York")->dg.AutomationCondition:
-    return (
-        dg.AutomationCondition.in_latest_time_window()
-            & dg.AutomationCondition.cron_tick_passed(
-                _cron_schedule, _cron_timezone
-           )
-            & dg.AutomationCondition.all_deps_updated_since_cron(_cron_schedule, _cron_timezone)
-    ).with_label(f"on_cron({_cron_schedule}, {_cron_timezone}_no_since")
-
-# Associated Assets
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=dg.AutomationCondition.on_cron("* * * * *")
-)
-def every_minute():
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=(
-        eager_no_since_at_all   
-        & dg.AutomationCondition.cron_tick_passed(
-            # half-hour minute windows prevent over/under evaluation
-            # 6AM-8PM is a liberal working hour window
-            cron_schedule="* 6-20 * * *",
-            cron_timezone="America/New_York",
-        )).with_label("eager_on_anyday_work_hrs")
-)
-def cron_eager_asset(every_minute):
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=eager_no_since_at_all,
-)
-def eager_no_since(every_minute):
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=same_as_eager
-)
-def same_as_eager(every_minute):
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=eager_no_initial_eval
-)
-def eager_no_initial_eval(every_minute):
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=eager_no_since_at_all
-)
-def eager_no_since_at_all(every_minute):
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=same_as_on_cron("0,30 6-20 * * WED", "America/New_York")
-)
-def same_as_on_cron(every_minute):
-    return
-
-@dg.asset(
-    partitions_def=daily_partitions_def,
-    automation_condition=cron_no_since_at_all("0,30 6-20 * * WED", "America/New_York")
-)
-def cron_no_since_at_all(every_minute):
-    return
-
 # ---------------- Weekly Forecasts --------------
 
 
@@ -637,7 +544,7 @@ def cron_no_since_at_all(every_minute):
     **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
-def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
+def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig): 
     _run_timeseries_e(context, config, epiweekly=False)
 
 
@@ -785,20 +692,6 @@ def postprocess_forecasts(
         skip_existing=config.skip_existing,
         local_copy_dir=daily_forecast_output_dir,
     )
-
-
-# ============================================================================
-# SCHEDULES AND AUTOMATION CONDITION SENSORS
-# ============================================================================
-
-# TODO: investigate use_user_code_server and custom/default automation conditions
-
-# ---------- Weekly Forecast Sensor ----------
-
-weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecast",
-    target=dg.AssetSelection.groups("WeeklyForecast"),
-)
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

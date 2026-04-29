@@ -538,7 +538,6 @@ if not is_production:
 
 # ---------------- Weekly Forecasts --------------
 
-
 # Timeseries E
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,

@@ -465,7 +465,7 @@ weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
-
+# Custom Automation Condition. Relies on use_user_code_server=True on the sensor
 class IsWeekday(dg.AutomationCondition):
     def __init__(self, weekday: int):
         """
@@ -481,12 +481,14 @@ class IsWeekday(dg.AutomationCondition):
         super().__init__()
 
     def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
-        if context.evaluation_time.weekday() == 2:
+        # If the current weekday is equal to the desired weekday, 
+        # return the candidate_subset -> a dagster context's "true" case
+        if context.evaluation_time.weekday() == self.weekday:
             true_subset = context.candidate_subset
         else:
             true_subset = context.get_empty_subset()
 
-        return dg.AutomationResult(true_subset=true_subset, context=context)
+        return dg.AutomationResult(context=context, true_subset=true_subset)
 
     @property
     def name(self) -> str:
@@ -515,6 +517,7 @@ weekly_forecast_initial_asset_args = {
     "group_name": "WeeklyForecast",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
+        # 0=monday,1=tuseday,2=wednesday,etc.
         IsWeekday(2) & dg.AutomationCondition.eager()
     ).with_label("eager_on_wednesday"),
 }
@@ -679,7 +682,7 @@ def fuse_pyrenew_he_ts_epiweekly(
                 | dg.AutomationCondition.will_be_requested()
             ),
         )
-    ),
+    ).with_label("postprocess_custom_eager"),
     group_name="WeeklyForecast",
 )
 def postprocess_forecasts(

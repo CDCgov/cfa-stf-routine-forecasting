@@ -92,7 +92,7 @@ container_build:
 container_tag:
 	$(ENGINE) tag $(CONTAINER_REMOTE_NAME) $(CONTAINER_REMOTE_NAME)
 
-container_push: ghcr_login container_build
+container_push: container_build ghcr_login
 	$(ENGINE) push $(CONTAINER_REMOTE_NAME)
 
 container_explore:

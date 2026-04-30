@@ -31,13 +31,16 @@ COPY ./EpiAutoGP /cfa-stf-routine-forecasting/EpiAutoGP
 # Set working directory
 WORKDIR /cfa-stf-routine-forecasting
 
-# Install hewr
-RUN Rscript -e "install.packages('pak')"
-RUN Rscript -e "pak::repo_add(hubverse = 'https://hubverse-org.r-universe.dev'); pak::local_install('hewr', upgrade = FALSE)"
-
 # Cache Julia packages and artifacts
 RUN --mount=type=cache,target=/root/.julia \
     julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+
+# Install hewr
+RUN Rscript -e "install.packages('pak')"
+RUN Rscript -e "\
+    pak::repo_add(hubverse = 'https://hubverse-org.r-universe.dev'); \
+    pak::local_install('hewr', upgrade = FALSE) \
+"
 
 #
 # Bring in python project dependency information and set the virtual env
@@ -69,7 +72,7 @@ COPY cfa ./cfa
 COPY pipelines ./pipelines
 COPY README.md ./README.md
 
-# Install the local project now that pipelines/ sources are present
+# Install the local project now that pipelines / sources are present
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
 

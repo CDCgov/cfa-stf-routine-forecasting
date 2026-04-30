@@ -519,8 +519,9 @@ weekly_forecast_initial_asset_args = {
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
         # 0=monday,1=tuseday,2=wednesday,etc.
-        IsWeekday(2) & dg.AutomationCondition.eager()
-    ).with_label("eager_on_wednesday"),
+        # Note this is different from cron which is 1-indexed
+        dg.AutomationCondition.eager() & IsWeekday(2)
+    ).with_label("eager_on_wednesday")
 }
 
 weekly_forecast_fusion_asset_args = {
@@ -729,17 +730,15 @@ defs = dg.Definitions(
         # These IOManagers let Dagster serialize asset outputs and store them
         # in Azure to pass between assets
         "io_manager": ADLS2PickleIOManager(),
-        "prod_io_manager": ADLS2PickleIOManager(use_production=True),
         # an example storage account
         "azure_blob_storage": AzureBlobStorageResource(
             account_url=f"{storage_account}.blob.core.windows.net",
             credential=AzureBlobStorageDefaultCredential(),
         ),
     },
-    # You can put a comment after azure_batch_config to solely execute with Azure batch
     executor=dynamic_executor(
-        # default_config=azure_batch_execution_config,
-        default_config=basic_execution_config,
+        default_config=azure_batch_execution_config,
+        # default_config=basic_execution_config,
         # default_config=docker_execution_config,
         alternate_configs=[basic_execution_config, docker_execution_config],
     ),

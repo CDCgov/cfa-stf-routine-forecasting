@@ -518,7 +518,7 @@ weekly_forecast_initial_asset_args = {
     "group_name": "WeeklyForecast",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
-        # 0=monday,1=tuseday,2=wednesday,etc.
+        # 0=monday,1=tuesday,2=wednesday,etc.
         # Note this is different from cron which is 1-indexed
         dg.AutomationCondition.eager() & IsWeekday(2)
     ).with_label("eager_on_wednesday")

@@ -521,7 +521,7 @@ weekly_forecast_initial_asset_args = {
         # 0=monday,1=tuseday,2=wednesday,etc.
         # Note this is different from cron which is 1-indexed
         dg.AutomationCondition.eager() & IsWeekday(2)
-    ).with_label("eager_on_wednesday")
+    ).with_label("eager_on_wednesday"),
 }
 
 weekly_forecast_fusion_asset_args = {

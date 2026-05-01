@@ -709,6 +709,39 @@ def postprocess_forecasts(
         local_copy_dir=daily_forecast_output_dir,
     )
 
+# ============================================================================
+# CUSTOM FORECAST FUNCTIONS - RERUNS AND EXPERIMENTS
+# ============================================================================
+
+@dg.op()
+def run_custom_forecast(context: dg.OpExecutionContext):
+    # TODO: Logic to handle run_config passed to the parent job.
+    # for asset in run_config_map.run_custom_forecast.config.assets:
+    #   dg.RunRequest(run_config=run_config_map)
+    return
+
+# This wraps our launch_pipeline op in a job that can be scheduled or manually launched via the GUI
+@dg.job(
+    executor_def=dynamic_executor(
+        default_config=basic_execution_config
+    ),
+    config=dg.RunConfig(
+        ops={
+            "run_custom_forecast": {
+                "config": {
+                    "assets": [
+                        "timeseries_e", "pyrenew_e", "pyrenew_h", "pyrenew_he", "epiweekly_timeseries_e", "fusion_e", "postprocess"
+                    ],
+                    "common_model_config": ModelBaseConfig()
+                }
+            }
+        },
+        execution=basic_execution_config.to_run_config()
+    ),
+)
+def run_custom_forecast_job():
+    run_custom_forecast()
+
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

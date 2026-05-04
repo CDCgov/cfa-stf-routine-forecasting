@@ -716,9 +716,11 @@ def postprocess_forecasts(
         local_copy_dir=daily_forecast_output_dir,
     )
 
+
 # ============================================================================
 # CUSTOM FORECAST FUNCTIONS - RERUNS AND EXPERIMENTS
 # ============================================================================
+
 
 @dg.op()
 def run_custom_forecast(context: dg.OpExecutionContext):
@@ -735,9 +737,7 @@ asset_names = [
 
 # This wraps our launch_pipeline op in a job that can be scheduled or manually launched via the GUI
 @dg.job(
-    executor_def=dynamic_executor(
-        default_config=basic_execution_config
-    ),
+    executor_def=dynamic_executor(default_config=basic_execution_config),
     config=dg.RunConfig(
         ops={
             "run_custom_forecast": {
@@ -750,7 +750,7 @@ asset_names = [
                 }
             }
         },
-        execution=basic_execution_config.to_run_config()
+        execution=basic_execution_config.to_run_config(),
     ),
 )
 def run_custom_forecast_job():

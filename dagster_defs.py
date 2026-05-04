@@ -46,7 +46,8 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # ============================================================================
 
 # function to start the dev server
-start_dev_env(__name__)
+if __name__ == "__main__":
+    start_dev_env(__name__)
 
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
 SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
@@ -198,11 +199,10 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # ASSET CONFIGURATIONS
 # ============================================================================
 
-
-class ModelBaseConfig(dg.Config):
+class ModelConfig(dg.Config):
     """
     Base configuration for all model assets.
-    Contains parameters common to both Timeseries and Pyrenew models.
+    Contains parameters common to Timeseries, Pyrenew, and Fusion models.
     """
 
     output_basedir: str = "output" if is_production else "test-output"
@@ -211,50 +211,57 @@ class ModelBaseConfig(dg.Config):
     diseases: list[str] = DISEASES
     locations: list[str] = LOCATIONS
 
-
-class TimeseriesConfig(ModelBaseConfig):
+class TimeseriesConfigBase(dg.Config):
     """
     Configuration for timeseries model assets (timeseries_e, epiweekly_timeseries_e).
     These default values can be modified in the Dagster asset materialization launchpad.
     """
-
     n_samples: int = 400 if not is_production else 2000  # Total samples for timeseries
 
 
-class PyrenewConfig(ModelBaseConfig):
+class PyrenewConfigBase(dg.Config):
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
     """
-
     n_warmup: int = 200 if not is_production else 1000
     n_samples: int = 200 if not is_production else 500
     n_chains: int = 2 if not is_production else 4
     rng_key: int = 12345
     additional_forecast_letters: str = ""
 
-
-class FusionConfig(ModelBaseConfig):
+class EConfigBase(dg.Config):
+    """Class that encodes locations for E models."""
     # filter out WY
     locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
 
+# class WConfigBase(dg.Config):
+#     """Class that encodes diseases for W models."""
+#     # only COVID-19 is valid for W
+#     diseases: list[str] = ["COVID-19"]
 
-class PyrenewEConfig(PyrenewConfig):
+class TimeseriesConfig(ModelConfig, TimeseriesConfigBase):
+    """Config class that inherits ModelConfig and TimeseriesConfigBase."""
+    pass
+
+class PyrenewConfig(ModelConfig, PyrenewConfigBase):
+    """Class that inherits both ModelConfig and PyrenewConfigBase."""
+    pass
+
+class PyrenewEConfig(ModelConfig, PyrenewConfigBase):
+    """Identical to PyrenewConfig, but overrides locations."""
     # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    locations: list[str] = EConfigBase().locations
 
-
-class PyrenewWConfig(PyrenewConfig):
-    # only COVID-19 is valid for W
-    diseases: list[str] = ["COVID-19"]
-
-
-class PyrenewEWConfig(PyrenewConfig):
-    # only COVID-19 is valid for W
-    diseases: list[str] = ["COVID-19"]
+class FusionConfig(ModelConfig):
+    """Identical to ModelConfig, but overrides locations."""
     # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    locations: list[str] = EConfigBase().locations
 
+# class PyrenewEWConfig(ModelConfig, PyrenewConfigBase):
+#     """Otherwise identical to PyrenewConfig, but overrides locations and diseases"""
+#     locations: list[str] = EConfigBase().locations
+#     diseases: list[str] = WConfigBase().diseases
 
 class PostProcessConfig(dg.Config):
     """
@@ -720,6 +727,12 @@ def run_custom_forecast(context: dg.OpExecutionContext):
     #   dg.RunRequest(run_config=run_config_map)
     return
 
+asset_names = [
+    asset_def.node_def.name 
+    for asset_def in collect_definitions(globals())["assets"] 
+    if not isinstance(asset_def, dg.AssetSpec)
+]
+
 # This wraps our launch_pipeline op in a job that can be scheduled or manually launched via the GUI
 @dg.job(
     executor_def=dynamic_executor(
@@ -729,10 +742,11 @@ def run_custom_forecast(context: dg.OpExecutionContext):
         ops={
             "run_custom_forecast": {
                 "config": {
-                    "assets": [
-                        "timeseries_e", "pyrenew_e", "pyrenew_h", "pyrenew_he", "epiweekly_timeseries_e", "fusion_e", "postprocess"
-                    ],
-                    "common_model_config": ModelBaseConfig()
+                    "assets_to_include": asset_names,
+                    "common_model_config": ModelConfig(),
+                    "timeseries_specific_config": TimeseriesConfigBase(),
+                    "postprocess_config": PostProcessConfig(),
+                    "asset_execution_config": azure_batch_execution_config.to_run_config()
                 }
             }
         },

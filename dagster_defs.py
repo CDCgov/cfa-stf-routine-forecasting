@@ -462,7 +462,13 @@ def _fuse_pyrenew_timeseries(
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecast",
     target=dg.AssetSelection.groups("WeeklyForecast"),
-    use_user_code_server=True,  # allows for custom automation conditions
+    use_user_code_server=True # allows for custom automation conditions
+)
+
+weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyForecastFusion",
+    target=dg.AssetSelection.groups("WeeklyForecastFusion"),
+    use_user_code_server=False # does NOT allow custom conditions
 )
 
 
@@ -515,7 +521,7 @@ class IsWeekday(dg.AutomationCondition):
 weekly_forecast_initial_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
-    "group_name": "WeeklyForecast",
+    "group_name": "WeeklyForecastInitial",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
         # 0=monday,1=tuesday,2=wednesday,etc.
@@ -526,6 +532,7 @@ weekly_forecast_initial_asset_args = {
 
 weekly_forecast_fusion_asset_args = {
     **weekly_forecast_initial_asset_args,
+    "group_name": "WeeklyForecastFusion",
     # we want vanilla eager for the fusion assets and post-processing
     "automation_condition": dg.AutomationCondition.eager(),
 }
@@ -685,7 +692,7 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    group_name="WeeklyForecast",
+    group_name="WeeklyForecastFusion",
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,

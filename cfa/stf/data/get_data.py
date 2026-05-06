@@ -18,8 +18,8 @@ NSSPDataset = Literal["gold", "comprehensive"]
 
 @overload
 def get_nhsn_hrd(
-    disease: str,
-    loc_abb: str,
+    disease: str | Iterable[str] | None = None,
+    loc_abb: str | Iterable[str] | None = None,
     prelim: bool = ...,
     as_of: dt.date | None = ...,
     start_date: dt.date | None = ...,
@@ -30,8 +30,8 @@ def get_nhsn_hrd(
 
 @overload
 def get_nhsn_hrd(
-    disease: str,
-    loc_abb: str,
+    disease: str | Iterable[str] | None = None,
+    loc_abb: str | Iterable[str] | None = None,
     prelim: bool = ...,
     as_of: dt.date | None = ...,
     start_date: dt.date | None = ...,
@@ -41,8 +41,8 @@ def get_nhsn_hrd(
 
 
 def get_nhsn_hrd(
-    disease: str,
-    loc_abb: str,
+    disease: str | Iterable[str] | None = None,
+    loc_abb: str | Iterable[str] | None = None,
     prelim: bool = True,
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
@@ -59,9 +59,9 @@ def get_nhsn_hrd(
     Parameters
     ----------
     disease
-        The disease to filter for ("COVID-19", "Influenza", or "RSV").
+        The disease to filter for ("COVID-19", "Influenza", or "RSV"). If None, all diseases are included.
     loc_abb
-        The location abbreviation to filter for.
+        The location abbreviation to filter for. If None, all locations are included.
     prelim
         Whether to retrieve "nhsn_hrd_prelim" data as opposed to "nhsn_hrd" data (defaults to True).
     as_of
@@ -80,19 +80,21 @@ def get_nhsn_hrd(
         Filtered data with columns:
         `weekendingdate`, `jurisdiction`, and `hospital_admissions`.
     """
+    if as_of is None:
+        as_of = dt.date.max
 
-    disease_col = nhsn_disease_map[disease]
+    disease = ensure_list(disease) if disease else list(nhsn_disease_map.keys())
 
-    filters = [
-        pl.col("jurisdiction") == loc_abb,
-    ]
+    disease_col = [nhsn_disease_map[x] for x in disease]
+    loc_abb = ensure_list(loc_abb) if loc_abb else None
+
+    filters = []
+    if loc_abb is not None:
+        filters.append(pl.col("jurisdiction").is_in(loc_abb))
     if start_date is not None:
         filters.append(pl.col("weekendingdate") >= start_date)
     if end_date is not None:
         filters.append(pl.col("weekendingdate") <= end_date)
-
-    if as_of is None:
-        as_of = dt.date.max
 
     datacat_dataset = (
         datacat.public.stf.nhsn_hrd_prelim if prelim else datacat.public.stf.nhsn_hrd
@@ -106,12 +108,11 @@ def get_nhsn_hrd(
     filtered_dat = (
         dat.with_columns(pl.col("jurisdiction").cast(pl.String).replace("USA", "US"))
         .filter(*filters)
-        .select(
-            "weekendingdate",
-            "jurisdiction",
-            pl.col(disease_col).alias("hospital_admissions"),
-        )
+        .select(disease_col + ["weekendingdate", "jurisdiction"])
     )
+    # need to pivot and add a new column for disease name
+
+    # .alias("hospital_admissions")
     return filtered_dat
 
 

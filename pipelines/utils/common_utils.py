@@ -12,7 +12,7 @@ from typing import Any
 
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
-from cfa.stf.forecasttools import LOCATION_LIST, ensure_listlike
+from cfa.stf.forecasttools import LOCATION_LIST, ensure_list
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations
@@ -579,7 +579,7 @@ def get_all_forecast_dirs(
     ValueError
         Given an invalid ``report_date``.
     """
-    diseases = ensure_listlike(diseases)
+    diseases = ensure_list(diseases)
 
     if report_date is None:
         report_date_str = ""

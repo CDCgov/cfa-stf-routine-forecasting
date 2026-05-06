@@ -460,8 +460,8 @@ def _fuse_pyrenew_timeseries(
 # ============================================================================
 
 weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecast",
-    target=dg.AssetSelection.groups("WeeklyForecast"),
+    name="WeeklyForecastUpstream",
+    target=dg.AssetSelection.groups("WeeklyForecastUpstream"),
     use_user_code_server=True # allows for custom automation conditions
 )
 
@@ -518,10 +518,10 @@ class IsWeekday(dg.AutomationCondition):
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
 
-weekly_forecast_initial_asset_args = {
+weekly_forecast_upstream_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
-    "group_name": "WeeklyForecastInitial",
+    "group_name": "WeeklyForecastUpstream",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
         # 0=monday,1=tuesday,2=wednesday,etc.
@@ -531,7 +531,7 @@ weekly_forecast_initial_asset_args = {
 }
 
 weekly_forecast_fusion_asset_args = {
-    **weekly_forecast_initial_asset_args,
+    **weekly_forecast_upstream_asset_args,
     "group_name": "WeeklyForecastFusion",
     # we want vanilla eager for the fusion assets and post-processing
     "automation_condition": dg.AutomationCondition.eager(),
@@ -564,7 +564,7 @@ if not is_production:
 
 # Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_forecast_upstream_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -573,7 +573,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_forecast_upstream_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -584,7 +584,7 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_forecast_upstream_asset_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -598,7 +598,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_forecast_upstream_asset_args,
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -609,7 +609,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_forecast_upstream_asset_args,
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },

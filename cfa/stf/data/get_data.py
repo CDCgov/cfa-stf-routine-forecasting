@@ -1,8 +1,11 @@
 import datetime as dt
+from collections.abc import Iterable
 from typing import Literal, overload
 
 import polars as pl
 from cfa.dataops import datacat
+
+from cfa.stf.forecasttools import ensure_list
 
 nhsn_disease_map = {
     "COVID-19": "totalconfc19newadm",
@@ -114,31 +117,31 @@ def get_nhsn_hrd(
 
 @overload
 def get_nssp(
-    disease: str,
-    loc_abb: str,
-    dataset: NSSPDataset = ...,
-    as_of: dt.date | None = ...,
-    start_date: dt.date | None = ...,
-    end_date: dt.date | None = ...,
+    disease: str | Iterable[str] | None = None,
+    loc_abb: str | Iterable[str] | None = None,
+    dataset: NSSPDataset = "gold",
+    as_of: dt.date | None = None,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
     lazy: Literal[True] = ...,
 ) -> pl.LazyFrame: ...
 
 
 @overload
 def get_nssp(
-    disease: str,
-    loc_abb: str,
-    dataset: NSSPDataset = ...,
-    as_of: dt.date | None = ...,
-    start_date: dt.date | None = ...,
-    end_date: dt.date | None = ...,
+    disease: str | Iterable[str] | None = None,
+    loc_abb: str | Iterable[str] | None = None,
+    dataset: NSSPDataset = "gold",
+    as_of: dt.date | None = None,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
     lazy: Literal[False] = ...,
 ) -> pl.DataFrame: ...
 
 
 def get_nssp(
-    disease: str,
-    loc_abb: str,
+    disease: str | Iterable[str] | None = None,
+    loc_abb: str | Iterable[str] | None = None,
     dataset: NSSPDataset = "gold",
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
@@ -157,9 +160,9 @@ def get_nssp(
     Parameters
     ----------
     disease
-        The disease to filter for ("COVID-19", "Influenza", or "RSV").
+        The disease to filter for ("COVID-19", "Influenza", or "RSV"). If None, all diseases are included.
     loc_abb
-        Location abbreviation to filter for.
+        Location abbreviation to filter for. If None, all locations are included.
     dataset
         One of the two datasets to retrieve from datacat: "gold" or
         "comprehensive" (defaults to "gold").
@@ -194,18 +197,60 @@ def get_nssp(
     if as_of is None:
         as_of = dt.date.max
 
+    output = "pl_lazy" if lazy else "pl"
+
     dataset_map = {
         "gold": datacat.public.stf.nssp_gold_v1,
         "comprehensive": datacat.public.stf.comprehensive_nssp_gold,
     }
+
     if dataset not in dataset_map:
         raise ValueError(
             f"Invalid dataset: {dataset!r}. Expected one of: {set(dataset_map)}."
         )
     datacat_dataset = dataset_map[dataset]
 
+    dat = datacat_dataset.load.get_dataframe(
+        output=output, version=f"<={as_of.strftime('%Y-%m-%d')}"
+    ).with_columns(
+        pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")
+    )
+
+    valid_locs = (
+        dat.select("geo_value").unique().collect()
+        if lazy
+        else dat.select("geo_value").unique()
+    ).get_column("geo_value").sort().to_list() + ["US"]
+
+    loc_abb = ensure_list(loc_abb) if loc_abb else valid_locs
+
+    US_required = "US" in loc_abb
+    non_US_locs = [loc for loc in loc_abb if loc != "US"]
+
+    invalid_locs = set(non_US_locs) - set(valid_locs)
+    if invalid_locs:
+        raise ValueError(f"Invalid location abbreviation(s): {invalid_locs}")
+
+    valid_diseases = (
+        (
+            dat.select("disease").unique().collect()
+            if lazy
+            else dat.select("disease").unique()
+        )
+        .get_column("disease")
+        .to_list()
+    )
+    disease = ensure_list(disease) if disease else valid_diseases
+
+    if "Total" not in disease:
+        disease.append("Total")
+
+    invalid_diseases = set(disease) - set(valid_diseases)
+    if invalid_diseases:
+        raise ValueError(f"Invalid disease(s): {invalid_diseases}")
+
     filters = [
-        pl.col("disease").is_in([disease, "Total"]),
+        pl.col("disease").is_in(disease),
         pl.col("metric") == "count_ed_visits",
     ]
 
@@ -213,34 +258,28 @@ def get_nssp(
         filters.append(pl.col("reference_date") >= start_date)
     if end_date is not None:
         filters.append(pl.col("reference_date") <= end_date)
-    if loc_abb != "US":
-        # National-level data (loc_abb == "US"), is obtained
-        # by aggregating state-level data. Therefore,
-        # we only filter by geo_value if loc_abb is not "US".
-        filters.append(pl.col("geo_value") == loc_abb)
 
-    output = "pl_lazy" if lazy else "pl"
-    dat = datacat_dataset.load.get_dataframe(
-        output=output, version=f"<={as_of.strftime('%Y-%m-%d')}"
+    dat = dat.filter(*filters)
+
+    non_US_dat = dat.filter(pl.col("geo_value").is_in(non_US_locs))
+
+    combined_dat = (
+        pl.concat(
+            [
+                non_US_dat,
+                dat.with_columns(pl.lit("US").alias("geo_value").cast(pl.Categorical)),
+            ]
+        )
+        if US_required
+        else non_US_dat
     )
 
-    valid_locs = (
-        dat.select("geo_value").unique().collect()
-        if lazy
-        else dat.select("geo_value").unique()
-    ).get_column("geo_value").to_list() + ["US"]
-
-    if loc_abb not in valid_locs:
-        raise ValueError(f"Invalid location abbreviation: {loc_abb}")
-
-    dat_filtered = dat.with_columns(
-        pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")
-    ).filter(*filters)
-
     result = (
-        dat_filtered.group_by("reference_date", "disease")
+        combined_dat.group_by("reference_date", "disease", "geo_value")
         .agg(pl.col("value").sum())
-        .sort("reference_date")
+        .sort(
+            ["geo_value", "disease", "reference_date"], descending=[False, False, True]
+        )
     )
 
     return result

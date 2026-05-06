@@ -459,7 +459,7 @@ def _fuse_pyrenew_timeseries(
 # SCHEDULES AND AUTOMATION CONDITION SENSORS
 # ============================================================================
 
-weekly_forecast_sensor = dg.AutomationConditionSensorDefinition(
+weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastUpstream",
     target=dg.AssetSelection.groups("WeeklyForecastUpstream"),
     use_user_code_server=True # allows for custom automation conditions

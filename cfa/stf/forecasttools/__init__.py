@@ -3,7 +3,7 @@
 from importlib import import_module
 
 from .location_constants import LOCATION_LIST
-from .utils import coalesce_common_columns, ensure_listlike
+from .utils import coalesce_common_columns, ensure_list
 
 
 def __getattr__(name):
@@ -16,7 +16,7 @@ def __getattr__(name):
 
 __all__ = [
     "coalesce_common_columns",
-    "ensure_listlike",
+    "ensure_list",
     "get_us_loc_pop_tbl",
     "LOCATION_LIST",
     "arviz",

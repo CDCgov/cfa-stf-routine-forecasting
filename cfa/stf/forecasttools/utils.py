@@ -4,7 +4,7 @@ import polars as pl
 import polars.selectors as cs
 
 
-def ensure_listlike[T](x: T | Iterable[T]) -> list[T]:
+def ensure_list[T](x: T | Iterable[T]) -> list[T]:
     if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
         return list(x)
     else:

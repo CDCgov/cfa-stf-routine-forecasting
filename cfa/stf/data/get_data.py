@@ -161,7 +161,7 @@ def get_nssp(
     Parameters
     ----------
     disease
-        The disease to filter for ("COVID-19", "Influenza", or "RSV"). If None, all diseases are included.
+        The disease to filter for ("COVID-19", "Influenza", "RSV", or "Total"). If None, all diseases are included.
     loc_abb
         Location abbreviation to filter for. If None, all locations are included.
     dataset
@@ -242,9 +242,6 @@ def get_nssp(
         .to_list()
     )
     disease = ensure_list(disease) if disease else valid_diseases
-
-    if "Total" not in disease:
-        disease.append("Total")
 
     invalid_diseases = set(disease) - set(valid_diseases)
     if invalid_diseases:

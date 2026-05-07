@@ -215,7 +215,7 @@ def get_nssp(
             f"Invalid dataset: {dataset!r}. Expected one of: {set(dataset_map)!r}."
         )
 
-    US_required = all_locs or "US" in loc_abb
+    national_required = all_locs or "US" in loc_abb
 
     filters = [
         pl.col("metric") == "count_ed_visits",
@@ -248,7 +248,7 @@ def get_nssp(
                 dat.with_columns(pl.lit("US").alias("geo_value").cast(pl.Categorical)),
             ]
         )
-        if US_required
+        if national_required
         else state_dat
     )
 

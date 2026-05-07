@@ -135,7 +135,21 @@ def get_nhsn_hrd(
             descending=[False, False, True],
         )
     )
-    # check if we got everything that was created
+
+    if not all_diseases:
+        result_disease = dat.unique("disease").collect().get_column("disease").to_list()
+        missing_diseases = set(disease) - set(result_disease)
+        if missing_diseases:
+            warnings.warn(
+                f"Requested diseases {missing_diseases} not found in results."
+            )
+    if not all_locs:
+        result_loc_abbr = (
+            dat.unique("jurisdiction").collect().get_column("jurisdiction").to_list()
+        )
+        missing_locs = set(loc_abb) - set(result_loc_abbr)
+        if missing_locs:
+            warnings.warn(f"Requested locations {missing_locs} not found in results.")
 
     if not lazy:
         dat = dat.collect()

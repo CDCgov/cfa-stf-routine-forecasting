@@ -138,8 +138,7 @@ def get_nhsn_hrd(
 
     if not all_diseases:
         result_disease = dat.unique("disease").collect().get_column("disease").to_list()
-        missing_diseases = set(disease) - set(result_disease)
-        if missing_diseases:
+        if missing_diseases := set(disease) - set(result_disease):
             warnings.warn(
                 f"Requested diseases {missing_diseases} not found in results."
             )
@@ -147,8 +146,7 @@ def get_nhsn_hrd(
         result_loc_abbr = (
             dat.unique("jurisdiction").collect().get_column("jurisdiction").to_list()
         )
-        missing_locs = set(loc_abb) - set(result_loc_abbr)
-        if missing_locs:
+        if missing_locs := set(loc_abb) - set(result_loc_abbr):
             warnings.warn(f"Requested locations {missing_locs} not found in results.")
 
     if not lazy:
@@ -303,8 +301,7 @@ def get_nssp(
         result_disease = (
             result.unique("disease").collect().get_column("disease").to_list()
         )
-        missing_diseases = set(disease) - set(result_disease)
-        if missing_diseases:
+        if missing_diseases := set(disease) - set(result_disease):
             warnings.warn(
                 f"Requested diseases {missing_diseases} not found in results."
             )
@@ -313,8 +310,7 @@ def get_nssp(
         result_loc_abbr = (
             result.unique("geo_value").collect().get_column("geo_value").to_list()
         )
-        missing_locs = set(loc_abb) - set(result_loc_abbr)
-        if missing_locs:
+        if missing_locs := set(loc_abb) - set(result_loc_abbr):
             warnings.warn(f"Requested locations {missing_locs} not found in results.")
 
     if not lazy:

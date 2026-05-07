@@ -5,7 +5,9 @@ import polars.selectors as cs
 
 
 def ensure_list[T](x: T | Iterable[T]) -> list[T]:
-    if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+    if x is None:
+        return []
+    elif isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
         return list(x)
     else:
         return [x]

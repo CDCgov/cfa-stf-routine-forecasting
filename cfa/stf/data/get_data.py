@@ -79,10 +79,10 @@ def get_nhsn_hrd(
         as_of = dt.date.max
 
     disease = ensure_list(disease)
-    all_diseases = not disease
+    get_all_diseases = not disease
 
     loc_abb = ensure_list(loc_abb)
-    all_locs = not loc_abb
+    get_all_locs = not loc_abb
 
     nhsn_disease_map = {
         "COVID-19": "totalconfc19newadm",
@@ -92,7 +92,7 @@ def get_nhsn_hrd(
 
     disease_valid = (
         list(nhsn_disease_map.keys())
-        if all_diseases
+        if get_all_diseases
         else [x for x in disease if x in nhsn_disease_map.keys()]
     )
 
@@ -101,7 +101,7 @@ def get_nhsn_hrd(
     inv_nhsn_disease_map = {nhsn_disease_map.get(x): x for x in disease_valid}
 
     filters = []
-    if not all_locs:
+    if not get_all_locs:
         filters.append(pl.col("jurisdiction").is_in(loc_abb))
     if start_date:
         filters.append(pl.col("weekendingdate") >= start_date)
@@ -136,13 +136,13 @@ def get_nhsn_hrd(
         )
     )
 
-    if not all_diseases:
+    if not get_all_diseases:
         result_disease = dat.unique("disease").collect().get_column("disease").to_list()
         if missing_diseases := set(disease) - set(result_disease):
             warnings.warn(
                 f"Requested diseases {missing_diseases} not found in results."
             )
-    if not all_locs:
+    if not get_all_locs:
         result_loc_abbr = (
             dat.unique("jurisdiction").collect().get_column("jurisdiction").to_list()
         )
@@ -237,10 +237,10 @@ def get_nssp(
         as_of = dt.date.max
 
     loc_abb = ensure_list(loc_abb)
-    all_locs = not loc_abb
+    get_all_locs = not loc_abb
 
     disease = ensure_list(disease)
-    all_diseases = not disease
+    get_all_diseases = not disease
 
     dataset_map = {
         "gold": datacat.public.stf.nssp_gold_v1,
@@ -252,13 +252,13 @@ def get_nssp(
             f"Invalid dataset: {dataset!r}. Expected one of: {set(dataset_map)!r}."
         )
 
-    national_required = all_locs or "US" in loc_abb
+    national_required = get_all_locs or "US" in loc_abb
 
     filters = [
         pl.col("metric") == "count_ed_visits",
     ]
 
-    if not all_diseases:
+    if not get_all_diseases:
         filters.append(pl.col("disease").is_in(disease))
     if start_date:
         filters.append(pl.col("reference_date") >= start_date)
@@ -276,7 +276,9 @@ def get_nssp(
     )
 
     state_locs = [loc for loc in loc_abb if loc != "US"]
-    state_dat = dat if all_locs else dat.filter(pl.col("geo_value").is_in(state_locs))
+    state_dat = (
+        dat if get_all_locs else dat.filter(pl.col("geo_value").is_in(state_locs))
+    )
 
     combined_dat = (
         pl.concat(
@@ -297,7 +299,7 @@ def get_nssp(
         )
     )
 
-    if not all_diseases:
+    if not get_all_diseases:
         result_disease = (
             result.unique("disease").collect().get_column("disease").to_list()
         )
@@ -306,7 +308,7 @@ def get_nssp(
                 f"Requested diseases {missing_diseases} not found in results."
             )
 
-    if not all_locs:
+    if not get_all_locs:
         result_loc_abbr = (
             result.unique("geo_value").collect().get_column("geo_value").to_list()
         )

@@ -1,4 +1,5 @@
 import datetime as dt
+import warnings
 from collections.abc import Iterable
 from typing import Literal, overload
 
@@ -198,78 +199,57 @@ def get_nssp(
     if as_of is None:
         as_of = dt.date.max
 
-    output = "pl_lazy" if lazy else "pl"
+    loc_abb = ensure_list(loc_abb)
+    all_locs = not loc_abb
+
+    disease = ensure_list(disease)
+    all_diseases = not disease
 
     dataset_map = {
         "gold": datacat.public.stf.nssp_gold_v1,
         "comprehensive": datacat.public.stf.comprehensive_nssp_gold,
     }
 
-    if dataset not in dataset_map:
+    if not (datacat_dataset := dataset_map.get(dataset)):
         raise ValueError(
-            f"Invalid dataset: {dataset!r}. Expected one of: {set(dataset_map)}."
+            f"Invalid dataset: {dataset!r}. Expected one of: {set(dataset_map)!r}."
         )
-    datacat_dataset = dataset_map[dataset]
 
-    dat = datacat_dataset.load.get_dataframe(
-        output=output, version=f"<={as_of.strftime('%Y-%m-%d')}"
-    ).with_columns(
-        pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")
-    )
-
-    valid_locs = (
-        dat.select("geo_value").unique().collect()
-        if lazy
-        else dat.select("geo_value").unique()
-    ).get_column("geo_value").sort().to_list() + ["US"]
-
-    loc_abb = ensure_list(loc_abb) if loc_abb else valid_locs
-
-    US_required = "US" in loc_abb
-    non_US_locs = [loc for loc in loc_abb if loc != "US"]
-
-    invalid_locs = set(non_US_locs) - set(valid_locs)
-    if invalid_locs:
-        raise ValueError(f"Invalid location abbreviation(s): {invalid_locs}")
-
-    valid_diseases = (
-        (
-            dat.select("disease").unique().collect()
-            if lazy
-            else dat.select("disease").unique()
-        )
-        .get_column("disease")
-        .to_list()
-    )
-    disease = ensure_list(disease) if disease else valid_diseases
-
-    invalid_diseases = set(disease) - set(valid_diseases)
-    if invalid_diseases:
-        raise ValueError(f"Invalid disease(s): {invalid_diseases}")
+    US_required = all_locs or "US" in loc_abb
 
     filters = [
-        pl.col("disease").is_in(disease),
         pl.col("metric") == "count_ed_visits",
     ]
 
-    if start_date is not None:
+    if not all_diseases:
+        filters.append(pl.col("disease").is_in(disease))
+    if start_date:
         filters.append(pl.col("reference_date") >= start_date)
-    if end_date is not None:
+    if end_date:
         filters.append(pl.col("reference_date") <= end_date)
 
-    dat = dat.filter(*filters)
+    dat = (
+        datacat_dataset.load.get_dataframe(
+            output="lazy", version=f"<={as_of.strftime('%Y-%m-%d')}"
+        )
+        .with_columns(
+            pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")
+        )
+        .filter(*filters)
+    )
 
-    non_US_dat = dat.filter(pl.col("geo_value").is_in(non_US_locs))
+    state_locs = [loc for loc in loc_abb if loc != "US"]
+    state_dat = dat if all_locs else dat.filter(pl.col("geo_value").is_in(state_locs))
 
     combined_dat = (
         pl.concat(
             [
-                non_US_dat,
+                state_dat,
                 dat.with_columns(pl.lit("US").alias("geo_value").cast(pl.Categorical)),
             ]
         )
         if US_required
-        else non_US_dat
+        else state_dat
     )
 
     result = (
@@ -280,4 +260,24 @@ def get_nssp(
         )
     )
 
+    if not all_diseases:
+        result_disease = (
+            result.unique("disease").collect().get_column("disease").to_list()
+        )
+        missing_diseases = set(disease) - set(result_disease)
+        if missing_diseases:
+            warnings.warn(
+                f"Requested diseases {missing_diseases} not found in results."
+            )
+
+    if not all_locs:
+        result_loc_abbr = (
+            result.unique("geo_value").collect().get_column("geo_value").to_list()
+        )
+        missing_locs = set(loc_abb) - set(result_loc_abbr)
+        if missing_locs:
+            warnings.warn(f"Requested locations {missing_locs} not found in results.")
+
+    if not lazy:
+        result = result.collect()
     return result

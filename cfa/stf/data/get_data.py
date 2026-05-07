@@ -8,12 +8,6 @@ from cfa.dataops import datacat
 
 from cfa.stf.forecasttools import ensure_list
 
-nhsn_disease_map = {
-    "COVID-19": "totalconfc19newadm",
-    "Influenza": "totalconfflunewadm",
-    "RSV": "totalconfrsvnewadm",
-}
-
 NSSPDataset = Literal["gold", "comprehensive"]
 
 
@@ -81,40 +75,71 @@ def get_nhsn_hrd(
         Filtered data with columns:
         `weekendingdate`, `jurisdiction`, and `hospital_admissions`.
     """
-    if as_of is None:
+    if not as_of:
         as_of = dt.date.max
 
-    disease = ensure_list(disease) if disease else list(nhsn_disease_map.keys())
+    disease = ensure_list(disease)
+    all_diseases = not disease
 
-    disease_col = [nhsn_disease_map[x] for x in disease]
-    loc_abb = ensure_list(loc_abb) if loc_abb else None
+    loc_abb = ensure_list(loc_abb)
+    all_locs = not loc_abb
+
+    nhsn_disease_map = {
+        "COVID-19": "totalconfc19newadm",
+        "Influenza": "totalconfflunewadm",
+        "RSV": "totalconfrsvnewadm",
+    }
+
+    disease_valid = (
+        list(nhsn_disease_map.keys())
+        if all_diseases
+        else [x for x in disease if x in nhsn_disease_map.keys()]
+    )
+
+    raw_disease_col = [nhsn_disease_map.get(x) for x in disease_valid]
+
+    inv_nhsn_disease_map = {nhsn_disease_map.get(x): x for x in disease_valid}
 
     filters = []
-    if loc_abb is not None:
+    if not all_locs:
         filters.append(pl.col("jurisdiction").is_in(loc_abb))
-    if start_date is not None:
+    if start_date:
         filters.append(pl.col("weekendingdate") >= start_date)
-    if end_date is not None:
+    if end_date:
         filters.append(pl.col("weekendingdate") <= end_date)
 
     datacat_dataset = (
         datacat.public.stf.nhsn_hrd_prelim if prelim else datacat.public.stf.nhsn_hrd
     )
 
-    output = "pl_lazy" if lazy else "pl"
-    dat = datacat_dataset.load.get_dataframe(
-        output=output, version=f"<={as_of.strftime('%Y-%m-%d')}"
-    )
-
-    filtered_dat = (
-        dat.with_columns(pl.col("jurisdiction").cast(pl.String).replace("USA", "US"))
+    dat = (
+        datacat_dataset.load.get_dataframe(
+            output="lazy", version=f"<={as_of.strftime('%Y-%m-%d')}"
+        )
+        .select(raw_disease_col + ["weekendingdate", "jurisdiction"])
+        .with_columns(
+            pl.col("jurisdiction").replace_strict(
+                {"USA": "US"}, default=pl.col("jurisdiction")
+            )
+        )
         .filter(*filters)
-        .select(disease_col + ["weekendingdate", "jurisdiction"])
+        .rename(inv_nhsn_disease_map)
+        .unpivot(
+            on=disease_valid,
+            index=["weekendingdate", "jurisdiction"],
+            variable_name="disease",
+            value_name="hospital_admissions",
+        )
+        .sort(
+            ["jurisdiction", "disease", "weekendingdate"],
+            descending=[False, False, True],
+        )
     )
-    # need to pivot and add a new column for disease name
+    # check if we got everything that was created
 
-    # .alias("hospital_admissions")
-    return filtered_dat
+    if not lazy:
+        dat = dat.collect()
+    return dat
 
 
 @overload

@@ -465,6 +465,12 @@ def _fuse_pyrenew_timeseries(
 #     use_user_code_server=True,  # allows for custom automation conditions
 # )
 
+weekly_forecast_h_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyForecastFusion",
+    target=dg.AssetSelection.groups("WeeklyForecastH"),
+    use_user_code_server=False,  # does NOT allow custom conditions
+)
+
 weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastFusion",
     target=dg.AssetSelection.groups("WeeklyForecastFusion"),
@@ -587,6 +593,7 @@ if not is_production:
 # Timeseries E
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
+        group_name="WeeklyForecastE", # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -596,6 +603,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
+        group_name="WeeklyForecastE", # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -607,6 +615,7 @@ def epiweekly_timeseries_e(
 # Pyrenew E
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
+        group_name="WeeklyForecastE", # This will override what's in the asset args for now
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -621,6 +630,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
+    group_name="WeeklyForecastH", # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -632,6 +642,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 # Pyrenew HE
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
+    group_name="WeeklyForecastH", # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },

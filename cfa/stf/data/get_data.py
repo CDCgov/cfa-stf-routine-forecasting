@@ -114,7 +114,7 @@ def get_nhsn_hrd(
 
     dat = (
         datacat_dataset.load.get_dataframe(
-            output="lazy", version=f"<={as_of.strftime('%Y-%m-%d')}"
+            output="pl_lazy", version=f"<={as_of.strftime('%Y-%m-%d')}"
         )
         .select(raw_disease_col + ["weekendingdate", "jurisdiction"])
         .with_columns(
@@ -267,7 +267,7 @@ def get_nssp(
 
     dat = (
         datacat_dataset.load.get_dataframe(
-            output="lazy", version=f"<={as_of.strftime('%Y-%m-%d')}"
+            output="pl_lazy", version=f"<={as_of.strftime('%Y-%m-%d')}"
         )
         .with_columns(
             pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")

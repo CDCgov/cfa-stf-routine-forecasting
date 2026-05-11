@@ -220,13 +220,7 @@ def get_nssp(
     -------
     pl.DataFrame | pl.LazyFrame
         Aggregated ED counts with columns:
-        `reference_date`, `disease`, and `value`.
-
-    Raises
-    ------
-    ValueError
-        If the specified dataset is invalid or the specified location
-        abbreviation is not found in the data.
+        `reference_date`, `disease`, `geo_value`, and `value`.
 
     Notes
     -----

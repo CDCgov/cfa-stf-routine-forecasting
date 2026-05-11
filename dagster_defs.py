@@ -516,10 +516,11 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=False,  # does NOT allow custom conditions
 )
 
+
 # Temporary workaround schedule while we debug the custom automation condition
 @dg.schedule(
-    target = dg.AssetSelection.assets(
-        "timeseries_e", 'epiweekly_timeseries_e', "pyrenew_e"
+    target=dg.AssetSelection.assets(
+        "timeseries_e", "epiweekly_timeseries_e", "pyrenew_e"
     ),
     cron_schedule="30 6 * * MON,TUE,WED",  # 6:30am on Wednesday (day 3)
     execution_timezone="America/New_York",
@@ -536,8 +537,9 @@ def weekly_forecast_e_schedule(context: dg.ScheduleEvaluationContext):
                 "pyrenew_e": PyrenewEConfig(),
             },
             execution=azure_batch_execution_config.to_run_config(),
-        )
+        ),
     )
+
 
 # ---------- Shared Asset Decorator Arguments ----------
 
@@ -598,7 +600,7 @@ if not is_production:
 @dynamic_graph_asset(
     # **weekly_forecast_upstream_asset_args,
     **weekly_forecast_base_asset_args,
-    group_name="WeeklyForecastE", # This will override what's in the asset args for now
+    group_name="WeeklyForecastE",  # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -609,7 +611,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 @dynamic_graph_asset(
     # **weekly_forecast_upstream_asset_args,
     **weekly_forecast_base_asset_args,
-    group_name="WeeklyForecastE", # This will override what's in the asset args for now
+    group_name="WeeklyForecastE",  # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -622,7 +624,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     # **weekly_forecast_upstream_asset_args,
     **weekly_forecast_base_asset_args,
-    group_name="WeeklyForecastE", # This will override what's in the asset args for now
+    group_name="WeeklyForecastE",  # This will override what's in the asset args for now
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -638,8 +640,8 @@ def pyrenew_e(
 @dynamic_graph_asset(
     # **weekly_forecast_upstream_asset_args,
     **weekly_forecast_base_asset_args,
-    automation_condition=dg.AutomationCondition.eager(), # H assets can be eager, inheriting their schedule from dataops
-    group_name="WeeklyForecastH", # This will override what's in the asset args for now
+    automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
+    group_name="WeeklyForecastH",  # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -652,8 +654,8 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 @dynamic_graph_asset(
     # **weekly_forecast_upstream_asset_args,
     **weekly_forecast_base_asset_args,
-    automation_condition=dg.AutomationCondition.eager(), # H assets can be eager, inheriting their schedule from dataops
-    group_name="WeeklyForecastH", # This will override what's in the asset args for now
+    automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
+    group_name="WeeklyForecastH",  # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },

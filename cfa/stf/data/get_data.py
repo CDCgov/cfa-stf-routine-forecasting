@@ -72,8 +72,8 @@ def get_nhsn_hrd(
     Returns
     -------
     pl.DataFrame | pl.LazyFrame
-        Filtered data with columns:
-        `weekendingdate`, `jurisdiction`, and `hospital_admissions`.
+        Filtered data in long format with columns:
+        `weekendingdate`, `jurisdiction`, `disease`, and `hospital_admissions`.
     """
     if not as_of:
         as_of = dt.date.max

@@ -459,6 +459,45 @@ def _fuse_pyrenew_timeseries(
 # SCHEDULES AND AUTOMATION CONDITION SENSORS
 # ============================================================================
 
+# Custom Automation Condition. Relies on use_user_code_server=True on the sensor
+# class IsWeekday(dg.AutomationCondition):
+#     def __init__(self, weekday: int):
+#         """
+#         Check if evaluation time falls on a specific weekday.
+#         This is is a simple evaluation, rather than a stateful operation,
+#         such as with cron_tick_passed().
+
+#         Args:
+#             weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday,
+#                     4=Friday, 5=Saturday, 6=Sunday
+#         """
+#         self.weekday = weekday
+#         super().__init__()
+
+#     def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
+#         # If the current weekday is equal to the desired weekday,
+#         # return the candidate_subset -> a dagster context's "true" case
+#         if context.evaluation_time.weekday() == self.weekday:
+#             true_subset = context.candidate_subset
+#         else:
+#             true_subset = context.get_empty_subset()
+
+#         return dg.AutomationResult(context=context, true_subset=true_subset)
+
+#     @property
+#     def name(self) -> str:
+#         """Define the label that will appear in the UI"""
+#         days = [
+#             "Monday",
+#             "Tuesday",
+#             "Wednesday",
+#             "Thursday",
+#             "Friday",
+#             "Saturday",
+#             "Sunday",
+#         ]
+#         return f"is_{days[self.weekday].lower()}"
+
 # weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
 #     name="WeeklyForecastUpstream",
 #     target=dg.AssetSelection.groups("WeeklyForecastUpstream"),
@@ -466,7 +505,7 @@ def _fuse_pyrenew_timeseries(
 # )
 
 weekly_forecast_h_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastFusion",
+    name="WeeklyForecastH",
     target=dg.AssetSelection.groups("WeeklyForecastH"),
     use_user_code_server=False,  # does NOT allow custom conditions
 )
@@ -477,46 +516,7 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=False,  # does NOT allow custom conditions
 )
 
-
-# Custom Automation Condition. Relies on use_user_code_server=True on the sensor
-class IsWeekday(dg.AutomationCondition):
-    def __init__(self, weekday: int):
-        """
-        Check if evaluation time falls on a specific weekday.
-        This is is a simple evaluation, rather than a stateful operation,
-        such as with cron_tick_passed().
-
-        Args:
-            weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday,
-                    4=Friday, 5=Saturday, 6=Sunday
-        """
-        self.weekday = weekday
-        super().__init__()
-
-    def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
-        # If the current weekday is equal to the desired weekday,
-        # return the candidate_subset -> a dagster context's "true" case
-        if context.evaluation_time.weekday() == self.weekday:
-            true_subset = context.candidate_subset
-        else:
-            true_subset = context.get_empty_subset()
-
-        return dg.AutomationResult(context=context, true_subset=true_subset)
-
-    @property
-    def name(self) -> str:
-        """Define the label that will appear in the UI"""
-        days = [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-        ]
-        return f"is_{days[self.weekday].lower()}"
-
+# Temporary workaround schedule while we debug the custom automation condition
 @dg.schedule(
     target = dg.AssetSelection.assets(
         "timeseries_e", 'epiweekly_timeseries_e', "pyrenew_e"
@@ -528,7 +528,6 @@ def weekly_forecast_e_schedule(context: dg.ScheduleEvaluationContext):
     _partition_key = daily_partitions_def.get_last_partition_key()
     context.log.info(f"Submitting job request for partition: {_partition_key}")
     return dg.RunRequest(
-        # asset_selection = dg.AssetSelection.groups("WeeklyForecastUpstream").to_selection_str(),
         partition_key=_partition_key,
         run_config=dg.RunConfig(
             ops={
@@ -546,20 +545,25 @@ def weekly_forecast_e_schedule(context: dg.ScheduleEvaluationContext):
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
 
-weekly_forecast_upstream_asset_args = {
+weekly_forecast_base_asset_args = {
     "partitions_def": daily_partitions_def,
     "graph_dimensions": ["diseases", "locations"],
-    "group_name": "WeeklyForecastUpstream",
-    "automation_condition": (
-        # We specifically don't want these to run unless it's Wednesday
-        # 0=monday,1=tuesday,2=wednesday,etc.
-        # Note this is different from cron which is 1-indexed
-        dg.AutomationCondition.eager() & IsWeekday(2)
-    ).with_label("eager_on_wednesday"),
 }
 
+# weekly_forecast_upstream_asset_args = {
+#     "partitions_def": daily_partitions_def,
+#     "graph_dimensions": ["diseases", "locations"],
+#     "group_name": "WeeklyForecastUpstream",
+#     "automation_condition": (
+#         # We specifically don't want these to run unless it's Wednesday
+#         # 0=monday,1=tuesday,2=wednesday,etc.
+#         # Note this is different from cron which is 1-indexed
+#         dg.AutomationCondition.eager() & IsWeekday(2)
+#     ).with_label("eager_on_wednesday"),
+# }
+
 weekly_forecast_fusion_asset_args = {
-    **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_base_asset_args,
     "group_name": "WeeklyForecastFusion",
     # we want vanilla eager for the fusion assets and post-processing
     "automation_condition": dg.AutomationCondition.eager(),
@@ -592,8 +596,9 @@ if not is_production:
 
 # Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
-        group_name="WeeklyForecastE", # This will override what's in the asset args for now
+    # **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_base_asset_args,
+    group_name="WeeklyForecastE", # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -602,8 +607,9 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
-        group_name="WeeklyForecastE", # This will override what's in the asset args for now
+    # **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_base_asset_args,
+    group_name="WeeklyForecastE", # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -614,8 +620,9 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
-        group_name="WeeklyForecastE", # This will override what's in the asset args for now
+    # **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_base_asset_args,
+    group_name="WeeklyForecastE", # This will override what's in the asset args for now
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -629,7 +636,9 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    # **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_base_asset_args,
+    automation_condition=dg.AutomationCondition.eager(), # H assets can be eager, inheriting their schedule from dataops
     group_name="WeeklyForecastH", # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -641,7 +650,9 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    # **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_base_asset_args,
+    automation_condition=dg.AutomationCondition.eager(), # H assets can be eager, inheriting their schedule from dataops
     group_name="WeeklyForecastH", # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),

@@ -43,7 +43,6 @@ allow-direct-references = true
 [dependency-groups]
 dev = [
   {include-group = "test"},
-  "dagster-webserver>=1.13.4",
   "ipykernel",
   "ipywidgets",
   "jupyter>=1.0.0",

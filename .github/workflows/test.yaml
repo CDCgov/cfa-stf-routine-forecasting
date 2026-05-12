@@ -29,6 +29,7 @@ jobs:
           XLA_FLAGS: --xla_force_host_platform_device_count=2
         run: |
           uv run pytest \
+            --ignore=pipelines/tests/test_epiautogp_parquet_interop.py \
             --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml .
 
       - name: Upload results to Codecov
@@ -95,6 +96,8 @@ jobs:
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v3
+        with:
+          version: "1.11"
 
       - name: Run tests
         uses: julia-actions/julia-runtest@v1
@@ -116,3 +119,13 @@ jobs:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+
+      - name: Set up R with hewr
+        uses: ./.github/actions/setup-hewr
+
+      - name: Set up Pyrenew-HEW via UV
+        uses: ./.github/actions/setup-pyrenew-hew
+
+      - name: Run EpiAutoGP parquet interop test
+        run: |
+          uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q

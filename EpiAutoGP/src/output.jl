@@ -117,6 +117,24 @@ function create_forecast_df(results::NamedTuple, output_type::PipelineOutput)
     return forecast_df
 end
 
+function _quote_duckdb_string(value::AbstractString)
+    return "'" * replace(value, "'" => "''") * "'"
+end
+
+function _write_parquet_with_duckdb(path::AbstractString, table)
+    con = DBInterface.connect(DuckDB.DB, ":memory:")
+    return try
+        DuckDB.register_data_frame(con, table, "forecast_samples")
+        DBInterface.execute(
+            con,
+            "COPY forecast_samples TO $(_quote_duckdb_string(path)) (FORMAT parquet)"
+        )
+    finally
+        DBInterface.close(con)
+    end
+end
+
+
 """
     create_forecast_output(input, results, output_dir, output_type; kwargs...) -> DataFrame
 
@@ -219,7 +237,7 @@ function create_forecast_output(
         Dict(
             "observed" => "observed_ed_visits",
             "other" => "other_ed_visits",
-            "pct" => "prop_disease_ed_visits",
+            "pct" => "prop_disease_ed_visits"
         )[input.ed_visit_type]
     end
 
@@ -236,21 +254,11 @@ function create_forecast_output(
     forecast_df[!, :geo_value] .= input.location
     forecast_df[!, :disease] .= input.pathogen
 
-    # Add metadata columns for hubverse compatibility
-    forecast_df[!, :geo_value] .= input.location
-    forecast_df[!, :disease] .= input.pathogen
-
-    # Convert date column to string for parquet compatibility
-    # Julia parquet does not support writing Dates
-    forecast_df[!, :date] = string.(forecast_df[!, :date])
-
     # Save as parquet if requested
     if save_output
-        # Use model-specific naming with frequency prefix
-        # This matches the convention: {frequency}_{model}_samples_{target_letter}.parquet
-        parquet_path = joinpath(output_dir, "samples_raw.parquet")
+        parquet_path = joinpath(output_dir, "samples.parquet")
         mkpath(dirname(parquet_path))
-        Parquet.write_parquet(parquet_path, forecast_df)
+        _write_parquet_with_duckdb(parquet_path, forecast_df)
 
         @info "Saved pipeline forecast samples to $parquet_path"
     end

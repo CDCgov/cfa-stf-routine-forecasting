@@ -887,7 +887,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "cfa-dagster", extras = ["dev"], git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
-    { name = "dagster-webserver", specifier = "==1.13.4" },
+    { name = "dagster-webserver", specifier = ">=1.13.4" },
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyter", specifier = ">=1.0.0" },

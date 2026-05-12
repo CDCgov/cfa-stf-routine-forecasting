@@ -522,7 +522,7 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     target=dg.AssetSelection.assets(
         "timeseries_e", "epiweekly_timeseries_e", "pyrenew_e"
     ),
-    cron_schedule="30 6 * * MON,TUE,WED",  # 6:30am on Wednesday (day 3)
+    cron_schedule="30 6 * * WED",  # 6:30am on Wednesday (day 3)
     execution_timezone="America/New_York",
 )
 def weekly_forecast_e_schedule(context: dg.ScheduleEvaluationContext):
@@ -553,8 +553,7 @@ weekly_forecast_base_asset_args = {
 }
 
 # weekly_forecast_upstream_asset_args = {
-#     "partitions_def": daily_partitions_def,
-#     "graph_dimensions": ["diseases", "locations"],
+#     **weekly_forecast_base_asset_args,
 #     "group_name": "WeeklyForecastUpstream",
 #     "automation_condition": (
 #         # We specifically don't want these to run unless it's Wednesday
@@ -567,7 +566,7 @@ weekly_forecast_base_asset_args = {
 weekly_forecast_fusion_asset_args = {
     **weekly_forecast_base_asset_args,
     "group_name": "WeeklyForecastFusion",
-    # we want vanilla eager for the fusion assets and post-processing
+    # we want vanilla eager for the fusion assets
     "automation_condition": dg.AutomationCondition.eager(),
 }
 

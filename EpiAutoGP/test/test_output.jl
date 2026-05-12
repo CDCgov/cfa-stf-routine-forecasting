@@ -114,23 +114,27 @@ end
                 Symbol(".variable"),
                 :resolution,
                 :geo_value,
-                :disease
+                :disease,
             ]
 
             con = DBInterface.connect(DuckDB.DB, ":memory:")
             try
-                read_df = DataFrame(DBInterface.execute(
-                    con,
-                    "SELECT * FROM read_parquet($(EpiAutoGP._quote_duckdb_string(parquet_path)))"
-                ))
+                read_df = DataFrame(
+                    DBInterface.execute(
+                        con,
+                        "SELECT * FROM read_parquet($(EpiAutoGP._quote_duckdb_string(parquet_path)))"
+                    )
+                )
 
                 @test eltype(read_df.date) == Date
                 @test propertynames(read_df) == propertynames(result_df)
                 @test read_df.date == forecast_dates[[1, 2, 1, 2]]
                 @test read_df[!, Symbol(".draw")] == [1, 1, 2, 2]
                 @test read_df[!, Symbol(".value")] == [10.0, 20.0, 30.0, 40.0]
-                @test all(read_df[!, Symbol(".variable")] .==
-                          "observed_hospital_admissions")
+                @test all(
+                    read_df[!, Symbol(".variable")] .==
+                        "observed_hospital_admissions"
+                )
                 @test all(read_df.resolution .== "epiweekly")
                 @test all(read_df.geo_value .== "CA")
                 @test all(read_df.disease .== "COVID-19")

@@ -61,7 +61,7 @@ ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 # Sync all python dependencies (excluding the local project itself)
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-install-project
+    uv sync --no-install-project --no-dev
 
 #
 # Copy in python pipeline and orchestration files that frequently change
@@ -74,7 +74,7 @@ COPY README.md ./README.md
 
 # Install the local project now that pipelines / sources are present
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync
+    uv sync --no-dev
 
 # Dagster
 COPY dagster_defs.py ./dagster_defs.py

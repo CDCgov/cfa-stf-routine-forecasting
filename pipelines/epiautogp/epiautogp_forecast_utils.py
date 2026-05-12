@@ -24,18 +24,7 @@ from pipelines.utils.common_utils import (
     load_credentials,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
-    run_r_script,
 )
-
-
-def create_samples_from_epiautogp_fit_dir(model_fit_dir: Path) -> None:
-    """Create samples.parquet from an EpiAutoGP model fit directory using R."""
-    run_r_script(
-        "pipelines/epiautogp/create_samples_from_epiautogp_fit_dir.R",
-        [str(model_fit_dir)],
-        function_name="create_samples_from_epiautogp_fit_dir",
-    )
-    return None
 
 
 @dataclass
@@ -149,8 +138,6 @@ class ForecastPipelineContext:
         """
         self.logger.info("Processing forecast and generating plots...")
         model_fit_dir = Path(self.model_run_dir, self.model_name)
-
-        create_samples_from_epiautogp_fit_dir(model_fit_dir=model_fit_dir)
 
         make_figures_from_model_fit_dir(
             model_fit_dir=model_fit_dir,

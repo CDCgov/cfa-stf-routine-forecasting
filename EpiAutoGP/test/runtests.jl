@@ -2,6 +2,8 @@ using Test, EpiAutoGP
 using JSON3
 using ArgParse
 using Dates
+using DBInterface
+using DuckDB
 using CSV
 using DataFramesMeta
 using Random

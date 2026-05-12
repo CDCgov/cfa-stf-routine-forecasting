@@ -78,4 +78,71 @@ end
             rm(tmpdir, recursive = true)
         end
     end
+
+    @testset "PipelineOutput writes samples parquet with Date column" begin
+        input = EpiAutoGPInput(
+            [Date("2024-01-01")],
+            [100.0],
+            "COVID-19",
+            "CA",
+            "nhsn",
+            "epiweekly",
+            "observed",
+            Date("2024-01-01"),
+            Date[],
+            Vector{Real}[]
+        )
+
+        forecast_dates = [Date("2024-01-08"), Date("2024-01-15")]
+        forecasts = reshape([10.0, 20.0, 30.0, 40.0], 2, 2)
+        results = (forecast_dates = forecast_dates, forecasts = forecasts)
+
+        tmpdir = mktempdir()
+        try
+            result_df = create_forecast_output(
+                input, results, tmpdir, PipelineOutput();
+                save_output = true
+            )
+
+            parquet_path = joinpath(tmpdir, "samples.parquet")
+            @test isfile(parquet_path)
+            @test eltype(result_df.date) == Date
+            @test propertynames(result_df) == [
+                :date,
+                Symbol(".value"),
+                Symbol(".draw"),
+                Symbol(".variable"),
+                :resolution,
+                :geo_value,
+                :disease,
+            ]
+
+            con = DBInterface.connect(DuckDB.DB, ":memory:")
+            try
+                read_df = DataFrame(
+                    DBInterface.execute(
+                        con,
+                        "SELECT * FROM read_parquet($(EpiAutoGP._quote_duckdb_string(parquet_path)))"
+                    )
+                )
+
+                @test eltype(read_df.date) == Date
+                @test propertynames(read_df) == propertynames(result_df)
+                @test read_df.date == forecast_dates[[1, 2, 1, 2]]
+                @test read_df[!, Symbol(".draw")] == [1, 1, 2, 2]
+                @test read_df[!, Symbol(".value")] == [10.0, 20.0, 30.0, 40.0]
+                @test all(
+                    read_df[!, Symbol(".variable")] .==
+                        "observed_hospital_admissions"
+                )
+                @test all(read_df.resolution .== "epiweekly")
+                @test all(read_df.geo_value .== "CA")
+                @test all(read_df.disease .== "COVID-19")
+            finally
+                DBInterface.close(con)
+            end
+        finally
+            rm(tmpdir, recursive = true)
+        end
+    end
 end

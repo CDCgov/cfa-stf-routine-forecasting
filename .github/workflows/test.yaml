@@ -126,6 +126,10 @@ jobs:
       - name: Set up Pyrenew-HEW via UV
         uses: ./.github/actions/setup-pyrenew-hew
 
+      - name: Instantiate EpiAutoGP Julia project
+        run: |
+          julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+
       - name: Run EpiAutoGP parquet interop test
         run: |
           uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q

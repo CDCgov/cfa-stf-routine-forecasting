@@ -1,5 +1,5 @@
 {
-  "julia": "1.10",
+  "julia": "1.11",
   "packages": {
     "NowcastAutoGP": {
       "uuid": "7e9f7f4b-f590-4c14-8324-de4fcbed18f7",

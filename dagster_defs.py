@@ -460,49 +460,49 @@ def _fuse_pyrenew_timeseries(
 # ============================================================================
 
 # Custom Automation Condition. Relies on use_user_code_server=True on the sensor
-# class IsWeekday(dg.AutomationCondition):
-#     def __init__(self, weekday: int):
-#         """
-#         Check if evaluation time falls on a specific weekday.
-#         This is is a simple evaluation, rather than a stateful operation,
-#         such as with cron_tick_passed().
+class IsWeekday(dg.AutomationCondition):
+    def __init__(self, weekday: int):
+        """
+        Check if evaluation time falls on a specific weekday.
+        This is is a simple evaluation, rather than a stateful operation,
+        such as with cron_tick_passed().
 
-#         Args:
-#             weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday,
-#                     4=Friday, 5=Saturday, 6=Sunday
-#         """
-#         self.weekday = weekday
-#         super().__init__()
+        Args:
+            weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday,
+                    4=Friday, 5=Saturday, 6=Sunday
+        """
+        self.weekday = weekday
+        super().__init__()
 
-#     def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
-#         # If the current weekday is equal to the desired weekday,
-#         # return the candidate_subset -> a dagster context's "true" case
-#         if context.evaluation_time.weekday() == self.weekday:
-#             true_subset = context.candidate_subset
-#         else:
-#             true_subset = context.get_empty_subset()
+    def evaluate(self, context: dg.AutomationContext) -> dg.AutomationResult:
+        # If the current weekday is equal to the desired weekday,
+        # return the candidate_subset -> a dagster context's "true" case
+        if context.evaluation_time.weekday() == self.weekday:
+            true_subset = context.candidate_subset
+        else:
+            true_subset = context.get_empty_subset()
 
-#         return dg.AutomationResult(context=context, true_subset=true_subset)
+        return dg.AutomationResult(context=context, true_subset=true_subset)
 
-#     @property
-#     def name(self) -> str:
-#         """Define the label that will appear in the UI"""
-#         days = [
-#             "Monday",
-#             "Tuesday",
-#             "Wednesday",
-#             "Thursday",
-#             "Friday",
-#             "Saturday",
-#             "Sunday",
-#         ]
-#         return f"is_{days[self.weekday].lower()}"
+    @property
+    def name(self) -> str:
+        """Define the label that will appear in the UI"""
+        days = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
+        return f"is_{days[self.weekday].lower()}"
 
-# weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
-#     name="WeeklyForecastUpstream",
-#     target=dg.AssetSelection.groups("WeeklyForecastUpstream"),
-#     use_user_code_server=True,  # allows for custom automation conditions
-# )
+weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyForecastUpstream",
+    target=dg.AssetSelection.groups("WeeklyForecastUpstream"),
+    use_user_code_server=True,  # allows for custom automation conditions
+)
 
 weekly_forecast_h_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastH",

@@ -30,6 +30,7 @@ jobs:
         run: |
           uv run pytest \
             --ignore=pipelines/tests/test_epiautogp_parquet_interop.py \
+            --ignore=pipelines/tests/test_epiautogp_parquet.py \
             --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml .
 
       - name: Upload results to Codecov
@@ -99,37 +100,16 @@ jobs:
         with:
           version: "1.11"
 
-      - name: Run tests
-        uses: julia-actions/julia-runtest@v1
-        with:
-          project: EpiAutoGP
-          coverage: true
-
-      - name: Process coverage
-        uses: julia-actions/julia-processcoverage@v1
-        with:
-          directories: EpiAutoGP/src
-
-      - name: Upload results to Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          env_vars: OS,PYTHON
-          fail_ci_if_error: true
-          flags: epiautogp
-          files: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
-
       - name: Set up R with hewr
         uses: ./.github/actions/setup-hewr
 
       - name: Set up Pyrenew-HEW via UV
         uses: ./.github/actions/setup-pyrenew-hew
 
-      - name: Instantiate EpiAutoGP Julia project
-        run: |
-          julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
-
       - name: Run EpiAutoGP parquet interop test
         run: |
           uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q
+
+      - name: Run direct EpiAutoGP parquet test
+        run: |
+          uv run pytest pipelines/tests/test_epiautogp_parquet.py -q

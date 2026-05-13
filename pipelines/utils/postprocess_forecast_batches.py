@@ -25,6 +25,8 @@ def _hubverse_table_filename(report_date: str | dt.date, disease: str) -> str:
     return f"{report_date}-{disease.lower()}-hubverse-table.parquet"
 
 
+# Batch collation assumes producer schemas already match. Type drift such as an
+# output_type_id integer/float mismatch should be fixed in the model output.
 def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
     model_batch_dir_path = Path(model_batch_dir_path)
     model_batch_dir_name = model_batch_dir_path.name

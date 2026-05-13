@@ -107,6 +107,7 @@ end
             parquet_path = joinpath(tmpdir, "samples.parquet")
             @test isfile(parquet_path)
             @test eltype(result_df.date) == Date
+            @test eltype(result_df[!, Symbol(".draw")]) == Int32
             @test propertynames(result_df) == [
                 :date,
                 Symbol(".value"),
@@ -127,6 +128,7 @@ end
                 )
 
                 @test eltype(read_df.date) == Date
+                @test eltype(read_df[!, Symbol(".draw")]) <: Integer
                 @test propertynames(read_df) == propertynames(result_df)
                 @test read_df.date == forecast_dates[[1, 2, 1, 2]]
                 @test read_df[!, Symbol(".draw")] == [1, 1, 2, 2]

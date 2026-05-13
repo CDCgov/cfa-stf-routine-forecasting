@@ -89,7 +89,7 @@ jobs:
           path: ${{ runner.temp }}/package
 
   epiautogp-test:
-    name: Run EpiAutoGP tests and collect coverage
+    name: Run EpiAutoGP runner output tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

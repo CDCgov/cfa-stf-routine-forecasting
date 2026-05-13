@@ -8,13 +8,13 @@ draw IDs as floats while the rest wrote integer sample identifiers.
 Those draw IDs are `.draw` in `samples.parquet`; the hubverse conversion renames
 them to `output_type_id`, which is where the CI failure surfaced.
 
-The fixtures intentionally do not run full forecasting models. Instead, they
-build tiny but realistic model-fit directories for each producer family:
-EpiAutoGP samples from Julia, fable-style samples from R, and PyRenew-style
-posterior predictive output from Python that is converted by the real PyRenew R
-sample conversion script. The final test then runs the same hubverse conversion
-and batch combine functions used by CI so producer schema drift is caught before
-postprocessing reaches the expensive end-to-end workflow.
+The fixtures build tiny but realistic model-fit directories for each producer
+family: EpiAutoGP samples from the direct NowcastAutoGP Julia runner,
+fable-style samples from R, and PyRenew-style posterior predictive output from
+Python that is converted by the real PyRenew R sample conversion script. The
+final test then runs the same hubverse conversion and batch combine functions
+used by CI so producer schema drift is caught before postprocessing reaches the
+expensive end-to-end workflow.
 """
 
 import datetime as dt
@@ -30,18 +30,17 @@ import pytest
 
 from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
-    run_julia_code,
+    run_julia_script,
     run_r_code,
     run_r_script,
 )
 from pipelines.utils.postprocess_forecast_batches import combine_hubverse_tables
 
-EXPECTED_DATES = [
+FORECAST_DATES = [
     dt.date(2024, 2, 4),
-    dt.date(2024, 2, 10),
-    dt.date(2024, 2, 4),
-    dt.date(2024, 2, 10),
+    dt.date(2024, 2, 5),
 ]
+EXPECTED_DATES = FORECAST_DATES * 2
 EXPECTED_DRAWS = [1, 1, 2, 2]
 
 
@@ -74,62 +73,50 @@ def _skip_if_r_packages_missing(*packages: str) -> None:
         pytest.skip(f"R packages are not available: {exc}")
 
 
+def _write_epiautogp_input(path: Path) -> None:
+    start_date = dt.date(2024, 1, 1)
+    dates = [start_date + dt.timedelta(days=i) for i in range(36)]
+    reports = [12.0 + (i % 7) * 0.4 + i * 0.05 for i in range(len(dates))]
+    input_data = {
+        "dates": [date.isoformat() for date in dates],
+        "reports": reports,
+        "pathogen": "COVID-19",
+        "location": "US",
+        "target": "nssp",
+        "frequency": "daily",
+        "ed_visit_type": "pct",
+        "forecast_date": FORECAST_DATES[0].isoformat(),
+        "nowcast_dates": [],
+        "nowcast_reports": [],
+    }
+    path.write_text(json.dumps(input_data), encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]:
     tmp_dir = tmp_path_factory.mktemp("epiautogp-parquet-interop")
     try:
         batch_dir = tmp_dir / "covid-19_r_2024-02-03_f_2024-01-01_t_2024-02-01"
-        model_fit_dir = batch_dir / "model_runs" / "US" / "epiautogp_nhsn_epiweekly"
-        forecast_dates = list(dict.fromkeys(EXPECTED_DATES))
-        assert len(EXPECTED_DATES) % len(forecast_dates) == 0
-        draw_count = len(EXPECTED_DATES) // len(forecast_dates)
-        assert EXPECTED_DATES == forecast_dates * draw_count
+        model_fit_dir = batch_dir / "model_runs" / "US" / "epiautogp_nssp_daily_pct"
+        input_path = tmp_dir / "epiautogp-input.json"
+        _write_epiautogp_input(input_path)
 
-        forecast_dates_julia = ", ".join(
-            f'Date("{forecast_date.isoformat()}")' for forecast_date in forecast_dates
-        )
-        forecasts_julia = "; ".join(
-            " ".join(
-                str(float(100 * (date_index + 1) + draw_index + 1))
-                for draw_index in range(draw_count)
-            )
-            for date_index in range(len(forecast_dates))
-        )
-        julia_code = textwrap.dedent(
-            f"""
-            using Dates
-            using EpiAutoGP
-
-            input = EpiAutoGPInput(
-                [Date("2024-01-01")],
-                [100.0],
-                "COVID-19",
-                "US",
-                "nhsn",
-                "epiweekly",
-                "observed",
-                Date("2024-02-03"),
-                Date[],
-                Vector{{Real}}[]
-            )
-            results = (
-                forecast_dates = [{forecast_dates_julia}],
-                forecasts = [{forecasts_julia}],
-            )
-
-            create_forecast_output(
-                input,
-                results,
-                {_quote_for_embedded_code(model_fit_dir)},
-                PipelineOutput();
-                save_output = true
-            )
-            """
-        )
         try:
-            run_julia_code(
-                julia_code,
-                executor_flags=["--project=EpiAutoGP", "--startup-file=no"],
+            run_julia_script(
+                "pipelines/epiautogp/fit_epiautogp.jl",
+                [
+                    f"--json-input={input_path}",
+                    f"--output-dir={model_fit_dir}",
+                    "--n-ahead=1",
+                    "--n-particles=2",
+                    "--n-mcmc=1",
+                    "--n-hmc=1",
+                    "--n-forecast-draws=2",
+                    "--transformation=percentage",
+                    "--smc-data-proportion=0.5",
+                ],
+                executor_flags=["--project=pipelines/epiautogp", "--startup-file=no"],
+                function_name="run_epiautogp_interop_fixture",
                 text=True,
             )
         except FileNotFoundError:

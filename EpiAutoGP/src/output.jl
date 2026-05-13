@@ -110,7 +110,7 @@ function create_forecast_df(results::NamedTuple, output_type::PipelineOutput)
         DataFrame(
             :date => forecast_dates,
             Symbol(".value") => sampled_values,
-            Symbol(".draw") => fill(draw, length(sampled_values))
+            Symbol(".draw") => fill(Int32(draw), length(sampled_values))
         )
     end
 

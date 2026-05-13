@@ -100,16 +100,20 @@ jobs:
         with:
           version: "1.11"
 
+      - name: Install Julia dependencies
+        run: |
+          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+
       - name: Set up R with hewr
         uses: ./.github/actions/setup-hewr
 
       - name: Set up Pyrenew-HEW via UV
         uses: ./.github/actions/setup-pyrenew-hew
 
-      - name: Run EpiAutoGP parquet interop test
-        run: |
-          uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q
-
       - name: Run direct EpiAutoGP parquet test
         run: |
           uv run pytest pipelines/tests/test_epiautogp_parquet.py -q
+
+      - name: Run EpiAutoGP parquet interop test
+        run: |
+          uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q

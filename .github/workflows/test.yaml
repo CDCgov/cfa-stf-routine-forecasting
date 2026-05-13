@@ -133,3 +133,7 @@ jobs:
       - name: Run EpiAutoGP parquet interop test
         run: |
           uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q
+
+      - name: Run direct NowcastAutoGP juliacall parquet test
+        run: |
+          uv run --no-dev --group test --group epiautogp-julia pytest pipelines/tests/test_epiautogp_juliacall_runner_parquet.py -q

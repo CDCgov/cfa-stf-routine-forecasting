@@ -6,11 +6,10 @@ from pipelines.epiautogp import (
     convert_to_epiautogp_json,
     setup_forecast_pipeline,
 )
+from pipelines.epiautogp.juliacall_runner import run_nowcastautogp_forecast
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     parse_exclude_date_ranges,
-    run_julia_code,
-    run_julia_script,
 )
 
 
@@ -21,7 +20,7 @@ def run_epiautogp_forecast(
     execution_settings: dict,
 ) -> None:
     """
-    Run EpiAutoGP forecasting model using Julia.
+    Run EpiAutoGP forecasting via NowcastAutoGP using juliacall.
 
     Parameters
     ----------
@@ -40,7 +39,6 @@ def run_epiautogp_forecast(
         - smc_data_proportion: Proportion of data used in each SMC step
     execution_settings : dict
         Execution settings for the Julia environment. Expected keys:
-        - project: Julia project name
         - threads: Number of threads to use or "auto"
 
     Returns
@@ -50,42 +48,22 @@ def run_epiautogp_forecast(
     Raises
     ------
     RuntimeError
-        If Julia environment setup or script execution fails
+        If Julia setup or model execution fails
 
     Notes
     -----
-    This function sets up the EpiAutoGP Julia environment and runs the
-    forecasting script. The output is saved to model_dir.
+    This function keeps the existing Python pipeline interface while delegating
+    the model fit and forecast to NowcastAutoGP through the internal juliacall
+    runner. The output is saved to model_dir.
     """
     # Ensure output directory exists
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    # Instantiate julia environment for EpiAutoGP
-    run_julia_code(
-        """
-        using Pkg
-        Pkg.activate("EpiAutoGP")
-        Pkg.instantiate()
-        """,
-        function_name="setup_epiautogp_environment",
-    )
-
-    # Add path arguments to pass to EpiAutoGP
-    params["json-input"] = str(json_input_path)
-    params["output-dir"] = str(model_dir)
-
-    # Convert Python dict keys (with underscores) to Julia CLI args (with hyphens)
-    args_to_epiautogp = [
-        f"--{key.replace('_', '-')}={value}" for key, value in params.items()
-    ]
-    executor_flags = [f"--{key}={value}" for key, value in execution_settings.items()]
-
-    # Run Julia script
-    run_julia_script(
-        "EpiAutoGP/run.jl",
-        args_to_epiautogp,
-        executor_flags=executor_flags,
-        function_name="run_epiautogp_forecast",
+    run_nowcastautogp_forecast(
+        json_input_path=json_input_path,
+        model_dir=model_dir,
+        params=params,
+        execution_settings=execution_settings,
     )
     return None
 

@@ -44,7 +44,7 @@ if [ "$ed_visit_type" != "observed" ]; then
 	cmd_args+=(--ed-visit-type "$ed_visit_type")
 fi
 
-uv run python pipelines/epiautogp/forecast_epiautogp.py "${cmd_args[@]}"
+uv run --no-dev --group epiautogp-julia python pipelines/epiautogp/forecast_epiautogp.py "${cmd_args[@]}"
 
 if [ "$?" -ne 0 ]; then
 	echo "TEST-MODE FAIL: EpiAutoGP forecast pipeline failed"

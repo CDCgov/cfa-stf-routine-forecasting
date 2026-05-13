@@ -1,0 +1,10 @@
+{
+  "julia": "1.10",
+  "packages": {
+    "NowcastAutoGP": {
+      "uuid": "7e9f7f4b-f590-4c14-8324-de4fcbed18f7",
+      "url": "https://github.com/CDCgov/NowcastAutoGP.git",
+      "rev": "v0.3.0"
+    }
+  }
+}

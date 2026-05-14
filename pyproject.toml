@@ -28,10 +28,9 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelines", "cfa"]
-include = ["cfa/stf/forecasttools/test_data/*.nc"]
 
 [tool.hatch.build.targets.sdist]
-include = ["cfa/stf/forecasttools/test_data/*.nc"]
+include = ["tests/cfa/stf/forecasttools/test_data/*.nc"]
 
 [build-system]
 requires = ["hatchling"]
@@ -62,7 +61,7 @@ fix = true
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
 [tool.pytest.ini_options]
-testpaths = ["pipelines", "cfa"]
+testpaths = ["pipelines/tests", "tests"]
 
 [tool.uv.sources]
 cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }

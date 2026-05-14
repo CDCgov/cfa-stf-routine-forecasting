@@ -599,7 +599,7 @@ if not is_production:
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
-    group_name="WeeklyForecastE",  # This will override what's in the asset args for now
+    # group_name="WeeklyForecastE",  # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -610,7 +610,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
-    group_name="WeeklyForecastE",  # This will override what's in the asset args for now
+    # group_name="WeeklyForecastE",  # This will override what's in the asset args for now
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -623,7 +623,7 @@ def epiweekly_timeseries_e(
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
-    group_name="WeeklyForecastE",  # This will override what's in the asset args for now
+    # group_name="WeeklyForecastE",  # This will override what's in the asset args for now
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -640,7 +640,7 @@ def pyrenew_e(
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
     automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
-    group_name="WeeklyForecastH",  # This will override what's in the asset args for now
+    # group_name="WeeklyForecastH",  # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -654,7 +654,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
     automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
-    group_name="WeeklyForecastH",  # This will override what's in the asset args for now
+    # group_name="WeeklyForecastH",  # This will override what's in the asset args for now
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),

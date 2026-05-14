@@ -10,8 +10,8 @@ on:
         type: choice
         description: "Should the container be pushed to the dagster prod server? (WILL ALWAYS PUSH ON MAIN)"
         options:
-          - no
-          - yes
+          - "no"
+          - "yes"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}

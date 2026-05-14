@@ -506,11 +506,11 @@ weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
-weekly_forecast_h_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastH",
-    target=dg.AssetSelection.groups("WeeklyForecastH"),
-    use_user_code_server=False,  # does NOT allow custom conditions
-)
+# weekly_forecast_h_sensor = dg.AutomationConditionSensorDefinition(
+#     name="WeeklyForecastH",
+#     target=dg.AssetSelection.groups("WeeklyForecastH"),
+#     use_user_code_server=False,  # does NOT allow custom conditions
+# )
 
 weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastFusion",
@@ -520,27 +520,27 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
 
 
 # Temporary workaround schedule while we debug the custom automation condition
-@dg.schedule(
-    target=dg.AssetSelection.assets(
-        "timeseries_e", "epiweekly_timeseries_e", "pyrenew_e"
-    ),
-    cron_schedule="30 6 * * WED",  # 6:30am on Wednesday (day 3)
-    execution_timezone="America/New_York",
-)
-def weekly_forecast_e_schedule(context: dg.ScheduleEvaluationContext):
-    _partition_key = daily_partitions_def.get_last_partition_key()
-    context.log.info(f"Submitting job request for partition: {_partition_key}")
-    return dg.RunRequest(
-        partition_key=_partition_key,
-        run_config=dg.RunConfig(
-            ops={
-                "timeseries_e": TimeseriesConfig(),
-                "epiweekly_timeseries_e": TimeseriesConfig(),
-                "pyrenew_e": PyrenewEConfig(),
-            },
-            execution=azure_batch_execution_config.to_run_config(),
-        ),
-    )
+# @dg.schedule(
+#     target=dg.AssetSelection.assets(
+#         "timeseries_e", "epiweekly_timeseries_e", "pyrenew_e"
+#     ),
+#     cron_schedule="30 6 * * WED",  # 6:30am on Wednesday (day 3)
+#     execution_timezone="America/New_York",
+# )
+# def weekly_forecast_e_schedule(context: dg.ScheduleEvaluationContext):
+#     _partition_key = daily_partitions_def.get_last_partition_key()
+#     context.log.info(f"Submitting job request for partition: {_partition_key}")
+#     return dg.RunRequest(
+#         partition_key=_partition_key,
+#         run_config=dg.RunConfig(
+#             ops={
+#                 "timeseries_e": TimeseriesConfig(),
+#                 "epiweekly_timeseries_e": TimeseriesConfig(),
+#                 "pyrenew_e": PyrenewEConfig(),
+#             },
+#             execution=azure_batch_execution_config.to_run_config(),
+#         ),
+#     )
 
 
 # ---------- Shared Asset Decorator Arguments ----------

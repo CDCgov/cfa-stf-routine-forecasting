@@ -459,6 +459,7 @@ def _fuse_pyrenew_timeseries(
 # SCHEDULES AND AUTOMATION CONDITION SENSORS
 # ============================================================================
 
+
 # Custom Automation Condition. Relies on use_user_code_server=True on the sensor
 class IsWeekday(dg.AutomationCondition):
     def __init__(self, weekday: int):
@@ -497,6 +498,7 @@ class IsWeekday(dg.AutomationCondition):
             "Sunday",
         ]
         return f"is_{days[self.weekday].lower()}"
+
 
 weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastUpstream",

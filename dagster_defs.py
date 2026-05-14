@@ -639,7 +639,7 @@ def pyrenew_e(
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
+    # automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
     # group_name="WeeklyForecastH",  # This will override what's in the asset args for now
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -653,7 +653,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 @dynamic_graph_asset(
     **weekly_forecast_upstream_asset_args,
     # **weekly_forecast_base_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
+    # automation_condition=dg.AutomationCondition.eager(),  # H assets can be eager, inheriting their schedule from dataops
     # group_name="WeeklyForecastH",  # This will override what's in the asset args for now
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),

@@ -1,12 +1,15 @@
 #!/usr/bin/env julia
 
-using Dates
-using DBInterface
-using DataFrames
-using DuckDB
-using JSON3
-using NowcastAutoGP
-using StructTypes
+using Dates, DataFrames, JSON3, StructTypes
+using DBInterface: close, connect, execute
+using DuckDB: DB, register_data_frame
+using NowcastAutoGP:
+    create_nowcast_data,
+    create_transformed_data,
+    forecast,
+    forecast_with_nowcasts,
+    get_transformations,
+    make_and_fit_model
 
 """
 Input data structure for EpiAutoGP pipeline,
@@ -25,7 +28,7 @@ struct EpiAutoGPInput
     nowcast_reports::Vector{Vector{Float64}}
 end
 
-StructTypes.StructType(::Type{EpiAutoGPInput}) = StructTypes.Struct()
+StructType(::Type{EpiAutoGPInput}) = Struct()
 
 const DEFAULT_ARGS = Dict{String, Any}(
     "n-ahead" => 8,
@@ -325,15 +328,15 @@ function _quote_duckdb_string(value::AbstractString)
 end
 
 function _write_parquet_with_duckdb(path::AbstractString, table)
-    con = DBInterface.connect(DuckDB.DB, ":memory:")
+    con = connect(DB, ":memory:")
     return try
-        DuckDB.register_data_frame(con, table, "forecast_samples")
-        DBInterface.execute(
+        register_data_frame(con, table, "forecast_samples")
+        execute(
             con,
             "COPY forecast_samples TO $(_quote_duckdb_string(path)) (FORMAT parquet)",
         )
     finally
-        DBInterface.close(con)
+        close(con)
     end
 end
 

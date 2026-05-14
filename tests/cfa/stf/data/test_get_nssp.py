@@ -1,5 +1,4 @@
 import pytest
-from cfa.cloudops.util import check_ext_env
 
 from cfa.stf.data import get_nssp
 from cfa.stf.forecasttools import ensure_list

@@ -1,7 +1,7 @@
 # Pyrenew Blobfuse Configuration
 
-This directory serves as a project-specific fork of the [cfa-blobfuse-tutorial](https://github.com/cdcent).  
-> [!NOTE] 
+This directory serves as a project-specific fork of the [cfa-blobfuse-tutorial](https://github.com/cdcent).
+> [!NOTE]
 > This is useful when testing, and is necessary (in this repository) for using the dagster `docker_executor` or `in_process_executor`.
 
 > Make sure you have blobfuse2 installed before running this module.

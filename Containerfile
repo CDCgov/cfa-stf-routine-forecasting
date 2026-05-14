@@ -25,15 +25,25 @@ ENV UV_PYTHON_CACHE_DIR=/root/.cache/uv/python
 # R package - hewr
 COPY ./hewr /cfa-stf-routine-forecasting/hewr
 
-# Julia package - EpiAutoGP
-COPY ./EpiAutoGP /cfa-stf-routine-forecasting/EpiAutoGP
+# Julia environment for direct NowcastAutoGP runner
+# Copy only Julia environment metadata first so dependency installation is cached
+# independently of changes to pipeline source files. The full pipelines tree is
+# copied later.
+COPY ./pipelines/epiautogp/Project.toml \
+     ./pipelines/epiautogp/Manifest.toml \
+     /cfa-stf-routine-forecasting/pipelines/epiautogp/
 
 # Set working directory
 WORKDIR /cfa-stf-routine-forecasting
 
-# Cache Julia packages and artifacts
-RUN --mount=type=cache,target=/root/.julia \
-    julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+# Instantiate Julia dependencies into the image so the runtime container can run
+# the EpiAutoGP subprocess without downloading packages. This is a script
+# environment under pipelines/epiautogp, so we commit its Manifest.toml for a
+# reproducible EpiAutoGP dependency set.
+RUN julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+
+
+
 
 # Install hewr
 RUN Rscript -e "install.packages('pak')"

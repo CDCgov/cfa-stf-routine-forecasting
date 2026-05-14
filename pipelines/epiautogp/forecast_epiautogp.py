@@ -9,7 +9,6 @@ from pipelines.epiautogp import (
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     parse_exclude_date_ranges,
-    run_julia_code,
     run_julia_script,
 )
 
@@ -21,7 +20,7 @@ def run_epiautogp_forecast(
     execution_settings: dict,
 ) -> None:
     """
-    Run EpiAutoGP forecasting model using Julia.
+    Run the EpiAutoGP forecasting model using the direct NowcastAutoGP Julia script.
 
     Parameters
     ----------
@@ -54,21 +53,11 @@ def run_epiautogp_forecast(
 
     Notes
     -----
-    This function sets up the EpiAutoGP Julia environment and runs the
-    forecasting script. The output is saved to model_dir.
+    This function runs the direct NowcastAutoGP Julia script. The output is
+    saved to model_dir.
     """
     # Ensure output directory exists
     model_dir.mkdir(parents=True, exist_ok=True)
-
-    # Instantiate julia environment for EpiAutoGP
-    run_julia_code(
-        """
-        using Pkg
-        Pkg.activate("EpiAutoGP")
-        Pkg.instantiate()
-        """,
-        function_name="setup_epiautogp_environment",
-    )
 
     # Add path arguments to pass to EpiAutoGP
     params["json-input"] = str(json_input_path)
@@ -82,7 +71,7 @@ def run_epiautogp_forecast(
 
     # Run Julia script
     run_julia_script(
-        "EpiAutoGP/run.jl",
+        "pipelines/epiautogp/fit_epiautogp.jl",
         args_to_epiautogp,
         executor_flags=executor_flags,
         function_name="run_epiautogp_forecast",
@@ -233,7 +222,7 @@ def main(
         "smc_data_proportion": smc_data_proportion,
     }
     execution_settings = {
-        "project": "EpiAutoGP",
+        "project": "pipelines/epiautogp",
         "threads": n_threads,
     }
 

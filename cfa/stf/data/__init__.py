@@ -4,6 +4,7 @@ from .get_nnh_pmfs import (
     get_nnh_generation_interval_pmf,
     get_nnh_right_truncation_pmf,
 )
+from .get_nnsp_with_exclusion import get_nssp_with_exclusion
 
 __all__ = [
     "get_nhsn_hrd",
@@ -11,4 +12,5 @@ __all__ = [
     "get_nnh_delay_pmf",
     "get_nnh_generation_interval_pmf",
     "get_nnh_right_truncation_pmf",
+    "get_nssp_with_exclusion",
 ]

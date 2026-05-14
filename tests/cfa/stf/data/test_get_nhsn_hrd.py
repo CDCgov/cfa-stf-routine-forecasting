@@ -1,7 +1,7 @@
 import pytest
 from cfa.cloudops.util import check_ext_env
 
-from cfa.stf.data import get_nssp
+from cfa.stf.data import get_nhsn_hrd
 from cfa.stf.forecasttools import ensure_list
 from tests.cfa.stf.data.data_test_utils import _unique_values
 
@@ -20,10 +20,12 @@ pytestmark = pytest.mark.skipif(
         ["CA", "US"],
     ],
 )
-def test_get_nssp_filters_locations(loc_abb) -> None:
-    expected_geo_values = set(ensure_list(loc_abb))
-    result = set(_unique_values(get_nssp(loc_abb=loc_abb, lazy=False), "geo_value"))
-    assert result == expected_geo_values
+def test_get_nhsn_hrd_filters_locations(loc_abb) -> None:
+    expected_jurisdictions = set(ensure_list(loc_abb))
+    result = set(
+        _unique_values(get_nhsn_hrd(loc_abb=loc_abb, lazy=False), "jurisdiction")
+    )
+    assert result == expected_jurisdictions
 
 
 @pytest.mark.parametrize(
@@ -33,24 +35,22 @@ def test_get_nssp_filters_locations(loc_abb) -> None:
         ["COVID-19", "Influenza"],
     ],
 )
-def test_get_nssp_filters_diseases(disease) -> None:
+def test_get_nhsn_hrd_filters_diseases(disease) -> None:
     expected_diseases = set(ensure_list(disease))
-    result = set(_unique_values(get_nssp(disease=disease, lazy=False), "disease"))
+    result = set(_unique_values(get_nhsn_hrd(disease=disease, lazy=False), "disease"))
     assert result == expected_diseases
 
 
-def test_get_nssp_returns_all_locations_and_diseases() -> None:
-    result = get_nssp(lazy=False)
+def test_get_nhsn_hrd_returns_all_locations_and_diseases() -> None:
+    result = get_nhsn_hrd(lazy=False)
 
-    assert {"COVID-19", "Influenza", "RSV", "Total"} == _unique_values(
-        result, "disease"
-    )
-    assert {"US", "CA", "SD"}.issubset(_unique_values(result, "geo_value"))
+    assert {"COVID-19", "Influenza", "RSV"} == _unique_values(result, "disease")
+    assert {"US", "CA", "SD"}.issubset(_unique_values(result, "jurisdiction"))
 
 
-def test_get_nssp_warns_about_missing_filters() -> None:
+def test_get_nhsn_hrd_warns_about_missing_filters() -> None:
     with pytest.warns(UserWarning) as warnings:
-        result = get_nssp(
+        result = get_nhsn_hrd(
             loc_abb=["CA", "US", "XY"],
             disease=["COVID-19", "Influenza", "ZZ"],
             lazy=False,
@@ -61,5 +61,5 @@ def test_get_nssp_warns_about_missing_filters() -> None:
     assert any(
         "Requested locations {'XY'} not found" in msg for msg in warning_messages
     )
-    assert _unique_values(result, "geo_value") == {"CA", "US"}
+    assert _unique_values(result, "jurisdiction") == {"CA", "US"}
     assert _unique_values(result, "disease") == {"COVID-19", "Influenza"}

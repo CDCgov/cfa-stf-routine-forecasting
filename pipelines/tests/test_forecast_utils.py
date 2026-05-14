@@ -301,12 +301,8 @@ class TestPostprocessForecast:
     @patch(
         "pipelines.epiautogp.epiautogp_forecast_utils.make_figures_from_model_fit_dir"
     )
-    @patch(
-        "pipelines.epiautogp.epiautogp_forecast_utils.create_samples_from_epiautogp_fit_dir"
-    )
     def test_postprocess_calls_required_functions(
         self,
-        mock_create_samples,
         mock_make_figures,
         mock_hubverse,
         base_context,  # Use fixture
@@ -321,15 +317,10 @@ class TestPostprocessForecast:
         context.post_process_forecast()
 
         # Verify all functions were called
-        mock_create_samples.assert_called_once()
         mock_make_figures.assert_called_once()
         mock_hubverse.assert_called_once()
 
-        # Verify correct arguments to create_samples_from_epiautogp_fit_dir
         expected_model_fit_dir = context.model_run_dir / context.model_name
-        assert (
-            mock_create_samples.call_args[1]["model_fit_dir"] == expected_model_fit_dir
-        )
 
         # Verify correct arguments to make_figures_from_model_fit_dir
         assert mock_make_figures.call_args[1]["model_fit_dir"] == expected_model_fit_dir
@@ -343,12 +334,8 @@ class TestPostprocessForecast:
     @patch(
         "pipelines.epiautogp.epiautogp_forecast_utils.make_figures_from_model_fit_dir"
     )
-    @patch(
-        "pipelines.epiautogp.epiautogp_forecast_utils.create_samples_from_epiautogp_fit_dir"
-    )
     def test_postprocess_creates_correct_paths(
         self,
-        mock_create_samples,
         mock_make_figures,
         mock_hubverse,
         base_context,  # Use fixture
@@ -360,7 +347,4 @@ class TestPostprocessForecast:
 
         # Verify model_fit_dir is correctly constructed as model_run_dir/model_name
         expected_model_fit_dir = context.model_run_dir / context.model_name
-        assert (
-            mock_create_samples.call_args[1]["model_fit_dir"] == expected_model_fit_dir
-        )
         assert mock_make_figures.call_args[1]["model_fit_dir"] == expected_model_fit_dir

@@ -60,7 +60,7 @@ jobs:
 
       - name: Install Julia dependencies
         run: |
-          julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
         uses: actions/download-artifact@v8
@@ -103,7 +103,7 @@ jobs:
 
       - name: Install Julia dependencies
         run: |
-          julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
         uses: actions/download-artifact@v8
@@ -146,7 +146,7 @@ jobs:
 
       - name: Install Julia dependencies
         run: |
-          julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
         uses: actions/download-artifact@v8
@@ -189,7 +189,7 @@ jobs:
 
       - name: Install Julia dependencies
         run: |
-          julia --project=EpiAutoGP -e 'using Pkg; Pkg.instantiate()'
+          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
 
       - name: Download test data
         uses: actions/download-artifact@v8

@@ -552,16 +552,16 @@ weekly_forecast_base_asset_args = {
     "graph_dimensions": ["diseases", "locations"],
 }
 
-# weekly_forecast_upstream_asset_args = {
-#     **weekly_forecast_base_asset_args,
-#     "group_name": "WeeklyForecastUpstream",
-#     "automation_condition": (
-#         # We specifically don't want these to run unless it's Wednesday
-#         # 0=monday,1=tuesday,2=wednesday,etc.
-#         # Note this is different from cron which is 1-indexed
-#         dg.AutomationCondition.eager() & IsWeekday(2)
-#     ).with_label("eager_on_wednesday"),
-# }
+weekly_forecast_upstream_asset_args = {
+    **weekly_forecast_base_asset_args,
+    "group_name": "WeeklyForecastUpstream",
+    "automation_condition": (
+        # We specifically don't want these to run unless it's Wednesday
+        # 0=monday,1=tuesday,2=wednesday,etc.
+        # Note this is different from cron which is 1-indexed
+        dg.AutomationCondition.eager() & IsWeekday(2)
+    ).with_label("eager_on_wednesday"),
+}
 
 weekly_forecast_fusion_asset_args = {
     **weekly_forecast_base_asset_args,

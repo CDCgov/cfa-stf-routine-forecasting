@@ -9,6 +9,10 @@ skip_without_ext_env = pytest.mark.skipif(
 catalog_test = pytest.mark.catalog
 
 
+def catalog_ext_env_test(test_func):
+    return skip_without_ext_env(catalog_test(test_func))
+
+
 def _unique_values(df, column: str) -> set[str]:
     if hasattr(df, "collect"):
         df = df.collect()

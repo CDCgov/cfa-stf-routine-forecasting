@@ -7,8 +7,7 @@ from cfa.stf.data import get_data
 from cfa.stf.forecasttools import ensure_list
 from tests.cfa.stf.data.data_test_utils import (
     _unique_values,
-    catalog_test,
-    skip_without_ext_env,
+    catalog_ext_env_test,
 )
 
 
@@ -112,8 +111,7 @@ def test_get_nhsn_hrd_warns_about_missing_filters() -> None:
     assert _unique_values(result, "disease") == {"COVID-19", "Influenza"}
 
 
-@skip_without_ext_env
-@catalog_test
+@catalog_ext_env_test
 @pytest.mark.parametrize(
     "loc_abb",
     [
@@ -135,8 +133,7 @@ def test_catalog_get_nhsn_hrd_filters_locations(
     assert result == expected_jurisdictions
 
 
-@skip_without_ext_env
-@catalog_test
+@catalog_ext_env_test
 @pytest.mark.parametrize(
     "disease",
     [
@@ -154,8 +151,7 @@ def test_catalog_get_nhsn_hrd_filters_diseases(
     assert result == expected_diseases
 
 
-@skip_without_ext_env
-@catalog_test
+@catalog_ext_env_test
 def test_catalog_get_nhsn_hrd_returns_all_locations_and_diseases() -> None:
     result = get_data.get_nhsn_hrd(lazy=False)
 

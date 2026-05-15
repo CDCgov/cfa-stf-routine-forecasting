@@ -6,8 +6,7 @@ import pytest
 from cfa.stf.data import get_nnh_pmfs
 from tests.cfa.stf.data.data_test_utils import (
     _unique_values,
-    catalog_test,
-    skip_without_ext_env,
+    catalog_ext_env_test,
 )
 
 
@@ -210,8 +209,7 @@ def test_get_nnh_pmfs_error_when_exactly_one_row_is_not_found(get_pmf, kwargs) -
         get_pmf(**kwargs)
 
 
-@skip_without_ext_env
-@catalog_test
+@catalog_ext_env_test
 @pytest.mark.parametrize(
     "disease",
     [
@@ -228,8 +226,7 @@ def test_catalog_get_nnh_generation_interval_pmf_returns_pmf(
     _assert_pmf(result)
 
 
-@skip_without_ext_env
-@catalog_test
+@catalog_ext_env_test
 @pytest.mark.parametrize(
     "disease",
     [
@@ -246,8 +243,7 @@ def test_catalog_get_nnh_delay_pmf_returns_pmf(
     _assert_pmf(result)
 
 
-@skip_without_ext_env
-@catalog_test
+@catalog_ext_env_test
 @pytest.mark.parametrize(
     "loc_abb",
     [

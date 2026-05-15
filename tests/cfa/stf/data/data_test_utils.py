@@ -1,16 +1,30 @@
 import pytest
 from cfa.cloudops.util import check_ext_env
 
-skip_without_ext_env = pytest.mark.skipif(
-    not check_ext_env(),
-    reason="requires external CFA data environment",
-)
-
-catalog_test = pytest.mark.catalog
+CATALOG_SKIP_REASON = "requires external CFA data environment"
 
 
-def catalog_ext_env_test(test_func):
-    return skip_without_ext_env(catalog_test(test_func))
+def requires_ext_catalog(test_func):
+    skip_without_ext_env = pytest.mark.skipif(
+        not check_ext_env(),
+        reason=CATALOG_SKIP_REASON,
+    )
+    return skip_without_ext_env(pytest.mark.catalog(test_func))
+
+
+def uses_catalog(request) -> bool:
+    return request.node.get_closest_marker("catalog") is not None
+
+
+def lazy_catalog_loader(df):
+    def get_dataframe(output: str, version: str):
+        if output != "pl_lazy":
+            raise ValueError(f"Unexpected output={output!r}")
+        if version is None:
+            raise ValueError("Expected a version constraint")
+        return df.lazy()
+
+    return get_dataframe
 
 
 def _unique_values(df, column: str) -> set[str]:

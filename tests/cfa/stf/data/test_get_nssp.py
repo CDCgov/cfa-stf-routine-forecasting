@@ -7,7 +7,9 @@ from cfa.stf.data import get_data
 from cfa.stf.forecasttools import ensure_list
 from tests.cfa.stf.data.data_test_utils import (
     _unique_values,
-    catalog_ext_env_test,
+    lazy_catalog_loader,
+    requires_ext_catalog,
+    uses_catalog,
 )
 
 
@@ -74,15 +76,10 @@ def nssp_data() -> pl.DataFrame:
 
 @pytest.fixture(autouse=True)
 def mock_nssp_data(monkeypatch, nssp_data: pl.DataFrame, request) -> None:
-    if request.node.get_closest_marker("catalog"):
+    if uses_catalog(request):
         return
 
-    def get_dataframe(output: str, version: str):
-        if output != "pl_lazy":
-            raise ValueError(f"Unexpected output={output!r}")
-        if version is None:
-            raise ValueError("Expected a version constraint")
-        return nssp_data.lazy()
+    get_dataframe = lazy_catalog_loader(nssp_data)
 
     monkeypatch.setattr(
         get_data.datacat.public.stf.nssp_gold_v1.load,
@@ -154,7 +151,7 @@ def test_get_nssp_warns_about_missing_filters() -> None:
     assert _unique_values(result, "disease") == {"COVID-19", "Influenza"}
 
 
-@catalog_ext_env_test
+@requires_ext_catalog
 @pytest.mark.parametrize(
     "loc_abb",
     [
@@ -172,7 +169,7 @@ def test_catalog_get_nssp_filters_locations(loc_abb) -> None:
     assert result == expected_geo_values
 
 
-@catalog_ext_env_test
+@requires_ext_catalog
 @pytest.mark.parametrize(
     "disease",
     [
@@ -188,7 +185,7 @@ def test_catalog_get_nssp_filters_diseases(disease) -> None:
     assert result == expected_diseases
 
 
-@catalog_ext_env_test
+@requires_ext_catalog
 def test_catalog_get_nssp_returns_all_locations_and_diseases() -> None:
     result = get_data.get_nssp(lazy=False)
 

@@ -6,7 +6,8 @@ import pytest
 from cfa.stf.data import get_nnh_pmfs
 from tests.cfa.stf.data.data_test_utils import (
     _unique_values,
-    catalog_ext_env_test,
+    requires_ext_catalog,
+    uses_catalog,
 )
 
 
@@ -99,7 +100,7 @@ def param_estimates() -> pl.DataFrame:
 
 @pytest.fixture(autouse=True)
 def mock_param_estimates(monkeypatch, param_estimates: pl.DataFrame, request) -> None:
-    if request.node.get_closest_marker("catalog"):
+    if uses_catalog(request):
         return
 
     def get_dataframe(output: str):
@@ -209,7 +210,7 @@ def test_get_nnh_pmfs_error_when_exactly_one_row_is_not_found(get_pmf, kwargs) -
         get_pmf(**kwargs)
 
 
-@catalog_ext_env_test
+@requires_ext_catalog
 @pytest.mark.parametrize(
     "disease",
     [
@@ -226,7 +227,7 @@ def test_catalog_get_nnh_generation_interval_pmf_returns_pmf(
     _assert_pmf(result)
 
 
-@catalog_ext_env_test
+@requires_ext_catalog
 @pytest.mark.parametrize(
     "disease",
     [
@@ -243,7 +244,7 @@ def test_catalog_get_nnh_delay_pmf_returns_pmf(
     _assert_pmf(result)
 
 
-@catalog_ext_env_test
+@requires_ext_catalog
 @pytest.mark.parametrize(
     "loc_abb",
     [

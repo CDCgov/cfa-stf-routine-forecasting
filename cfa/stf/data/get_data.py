@@ -130,10 +130,7 @@ def get_nhsn_hrd(
             variable_name="disease",
             value_name="hospital_admissions",
         )
-        .sort(
-            ["jurisdiction", "disease", "weekendingdate"],
-            descending=[False, False, True],
-        )
+        .sort("jurisdiction", "disease", "weekendingdate")
     )
 
     if not get_all_diseases:
@@ -261,7 +258,8 @@ def get_nssp(
 
     dat = (
         datacat_dataset.load.get_dataframe(
-            output="pl_lazy", version=f"<={as_of.strftime('%Y-%m-%dT%H-%M-%S')}"
+            output="pl_lazy",
+            version=f"<={as_of.strftime('%Y-%m-%dT%H-%M-%S')}",
         )
         .with_columns(
             pl.col("disease").cast(pl.String).replace("COVID-19/Omicron", "COVID-19")
@@ -288,9 +286,7 @@ def get_nssp(
     result = (
         combined_dat.group_by("reference_date", "disease", "geo_value")
         .agg(pl.col("value").sum())
-        .sort(
-            ["geo_value", "disease", "reference_date"], descending=[False, False, True]
-        )
+        .sort("geo_value", "disease", "reference_date")
     )
 
     if not get_all_diseases:

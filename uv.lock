@@ -739,8 +739,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-cloudops"
-version = "0.3.23"
-source = { git = "https://github.com/CDCgov/cfa-cloudops.git#3aa2c64bdf27c61a21d0870b51d5fd5caaf6f4da" }
+version = "0.4.0"
+source = { git = "https://github.com/CDCgov/cfa-cloudops.git#828a2c778236ae03cba5f40f049bf41aa30a88bc" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
@@ -774,8 +774,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-dagster"
-version = "0.1.0"
-source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#48b17b274de0641e10b5542d78adfb7a1ccd01cb" }
+version = "1.0.0"
+source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#dbb6a4459d68b5d2b5c52440cd594d87b5a1b451" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },

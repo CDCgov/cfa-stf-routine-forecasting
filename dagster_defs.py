@@ -562,9 +562,8 @@ weekly_forecast_upstream_asset_args = {
         # 0=monday,1=tuesday,2=wednesday,etc.
         # Note this is different from cron which is 1-indexed
         # TEMPORARY: allowing thursday and friday too for testing
-        dg.AutomationCondition.eager() & (
-            IsWeekday(0) | IsWeekday(1) | IsWeekday(2) | IsWeekday(3) | IsWeekday(4)
-        )
+        dg.AutomationCondition.eager()
+        & (IsWeekday(0) | IsWeekday(1) | IsWeekday(2) | IsWeekday(3) | IsWeekday(4))
     ).with_label("eager_on_weekdays"),
 }
 

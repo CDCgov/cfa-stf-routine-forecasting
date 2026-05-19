@@ -54,10 +54,7 @@ class NsspRightTruncationNowcast:
         ):
             report = float(report)
             if fraction < 0.0:
-                raise ValueError(
-                    "Reporting fraction must be nonnegative: "
-                    f"{fraction}"
-                )
+                raise ValueError(f"Reporting fraction must be nonnegative: {fraction}")
             if fraction == 0.0:
                 if report == 0.0:
                     nowcast_estimates.append(0.0)
@@ -65,8 +62,6 @@ class NsspRightTruncationNowcast:
                 raise ValueError(
                     "Cannot nowcast a positive report with zero reporting fraction"
                 )
-            nowcast_estimates.append(
-                (report + 1.0 - fraction) / fraction
-            )
+            nowcast_estimates.append((report + 1.0 - fraction) / fraction)
 
         return NowcastData(dates=nowcast_dates, reports=[nowcast_estimates])

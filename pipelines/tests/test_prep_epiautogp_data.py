@@ -7,12 +7,22 @@ list-based implementation to ensure correctness.
 """
 
 import datetime as dt
+import json
+import logging
 from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
 
-from pipelines.epiautogp.prep_epiautogp_data import _apply_date_exclusions
+from pipelines.epiautogp.epiautogp_forecast_utils import (
+    ForecastPipelineContext,
+    ModelPaths,
+)
+from pipelines.epiautogp.nowcast import NowcastData
+from pipelines.epiautogp.prep_epiautogp_data import (
+    _apply_date_exclusions,
+    convert_to_epiautogp_json,
+)
 
 N_DAYS = 10
 
@@ -265,3 +275,113 @@ class TestDateExclusionFiltering:
         assert "disease" in filtered_df.columns
         assert all(filtered_df["geo_value"] == "CA")
         assert all(filtered_df["disease"] == "COVID-19")
+
+
+class FakeNowcastSource:
+    """Small test nowcast source that records the model series it receives."""
+
+    def __init__(self):
+        self.dates = None
+        self.reports = None
+
+    def get_nowcast_data(
+        self,
+        *,
+        dates: list[dt.date],
+        reports: list[float],
+    ) -> NowcastData:
+        self.dates = dates
+        self.reports = reports
+        return NowcastData(dates=[dates[-1]], reports=[[reports[-1] + 1.0]])
+
+
+def _write_combined_data(path):
+    pl.DataFrame(
+        [
+            {
+                "date": dt.date(2024, 1, 1),
+                "geo_value": "CA",
+                "disease": "COVID-19",
+                "data_type": "train",
+                ".variable": "observed_ed_visits",
+                ".value": 10.0,
+            },
+            {
+                "date": dt.date(2024, 1, 2),
+                "geo_value": "CA",
+                "disease": "COVID-19",
+                "data_type": "train",
+                ".variable": "observed_ed_visits",
+                ".value": 20.0,
+            },
+        ]
+    ).write_csv(path, separator="\t")
+
+
+def _epiautogp_context(tmp_path, nowcast_source=None):
+    return ForecastPipelineContext(
+        disease="COVID-19",
+        loc="CA",
+        target="nssp",
+        frequency="daily",
+        ed_visit_type="observed",
+        model_name="test_model",
+        nhsn_data_path=None,
+        report_date=dt.date(2024, 1, 3),
+        first_training_date=dt.date(2024, 1, 1),
+        last_training_date=dt.date(2024, 1, 2),
+        n_forecast_days=28,
+        exclude_last_n_days=0,
+        exclude_date_ranges=None,
+        model_batch_dir=tmp_path / "batch",
+        model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
+        credentials_dict={},
+        facility_level_nssp_data=pl.LazyFrame(),
+        logger=logging.getLogger(),
+        nowcast_source=nowcast_source,
+    )
+
+
+class TestConvertToEpiAutoGpJson:
+    """Tests for EpiAutoGP JSON serialization."""
+
+    def test_no_nowcast_source_serializes_empty_nowcast_arrays(self, tmp_path):
+        """Test converter writes empty nowcast arrays without a source."""
+        data_path = tmp_path / "combined_data.tsv"
+        _write_combined_data(data_path)
+        paths = ModelPaths(
+            model_output_dir=tmp_path / "model",
+            data_dir=tmp_path,
+            training_data=data_path,
+        )
+
+        output_path = convert_to_epiautogp_json(
+            context=_epiautogp_context(tmp_path),
+            paths=paths,
+        )
+
+        output = json.loads(output_path.read_text())
+        assert output["nowcast_dates"] == []
+        assert output["nowcast_reports"] == []
+
+    def test_nowcast_source_serializes_nowcast_data(self, tmp_path):
+        """Test converter writes nowcast data supplied by the context source."""
+        data_path = tmp_path / "combined_data.tsv"
+        _write_combined_data(data_path)
+        paths = ModelPaths(
+            model_output_dir=tmp_path / "model",
+            data_dir=tmp_path,
+            training_data=data_path,
+        )
+        source = FakeNowcastSource()
+
+        output_path = convert_to_epiautogp_json(
+            context=_epiautogp_context(tmp_path, nowcast_source=source),
+            paths=paths,
+        )
+
+        output = json.loads(output_path.read_text())
+        assert source.dates == [dt.date(2024, 1, 1), dt.date(2024, 1, 2)]
+        assert source.reports == [10.0, 20.0]
+        assert output["nowcast_dates"] == ["2024-01-02"]
+        assert output["nowcast_reports"] == [[21.0]]

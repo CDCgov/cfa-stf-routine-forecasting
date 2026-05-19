@@ -6,7 +6,6 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Protocol
 
-
 @dataclass(frozen=True)
 class NowcastData:
     """
@@ -17,12 +16,12 @@ class NowcastData:
     reports: list[list[float]] = field(default_factory=list)
 
 
-class NowcastModel(Protocol):
+class NowcastSource(Protocol):
     """
-    Interface for models that estimate nowcast data.
+    Interface to getting nowcast data, whether from a fixed source or some estimation procedure.
     """
 
-    def estimate(
+    def get_nowcast_data(
         self,
         *,
         dates: list[dt.date],
@@ -32,3 +31,19 @@ class NowcastModel(Protocol):
         Estimate nowcast data for one model run.
         """
         ...
+
+
+@dataclass(frozen=True)
+class FixedNowcast:
+    data: NowcastData
+
+    def get_nowcast_data(
+        self,
+        *,
+        dates: list[dt.date],
+        reports: list[float],
+    ) -> NowcastData:
+        return self.data
+
+
+

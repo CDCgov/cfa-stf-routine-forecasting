@@ -19,7 +19,7 @@ class NsspRightTruncationNowcast:
 
     right_truncation_pmf: list[float]
 
-    def estimate(
+    def get_nowcast_data(
         self,
         *,
         dates: list[dt.date],

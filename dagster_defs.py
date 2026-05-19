@@ -500,17 +500,11 @@ class IsWeekday(dg.AutomationCondition):
         return f"is_{days[self.weekday].lower()}"
 
 
-weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastUpstream",
-    target=dg.AssetSelection.groups("WeeklyForecastUpstream"),
+weekly_forecast_initial_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyForecastInitial",
+    target=dg.AssetSelection.groups("WeeklyForecastInitial"),
     use_user_code_server=True,  # allows for custom automation conditions
 )
-
-# weekly_forecast_h_sensor = dg.AutomationConditionSensorDefinition(
-#     name="WeeklyForecastH",
-#     target=dg.AssetSelection.groups("WeeklyForecastH"),
-#     use_user_code_server=False,  # does NOT allow custom conditions
-# )
 
 weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastFusion",
@@ -529,9 +523,9 @@ weekly_forecast_base_asset_args = {
     "graph_dimensions": ["diseases", "locations"],
 }
 
-weekly_forecast_upstream_asset_args = {
+weekly_forecast_initial_asset_args = {
     **weekly_forecast_base_asset_args,
-    "group_name": "WeeklyForecastUpstream",
+    "group_name": "WeeklyForecastInitial",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
         # 0=monday,1=tuesday,2=wednesday,etc.
@@ -574,7 +568,7 @@ if not is_production:
 
 # Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
@@ -583,7 +577,7 @@ def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesC
 
 # Epiweekly Timeseries E
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_timeseries_e(
@@ -594,7 +588,7 @@ def epiweekly_timeseries_e(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -608,7 +602,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -619,7 +613,7 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_upstream_asset_args,
+    **weekly_forecast_initial_asset_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),

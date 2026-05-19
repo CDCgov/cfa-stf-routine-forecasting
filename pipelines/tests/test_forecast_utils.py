@@ -26,8 +26,10 @@ import pytest
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ModelPaths,
+    _resolve_nowcast_source,
     setup_forecast_pipeline,
 )
+from pipelines.epiautogp.nssp_nowcast import NsspRightTruncationNowcast
 
 
 @pytest.fixture
@@ -144,6 +146,7 @@ class TestSetupForecastPipeline:
             exclude_last_n_days=0,
             credentials_path=None,
             logger=None,
+            nowcast_source_name="none",
         )
 
         assert isinstance(context, ForecastPipelineContext)
@@ -178,6 +181,7 @@ class TestSetupForecastPipeline:
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            nowcast_source_name="none",
         )
 
         expected_batch_dir = (
@@ -187,6 +191,162 @@ class TestSetupForecastPipeline:
 
         assert context.model_batch_dir == expected_batch_dir
         assert context.model_run_dir == expected_run_dir
+
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
+    def test_auto_nssp_observed_builds_right_truncation_source(
+        self,
+        mock_calc_dates,
+        mock_get_reports,
+        mock_load_creds,
+        mock_scan_parquet,
+        mock_get_pmfs,
+        tmp_path,
+    ):
+        """Test auto nowcasting builds an NSSP right-truncation source."""
+        mock_load_creds.return_value = {}
+        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
+        mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
+        mock_scan_parquet.return_value = pl.LazyFrame()
+        mock_get_pmfs.return_value = {"right_truncation_pmf": [0.25, 0.75]}
+
+        context = setup_forecast_pipeline(
+            disease="COVID-19",
+            loc="CA",
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+            model_name="test_model",
+            nhsn_data_path=None,
+            facility_level_nssp_data_dir=tmp_path,
+            output_dir=tmp_path,
+            n_training_days=90,
+            n_forecast_days=28,
+            param_data_dir=tmp_path / "prod_param_estimates",
+        )
+
+        assert isinstance(context.nowcast_source, NsspRightTruncationNowcast)
+        assert context.nowcast_source.right_truncation_pmf == [0.25, 0.75]
+        assert mock_get_pmfs.call_args.kwargs["loc_abb"] == "CA"
+        assert mock_get_pmfs.call_args.kwargs["disease"] == "COVID-19"
+        assert mock_get_pmfs.call_args.kwargs["as_of"] == dt.date(2024, 12, 20)
+
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
+    def test_direct_right_truncation_pmf_wins_over_param_data_dir(
+        self,
+        mock_calc_dates,
+        mock_get_reports,
+        mock_load_creds,
+        mock_scan_parquet,
+        mock_get_pmfs,
+        tmp_path,
+    ):
+        """Test a directly supplied PMF is used without calling get_pmfs."""
+        mock_load_creds.return_value = {}
+        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
+        mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
+        mock_scan_parquet.return_value = pl.LazyFrame()
+
+        context = setup_forecast_pipeline(
+            disease="COVID-19",
+            loc="CA",
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="other",
+            model_name="test_model",
+            nhsn_data_path=None,
+            facility_level_nssp_data_dir=tmp_path,
+            output_dir=tmp_path,
+            n_training_days=90,
+            n_forecast_days=28,
+            param_data_dir=tmp_path / "prod_param_estimates",
+            right_truncation_pmf=[0.4, 0.6],
+        )
+
+        assert isinstance(context.nowcast_source, NsspRightTruncationNowcast)
+        assert context.nowcast_source.right_truncation_pmf == [0.4, 0.6]
+        mock_get_pmfs.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("target", "ed_visit_type"),
+        [
+            ("nssp", "pct"),
+            ("nhsn", "observed"),
+        ],
+    )
+    def test_auto_source_leaves_unsupported_targets_without_nowcast(
+        self,
+        target,
+        ed_visit_type,
+    ):
+        """Test auto selection leaves pct NSSP and NHSN without nowcasts."""
+        result = _resolve_nowcast_source(
+            disease="COVID-19",
+            loc="CA",
+            target=target,
+            frequency="epiweekly",
+            ed_visit_type=ed_visit_type,
+            report_date=dt.date(2024, 12, 20),
+            param_data_dir=None,
+            nowcast_source_name="auto",
+            right_truncation_pmf=None,
+            logger=logging.getLogger(),
+        )
+
+        assert result is None
+
+    @pytest.mark.parametrize(
+        ("target", "ed_visit_type"),
+        [
+            ("nhsn", "observed"),
+            ("nssp", "pct"),
+        ],
+    )
+    def test_forced_right_truncation_errors_for_unsupported_targets(
+        self,
+        target,
+        ed_visit_type,
+    ):
+        """Test forced right-truncation fails for unsupported targets."""
+        with pytest.raises(ValueError):
+            _resolve_nowcast_source(
+                disease="COVID-19",
+                loc="CA",
+                target=target,
+                frequency="daily",
+                ed_visit_type=ed_visit_type,
+                report_date=dt.date(2024, 12, 20),
+                param_data_dir=None,
+                nowcast_source_name="right-truncation",
+                right_truncation_pmf=[1.0],
+                logger=logging.getLogger(),
+            )
+
+    def test_right_truncation_warns_for_non_daily_frequency(self, caplog):
+        """Test right-truncation logs a cadence warning for non-daily runs."""
+        with caplog.at_level(logging.WARNING):
+            result = _resolve_nowcast_source(
+                disease="COVID-19",
+                loc="CA",
+                target="nssp",
+                frequency="epiweekly",
+                ed_visit_type="observed",
+                report_date=dt.date(2024, 12, 20),
+                param_data_dir=None,
+                nowcast_source_name="right-truncation",
+                right_truncation_pmf=[1.0],
+                logger=logging.getLogger(),
+            )
+
+        assert isinstance(result, NsspRightTruncationNowcast)
+        assert "Confirm that the right-truncation PMF is indexed" in caplog.text
 
 
 class TestPrepareModelData:

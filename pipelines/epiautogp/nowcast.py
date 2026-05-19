@@ -6,6 +6,7 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Protocol
 
+
 @dataclass(frozen=True)
 class NowcastData:
     """
@@ -44,6 +45,3 @@ class FixedNowcast:
         reports: list[float],
     ) -> NowcastData:
         return self.data
-
-
-

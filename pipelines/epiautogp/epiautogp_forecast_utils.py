@@ -15,8 +15,8 @@ from typing import Any, Literal
 import polars as pl
 
 from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
-from pipelines.epiautogp.nssp_nowcast import NsspRightTruncationNowcast
 from pipelines.epiautogp.nowcast import NowcastSource
+from pipelines.epiautogp.nssp_nowcast import NsspRightTruncationNowcast
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
@@ -157,6 +157,7 @@ class ForecastPipelineContext:
         model_fit_dir_to_hub_tbl(model_fit_dir)
         self.logger.info("Postprocessing complete.")
 
+
 def _use_right_truncation_nowcasting_auto(
     *,
     target: str,
@@ -182,6 +183,7 @@ def _use_right_truncation_nowcasting_auto(
         True if right-truncation nowcasting should be used, False otherwise
     """
     return target == "nssp" and ed_visit_type in ["observed", "other"]
+
 
 def _use_right_truncation_nowcasting_right_truncation(
     *,
@@ -209,15 +211,14 @@ def _use_right_truncation_nowcasting_right_truncation(
     """
     if target != "nssp":
         raise ValueError(
-            "right-truncation nowcasting is currently supported only "
-            "for target='nssp'."
+            "right-truncation nowcasting is currently supported only for target='nssp'."
         )
     if ed_visit_type == "pct":
         raise ValueError(
-            "right-truncation nowcasting is not supported for "
-            "ed_visit_type='pct'."
+            "right-truncation nowcasting is not supported for ed_visit_type='pct'."
         )
     return True
+
 
 def _generate_right_truncation_nowcast(
     *,
@@ -229,8 +230,7 @@ def _generate_right_truncation_nowcast(
     param_data_dir: Path | str | None,
     logger: logging.Logger,
 ) -> NsspRightTruncationNowcast:
-    """Generate a right-truncation nowcast source for EpiAutoGP.
-    """ 
+    """Generate a right-truncation nowcast source for EpiAutoGP."""
     if frequency != "daily":
         logger.warning(
             "Using right-truncation nowcasting for frequency=%r. Confirm that "
@@ -254,6 +254,7 @@ def _generate_right_truncation_nowcast(
         )["right_truncation_pmf"]
 
     return NsspRightTruncationNowcast(right_truncation_pmf=right_truncation_pmf)
+
 
 def _resolve_nowcast_source(
     *,

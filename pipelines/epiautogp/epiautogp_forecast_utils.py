@@ -10,11 +10,13 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import polars as pl
 
-from pipelines.data.prep_data import process_and_save_loc_data
+from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
+from pipelines.epiautogp.nssp_nowcast import NsspRightTruncationNowcast
+from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
@@ -25,6 +27,8 @@ from pipelines.utils.common_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
 )
+
+NowcastSourceName = Literal["auto", "none", "right-truncation"]
 
 
 @dataclass
@@ -70,6 +74,7 @@ class ForecastPipelineContext:
     credentials_dict: dict[str, Any]
     facility_level_nssp_data: pl.LazyFrame
     logger: logging.Logger
+    nowcast_source: NowcastSource | None = None
 
     def prepare_model_data(self) -> ModelPaths:
         """
@@ -152,6 +157,155 @@ class ForecastPipelineContext:
         model_fit_dir_to_hub_tbl(model_fit_dir)
         self.logger.info("Postprocessing complete.")
 
+def _use_right_truncation_nowcasting_auto(
+    *,
+    target: str,
+    ed_visit_type: str,
+) -> bool:
+    """
+    Determine whether right-truncation nowcasting should be used based on the
+    target and ED visit type when nowcast_source_name="auto".
+
+    Right-truncation nowcasting is currently only supported for NSSP targets with
+    "observed" or "other" ED visit types.
+
+    Parameters
+    ----------
+    target : str
+        Target data type (e.g., "nssp", "nhsn")
+    ed_visit_type : str
+        Type of ED visits (e.g., "observed", "other", "pct")
+
+    Returns
+    -------
+    bool
+        True if right-truncation nowcasting should be used, False otherwise
+    """
+    return target == "nssp" and ed_visit_type in ["observed", "other"]
+
+def _use_right_truncation_nowcasting_right_truncation(
+    *,
+    target: str,
+    ed_visit_type: str,
+) -> bool:
+    """
+    Determine whether right-truncation nowcasting should be used based on the
+    target and ED visit type when nowcast_source_name="right-truncation".
+
+    Right-truncation nowcasting is currently only supported for NSSP targets with
+    "observed" or "other" ED visit types.
+
+    Parameters
+    ----------
+    target : str
+        Target data type (e.g., "nssp", "nhsn")
+    ed_visit_type : str
+        Type of ED visits (e.g., "observed", "other", "pct")
+
+    Returns
+    -------
+    bool
+        True if right-truncation nowcasting should be used, False otherwise
+    """
+    if target != "nssp":
+        raise ValueError(
+            "right-truncation nowcasting is currently supported only "
+            "for target='nssp'."
+        )
+    if ed_visit_type == "pct":
+        raise ValueError(
+            "right-truncation nowcasting is not supported for "
+            "ed_visit_type='pct'."
+        )
+    return True
+
+def _generate_right_truncation_nowcast(
+    *,
+    right_truncation_pmf: list[float] | None,
+    disease: str,
+    loc: str,
+    frequency: str,
+    report_date: date,
+    param_data_dir: Path | str | None,
+    logger: logging.Logger,
+) -> NsspRightTruncationNowcast:
+    """Generate a right-truncation nowcast source for EpiAutoGP.
+    """ 
+    if frequency != "daily":
+        logger.warning(
+            "Using right-truncation nowcasting for frequency=%r. Confirm that "
+            "the right-truncation PMF is indexed to the cadence of the model "
+            "series being nowcast.",
+            frequency,
+        )
+
+    if right_truncation_pmf is None:
+        if param_data_dir is None:
+            raise ValueError(
+                "param_data_dir is required when right-truncation nowcasting "
+                "is requested without a directly supplied right_truncation_pmf."
+            )
+        param_estimates = pl.scan_parquet(Path(param_data_dir, "prod.parquet"))
+        right_truncation_pmf = get_pmfs(
+            param_estimates=param_estimates,
+            loc_abb=loc,
+            disease=disease,
+            as_of=report_date,
+        )["right_truncation_pmf"]
+
+    return NsspRightTruncationNowcast(right_truncation_pmf=right_truncation_pmf)
+
+def _resolve_nowcast_source(
+    *,
+    disease: str,
+    loc: str,
+    target: str,
+    frequency: str,
+    ed_visit_type: str,
+    report_date: date,
+    param_data_dir: Path | str | None,
+    nowcast_source_name: NowcastSourceName,
+    right_truncation_pmf: list[float] | None,
+    logger: logging.Logger,
+) -> NowcastSource | None:
+    """
+    Resolve the requested nowcast source for one EpiAutoGP run.
+    """
+    valid_sources = ["auto", "none", "right-truncation"]
+    if nowcast_source_name not in valid_sources:
+        raise ValueError(
+            f"nowcast_source_name must be one of {valid_sources}, "
+            f"got {nowcast_source_name!r}"
+        )
+
+    if nowcast_source_name == "none":
+        return None
+
+    use_right_truncation = False
+    if nowcast_source_name == "auto":
+        use_right_truncation = _use_right_truncation_nowcasting_auto(
+            target=target,
+            ed_visit_type=ed_visit_type,
+        )
+    elif nowcast_source_name == "right-truncation":
+        use_right_truncation = _use_right_truncation_nowcasting_right_truncation(
+            target=target,
+            ed_visit_type=ed_visit_type,
+        )
+
+    if use_right_truncation:
+        return _generate_right_truncation_nowcast(
+            right_truncation_pmf=right_truncation_pmf,
+            disease=disease,
+            loc=loc,
+            frequency=frequency,
+            report_date=report_date,
+            param_data_dir=param_data_dir,
+            logger=logger,
+        )
+    else:
+        return None
+
 
 def setup_forecast_pipeline(
     disease: str,
@@ -169,6 +323,9 @@ def setup_forecast_pipeline(
     exclude_date_ranges: list[tuple[date, date]] | None = None,
     credentials_path: Path | None = None,
     logger: logging.Logger | None = None,
+    param_data_dir: Path | str | None = None,
+    nowcast_source_name: NowcastSourceName = "auto",
+    right_truncation_pmf: list[float] | None = None,
 ) -> ForecastPipelineContext:
     """
     Set up common forecast pipeline infrastructure.
@@ -181,6 +338,7 @@ def setup_forecast_pipeline(
     4. Calculate training dates
     5. Load NSSP data
     6. Create batch directory structure
+    7. Resolve nowcasting source based on input parameters and available data
 
     Parameters
     ----------
@@ -215,6 +373,15 @@ def setup_forecast_pipeline(
         Path to credentials file
     logger : logging.Logger | None, default=None
         Logger instance. If None, creates a new logger
+    param_data_dir : Path | str | None, default=None
+        Directory containing parameter estimates such as right-truncation PMFs.
+        Required when right-truncation nowcasting is selected and no PMF is
+        directly supplied.
+    nowcast_source_name : {"auto", "none", "right-truncation"}, default="auto"
+        Nowcast source selection for EpiAutoGP input.
+    right_truncation_pmf : list[float] | None, default=None
+        Directly supplied right-truncation PMF. Takes precedence over
+        param_data_dir when right-truncation nowcasting is selected.
 
     Returns
     -------
@@ -266,6 +433,20 @@ def setup_forecast_pipeline(
     logger.info(f"Model batch directory: {model_batch_dir}")
     logger.info(f"Model run directory: {model_run_dir}")
 
+    # Resolve nowcast source
+    resolved_nowcast_source = _resolve_nowcast_source(
+        disease=disease,
+        loc=loc,
+        target=target,
+        frequency=frequency,
+        ed_visit_type=ed_visit_type,
+        report_date=report_date_parsed,
+        param_data_dir=param_data_dir,
+        nowcast_source_name=nowcast_source_name,
+        right_truncation_pmf=right_truncation_pmf,
+        logger=logger,
+    )
+
     return ForecastPipelineContext(
         disease=disease,
         loc=loc,
@@ -285,4 +466,5 @@ def setup_forecast_pipeline(
         credentials_dict=credentials_dict,
         facility_level_nssp_data=facility_level_nssp_data,
         logger=logger,
+        nowcast_source=resolved_nowcast_source,
     )

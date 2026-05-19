@@ -16,6 +16,7 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ModelPaths,
 )
+from pipelines.epiautogp.nowcast import NowcastData
 
 
 def _validate_epiautogp_parameters(
@@ -55,11 +56,43 @@ def _validate_epiautogp_parameters(
         )
 
 
+def _generate_nowcast_data(
+    context: ForecastPipelineContext,
+    dates: list[dt.date],
+    reports: list[float],
+) -> NowcastData:
+    """
+    Generate nowcast data using the provided nowcast source.
+
+    If context.nowcast_source is None, returns empty NowcastData.
+    Otherwise, calls the get_nowcast_data method of the nowcast source.
+
+    Parameters
+    ----------
+    context : ForecastPipelineContext
+        Forecast pipeline context containing the nowcast source
+    dates : list[dt.date]
+        List of dates corresponding to the observed reports
+    reports : list[float]
+        List of observed report values corresponding to the dates
+
+    Returns
+    -------
+    NowcastData
+        NowcastData object containing nowcast dates and reports
+    """
+    if context.nowcast_source is None:
+        return NowcastData()
+
+    return context.nowcast_source.get_nowcast_data(
+        dates=dates,
+        reports=reports,
+    )
+
+
 def convert_to_epiautogp_json(
     context: ForecastPipelineContext,
     paths: ModelPaths,
-    nowcast_dates: list[dt.date] | None = None,
-    nowcast_reports: list[list[float]] | None = None,
 ) -> Path:
     """
     Convert surveillance data to EpiAutoGP JSON format.
@@ -76,12 +109,6 @@ def convert_to_epiautogp_json(
     paths : ModelPaths
         Model paths containing daily and epiweekly training data paths,
         and model_output_dir where the JSON file will be saved
-    nowcast_dates : list[dt.date] | `None`, default=`None`
-        Dates requiring nowcasting (typically recent dates with
-        incomplete data). If `None`, defaults to empty list. Not currently used.
-    nowcast_reports : list[list[float]] | `None`, default=`None`
-        Samples for nowcast dates to represent nowcast uncertainty. If `None`,
-        defaults to empty list. Not currently used.
 
     Returns
     -------
@@ -124,12 +151,6 @@ def convert_to_epiautogp_json(
         context.target, context.frequency, context.ed_visit_type
     )
 
-    # Set defaults for nowcasting
-    if nowcast_dates is None:
-        nowcast_dates = []
-    if nowcast_reports is None:
-        nowcast_reports = []
-
     # Define input data JSON path
     input_json_path = paths.model_output_dir / f"{context.model_name}_input.json"
     # Determine which data path to use based on frequency
@@ -148,6 +169,14 @@ def convert_to_epiautogp_json(
         logger,
     )
 
+    # Generate nowcast data from the provided nowcast source in the context (if any)
+    if context.nowcast_source is not None:
+        logger.info(
+            "Generating nowcast data using nowcast source type "
+            f"{type(context.nowcast_source).__name__}"
+        )
+    nowcast_data = _generate_nowcast_data(context, dates, reports)
+
     # Create EpiAutoGP input structure
     epiautogp_input = {
         "dates": [d.isoformat() for d in dates],
@@ -158,8 +187,8 @@ def convert_to_epiautogp_json(
         "frequency": context.frequency,
         "ed_visit_type": context.ed_visit_type,
         "forecast_date": context.report_date.isoformat(),
-        "nowcast_dates": [d.isoformat() for d in nowcast_dates],
-        "nowcast_reports": nowcast_reports,
+        "nowcast_dates": [d.isoformat() for d in nowcast_data.dates],
+        "nowcast_reports": nowcast_data.reports,
     }
 
     # Write JSON file

@@ -7,6 +7,7 @@ import polars as pl
 from jax.typing import ArrayLike
 
 from cfa.stf.data import get_nnh_right_truncation_pmf, get_nssp
+from cfa.stf.data.get_data import NSSPDataset
 from cfa.stf.forecasttools import ensure_list
 
 
@@ -65,10 +66,11 @@ def identify_outlier_tail(
     return exclude.tolist()
 
 
-# this only works with one disease at a time
 def exclude_tail_auto(
     loc_abb: str,
     as_of: dt.date | None = None,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
     exclusion_calc_disease: str | list[str] = ["Influenza", "RSV", "COVID-19"],
     outlier_sd_multiplier: float = 2.5,
     max_tail_length: int = 7,
@@ -79,14 +81,21 @@ def exclude_tail_auto(
         else ["Influenza", "RSV", "COVID-19"]
     )
 
-    nssp_dat = get_nssp(
-        as_of=as_of, loc_abb=loc_abb, disease=disease_pmf, lazy=False
-    ).with_columns(
-        offset_days=(
-            pl.col("reference_date").max() - pl.col("reference_date")
-        ).dt.total_days()
-        + 1
-    )
+    nssp_dat = (
+        get_nssp(
+            as_of=as_of,
+            loc_abb=loc_abb,
+            start_date=start_date,
+            end_date=end_date,
+            disease=exclusion_calc_disease,
+            lazy=False,
+        ).with_columns(
+            offset_days=(
+                pl.col("reference_date").max() - pl.col("reference_date")
+            ).dt.total_days()
+            + 1
+        )
+    ).sort("reference_date")
 
     pmf_df = (
         pl.DataFrame(
@@ -108,7 +117,8 @@ def exclude_tail_auto(
             offset_days=pl.row_index().over("disease") + 1,
         )
     )
-
+    # If exclusion_calc_disease is "Total", disease_pmf is all diseases,
+    # so we average the pmf across all of them
     if exclusion_calc_disease == "Total":
         pmf_df = (
             pmf_df.group_by("offset_days")
@@ -132,13 +142,13 @@ def exclude_tail_auto(
         )
         .pipe(
             lambda df: df.with_columns(
-                exclude=pl.lit(
+                pl.Series(
                     identify_outlier_tail(
                         df["adjusted_value"],
                         outlier_sd_multiplier=outlier_sd_multiplier,
                         max_tail_length=max_tail_length,
                     )
-                )
+                ).alias("exclude")
             )
         )
         .select("reference_date", "exclude")
@@ -159,48 +169,71 @@ def exclude_tail_n(reference_dates: list[dt.date], n: int) -> pl.DataFrame:
     return exclusion_df
 
 
-# this only works for one location and one disease at a time
-# need to add arg for start date or n_days or something
-# should probably re-work the auto tail functions so they accept nssp_dat as input and do the computations on that.
 def get_nssp_with_exclusion(
-    as_of: dt.date,
-    loc_abb: str,
     disease: str,
+    loc_abb: str,
     exclusion_strategy: Literal[
         "tail_by_target_disease", "tail_by_all_disease", "tail_by_total", "tail_by_n"
     ],
+    dataset: NSSPDataset = "gold",
+    as_of: dt.date | None = None,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
     **exclusion_strategy_args,
 ) -> pl.DataFrame:
-    nssp_dat = get_nssp(as_of=as_of, loc_abb=loc_abb, disease=disease, lazy=False)
+    if len(ensure_list(disease)) != 1:
+        raise ValueError(f"Only one disease can be processed at a time. Got {disease}.")
+
+    if len(ensure_list(loc_abb)) != 1:
+        raise ValueError(
+            f"Only one location can be processed at a time. Got {loc_abb}."
+        )
 
     exclusion_strategies = {
         "tail_by_target_disease": partial(
             exclude_tail_auto,
             loc_abb=loc_abb,
             as_of=as_of,
+            start_date=start_date,
+            end_date=end_date,
             exclusion_calc_disease=disease,
         ),
         "tail_by_all_disease": partial(
             exclude_tail_auto,
             loc_abb=loc_abb,
             as_of=as_of,
+            start_date=start_date,
+            end_date=end_date,
             exclusion_calc_disease=["Influenza", "RSV", "COVID-19"],
         ),
         "tail_by_total": partial(
             exclude_tail_auto,
             loc_abb=loc_abb,
             as_of=as_of,
+            start_date=start_date,
+            end_date=end_date,
             exclusion_calc_disease="Total",
         ),
         "tail_by_n": lambda **kwargs: exclude_tail_n(
             reference_dates=nssp_dat["reference_date"].to_list(), **kwargs
         ),
     }
+
     if exclusion_strategy not in exclusion_strategies:
         raise ValueError(
             f"exclusion_strategy must be one of {set(exclusion_strategies)}, "
             f"got {exclusion_strategy!r}"
         )
+
+    nssp_dat = get_nssp(
+        as_of=as_of,
+        loc_abb=loc_abb,
+        disease=disease,
+        dataset=dataset,
+        start_date=start_date,
+        end_date=end_date,
+        lazy=False,
+    )
 
     exclusion_dat = exclusion_strategies[exclusion_strategy](**exclusion_strategy_args)
 

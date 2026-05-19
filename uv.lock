@@ -739,8 +739,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-cloudops"
-version = "0.4.0"
-source = { git = "https://github.com/CDCgov/cfa-cloudops.git#828a2c778236ae03cba5f40f049bf41aa30a88bc" }
+version = "0.5.1"
+source = { git = "https://github.com/CDCgov/cfa-cloudops.git#33190ed105839515671c5afbfdd922a8650998b2" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
@@ -753,7 +753,6 @@ dependencies = [
     { name = "azure-mgmt-batch" },
     { name = "azure-mgmt-compute" },
     { name = "azure-mgmt-resource" },
-    { name = "azure-mgmt-subscription" },
     { name = "azure-mgmt-web" },
     { name = "azure-storage-blob" },
     { name = "docker" },

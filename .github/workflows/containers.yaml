@@ -76,7 +76,7 @@ jobs:
             cache-to: type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache,mode=max
 
     check_if_dagster_defs_changed:
-      name: Check if Dagster Definitions Changed
+      name: Check if dagster_defs.py Changed
       needs: build-pipeline-image
       runs-on: ubuntu-latest
       permissions:

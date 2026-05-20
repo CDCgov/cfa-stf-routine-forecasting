@@ -515,7 +515,6 @@ weekly_forecast_upstream_sensor = dg.AutomationConditionSensorDefinition(
 weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyForecastFusion",
     target=dg.AssetSelection.groups("WeeklyForecastFusion"),
-    minimum_interval_seconds=300,
     use_user_code_server=False,  # does NOT allow custom conditions
 )
 

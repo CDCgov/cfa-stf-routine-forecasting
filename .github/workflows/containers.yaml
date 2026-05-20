@@ -97,17 +97,16 @@ jobs:
             if [ "${{ github.event_name }}" = "push" ]; then
               BASE="${{ github.event.before }}"
               HEAD="${{ github.sha }}"
-            else
-              BASE="HEAD~1"
-              HEAD="HEAD"
-            fi
+              CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
+              echo $CHANGED
 
-            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep '^dagster_defs\.py$' || true)
-            echo $CHANGED
-
-            if [ -n "$CHANGED" ]; then
-              echo "changed=true" >> $GITHUB_OUTPUT
+              if [ -n "$CHANGED" ]; then
+                echo "changed=true" >> $GITHUB_OUTPUT
+              else
+                echo "changed=false" >> $GITHUB_OUTPUT
+              fi
             else
+              echo "Setting 'changed' to false as we only care to check when it's a push."
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
 
@@ -121,6 +120,7 @@ jobs:
         ${{
           ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
           ( github.event_name == 'push' && github.ref_name == 'main' && needs.check_if_dagster_defs_changed.outputs.changed == 'true' )
+          
         }}
       runs-on: ubuntu-latest
       name: Update Dagster Code Location

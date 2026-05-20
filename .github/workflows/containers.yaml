@@ -99,6 +99,7 @@ jobs:
             fi
 
             CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep '^dagster_defs\.py$' || true)
+            echo $CHANGED
 
             if [ -n "$CHANGED" ]; then
               echo "changed=true" >> $GITHUB_OUTPUT

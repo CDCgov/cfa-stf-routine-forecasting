@@ -111,7 +111,7 @@ jobs:
             fi
 
     deploy_dagster_code:
-      needs: [ build-pipeline-image, check_if_dagster_defs_changed]
+      needs: [ build-pipeline-image, check_if_dagster_defs_changed ]
       # Conditional step execution that runs only when:
       # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
       # OR
@@ -120,7 +120,6 @@ jobs:
         ${{
           ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
           ( github.event_name == 'push' && github.ref_name == 'main' && needs.check_if_dagster_defs_changed.outputs.changed == 'true' )
-          
         }}
       runs-on: ubuntu-latest
       name: Update Dagster Code Location

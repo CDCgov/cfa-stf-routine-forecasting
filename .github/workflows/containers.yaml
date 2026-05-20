@@ -1,4 +1,4 @@
-name: Create Docker Image and push to dagster
+name: Create Docker Image and optionally deploy to Dagster
 
 on:
   push:

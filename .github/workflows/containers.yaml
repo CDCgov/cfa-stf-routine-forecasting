@@ -78,8 +78,8 @@ jobs:
     deploy_dagster_code:
       needs: build-pipeline-image
       # Conditional step execution that runs only when:
-      # A manual workflow dispatch input 'push_to_dagster' is set to 'yes'
-      if: ${{ github.event.inputs.push_to_dagster == 'yes' }}
+      # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' }}
       runs-on: ubuntu-latest
       name: Update Dagster Code Location
       permissions:

@@ -115,9 +115,9 @@ jobs:
       # OR
       # the event is a push to main where the dagster_defs_changed
       if: >-
-        ${{ 
+        ${{
           ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
-          ( github.event_name == 'push' && github.ref_name == 'main' && needs.check_if_dagster_defs_changed.outputs.changed == 'true' ) 
+          ( github.event_name == 'push' && github.ref_name == 'main' && needs.check_if_dagster_defs_changed.outputs.changed == 'true' )
         }}
       runs-on: ubuntu-latest
       name: Update Dagster Code Location

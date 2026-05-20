@@ -8,7 +8,7 @@ on:
     inputs:
       push_to_dagster:
         type: choice
-        description: "Should the container be pushed to the dagster prod server? (WILL ALWAYS PUSH ON MAIN)"
+        description: "Should the container be pushed to the dagster prod server?"
         options:
           - "no"
           - "yes"
@@ -80,7 +80,7 @@ jobs:
       # Conditional step execution that runs when either:
       # 1. The workflow is triggered on the main branch (refs/heads/main), OR
       # 2. A manual workflow dispatch input 'push_to_dagster' is set to 'yes'
-      if: ${{ github.ref == 'refs/heads/main' || github.event.inputs.push_to_dagster == 'yes' }}
+      if: ${{ github.event.inputs.push_to_dagster == 'yes' }}
       runs-on: ubuntu-latest
       name: Update Dagster Code Location
       permissions:

@@ -29,7 +29,7 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     _resolve_nowcast_source,
     setup_forecast_pipeline,
 )
-from pipelines.epiautogp.nssp_nowcast import NsspRightTruncationNowcast
+from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
 @pytest.fixture
@@ -197,7 +197,7 @@ class TestSetupForecastPipeline:
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
-    def test_auto_nssp_observed_builds_right_truncation_source(
+    def test_reporting_delay_fetches_pmf_from_param_data_dir(
         self,
         mock_calc_dates,
         mock_get_reports,
@@ -206,7 +206,7 @@ class TestSetupForecastPipeline:
         mock_get_pmfs,
         tmp_path,
     ):
-        """Test auto nowcasting builds an NSSP right-truncation source."""
+        """Test reporting-delay nowcasting loads the PMF from param_data_dir."""
         mock_load_creds.return_value = {}
         mock_get_reports.return_value = [dt.date(2024, 12, 20)]
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
@@ -226,10 +226,11 @@ class TestSetupForecastPipeline:
             n_training_days=90,
             n_forecast_days=28,
             param_data_dir=tmp_path / "prod_param_estimates",
+            nowcast_source_name="reporting-delay",
         )
 
-        assert isinstance(context.nowcast_source, NsspRightTruncationNowcast)
-        assert context.nowcast_source.right_truncation_pmf == [0.25, 0.75]
+        assert isinstance(context.nowcast_source, ReportingDelayNowcast)
+        assert context.nowcast_source.reporting_delay_pmf == [0.25, 0.75]
         assert mock_get_pmfs.call_args.kwargs["loc_abb"] == "CA"
         assert mock_get_pmfs.call_args.kwargs["disease"] == "COVID-19"
         assert mock_get_pmfs.call_args.kwargs["as_of"] == dt.date(2024, 12, 20)
@@ -239,7 +240,7 @@ class TestSetupForecastPipeline:
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
-    def test_direct_right_truncation_pmf_wins_over_param_data_dir(
+    def test_direct_reporting_delay_pmf_wins_over_param_data_dir(
         self,
         mock_calc_dates,
         mock_get_reports,
@@ -267,70 +268,67 @@ class TestSetupForecastPipeline:
             n_training_days=90,
             n_forecast_days=28,
             param_data_dir=tmp_path / "prod_param_estimates",
-            right_truncation_pmf=[0.4, 0.6],
+            nowcast_source_name="reporting-delay",
+            reporting_delay_pmf=[0.4, 0.6],
         )
 
-        assert isinstance(context.nowcast_source, NsspRightTruncationNowcast)
-        assert context.nowcast_source.right_truncation_pmf == [0.4, 0.6]
+        assert isinstance(context.nowcast_source, ReportingDelayNowcast)
+        assert context.nowcast_source.reporting_delay_pmf == [0.4, 0.6]
         mock_get_pmfs.assert_not_called()
 
-    @pytest.mark.parametrize(
-        ("target", "ed_visit_type"),
-        [
-            ("nssp", "pct"),
-            ("nhsn", "observed"),
-        ],
-    )
-    def test_auto_source_leaves_unsupported_targets_without_nowcast(
-        self,
-        target,
-        ed_visit_type,
-    ):
-        """Test auto selection leaves pct NSSP and NHSN without nowcasts."""
-        result = _resolve_nowcast_source(
-            disease="COVID-19",
-            loc="CA",
-            target=target,
-            frequency="epiweekly",
-            ed_visit_type=ed_visit_type,
-            report_date=dt.date(2024, 12, 20),
-            param_data_dir=None,
-            nowcast_source_name="auto",
-            right_truncation_pmf=None,
-            logger=logging.getLogger(),
-        )
-
-        assert result is None
-
-    @pytest.mark.parametrize(
-        ("target", "ed_visit_type"),
-        [
-            ("nhsn", "observed"),
-            ("nssp", "pct"),
-        ],
-    )
-    def test_forced_right_truncation_errors_for_unsupported_targets(
-        self,
-        target,
-        ed_visit_type,
-    ):
-        """Test forced right-truncation fails for unsupported targets."""
-        with pytest.raises(ValueError):
+    def test_reporting_delay_errors_for_percentage_targets(self):
+        """Test reporting-delay fails for percentage data (numerator/denominator)."""
+        with pytest.raises(ValueError, match="not applicable"):
             _resolve_nowcast_source(
                 disease="COVID-19",
                 loc="CA",
-                target=target,
+                target="nssp",
                 frequency="daily",
-                ed_visit_type=ed_visit_type,
+                ed_visit_type="pct",
                 report_date=dt.date(2024, 12, 20),
                 param_data_dir=None,
-                nowcast_source_name="right-truncation",
-                right_truncation_pmf=[1.0],
+                nowcast_source_name="reporting-delay",
+                reporting_delay_pmf=[1.0],
                 logger=logging.getLogger(),
             )
 
-    def test_right_truncation_warns_for_non_daily_frequency(self, caplog):
-        """Test right-truncation logs a cadence warning for non-daily runs."""
+    def test_reporting_delay_applies_to_nhsn_counts(self):
+        """Test reporting-delay also applies to NHSN counts (not just NSSP)."""
+        result = _resolve_nowcast_source(
+            disease="COVID-19",
+            loc="CA",
+            target="nhsn",
+            frequency="daily",
+            ed_visit_type="observed",
+            report_date=dt.date(2024, 12, 20),
+            param_data_dir=None,
+            nowcast_source_name="reporting-delay",
+            reporting_delay_pmf=[0.4, 0.6],
+            logger=logging.getLogger(),
+        )
+
+        assert isinstance(result, ReportingDelayNowcast)
+
+    def test_reporting_delay_returns_source_for_applicable_config(self):
+        """Test reporting-delay builds a source for daily NSSP counts."""
+        result = _resolve_nowcast_source(
+            disease="COVID-19",
+            loc="CA",
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+            report_date=dt.date(2024, 12, 20),
+            param_data_dir=None,
+            nowcast_source_name="reporting-delay",
+            reporting_delay_pmf=[0.4, 0.6],
+            logger=logging.getLogger(),
+        )
+
+        assert isinstance(result, ReportingDelayNowcast)
+        assert result.reporting_delay_pmf == [0.4, 0.6]
+
+    def test_reporting_delay_warns_for_non_daily_frequency(self, caplog):
+        """Test reporting-delay logs a soft cadence warning on non-daily runs."""
         with caplog.at_level(logging.WARNING):
             result = _resolve_nowcast_source(
                 disease="COVID-19",
@@ -340,13 +338,46 @@ class TestSetupForecastPipeline:
                 ed_visit_type="observed",
                 report_date=dt.date(2024, 12, 20),
                 param_data_dir=None,
-                nowcast_source_name="right-truncation",
-                right_truncation_pmf=[1.0],
+                nowcast_source_name="reporting-delay",
+                reporting_delay_pmf=[1.0],
                 logger=logging.getLogger(),
             )
 
-        assert isinstance(result, NsspRightTruncationNowcast)
-        assert "Confirm that the right-truncation PMF is indexed" in caplog.text
+        assert isinstance(result, ReportingDelayNowcast)
+        assert "reporting-delay PMF support matches the model cadence" in caplog.text
+
+    def test_none_keyword_returns_no_source(self):
+        """Test 'none' resolves to no nowcast source regardless of config."""
+        result = _resolve_nowcast_source(
+            disease="COVID-19",
+            loc="CA",
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+            report_date=dt.date(2024, 12, 20),
+            param_data_dir=None,
+            nowcast_source_name="none",
+            reporting_delay_pmf=[0.5, 0.5],
+            logger=logging.getLogger(),
+        )
+
+        assert result is None
+
+    def test_unknown_keyword_raises(self):
+        """Test an unrecognised keyword raises a descriptive error."""
+        with pytest.raises(ValueError, match="nowcast_source_name must be one of"):
+            _resolve_nowcast_source(
+                disease="COVID-19",
+                loc="CA",
+                target="nssp",
+                frequency="daily",
+                ed_visit_type="observed",
+                report_date=dt.date(2024, 12, 20),
+                param_data_dir=None,
+                nowcast_source_name="auto",
+                reporting_delay_pmf=None,
+                logger=logging.getLogger(),
+            )
 
 
 class TestPrepareModelData:

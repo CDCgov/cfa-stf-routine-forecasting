@@ -206,38 +206,29 @@ def _resolve_nowcast_source(
     Reporting-delay also logs a soft cadence warning for non-daily runs
     because the PMF support is daily by convention.
     """
-    if nowcast_source_name not in VALID_NOWCAST_SOURCE_NAMES:
-        raise ValueError(
-            f"nowcast_source_name must be one of {list(VALID_NOWCAST_SOURCE_NAMES)}, "
-            f"got {nowcast_source_name!r}"
-        )
-
-    if nowcast_source_name == "none":
-        return None
-
-    if nowcast_source_name == "reporting-delay":
-        if not ReportingDelayNowcast.applies_to(
-            target=target, ed_visit_type=ed_visit_type, frequency=frequency
-        ):
+    match nowcast_source_name:
+        case "none":
+            return None
+        case "reporting-delay":
+            if not ReportingDelayNowcast.applies_to(
+                target=target, ed_visit_type=ed_visit_type, frequency=frequency
+            ):
+                raise ValueError(
+                    f"reporting-delay nowcasting is not applicable to "
+                    f"target={target!r}, ed_visit_type={ed_visit_type!r}."
+                )
+            return _build_reporting_delay_nowcast(
+                reporting_delay_pmf=reporting_delay_pmf,
+                disease=disease,
+                loc=loc,
+                report_date=report_date,
+                param_data_dir=param_data_dir,
+            )
+        case _:
             raise ValueError(
-                f"reporting-delay nowcasting is not applicable to "
-                f"target={target!r}, ed_visit_type={ed_visit_type!r}."
+                f"nowcast_source_name must be one of {list(VALID_NOWCAST_SOURCE_NAMES)}, "
+                f"got {nowcast_source_name!r}"
             )
-        if frequency != "daily":
-            logger.warning(
-                "Using reporting-delay nowcasting for frequency=%r. Confirm "
-                "the reporting-delay PMF support matches the model cadence.",
-                frequency,
-            )
-        return _build_reporting_delay_nowcast(
-            reporting_delay_pmf=reporting_delay_pmf,
-            disease=disease,
-            loc=loc,
-            report_date=report_date,
-            param_data_dir=param_data_dir,
-        )
-
-    raise ValueError(f"unhandled nowcast_source_name: {nowcast_source_name!r}")
 
 
 def setup_forecast_pipeline(

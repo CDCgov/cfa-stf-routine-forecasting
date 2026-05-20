@@ -1,5 +1,5 @@
 """
-NSSP right-truncation nowcasting for EpiAutoGP.
+Reporting-delay nowcasting for EpiAutoGP.
 
 The estimator inflates the most-recent observations of a daily count series by
 the inverse of the reporting CDF. It is only meaningful for *count* targets:
@@ -21,12 +21,12 @@ from pipelines.epiautogp.reporting_delay import (
 
 
 @dataclass(frozen=True)
-class NsspRightTruncationNowcast:
+class ReportingDelayNowcast:
     """
-    Estimate NSSP nowcasts from PyRenew-style reporting-delay PMFs.
+    Estimate nowcasts by inflating recent observations with a reporting-delay PMF.
 
-    The PMF support is daily reporting delay by convention; that is the source
-    of the `frequency="daily"` requirement in `applies_to`.
+    The PMF support is daily reporting delay by convention; the resolver logs a
+    soft warning if used with a non-daily series.
     """
 
     reporting_delay_pmf: list[float]
@@ -34,14 +34,16 @@ class NsspRightTruncationNowcast:
     @staticmethod
     def applies_to(
         *,
-        target: str,
-        ed_visit_type: str,
-        frequency: str,
+        target: str = "nssp",
+        ed_visit_type: str = "observed",
+        frequency: str = "daily",
     ) -> bool:
-        return (
-            target == "nssp"
-            and ed_visit_type in ("observed", "other")
-        )
+        # The estimator multiplies recent observations by 1/reporting_fraction.
+        # For a percentage (numerator / denominator) the same factor applies to
+        # both terms and cancels, so reject ed_visit_type="pct". Target and
+        # frequency are not gating conditions: any count series can be
+        # corrected when paired with a PMF on its native cadence.
+        return ed_visit_type != "pct"
 
     def get_nowcast_data(
         self,
@@ -50,7 +52,7 @@ class NsspRightTruncationNowcast:
         reports: list[float],
     ) -> NowcastData:
         """
-        Apply right-truncation correction to one daily NSSP time series.
+        Apply reporting-delay inflation to one daily time series.
         """
         if len(dates) != len(reports):
             raise ValueError("dates and reports must have the same length")

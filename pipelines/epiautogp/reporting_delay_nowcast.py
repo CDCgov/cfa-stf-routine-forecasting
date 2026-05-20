@@ -11,6 +11,7 @@ would require distinct PMFs for the numerator and denominator series (see
 """
 
 import datetime as dt
+import logging
 from dataclasses import dataclass
 
 from pipelines.epiautogp.nowcast import NowcastData
@@ -18,6 +19,8 @@ from pipelines.epiautogp.reporting_delay import (
     inflate_report,
     reporting_inflation_factors,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,13 @@ class ReportingDelayNowcast:
         # both terms and cancels, so reject ed_visit_type="pct". Target and
         # frequency are not gating conditions: any count series can be
         # corrected when paired with a PMF on its native cadence.
+        if frequency != "daily":
+            logger.warning(
+                "Using reporting-delay nowcasting for frequency=%r. Confirm "
+                "the reporting-delay PMF support matches the model cadence.",
+                frequency,
+            )
+
         return ed_visit_type != "pct"
 
     def get_nowcast_data(

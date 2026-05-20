@@ -85,6 +85,9 @@ jobs:
       outputs:
         changed: ${{ steps.dagster_changed.outputs.changed }}
       steps:
+        - name: Checkout code
+          uses: actions/checkout@v6
+
         - name: Check if dagster defs changed
           id: dagster_changed
           shell: bash

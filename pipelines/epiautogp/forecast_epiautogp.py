@@ -6,6 +6,9 @@ from pipelines.epiautogp import (
     convert_to_epiautogp_json,
     setup_forecast_pipeline,
 )
+from pipelines.epiautogp.epiautogp_forecast_utils import (
+    VALID_NOWCAST_SOURCE_NAMES,
+)
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     parse_exclude_date_ranges,
@@ -101,8 +104,8 @@ def main(
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
     param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
-    nowcast_source_name: str = "auto",
-    right_truncation_pmf: list[float] | None = None,
+    nowcast_source_name: str = "none",
+    reporting_delay_pmf: list[float] | None = None,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -126,7 +129,7 @@ def main(
     facility_level_nssp_data_dir : Path | str
         Directory containing facility-level NSSP ED visit data
     param_data_dir : Path | str
-        Directory containing parameter estimates such as right-truncation PMFs
+        Directory containing parameter estimates such as reporting-delay PMFs
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -162,10 +165,10 @@ def main(
         Proportion of data used in each SMC step
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
-    nowcast_source_name : str, default="auto"
-        Nowcast source to use: "auto", "none", or "right-truncation"
-    right_truncation_pmf : list[float] | None, default=None
-        Directly supplied right-truncation PMF. Python API only.
+    nowcast_source_name : str, default="none"
+        Nowcast source to use: "none" or "reporting-delay"
+    reporting_delay_pmf : list[float] | None, default=None
+        Directly supplied reporting-delay PMF. Python API only.
 
     Returns
     -------
@@ -260,7 +263,7 @@ def main(
         logger=logger,
         param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
-        right_truncation_pmf=right_truncation_pmf,
+        reporting_delay_pmf=reporting_delay_pmf,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -348,19 +351,19 @@ if __name__ == "__main__":
         "--param-data-dir",
         type=Path,
         default=Path("private_data", "prod_param_estimates"),
-        help="Directory containing parameter estimates such as right-truncation PMFs.",
+        help="Directory containing parameter estimates such as reporting-delay PMFs.",
     )
 
     parser.add_argument(
         "--nowcast-source",
         dest="nowcast_source_name",
         type=str,
-        default="auto",
-        choices=["auto", "none", "right-truncation"],
+        default="none",
+        choices=list(VALID_NOWCAST_SOURCE_NAMES),
         help=(
-            "Nowcast source to use: 'auto' selects the default for the target, "
-            "'none' disables nowcasting, and 'right-truncation' forces "
-            "right-truncation nowcasting where supported (default: auto)."
+            "Nowcast source to use: 'none' disables nowcasting; "
+            "'reporting-delay' inflates recent counts using a reporting-delay "
+            "PMF (default: none)."
         ),
     )
 

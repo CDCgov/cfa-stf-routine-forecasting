@@ -10,13 +10,13 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 import polars as pl
 
 from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
 from pipelines.epiautogp.nowcast import NowcastSource
-from pipelines.epiautogp.nssp_nowcast import NsspRightTruncationNowcast
+from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
@@ -28,7 +28,8 @@ from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
 )
 
-NowcastSourceName = Literal["auto", "none", "right-truncation"]
+NowcastSourceName = Literal["none", "reporting-delay"]
+VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
 @dataclass
@@ -158,102 +159,30 @@ class ForecastPipelineContext:
         self.logger.info("Postprocessing complete.")
 
 
-def _use_right_truncation_nowcasting_auto(
+def _build_reporting_delay_nowcast(
     *,
-    target: str,
-    ed_visit_type: str,
-) -> bool:
-    """
-    Determine whether right-truncation nowcasting should be used based on the
-    target and ED visit type when nowcast_source_name="auto".
-
-    Right-truncation nowcasting is currently only supported for NSSP targets with
-    "observed" or "other" ED visit types.
-
-    Parameters
-    ----------
-    target : str
-        Target data type (e.g., "nssp", "nhsn")
-    ed_visit_type : str
-        Type of ED visits (e.g., "observed", "other", "pct")
-
-    Returns
-    -------
-    bool
-        True if right-truncation nowcasting should be used, False otherwise
-    """
-    return target == "nssp" and ed_visit_type in ["observed", "other"]
-
-
-def _use_right_truncation_nowcasting_right_truncation(
-    *,
-    target: str,
-    ed_visit_type: str,
-) -> bool:
-    """
-    Determine whether right-truncation nowcasting should be used based on the
-    target and ED visit type when nowcast_source_name="right-truncation".
-
-    Right-truncation nowcasting is currently only supported for NSSP targets with
-    "observed" or "other" ED visit types.
-
-    Parameters
-    ----------
-    target : str
-        Target data type (e.g., "nssp", "nhsn")
-    ed_visit_type : str
-        Type of ED visits (e.g., "observed", "other", "pct")
-
-    Returns
-    -------
-    bool
-        True if right-truncation nowcasting should be used, False otherwise
-    """
-    if target != "nssp":
-        raise ValueError(
-            "right-truncation nowcasting is currently supported only for target='nssp'."
-        )
-    if ed_visit_type == "pct":
-        raise ValueError(
-            "right-truncation nowcasting is not supported for ed_visit_type='pct'."
-        )
-    return True
-
-
-def _generate_right_truncation_nowcast(
-    *,
-    right_truncation_pmf: list[float] | None,
+    reporting_delay_pmf: list[float] | None,
     disease: str,
     loc: str,
-    frequency: str,
     report_date: date,
     param_data_dir: Path | str | None,
-    logger: logging.Logger,
-) -> NsspRightTruncationNowcast:
-    """Generate a right-truncation nowcast source for EpiAutoGP."""
-    if frequency != "daily":
-        logger.warning(
-            "Using right-truncation nowcasting for frequency=%r. Confirm that "
-            "the right-truncation PMF is indexed to the cadence of the model "
-            "series being nowcast.",
-            frequency,
-        )
-
-    if right_truncation_pmf is None:
+) -> ReportingDelayNowcast:
+    """Build a ReportingDelayNowcast, fetching the PMF if not supplied."""
+    if reporting_delay_pmf is None:
         if param_data_dir is None:
             raise ValueError(
-                "param_data_dir is required when right-truncation nowcasting "
-                "is requested without a directly supplied right_truncation_pmf."
+                "param_data_dir is required when reporting-delay nowcasting "
+                "is requested without a directly supplied reporting_delay_pmf."
             )
         param_estimates = pl.scan_parquet(Path(param_data_dir, "prod.parquet"))
-        right_truncation_pmf = get_pmfs(
+        reporting_delay_pmf = get_pmfs(
             param_estimates=param_estimates,
             loc_abb=loc,
             disease=disease,
             as_of=report_date,
         )["right_truncation_pmf"]
 
-    return NsspRightTruncationNowcast(right_truncation_pmf=right_truncation_pmf)
+    return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
 
 
 def _resolve_nowcast_source(
@@ -266,46 +195,49 @@ def _resolve_nowcast_source(
     report_date: date,
     param_data_dir: Path | str | None,
     nowcast_source_name: NowcastSourceName,
-    right_truncation_pmf: list[float] | None,
+    reporting_delay_pmf: list[float] | None,
     logger: logging.Logger,
 ) -> NowcastSource | None:
     """
     Resolve the requested nowcast source for one EpiAutoGP run.
+
+    The keyword maps directly to a nowcast approach; each source's `applies_to`
+    method decides whether the requested configuration is supported.
+    Reporting-delay also logs a soft cadence warning for non-daily runs
+    because the PMF support is daily by convention.
     """
-    valid_sources = ["auto", "none", "right-truncation"]
-    if nowcast_source_name not in valid_sources:
+    if nowcast_source_name not in VALID_NOWCAST_SOURCE_NAMES:
         raise ValueError(
-            f"nowcast_source_name must be one of {valid_sources}, "
+            f"nowcast_source_name must be one of {list(VALID_NOWCAST_SOURCE_NAMES)}, "
             f"got {nowcast_source_name!r}"
         )
 
     if nowcast_source_name == "none":
         return None
 
-    use_right_truncation = False
-    if nowcast_source_name == "auto":
-        use_right_truncation = _use_right_truncation_nowcasting_auto(
-            target=target,
-            ed_visit_type=ed_visit_type,
-        )
-    elif nowcast_source_name == "right-truncation":
-        use_right_truncation = _use_right_truncation_nowcasting_right_truncation(
-            target=target,
-            ed_visit_type=ed_visit_type,
-        )
-
-    if use_right_truncation:
-        return _generate_right_truncation_nowcast(
-            right_truncation_pmf=right_truncation_pmf,
+    if nowcast_source_name == "reporting-delay":
+        if not ReportingDelayNowcast.applies_to(
+            target=target, ed_visit_type=ed_visit_type, frequency=frequency
+        ):
+            raise ValueError(
+                f"reporting-delay nowcasting is not applicable to "
+                f"target={target!r}, ed_visit_type={ed_visit_type!r}."
+            )
+        if frequency != "daily":
+            logger.warning(
+                "Using reporting-delay nowcasting for frequency=%r. Confirm "
+                "the reporting-delay PMF support matches the model cadence.",
+                frequency,
+            )
+        return _build_reporting_delay_nowcast(
+            reporting_delay_pmf=reporting_delay_pmf,
             disease=disease,
             loc=loc,
-            frequency=frequency,
             report_date=report_date,
             param_data_dir=param_data_dir,
-            logger=logger,
         )
-    else:
-        return None
+
+    raise ValueError(f"unhandled nowcast_source_name: {nowcast_source_name!r}")
 
 
 def setup_forecast_pipeline(
@@ -325,8 +257,8 @@ def setup_forecast_pipeline(
     credentials_path: Path | None = None,
     logger: logging.Logger | None = None,
     param_data_dir: Path | str | None = None,
-    nowcast_source_name: NowcastSourceName = "auto",
-    right_truncation_pmf: list[float] | None = None,
+    nowcast_source_name: NowcastSourceName = "none",
+    reporting_delay_pmf: list[float] | None = None,
 ) -> ForecastPipelineContext:
     """
     Set up common forecast pipeline infrastructure.
@@ -375,14 +307,14 @@ def setup_forecast_pipeline(
     logger : logging.Logger | None, default=None
         Logger instance. If None, creates a new logger
     param_data_dir : Path | str | None, default=None
-        Directory containing parameter estimates such as right-truncation PMFs.
-        Required when right-truncation nowcasting is selected and no PMF is
+        Directory containing parameter estimates such as reporting-delay PMFs.
+        Required when reporting-delay nowcasting is selected and no PMF is
         directly supplied.
-    nowcast_source_name : {"auto", "none", "right-truncation"}, default="auto"
+    nowcast_source_name : {"none", "reporting-delay"}, default="none"
         Nowcast source selection for EpiAutoGP input.
-    right_truncation_pmf : list[float] | None, default=None
-        Directly supplied right-truncation PMF. Takes precedence over
-        param_data_dir when right-truncation nowcasting is selected.
+    reporting_delay_pmf : list[float] | None, default=None
+        Directly supplied reporting-delay PMF. Takes precedence over
+        param_data_dir when reporting-delay nowcasting is selected.
 
     Returns
     -------
@@ -444,7 +376,7 @@ def setup_forecast_pipeline(
         report_date=report_date_parsed,
         param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
-        right_truncation_pmf=right_truncation_pmf,
+        reporting_delay_pmf=reporting_delay_pmf,
         logger=logger,
     )
 

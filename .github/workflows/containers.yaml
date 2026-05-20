@@ -98,8 +98,7 @@ jobs:
               BASE="${{ github.event.before }}"
               HEAD="${{ github.sha }}"
               CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
-              echo $CHANGED
-
+              echo "Dagster defs changed? --> $CHANGED"
               if [ -n "$CHANGED" ]; then
                 echo "changed=true" >> $GITHUB_OUTPUT
               else

@@ -74,7 +74,7 @@ jobs:
               type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache
               type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:latest-cache
             cache-to: type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache,mode=max
-        
+
     check_and_deploy_dagster_code:
       needs: [ build-pipeline-image ]
       # Conditional step execution that runs only when:
@@ -115,7 +115,7 @@ jobs:
             ${{
               ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
               ( github.event_name == 'push' && github.ref_name == 'main' && steps.dagster_changed.outputs.changed == 'true' )
-            }} 
+            }}
 
           with:
             github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}

@@ -82,7 +82,7 @@ jobs:
       # OR
       # the event is a push to main where the dagster_defs_changed
       runs-on: ubuntu-latest
-      name: Update Dagster Code Location
+      name: Check Dagster Changes and Update Prod Server
       permissions:
             contents: read
             packages: write

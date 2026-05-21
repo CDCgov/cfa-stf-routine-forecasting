@@ -73,7 +73,7 @@ From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), yo
 - It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date. `cfa-dagster`, our own implementation of dagster, updates frequently. To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.
 
 #### How to push to the dagster server
-1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch. 
+1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch.
     - Let people know when you do this so they don't override you text with their own.
     - Pushes to main that do not include changes to the `dagster_defs.py` file will NOT automatically update the server.
 2. As mentioned, pushes to main that target `dagster_defs.py` will push to the server.

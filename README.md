@@ -73,10 +73,10 @@ From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), yo
 - It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date. `cfa-dagster`, our own implementation of dagster, updates frequently. To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.
 
 #### How to push to the dagster server
-1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch. 
+1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch.
     - Let people know when you do this so they don't override you text with their own.
 2. As mentioned, pushes to main that target `dagster_defs.py` will push to the server.
-3. Powerusers: `make prod_test` will push your own local branch to the server. Communicate that you are running this command to the STF team before doing so. 
+3. Powerusers: `make prod_test` will push your own local branch to the server. Communicate that you are running this command to the STF team before doing so.
 
 ## General Disclaimer
 This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/organization/mission.htm).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise.

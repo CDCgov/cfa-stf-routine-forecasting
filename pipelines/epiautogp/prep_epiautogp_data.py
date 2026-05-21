@@ -145,11 +145,10 @@ def convert_to_epiautogp_json(
     }
     """
     logger = context.logger
+    forecast_spec = context.forecast_spec
 
     # Validate parameters
-    _validate_epiautogp_parameters(
-        context.target, context.frequency, context.ed_visit_type
-    )
+    _validate_epiautogp_parameters(forecast_spec.target, forecast_spec.frequency, forecast_spec.ed_visit_type)
 
     # Define input data JSON path
     input_json_path = paths.model_output_dir / f"{context.model_name}_input.json"
@@ -157,14 +156,14 @@ def convert_to_epiautogp_json(
     data_path = paths.training_data
 
     # Read data from TSV
-    logger.info(f"Reading {context.frequency} data from {data_path}")
+    logger.info(f"Reading {forecast_spec.frequency} data from {data_path}")
     dates, reports = _read_tsv_data(
         data_path,
-        context.disease,
-        context.loc,
-        context.target,
-        context.frequency,
-        context.ed_visit_type,
+        forecast_spec.disease,
+        forecast_spec.loc,
+        forecast_spec.target,
+        forecast_spec.frequency,
+        forecast_spec.ed_visit_type,
         context.exclude_date_ranges,
         logger,
     )
@@ -181,12 +180,12 @@ def convert_to_epiautogp_json(
     epiautogp_input = {
         "dates": [d.isoformat() for d in dates],
         "reports": reports,
-        "pathogen": context.disease,
-        "location": context.loc,
-        "target": context.target,
-        "frequency": context.frequency,
-        "ed_visit_type": context.ed_visit_type,
-        "forecast_date": context.report_date.isoformat(),
+        "pathogen": forecast_spec.disease,
+        "location": forecast_spec.loc,
+        "target": forecast_spec.target,
+        "frequency": forecast_spec.frequency,
+        "ed_visit_type": forecast_spec.ed_visit_type,
+        "forecast_date": forecast_spec.report_date.isoformat(),
         "nowcast_dates": [d.isoformat() for d in nowcast_data.dates],
         "nowcast_reports": nowcast_data.reports,
     }
@@ -197,8 +196,8 @@ def convert_to_epiautogp_json(
         json.dump(epiautogp_input, f, indent=2)
 
     logger.info(
-        f"Saved EpiAutoGP input JSON for {context.disease} {context.loc} "
-        f"(target={context.target}) to {input_json_path}"
+        f"Saved EpiAutoGP input JSON for {forecast_spec.disease} {forecast_spec.loc} "
+        f"(target={forecast_spec.target}) to {input_json_path}"
     )
 
     return input_json_path

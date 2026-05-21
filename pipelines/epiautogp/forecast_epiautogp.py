@@ -6,6 +6,9 @@ from pipelines.epiautogp import (
     convert_to_epiautogp_json,
     setup_forecast_pipeline,
 )
+from pipelines.epiautogp.epiautogp_forecast_utils import (
+    VALID_NOWCAST_SOURCE_NAMES,
+)
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     parse_exclude_date_ranges,
@@ -100,6 +103,9 @@ def main(
     n_forecast_draws: int = 2000,
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
+    param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
+    nowcast_source_name: str = "none",
+    reporting_delay_pmf: list[float] | None = None,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -122,6 +128,8 @@ def main(
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
     facility_level_nssp_data_dir : Path | str
         Directory containing facility-level NSSP ED visit data
+    param_data_dir : Path | str
+        Directory containing parameter estimates such as reporting-delay PMFs
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -157,6 +165,10 @@ def main(
         Proportion of data used in each SMC step
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
+    nowcast_source_name : str, default="none"
+        Nowcast source to use: "none" or "reporting-delay"
+    reporting_delay_pmf : list[float] | None, default=None
+        Directly supplied reporting-delay PMF. Python API only.
 
     Returns
     -------
@@ -249,6 +261,9 @@ def main(
         exclude_date_ranges=parsed_exclude_date_ranges,
         credentials_path=credentials_path,
         logger=logger,
+        param_data_dir=param_data_dir,
+        nowcast_source_name=nowcast_source_name,
+        reporting_delay_pmf=reporting_delay_pmf,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -329,6 +344,26 @@ if __name__ == "__main__":
             "Type of ED visits to model: 'observed' (disease-related), "
             "'other' (non-disease background), or 'pct' (percentage of total ED visits). "
             "Only applicable for NSSP target (default: observed)."
+        ),
+    )
+
+    parser.add_argument(
+        "--param-data-dir",
+        type=Path,
+        default=Path("private_data", "prod_param_estimates"),
+        help="Directory containing parameter estimates such as reporting-delay PMFs.",
+    )
+
+    parser.add_argument(
+        "--nowcast-source",
+        dest="nowcast_source_name",
+        type=str,
+        default="none",
+        choices=list(VALID_NOWCAST_SOURCE_NAMES),
+        help=(
+            "Nowcast source to use: 'none' disables nowcasting; "
+            "'reporting-delay' inflates recent counts using a reporting-delay "
+            "PMF (default: none)."
         ),
     )
 

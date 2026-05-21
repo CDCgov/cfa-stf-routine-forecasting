@@ -25,9 +25,12 @@ import pytest
 
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
+    ForecastSpec,
     ModelPaths,
+    _resolve_nowcast_source,
     setup_forecast_pipeline,
 )
+from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
 @pytest.fixture
@@ -38,14 +41,16 @@ def base_context(tmp_path):
     Tests can use this directly or override specific fields as needed.
     """
     return ForecastPipelineContext(
-        disease="COVID-19",
-        loc="CA",
-        target="nssp",
-        frequency="epiweekly",
-        ed_visit_type="observed",
+        forecast_spec=ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        ),
         model_name="test_model",
         nhsn_data_path=None,
-        report_date=dt.date(2024, 12, 20),
         first_training_date=dt.date(2024, 9, 22),
         last_training_date=dt.date(2024, 12, 20),
         n_forecast_days=28,
@@ -65,14 +70,16 @@ class TestForecastPipelineContext:
     def test_context_initialization(self):
         """Test that ForecastPipelineContext can be initialized with all fields."""
         context = ForecastPipelineContext(
-            disease="COVID-19",
-            loc="CA",
-            target="nssp",
-            frequency="epiweekly",
-            ed_visit_type="observed",
+            forecast_spec=ForecastSpec(
+                disease="COVID-19",
+                loc="CA",
+                report_date=dt.date(2024, 12, 20),
+                target="nssp",
+                frequency="epiweekly",
+                ed_visit_type="observed",
+            ),
             model_name="test_model",
             nhsn_data_path=None,
-            report_date=dt.date(2024, 12, 20),
             first_training_date=dt.date(2024, 9, 22),
             last_training_date=dt.date(2024, 12, 20),
             n_forecast_days=28,
@@ -85,8 +92,8 @@ class TestForecastPipelineContext:
             logger=logging.getLogger(),
         )
 
-        assert context.disease == "COVID-19"
-        assert context.loc == "CA"
+        assert context.forecast_spec.disease == "COVID-19"
+        assert context.forecast_spec.loc == "CA"
         assert context.n_forecast_days == 28
         assert context.exclude_last_n_days == 0
         assert context.exclude_date_ranges is None
@@ -144,6 +151,7 @@ class TestSetupForecastPipeline:
             exclude_last_n_days=0,
             credentials_path=None,
             logger=None,
+            nowcast_source_name="none",
         )
 
         assert isinstance(context, ForecastPipelineContext)
@@ -178,6 +186,7 @@ class TestSetupForecastPipeline:
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            nowcast_source_name="none",
         )
 
         expected_batch_dir = (
@@ -187,6 +196,205 @@ class TestSetupForecastPipeline:
 
         assert context.model_batch_dir == expected_batch_dir
         assert context.model_run_dir == expected_run_dir
+
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
+    def test_reporting_delay_fetches_pmf_from_param_data_dir(
+        self,
+        mock_calc_dates,
+        mock_get_reports,
+        mock_load_creds,
+        mock_scan_parquet,
+        mock_get_pmfs,
+        tmp_path,
+    ):
+        """Test reporting-delay nowcasting loads the PMF from param_data_dir."""
+        mock_load_creds.return_value = {}
+        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
+        mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
+        mock_scan_parquet.return_value = pl.LazyFrame()
+        mock_get_pmfs.return_value = {"right_truncation_pmf": [0.25, 0.75]}
+
+        context = setup_forecast_pipeline(
+            disease="COVID-19",
+            loc="CA",
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+            model_name="test_model",
+            nhsn_data_path=None,
+            facility_level_nssp_data_dir=tmp_path,
+            output_dir=tmp_path,
+            n_training_days=90,
+            n_forecast_days=28,
+            param_data_dir=tmp_path / "prod_param_estimates",
+            nowcast_source_name="reporting-delay",
+        )
+
+        assert isinstance(context.nowcast_source, ReportingDelayNowcast)
+        assert context.nowcast_source.reporting_delay_pmf == [0.25, 0.75]
+        assert mock_get_pmfs.call_args.kwargs["loc_abb"] == "CA"
+        assert mock_get_pmfs.call_args.kwargs["disease"] == "COVID-19"
+        assert mock_get_pmfs.call_args.kwargs["as_of"] == dt.date(2024, 12, 20)
+
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
+    def test_direct_reporting_delay_pmf_wins_over_param_data_dir(
+        self,
+        mock_calc_dates,
+        mock_get_reports,
+        mock_load_creds,
+        mock_scan_parquet,
+        mock_get_pmfs,
+        tmp_path,
+    ):
+        """Test a directly supplied PMF is used without calling get_pmfs."""
+        mock_load_creds.return_value = {}
+        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
+        mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
+        mock_scan_parquet.return_value = pl.LazyFrame()
+
+        context = setup_forecast_pipeline(
+            disease="COVID-19",
+            loc="CA",
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="other",
+            model_name="test_model",
+            nhsn_data_path=None,
+            facility_level_nssp_data_dir=tmp_path,
+            output_dir=tmp_path,
+            n_training_days=90,
+            n_forecast_days=28,
+            param_data_dir=tmp_path / "prod_param_estimates",
+            nowcast_source_name="reporting-delay",
+            reporting_delay_pmf=[0.4, 0.6],
+        )
+
+        assert isinstance(context.nowcast_source, ReportingDelayNowcast)
+        assert context.nowcast_source.reporting_delay_pmf == [0.4, 0.6]
+        mock_get_pmfs.assert_not_called()
+
+    def test_reporting_delay_errors_for_percentage_targets(self):
+        """Test reporting-delay fails for percentage data (numerator/denominator)."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="pct",
+        )
+        with pytest.raises(ValueError, match="not applicable"):
+            _resolve_nowcast_source(
+                forecast_spec=spec,
+                param_data_dir=None,
+                nowcast_source_name="reporting-delay",
+                reporting_delay_pmf=[1.0],
+            )
+
+    def test_reporting_delay_applies_to_nhsn_counts(self):
+        """Test reporting-delay also applies to NHSN counts (not just NSSP)."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nhsn",
+            frequency="daily",
+            ed_visit_type="observed",
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
+            param_data_dir=None,
+            nowcast_source_name="reporting-delay",
+            reporting_delay_pmf=[0.4, 0.6],
+        )
+
+        assert isinstance(result, ReportingDelayNowcast)
+
+    def test_reporting_delay_returns_source_for_applicable_config(self):
+        """Test reporting-delay builds a source for daily NSSP counts."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
+            param_data_dir=None,
+            nowcast_source_name="reporting-delay",
+            reporting_delay_pmf=[0.4, 0.6],
+        )
+
+        assert isinstance(result, ReportingDelayNowcast)
+        assert result.reporting_delay_pmf == [0.4, 0.6]
+
+    def test_reporting_delay_warns_for_non_daily_frequency(self, caplog):
+        """Test reporting-delay logs a soft cadence warning on non-daily runs."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        )
+        with caplog.at_level(logging.WARNING):
+            result = _resolve_nowcast_source(
+                forecast_spec=spec,
+                param_data_dir=None,
+                nowcast_source_name="reporting-delay",
+                reporting_delay_pmf=[1.0],
+            )
+
+        assert isinstance(result, ReportingDelayNowcast)
+        assert "reporting-delay PMF support matches the model cadence" in caplog.text
+
+    def test_none_keyword_returns_no_source(self):
+        """Test 'none' resolves to no nowcast source regardless of config."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
+            param_data_dir=None,
+            nowcast_source_name="none",
+            reporting_delay_pmf=[0.5, 0.5],
+        )
+
+        assert result is None
+
+    def test_unknown_keyword_raises(self):
+        """Test an unrecognised keyword raises a descriptive error."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+        )
+        with pytest.raises(ValueError, match="nowcast_source_name must be one of"):
+            _resolve_nowcast_source(
+                forecast_spec=spec,
+                param_data_dir=None,
+                nowcast_source_name="auto",
+                reporting_delay_pmf=None,
+            )
 
 
 class TestPrepareModelData:
@@ -251,7 +459,7 @@ class TestPrepareModelData:
         # Override just the fields we need for this test
         context = replace(
             base_context,
-            target="nhsn",
+            forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
             nhsn_data_path=nhsn_path,
         )
 
@@ -280,7 +488,7 @@ class TestPrepareModelData:
         # Override multiple fields for NHSN test
         context = replace(
             base_context,
-            target="nhsn",
+            forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
             model_name="epiautogp_nhsn_epiweekly",
             nhsn_data_path=nhsn_path,
             credentials_dict={"key": "value"},

@@ -15,6 +15,7 @@ from typing import Any, Literal, get_args
 import polars as pl
 
 from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
+from pipelines.epiautogp.forecast_spec import ForecastSpec
 from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.utils.common_utils import (
@@ -57,14 +58,9 @@ class ForecastPipelineContext:
     to be passed between functions.
     """
 
-    disease: str
-    loc: str
-    target: str
-    frequency: str
-    ed_visit_type: str
+    forecast_spec: ForecastSpec
     model_name: str
     nhsn_data_path: Path | None
-    report_date: date
     first_training_date: date
     last_training_date: date
     n_forecast_days: int
@@ -97,14 +93,14 @@ class ForecastPipelineContext:
         data_dir = Path(model_output_dir, "data")
         os.makedirs(data_dir, exist_ok=True)
 
-        self.logger.info(f"Processing data for {self.loc}")
+        self.logger.info(f"Processing data for {self.forecast_spec.loc}")
 
         # Process and save location data
         process_and_save_loc_data(
-            loc_abb=self.loc,
-            disease=self.disease,
+            loc_abb=self.forecast_spec.loc,
+            disease=self.forecast_spec.disease,
             facility_level_nssp_data=self.facility_level_nssp_data,
-            report_date=self.report_date,
+            report_date=self.forecast_spec.report_date,
             first_training_date=self.first_training_date,
             last_training_date=self.last_training_date,
             save_dir=data_dir,
@@ -115,7 +111,7 @@ class ForecastPipelineContext:
 
         # Generate epiweekly datasets
         # only do this if we're fitting an epiweekly model
-        if self.frequency == "epiweekly":
+        if self.forecast_spec.frequency == "epiweekly":
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(data_dir, overwrite_daily=True)
 
@@ -161,10 +157,8 @@ class ForecastPipelineContext:
 
 def _build_reporting_delay_nowcast(
     *,
+    forecast_spec: ForecastSpec,
     reporting_delay_pmf: list[float] | None,
-    disease: str,
-    loc: str,
-    report_date: date,
     param_data_dir: Path | str | None,
 ) -> ReportingDelayNowcast:
     """Build a ReportingDelayNowcast, fetching the PMF if not supplied."""
@@ -177,9 +171,9 @@ def _build_reporting_delay_nowcast(
         param_estimates = pl.scan_parquet(Path(param_data_dir, "prod.parquet"))
         reporting_delay_pmf = get_pmfs(
             param_estimates=param_estimates,
-            loc_abb=loc,
-            disease=disease,
-            as_of=report_date,
+            loc_abb=forecast_spec.loc,
+            disease=forecast_spec.disease,
+            as_of=forecast_spec.report_date,
         )["right_truncation_pmf"]
 
     return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
@@ -187,42 +181,29 @@ def _build_reporting_delay_nowcast(
 
 def _resolve_nowcast_source(
     *,
-    disease: str,
-    loc: str,
-    target: str,
-    frequency: str,
-    ed_visit_type: str,
-    report_date: date,
-    param_data_dir: Path | str | None,
+    forecast_spec: ForecastSpec,
     nowcast_source_name: NowcastSourceName,
-    reporting_delay_pmf: list[float] | None,
-    logger: logging.Logger,
+    **options: Any,
 ) -> NowcastSource | None:
     """
     Resolve the requested nowcast source for one EpiAutoGP run.
 
-    The keyword maps directly to a nowcast approach; each source's `applies_to`
-    method decides whether the requested configuration is supported.
-    Reporting-delay also logs a soft cadence warning for non-daily runs
-    because the PMF support is daily by convention.
+    `forecast_spec` and `nowcast_source_name` are universal; remaining keyword
+    arguments are forwarded as-is to the chosen source's builder, which is
+    responsible for validating them. New nowcast approaches plug in by adding
+    a new case here and a builder that defines its own required kwargs.
     """
     match nowcast_source_name:
         case "none":
             return None
         case "reporting-delay":
-            if not ReportingDelayNowcast.applies_to(
-                target=target, ed_visit_type=ed_visit_type, frequency=frequency
-            ):
+            if not ReportingDelayNowcast.applies_to(forecast_spec=forecast_spec):
                 raise ValueError(
                     f"reporting-delay nowcasting is not applicable to "
-                    f"target={target!r}, ed_visit_type={ed_visit_type!r}."
+                    f"target={forecast_spec.target!r}, ed_visit_type={forecast_spec.ed_visit_type!r}."
                 )
             return _build_reporting_delay_nowcast(
-                reporting_delay_pmf=reporting_delay_pmf,
-                disease=disease,
-                loc=loc,
-                report_date=report_date,
-                param_data_dir=param_data_dir,
+                forecast_spec=forecast_spec, **options
             )
         case _:
             raise ValueError(
@@ -330,6 +311,16 @@ def setup_forecast_pipeline(
 
     report_date_parsed = max(available_facility_level_reports)
 
+    # Gather the forecast specification input parameters into a single cohesive unit
+    forecast_spec = ForecastSpec(
+        disease=disease,
+        loc=loc,
+        report_date=report_date_parsed,
+        target=target,
+        frequency=frequency,
+        ed_visit_type=ed_visit_type,
+    )
+
     # Calculate training dates
     first_training_date, last_training_date = calculate_training_dates(
         report_date_parsed,
@@ -359,27 +350,16 @@ def setup_forecast_pipeline(
 
     # Resolve nowcast source
     resolved_nowcast_source = _resolve_nowcast_source(
-        disease=disease,
-        loc=loc,
-        target=target,
-        frequency=frequency,
-        ed_visit_type=ed_visit_type,
-        report_date=report_date_parsed,
-        param_data_dir=param_data_dir,
+        forecast_spec=forecast_spec,
         nowcast_source_name=nowcast_source_name,
+        param_data_dir=param_data_dir,
         reporting_delay_pmf=reporting_delay_pmf,
-        logger=logger,
     )
 
     return ForecastPipelineContext(
-        disease=disease,
-        loc=loc,
-        target=target,
-        frequency=frequency,
-        ed_visit_type=ed_visit_type,
+        forecast_spec=forecast_spec,
         model_name=model_name,
         nhsn_data_path=nhsn_data_path,
-        report_date=report_date_parsed,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         n_forecast_days=n_forecast_days,

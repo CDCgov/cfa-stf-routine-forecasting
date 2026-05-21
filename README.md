@@ -74,7 +74,7 @@ From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), yo
 
 #### How to push to the dagster server
 1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch.
-    - Let people know when you do this so they don't override you text with their own.
+    - Let people know when you do this so they don't override your test with their own.
     - Pushes to main that do not include changes to the `dagster_defs.py` file will NOT automatically update the server.
 2. As mentioned, pushes to main that target `dagster_defs.py` will push to the server.
 3. Powerusers: `make prod_test` will build and push your own local branch to the server.

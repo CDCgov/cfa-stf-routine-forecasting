@@ -56,6 +56,7 @@ class FixedNowcast:
     """
     Simple nowcast source that just returns a fixed set of nowcast data
     """
+
     data: NowcastData
 
     @staticmethod

@@ -148,7 +148,9 @@ def convert_to_epiautogp_json(
     forecast_spec = context.forecast_spec
 
     # Validate parameters
-    _validate_epiautogp_parameters(forecast_spec.target, forecast_spec.frequency, forecast_spec.ed_visit_type)
+    _validate_epiautogp_parameters(
+        forecast_spec.target, forecast_spec.frequency, forecast_spec.ed_visit_type
+    )
 
     # Define input data JSON path
     input_json_path = paths.model_output_dir / f"{context.model_name}_input.json"

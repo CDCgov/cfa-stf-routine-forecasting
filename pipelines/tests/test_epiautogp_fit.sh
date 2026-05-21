@@ -26,6 +26,7 @@ cmd_args=(
 	--disease "$disease"
 	--loc "$location"
 	--facility-level-nssp-data-dir "$BASE_DIR/private_data/nssp_etl_gold"
+	--param-data-dir "$BASE_DIR/private_data/prod_param_estimates"
 	--output-dir "$BASE_DIR/2024-12-21_forecasts"
 	--n-training-days 90
 	--target "$target"
@@ -42,6 +43,13 @@ cmd_args=(
 # Add ed-visit-type if not default
 if [ "$ed_visit_type" != "observed" ]; then
 	cmd_args+=(--ed-visit-type "$ed_visit_type")
+fi
+
+# NSSP counts use the test-data reporting-delay PMF; NHSN and NSSP
+# percentages have no nowcast (the reporting-delay estimator only applies
+# to count series).
+if [ "$target" = "nssp" ] && [ "$ed_visit_type" != "pct" ]; then
+	cmd_args+=(--nowcast-source reporting-delay)
 fi
 
 uv run python pipelines/epiautogp/forecast_epiautogp.py "${cmd_args[@]}"

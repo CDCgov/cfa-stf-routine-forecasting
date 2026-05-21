@@ -14,8 +14,9 @@ from pipelines.epiautogp.reporting_delay import (
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
-def _spec(*, target: str = "nssp", ed_visit_type: str = "observed",
-          frequency: str = "daily") -> ForecastSpec:
+def _spec(
+    *, target: str = "nssp", ed_visit_type: str = "observed", frequency: str = "daily"
+) -> ForecastSpec:
     """Build a ForecastSpec varying only the fields applies_to cares about."""
     return ForecastSpec(
         disease="COVID-19",

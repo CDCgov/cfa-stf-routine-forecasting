@@ -63,14 +63,22 @@ If you'd like to test a few "tasks" locally, you can have dagster execute on you
 
 When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
 - `make mount`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
-- `make unmount`: gracefully unmounts the pyrenew-relevant blobs.
+- `make unmount`: gracefully unmounts the pyrenew-relevant bslobs.
 
 #### Production Scheduling
 
 From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA.
-- Pushes to main will automatically update this server via a Github Actions Workflow.
+- Pushes to `main` that include changes to `dagster_defs.py` will automatically update this server via a Github Actions Workflow. (See next section.)
 - Before pushing to `main`, make sure you have thoroughly tested your own branch and gotten a PR review.
 - It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date. `cfa-dagster`, our own implementation of dagster, updates frequently. To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.
+
+#### How to push to the dagster server
+1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch.
+    - Let people know when you do this so they don't override your test with their own.
+    - Pushes to main that do not include changes to the `dagster_defs.py` file will NOT automatically update the server.
+2. As mentioned, pushes to main that target `dagster_defs.py` will push to the server.
+3. Powerusers: `make prod_test` will build and push your own local branch to the server.
+    - Communicate that you are running this command to the STF team before doing so.
 
 ## General Disclaimer
 This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/organization/mission.htm).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise.

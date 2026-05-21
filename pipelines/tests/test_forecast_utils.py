@@ -25,6 +25,7 @@ import pytest
 
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
+    ForecastSpec,
     ModelPaths,
     _resolve_nowcast_source,
     setup_forecast_pipeline,
@@ -40,14 +41,16 @@ def base_context(tmp_path):
     Tests can use this directly or override specific fields as needed.
     """
     return ForecastPipelineContext(
-        disease="COVID-19",
-        loc="CA",
-        target="nssp",
-        frequency="epiweekly",
-        ed_visit_type="observed",
+        forecast_spec=ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        ),
         model_name="test_model",
         nhsn_data_path=None,
-        report_date=dt.date(2024, 12, 20),
         first_training_date=dt.date(2024, 9, 22),
         last_training_date=dt.date(2024, 12, 20),
         n_forecast_days=28,
@@ -67,14 +70,16 @@ class TestForecastPipelineContext:
     def test_context_initialization(self):
         """Test that ForecastPipelineContext can be initialized with all fields."""
         context = ForecastPipelineContext(
-            disease="COVID-19",
-            loc="CA",
-            target="nssp",
-            frequency="epiweekly",
-            ed_visit_type="observed",
+            forecast_spec=ForecastSpec(
+                disease="COVID-19",
+                loc="CA",
+                report_date=dt.date(2024, 12, 20),
+                target="nssp",
+                frequency="epiweekly",
+                ed_visit_type="observed",
+            ),
             model_name="test_model",
             nhsn_data_path=None,
-            report_date=dt.date(2024, 12, 20),
             first_training_date=dt.date(2024, 9, 22),
             last_training_date=dt.date(2024, 12, 20),
             n_forecast_days=28,
@@ -87,8 +92,8 @@ class TestForecastPipelineContext:
             logger=logging.getLogger(),
         )
 
-        assert context.disease == "COVID-19"
-        assert context.loc == "CA"
+        assert context.forecast_spec.disease == "COVID-19"
+        assert context.forecast_spec.loc == "CA"
         assert context.n_forecast_days == 28
         assert context.exclude_last_n_days == 0
         assert context.exclude_date_ranges is None
@@ -278,50 +283,56 @@ class TestSetupForecastPipeline:
 
     def test_reporting_delay_errors_for_percentage_targets(self):
         """Test reporting-delay fails for percentage data (numerator/denominator)."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="pct",
+        )
         with pytest.raises(ValueError, match="not applicable"):
             _resolve_nowcast_source(
-                disease="COVID-19",
-                loc="CA",
-                target="nssp",
-                frequency="daily",
-                ed_visit_type="pct",
-                report_date=dt.date(2024, 12, 20),
+                forecast_spec=spec,
                 param_data_dir=None,
                 nowcast_source_name="reporting-delay",
                 reporting_delay_pmf=[1.0],
-                logger=logging.getLogger(),
             )
 
     def test_reporting_delay_applies_to_nhsn_counts(self):
         """Test reporting-delay also applies to NHSN counts (not just NSSP)."""
-        result = _resolve_nowcast_source(
+        spec = ForecastSpec(
             disease="COVID-19",
             loc="CA",
+            report_date=dt.date(2024, 12, 20),
             target="nhsn",
             frequency="daily",
             ed_visit_type="observed",
-            report_date=dt.date(2024, 12, 20),
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
             param_data_dir=None,
             nowcast_source_name="reporting-delay",
             reporting_delay_pmf=[0.4, 0.6],
-            logger=logging.getLogger(),
         )
 
         assert isinstance(result, ReportingDelayNowcast)
 
     def test_reporting_delay_returns_source_for_applicable_config(self):
         """Test reporting-delay builds a source for daily NSSP counts."""
-        result = _resolve_nowcast_source(
+        spec = ForecastSpec(
             disease="COVID-19",
             loc="CA",
+            report_date=dt.date(2024, 12, 20),
             target="nssp",
             frequency="daily",
             ed_visit_type="observed",
-            report_date=dt.date(2024, 12, 20),
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
             param_data_dir=None,
             nowcast_source_name="reporting-delay",
             reporting_delay_pmf=[0.4, 0.6],
-            logger=logging.getLogger(),
         )
 
         assert isinstance(result, ReportingDelayNowcast)
@@ -329,18 +340,20 @@ class TestSetupForecastPipeline:
 
     def test_reporting_delay_warns_for_non_daily_frequency(self, caplog):
         """Test reporting-delay logs a soft cadence warning on non-daily runs."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        )
         with caplog.at_level(logging.WARNING):
             result = _resolve_nowcast_source(
-                disease="COVID-19",
-                loc="CA",
-                target="nssp",
-                frequency="epiweekly",
-                ed_visit_type="observed",
-                report_date=dt.date(2024, 12, 20),
+                forecast_spec=spec,
                 param_data_dir=None,
                 nowcast_source_name="reporting-delay",
                 reporting_delay_pmf=[1.0],
-                logger=logging.getLogger(),
             )
 
         assert isinstance(result, ReportingDelayNowcast)
@@ -348,35 +361,39 @@ class TestSetupForecastPipeline:
 
     def test_none_keyword_returns_no_source(self):
         """Test 'none' resolves to no nowcast source regardless of config."""
-        result = _resolve_nowcast_source(
+        spec = ForecastSpec(
             disease="COVID-19",
             loc="CA",
+            report_date=dt.date(2024, 12, 20),
             target="nssp",
             frequency="daily",
             ed_visit_type="observed",
-            report_date=dt.date(2024, 12, 20),
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
             param_data_dir=None,
             nowcast_source_name="none",
             reporting_delay_pmf=[0.5, 0.5],
-            logger=logging.getLogger(),
         )
 
         assert result is None
 
     def test_unknown_keyword_raises(self):
         """Test an unrecognised keyword raises a descriptive error."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 20),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+        )
         with pytest.raises(ValueError, match="nowcast_source_name must be one of"):
             _resolve_nowcast_source(
-                disease="COVID-19",
-                loc="CA",
-                target="nssp",
-                frequency="daily",
-                ed_visit_type="observed",
-                report_date=dt.date(2024, 12, 20),
+                forecast_spec=spec,
                 param_data_dir=None,
                 nowcast_source_name="auto",
                 reporting_delay_pmf=None,
-                logger=logging.getLogger(),
             )
 
 
@@ -442,7 +459,7 @@ class TestPrepareModelData:
         # Override just the fields we need for this test
         context = replace(
             base_context,
-            target="nhsn",
+            forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
             nhsn_data_path=nhsn_path,
         )
 
@@ -471,7 +488,7 @@ class TestPrepareModelData:
         # Override multiple fields for NHSN test
         context = replace(
             base_context,
-            target="nhsn",
+            forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
             model_name="epiautogp_nhsn_epiweekly",
             nhsn_data_path=nhsn_path,
             credentials_dict={"key": "value"},

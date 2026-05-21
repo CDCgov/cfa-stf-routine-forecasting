@@ -16,6 +16,7 @@ import pytest
 
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
+    ForecastSpec,
     ModelPaths,
 )
 from pipelines.epiautogp.nowcast import NowcastData
@@ -320,14 +321,16 @@ def _write_combined_data(path):
 
 def _epiautogp_context(tmp_path, nowcast_source=None):
     return ForecastPipelineContext(
-        disease="COVID-19",
-        loc="CA",
-        target="nssp",
-        frequency="daily",
-        ed_visit_type="observed",
+        forecast_spec=ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 1, 3),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+        ),
         model_name="test_model",
         nhsn_data_path=None,
-        report_date=dt.date(2024, 1, 3),
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
         n_forecast_days=28,

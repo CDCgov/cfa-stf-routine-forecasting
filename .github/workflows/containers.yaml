@@ -124,7 +124,7 @@ jobs:
             fi
 
             echo "Dagster defs changed?"
-            echo "->" && echo "$CHANGED"
+            echo "->" && echo "$changed"
 
         - name: Run update script with cfa runner-action
           uses: CDCgov/cfa-actions/runner-action@v1.5.0

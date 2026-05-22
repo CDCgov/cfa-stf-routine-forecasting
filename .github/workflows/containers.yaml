@@ -104,13 +104,14 @@ jobs:
 
         - name: Check if dagster defs changed
           id: dagster_changed
+          if: ${{ github.event_name == "push" || github.event_name == "pull_request" }}
           shell: bash
           run: |
 
             # Check to see if dagster defs changed since before this PR or push happened
             if [ "${{ github.event_name }}" == "push" ]; then
               BASE="${{ github.event.before }}"
-            else
+            elif [ "${{ github.event_name }}" == "pull_request" ]; then
               BASE="${{ github.event.pull_request.base.sha }}"
             fi
 

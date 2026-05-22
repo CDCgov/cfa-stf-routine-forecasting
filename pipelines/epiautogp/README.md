@@ -16,9 +16,10 @@ The forecasting pipeline consists of five main steps:
 
 1. **Setup**: Load data, validate dates, create directory structure
 2. **Data Preparation**: Process location data, evaluation data, and generate epiweekly datasets
-3. **Data Conversion**: Transform data into EpiAutoGP's JSON input format
-4. **Model Execution**: Run the Julia-based EpiAutoGP model
-5. **Post-processing**: Process outputs, create hubverse tables, and generate plots
+3. **Data nowcasting**: Either simple right-truncation correction or no nowcasting (further methods coming)
+4. **Data Conversion**: Transform data into EpiAutoGP's JSON input format
+5. **Model Execution**: Run the Julia-based EpiAutoGP model
+6. **Post-processing**: Process outputs, create hubverse tables, and generate plots
 
 ## Module Components
 
@@ -39,13 +40,29 @@ Main entry point for the forecasting pipeline.
 - `--n-forecast-draws`: Number of forecast draws (default: 2000)
 - `--smc-data-proportion`: Data proportion per SMC step (default: 0.1)
 
+### `forecast_spec.py`
+
+Defines the `ForecastSpec` value object — a frozen dataclass bundling the six fields that identify a single forecast run: `disease`, `loc`, `report_date`, `target`, `frequency`, `ed_visit_type`. These fields travel together through the pipeline and have inter-field validity constraints (see `_validate_epiautogp_parameters`), so they're treated as one cohesive unit. Lives in its own module to avoid an import cycle between `nowcast.py` and `epiautogp_forecast_utils.py`.
+
 ### `epiautogp_forecast_utils.py`
 
 Shared utilities for the forecast pipeline, containing modular functions for each pipeline stage.
 
 **Data Classes:**
-- **`ForecastPipelineContext`**: Container for shared pipeline state (disease, location, dates, data sources, logger)
+- **`ForecastPipelineContext`**: Container for shared pipeline state. Embeds a `ForecastSpec` plus workflow-only fields (training dates, output directories, data sources, logger, nowcast source).
 - **`ModelPaths`**: Container for output directory structure and file paths
+
+**Key Functions:**
+- **`setup_forecast_pipeline()`**: Builds the `ForecastSpec`, resolves the nowcast source, and assembles a `ForecastPipelineContext` for downstream stages.
+- **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`. Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
+
+### `nowcast.py` & `reporting_delay_nowcast.py`
+
+Pluggable nowcasting sources for nowcasting recent observations.
+
+- **`NowcastSource`** (Protocol): Declares `applies_to(*, forecast_spec) -> bool` (the predicate the resolver queries before constructing) and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
+- **`FixedNowcast`**: Trivial source wrapping a precomputed `NowcastData`.
+- **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF. Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.
 
 ### `prep_epiautogp_data.py`
 
@@ -73,6 +90,8 @@ Data conversion utilities for EpiAutoGP JSON format.
   "pathogen": "COVID-19",
   "location": "DC",
   "target": "nssp",
+  "frequency": "daily",
+  "ed_visit_type": "observed",
   "forecast_date": "2024-12-20",
   "nowcast_dates": [],
   "nowcast_reports": []

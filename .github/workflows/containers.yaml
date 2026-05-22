@@ -113,15 +113,15 @@ jobs:
             fi
 
             HEAD="${{ github.sha }}"
-            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || "true")
-
-            echo "Dagster defs changed? --> ${CHANGED}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
 
             if [ -n "$CHANGED" ]; then
               echo "changed=true" >> $GITHUB_OUTPUT
             else
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
+
+            echo "Dagster defs changed? --> ${CHANGED}"
 
         - name: Run update script with cfa runner-action
           uses: CDCgov/cfa-actions/runner-action@v1.5.0

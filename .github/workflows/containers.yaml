@@ -107,25 +107,21 @@ jobs:
           if: github.event_name == 'push' || github.event_name == 'pull_request'
           shell: bash
           run: |
-
-            # Check to see if dagster defs changed since before this PR or push happened
             if [ "${{ github.event_name }}" == "push" ]; then
               BASE="${{ github.event.before }}"
-            elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            else
               BASE="${{ github.event.pull_request.base.sha }}"
             fi
 
             HEAD="${{ github.sha }}"
-            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
 
-            if [ -n "$CHANGED" ]; then
-              echo "changed='true'" >> $GITHUB_OUTPUT
+            if git diff --name-only "$BASE" "$HEAD" | grep -q 'dagster_defs\.py'; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "Dagster defs changed: true"
             else
-              echo "changed='false'" >> $GITHUB_OUTPUT
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "Dagster defs changed: false"
             fi
-
-            echo "Dagster defs changed?"
-            echo "->" && echo "$changed"
 
         - name: Run update script with cfa runner-action
           uses: CDCgov/cfa-actions/runner-action@v1.5.0

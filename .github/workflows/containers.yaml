@@ -113,9 +113,9 @@ jobs:
             fi
 
             HEAD="${{ github.sha }}"
-            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || "true")
 
-            echo "Dagster defs changed? --> $CHANGED"
+            echo "Dagster defs changed? --> ${CHANGED}"
 
             if [ -n "$CHANGED" ]; then
               echo "changed=true" >> $GITHUB_OUTPUT

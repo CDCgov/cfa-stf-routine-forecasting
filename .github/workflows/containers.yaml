@@ -109,7 +109,7 @@ jobs:
             if [ "${{ github.event_name }}" == "push" ]; then
               BASE="${{ github.event.before }}"
             else
-              BASE="${{ github.event.pull_request.base.ref }}"
+              BASE="${{ github.event.pull_request.base.sha }}"
             fi
 
             HEAD="${{ github.sha }}"

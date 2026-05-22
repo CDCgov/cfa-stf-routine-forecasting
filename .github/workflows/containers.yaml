@@ -89,23 +89,24 @@ jobs:
       steps:
         - name: Checkout code
           uses: actions/checkout@v6
+          with:
+            fetch-depth: 0
 
         - name: Check if dagster defs changed
           id: dagster_changed
           shell: bash
           run: |
-            if [ "${{ github.event_name }}" = "push" ]; then
-              BASE="${{ github.event.before }}"
-              HEAD="${{ github.sha }}"
-              CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
-              echo "Dagster defs changed? --> $CHANGED"
-              if [ -n "$CHANGED" ]; then
-                echo "changed=true" >> $GITHUB_OUTPUT
-              else
-                echo "changed=false" >> $GITHUB_OUTPUT
-              fi
+            
+            # Check to see if dagster defs changed since before this PR or push happened
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
+
+            echo "Dagster defs changed? --> $CHANGED"
+          
+            if [ -n "$CHANGED" ]; then
+              echo "changed=true" >> $GITHUB_OUTPUT
             else
-              echo "Setting 'changed' to false as we only care to check when it's a push."
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
 

@@ -105,8 +105,8 @@ jobs:
           id: dagster_changed
           shell: bash
           run: |
-            
-            # Check to see if dagster defs changed since before this PR or push happened    
+
+            # Check to see if dagster defs changed since before this PR or push happened
             if [ "${{ github.event_name }}" == "push" ]; then
               BASE="${{ github.event.before }}"
             else

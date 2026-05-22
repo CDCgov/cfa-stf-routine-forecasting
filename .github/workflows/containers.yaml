@@ -6,6 +6,14 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      build_image:
+        type: choice
+        description: "Should the container be built?"
+        options:
+          - "yes"
+          - "no"
+        default:
+          - "yes"
       push_to_dagster:
         type: choice
         description: "Should the container be pushed to the dagster prod server?"
@@ -27,6 +35,7 @@ jobs:
       name: Build image
       outputs:
         tag: ${{ steps.image-tag.outputs.tag }}
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_image == 'yes' }}
       steps:
 
         - name: Checkout code
@@ -97,8 +106,13 @@ jobs:
           shell: bash
           run: |
             
-            # Check to see if dagster defs changed since before this PR or push happened
-            BASE="${{ github.event.before }}"
+            # Check to see if dagster defs changed since before this PR or push happened    
+            if [ "${{ github.event_name }}" == "push" ]; then
+              BASE="${{ github.event.before }}"
+            else
+              BASE="${{ github.event.pull_request.base.ref }}"
+            fi
+
             HEAD="${{ github.sha }}"
             CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
 

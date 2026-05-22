@@ -6,6 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      build_image:
+        type: choice
+        description: "Should the container be built?"
+        options:
+          - "yes"
+          - "no"
+        default: "yes"
       push_to_dagster:
         type: choice
         description: "Should the container be pushed to the dagster prod server?"
@@ -48,6 +55,7 @@ jobs:
             fi
 
         - name: Docker Login
+          if: github.event.inputs.build_image != 'no'
           uses: docker/login-action@v4
           with:
             registry: ghcr.io
@@ -55,10 +63,12 @@ jobs:
             password: ${{ secrets.GITHUB_TOKEN }}
 
         - name: Set up Docker Buildx
+          if: github.event.inputs.build_image != 'no'
           id: buildx
           uses: docker/setup-buildx-action@v4
 
         - name: Docker build and push
+          if: github.event.inputs.build_image != 'no'
           uses: docker/build-push-action@v7
           with:
             context: .
@@ -89,33 +99,35 @@ jobs:
       steps:
         - name: Checkout code
           uses: actions/checkout@v6
+          with:
+            fetch-depth: 0
 
         - name: Check if dagster defs changed
           id: dagster_changed
+          if: github.event_name == 'push' || github.event_name == 'pull_request'
           shell: bash
           run: |
-            if [ "${{ github.event_name }}" = "push" ]; then
+            if [ "${{ github.event_name }}" == "push" ]; then
               BASE="${{ github.event.before }}"
-              HEAD="${{ github.sha }}"
-              CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
-              echo "Dagster defs changed? --> $CHANGED"
-              if [ -n "$CHANGED" ]; then
-                echo "changed=true" >> $GITHUB_OUTPUT
-              else
-                echo "changed=false" >> $GITHUB_OUTPUT
-              fi
             else
-              echo "Setting 'changed' to false as we only care to check when it's a push."
+              BASE="${{ github.event.pull_request.base.sha }}"
+            fi
+
+            HEAD="${{ github.sha }}"
+
+            if git diff --name-only "$BASE" "$HEAD" | grep -q 'dagster_defs\.py'; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "Dagster defs changed: true"
+            else
               echo "changed=false" >> $GITHUB_OUTPUT
+              echo "Dagster defs changed: false"
             fi
 
         - name: Run update script with cfa runner-action
           uses: CDCgov/cfa-actions/runner-action@v1.5.0
           if: >-
-            ${{
               ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
               ( github.event_name == 'push' && github.ref_name == 'main' && steps.dagster_changed.outputs.changed == 'true' )
-            }}
 
           with:
             github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}

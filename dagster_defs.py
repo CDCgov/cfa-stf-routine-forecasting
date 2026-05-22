@@ -553,14 +553,13 @@ weekly_forecast_fusion_asset_args = {
 # They are replaced with true assets in production where
 # other code locations are able to be referenced.
 
-if not is_production:
-    nssp_gold_v1 = dg.AssetSpec(
-        "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
-    )
+nssp_gold_v1 = dg.AssetSpec(
+    "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
+)
 
-    nhsn_hrd_prelim = dg.AssetSpec(
-        "nhsn_hrd_prelim", partitions_def=daily_partitions_def, group_name="Upstream"
-    )
+nhsn_hrd_prelim = dg.AssetSpec(
+    "nhsn_hrd_prelim", partitions_def=daily_partitions_def, group_name="Upstream"
+)
 
 
 # ---------------- Weekly Forecasts --------------

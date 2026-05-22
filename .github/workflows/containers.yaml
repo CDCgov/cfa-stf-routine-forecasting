@@ -96,14 +96,14 @@ jobs:
           id: dagster_changed
           shell: bash
           run: |
-            
+
             # Check to see if dagster defs changed since before this PR or push happened
             BASE="${{ github.event.before }}"
             HEAD="${{ github.sha }}"
             CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep 'dagster_defs\.py' || true)
 
             echo "Dagster defs changed? --> $CHANGED"
-          
+
             if [ -n "$CHANGED" ]; then
               echo "changed=true" >> $GITHUB_OUTPUT
             else

@@ -123,7 +123,7 @@ jobs:
               echo "changed=false" >> $GITHUB_OUTPUT
             fi
 
-            echo "Dagster defs changed?" 
+            echo "Dagster defs changed?"
             echo "->" && echo "$CHANGED"
 
         - name: Run update script with cfa runner-action

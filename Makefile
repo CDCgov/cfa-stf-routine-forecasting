@@ -55,6 +55,7 @@ help:
 	@echo "  container_tag	     : Tag the container image for pushing to the registry"
 	@echo "  container_push	     : Push the container image"
 	@echo "  container_explore   : Run the last locally-built container interactively in your shell"
+	@echo '  prod_test           : Push your local image to the dagster prod server (use sparingly and with agreement from team)'
 	@echo ""
 	@echo ""
 	@echo "Model Fit Targets: "
@@ -97,6 +98,10 @@ container_push: container_build ghcr_login
 
 container_explore:
 	$(ENGINE) run -it --rm $(CONTAINER_REMOTE_NAME) bash
+
+prod_test: container_push
+	uv run https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py \
+	--registry_image $(CONTAINER_REMOTE_NAME)
 
 config:
 	bash -c "source ./azureconfig.sh"

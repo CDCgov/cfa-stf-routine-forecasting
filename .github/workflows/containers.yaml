@@ -34,7 +34,7 @@ jobs:
       name: Build image
       outputs:
         tag: ${{ steps.image-tag.outputs.tag }}
-      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_image == 'yes' }}
+      if: ${{ github.event.inputs.build_image != 'no' }}
       steps:
 
         - name: Checkout code

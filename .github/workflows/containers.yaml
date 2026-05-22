@@ -12,8 +12,7 @@ on:
         options:
           - "yes"
           - "no"
-        default:
-          - "yes"
+        default: "yes"
       push_to_dagster:
         type: choice
         description: "Should the container be pushed to the dagster prod server?"

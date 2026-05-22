@@ -16,14 +16,14 @@ all_locs = (
     .with_columns(pl.col("geo_value").cast(pl.String).alias("loc_abb"))
     .select("loc_abb")
     .sort("loc_abb")
-    .filter(pl.col("loc_abb").not_in(["WY", "GU"]))
+    .filter(~pl.col("loc_abb").is_in(["WY", "GU"]))
     .collect()
 )
 
 
 exclusion_params = pl.DataFrame(
-    {"max_tail_length": [7], "outlier_sd_multiplier": [2.5]}
-)
+    {"outlier_sd_multiplier": [2.0, 2.5, 3.0]}
+).with_columns(pl.lit(7).alias("max_tail_length"))
 all_benchmark = (
     outliers_benchmark.unique("reference_date")
     .select("reference_date")
@@ -90,5 +90,50 @@ result = result.with_columns(
 result.group_by("max_tail_length", "outlier_sd_multiplier").agg(
     false_discovery_rate=pl.col("false_positives").sum()
     / pl.col("predicted_positives").sum(),
-    sensitivity=pl.col("true_positives").sum() / pl.col("true_positives").sum(),
+    sensitivity=pl.col("true_positives").sum() / pl.col("n_drop_kelly").sum(),
 )
+
+
+# kelly dropped vs algorithm dropped
+# or bin it
+# algorithdropped - kellydropped
+
+result = (
+    result.rename({"n_drop_kelly": "kelly_drops", "exclude_sum": "algo_drops"})
+    .filter(pl.col("algo_drops").is_not_null())
+    .with_columns(
+        (pl.col("algo_drops") - pl.col("kelly_drops")).alias("drop_difference")
+    )
+)
+result.write_parquet("outliers_benchmark_results.parquet")
+
+
+result.group_by("drop_difference", "outlier_sd_multiplier").len("n").sort(
+    "outlier_sd_multiplier"
+).pivot(
+    index="drop_difference", on="outlier_sd_multiplier", values="n", maintain_order=True
+).fill_null(0).sort("drop_difference")
+
+
+target_config = result.filter(pl.col("drop_difference") <= -6).row(0, named=True)
+
+target_dat = get_nssp_with_exclusion(
+    disease="Total",
+    loc_abb=target_config["loc_abb"],
+    as_of=target_config["reference_date"],
+    start_date=target_config["reference_date"] - dt.timedelta(days=120),
+    exclusion_strategy="tail_by_total",
+    outlier_sd_multiplier=target_config["outlier_sd_multiplier"],
+    max_tail_length=target_config["max_tail_length"],
+)
+
+import plotnine as p9
+
+(
+    p9.ggplot(
+        target_dat.to_pandas(),
+        p9.aes(x="reference_date", y="value", color="exclude"),
+    )
+    + p9.geom_line()
+)
+# something definitely wrong with that

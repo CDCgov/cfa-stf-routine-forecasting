@@ -104,7 +104,7 @@ jobs:
 
         - name: Check if dagster defs changed
           id: dagster_changed
-          if: ${{ github.event_name == "push" || github.event_name == "pull_request" }}
+          if: github.event_name == 'push' || github.event_name == 'pull_request'
           shell: bash
           run: |
 

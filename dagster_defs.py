@@ -533,7 +533,7 @@ weekly_forecast_initial_asset_args = {
         dg.AutomationCondition.eager() & IsWeekday(2)
     ).with_label("eager_on_wed"),
 }
-# test ci
+
 weekly_forecast_fusion_asset_args = {
     **weekly_forecast_base_asset_args,
     "group_name": "WeeklyForecastFusion",

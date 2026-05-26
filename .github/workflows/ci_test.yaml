@@ -90,7 +90,7 @@ jobs:
       # Conditional step execution that runs only when:
       # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
       # OR
-      # the event is a push to main where the dagster_defs_changed
+      # the event is a push to main where the ci_test_changed
       runs-on: ubuntu-latest
       name: Check Dagster Changes and Update Prod Server
       permissions:
@@ -102,7 +102,7 @@ jobs:
           with:
             fetch-depth: 0
 
-        - name: Check if dagster defs changed
+        - name: Check if ci test changed
           id: dagster_changed
           if: github.event_name == 'push' || github.event_name == 'pull_request'
           shell: bash
@@ -115,12 +115,12 @@ jobs:
 
             HEAD="${{ github.sha }}"
 
-            if git diff --name-only "$BASE" "$HEAD" | grep -q 'dagster_defs\.py'; then
+            if git diff --name-only "$BASE" "$HEAD" | grep -q 'ci_test\.py'; then
               echo "changed=true" >> $GITHUB_OUTPUT
-              echo "Dagster defs changed: true"
+              echo "CI test changed: true"
             else
               echo "changed=false" >> $GITHUB_OUTPUT
-              echo "Dagster defs changed: false"
+              echo "CI test changed: false"
             fi
 
         - name: Run update script with cfa runner-action

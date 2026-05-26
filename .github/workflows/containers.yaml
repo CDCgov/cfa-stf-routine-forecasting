@@ -3,7 +3,13 @@ name: Create Docker Image and optionally deploy to Dagster
 on:
   push:
     branches: [main]
+    paths-ignore: 
+      - .github/workflows/ci_test.yaml
+      - ci_test.py
   pull_request:
+    paths-ignore: 
+      - .github/workflows/ci_test.yaml
+      - ci_test.py
   workflow_dispatch:
     inputs:
       build_image:

@@ -1,0 +1,139 @@
+name: Create Docker Image and optionally deploy to Dagster
+
+on:
+  push:
+    branches: [jk-test-ci]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_image:
+        type: choice
+        description: "Should the container be built?"
+        options:
+          - "yes"
+          - "no"
+        default: "yes"
+      push_to_dagster:
+        type: choice
+        description: "Should the container be pushed to the dagster prod server?"
+        options:
+          - "no"
+          - "yes"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: cfa-stf-routine-forecasting
+
+jobs:
+    # This can be used as a template, later: https://github.com/CDCgov/cfa-epinow2-pipeline/blob/main/.github/workflows/containers-and-az-pool.yaml
+    build-pipeline-image:
+      runs-on: ubuntu-latest
+      name: Build image
+      outputs:
+        tag: ${{ steps.image-tag.outputs.tag }}
+      steps:
+
+        - name: Checkout code
+          uses: actions/checkout@v6
+
+        - name: Extract branch name
+          shell: bash
+          run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+          id: branch-name
+
+        - name: Figure out tag (either latest if it is main or the branch name)
+          shell: bash
+          id: image-tag
+          run: |
+            if [ "${{ steps.branch-name.outputs.branch }}" = "main" ]; then
+              echo "tag=latest" >> $GITHUB_OUTPUT
+            else
+              echo "tag=$(echo "${{ steps.branch-name.outputs.branch }}" | tr '/' '-')" >> $GITHUB_OUTPUT
+            fi
+
+        # - name: Docker Login
+        #   if: github.event.inputs.build_image != 'no'
+        #   uses: docker/login-action@v4
+        #   with:
+        #     registry: ghcr.io
+        #     username: ${{ github.actor }}
+        #     password: ${{ secrets.GITHUB_TOKEN }}
+
+        # - name: Set up Docker Buildx
+        #   if: github.event.inputs.build_image != 'no'
+        #   id: buildx
+        #   uses: docker/setup-buildx-action@v4
+
+        # - name: Docker build and push
+        #   if: github.event.inputs.build_image != 'no'
+        #   uses: docker/build-push-action@v7
+        #   with:
+        #     context: .
+        #     file: Containerfile
+        #     push: true
+        #     builder: ${{ steps.buildx.outputs.name }}
+        #     tags: |
+        #       ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}
+        #     build-args: |
+        #       GIT_COMMIT_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+        #       GIT_BRANCH_NAME=${{ steps.branch-name.outputs.branch }}
+        #     cache-from: |
+        #       type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache
+        #       type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:latest-cache
+        #     cache-to: type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache,mode=max
+
+    check_and_deploy_dagster_code:
+      needs: [ build-pipeline-image ]
+      # Conditional step execution that runs only when:
+      # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
+      # OR
+      # the event is a push to main where the dagster_defs_changed
+      runs-on: ubuntu-latest
+      name: Check Dagster Changes and Update Prod Server
+      permissions:
+            contents: read
+            packages: write
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v6
+          with:
+            fetch-depth: 0
+
+        - name: Check if dagster defs changed
+          id: dagster_changed
+          if: github.event_name == 'push' || github.event_name == 'pull_request'
+          shell: bash
+          run: |
+            if [ "${{ github.event_name }}" == "push" ]; then
+              BASE="${{ github.event.before }}"
+            else
+              BASE="${{ github.event.pull_request.base.sha }}"
+            fi
+
+            HEAD="${{ github.sha }}"
+
+            if git diff --name-only "$BASE" "$HEAD" | grep -q 'dagster_defs\.py'; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "Dagster defs changed: true"
+            else
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "Dagster defs changed: false"
+            fi
+
+        - name: Run update script with cfa runner-action
+          uses: CDCgov/cfa-actions/runner-action@v1.5.0
+          if: >-
+              ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
+              ( github.event_name == 'push' && github.ref_name == 'jk-test-ci' && steps.dagster_changed.outputs.changed == 'true' )
+          with:
+            github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
+            github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
+            script: |
+              echo "Running update script"
+              echo "DRY RUN"
+              # uv run \
+              #   https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py \
+              #   --registry_image ghcr.io/cdcgov/cfa-stf-routine-forecasting:${{ needs.build-pipeline-image.outputs.tag }}

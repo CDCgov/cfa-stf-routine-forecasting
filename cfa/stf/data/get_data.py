@@ -272,13 +272,11 @@ def get_nssp(
         dat if get_all_locs else dat.filter(pl.col("geo_value").is_in(state_locs))
     )
 
-    geo_value_dtype = dat.collect_schema()["geo_value"]
-
     combined_dat = (
         pl.concat(
             [
-                state_dat,
-                dat.with_columns(pl.lit("US").alias("geo_value").cast(geo_value_dtype)),
+                state_dat.with_columns(pl.col("geo_value").cast(pl.String)),
+                dat.with_columns(pl.lit("US").alias("geo_value")),
             ]
         )
         if national_required

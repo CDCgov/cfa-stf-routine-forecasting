@@ -275,8 +275,8 @@ def get_nssp(
     combined_dat = (
         pl.concat(
             [
-                state_dat,
-                dat.with_columns(pl.lit("US").alias("geo_value").cast(pl.Categorical)),
+                state_dat.with_columns(pl.col("geo_value").cast(pl.String)),
+                dat.with_columns(pl.lit("US").alias("geo_value")),
             ]
         )
         if national_required

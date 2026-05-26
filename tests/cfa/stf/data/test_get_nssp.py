@@ -74,22 +74,27 @@ def nssp_data() -> pl.DataFrame:
     ).with_columns(pl.col("geo_value").cast(pl.Categorical))
 
 
+@pytest.fixture
+def nssp_data_comprehensive(nssp_data: pl.DataFrame) -> pl.DataFrame:
+    return nssp_data.with_columns(pl.col("geo_value").cast(pl.String))
+
+
 @pytest.fixture(autouse=True)
-def mock_nssp_data(monkeypatch, nssp_data: pl.DataFrame, request) -> None:
+def mock_nssp_data(
+    monkeypatch, nssp_data: pl.DataFrame, nssp_data_comprehensive: pl.DataFrame, request
+) -> None:
     if uses_catalog(request):
         return
-
-    get_dataframe = lazy_catalog_loader(nssp_data)
 
     monkeypatch.setattr(
         get_data.datacat.public.stf.nssp_gold_v1.load,
         "get_dataframe",
-        get_dataframe,
+        lazy_catalog_loader(nssp_data),
     )
     monkeypatch.setattr(
         get_data.datacat.public.stf.comprehensive_nssp_gold.load,
         "get_dataframe",
-        get_dataframe,
+        lazy_catalog_loader(nssp_data_comprehensive),
     )
 
 
@@ -149,6 +154,44 @@ def test_get_nssp_warns_about_missing_filters() -> None:
     )
     assert _unique_values(result, "geo_value") == {"CA", "US"}
     assert _unique_values(result, "disease") == {"COVID-19", "Influenza"}
+
+
+@pytest.mark.parametrize(
+    "loc_abb",
+    [
+        "US",
+        "AK",
+        ["AK", "CA"],
+        ["CA", "US"],
+    ],
+)
+def test_get_nssp_comprehensive_filters_locations(loc_abb) -> None:
+    expected_geo_values = set(ensure_list(loc_abb))
+    result = set(
+        _unique_values(
+            get_data.get_nssp(loc_abb=loc_abb, dataset="comprehensive", lazy=False),
+            "geo_value",
+        )
+    )
+    assert result == expected_geo_values
+
+
+@pytest.mark.parametrize(
+    "disease",
+    [
+        "COVID-19",
+        ["COVID-19", "Influenza"],
+    ],
+)
+def test_get_nssp_comprehensive_filters_diseases(disease) -> None:
+    expected_diseases = set(ensure_list(disease))
+    result = set(
+        _unique_values(
+            get_data.get_nssp(disease=disease, dataset="comprehensive", lazy=False),
+            "disease",
+        )
+    )
+    assert result == expected_diseases
 
 
 @requires_ext_catalog

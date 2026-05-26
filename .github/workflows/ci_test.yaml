@@ -2,8 +2,9 @@ name: Test CI Rapidly
 
 on:
   push:
-    branches: [jk-test-ci]
+    branches: [jk-test-ci**]
   pull_request:
+    branches: [jk-test-ci]
   workflow_dispatch:
     inputs:
       build_image:

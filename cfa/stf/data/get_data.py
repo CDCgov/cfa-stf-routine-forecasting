@@ -272,7 +272,7 @@ def get_nssp(
         dat if get_all_locs else dat.filter(pl.col("geo_value").is_in(state_locs))
     )
 
-    geo_value_dtype = dat.schema["geo_value"]
+    geo_value_dtype = dat.collect_schema()["geo_value"]
 
     combined_dat = (
         pl.concat(

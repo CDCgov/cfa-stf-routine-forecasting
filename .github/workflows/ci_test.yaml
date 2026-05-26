@@ -1,4 +1,4 @@
-name: Create Docker Image and optionally deploy to Dagster
+name: Test CI Rapidly
 
 on:
   push:

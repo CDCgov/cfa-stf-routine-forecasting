@@ -12,7 +12,11 @@ from cfa.stf.forecasttools import ensure_list
 
 
 def identify_outlier_tail(
-    x: ArrayLike, outlier_sd_multiplier: float = 2.5, max_tail_length: int = 7
+    x: ArrayLike,
+    low_outliers_only: bool = True,
+    spread_estimator: Literal["median", "mean"] = "mean",
+    outlier_multiplier: float = 8.0,
+    max_tail_length: int = 7,
 ) -> list[bool]:
     """
     Identify outliers in the tail of a time series based on log differences.
@@ -21,8 +25,10 @@ def identify_outlier_tail(
     -----------
     x : array-like
         Input data
-    outlier_sd_multiplier : float
-        Number of standard deviations to use as threshold (default: 2.5)
+    spread_estimator : Literal["median", "mean"]
+        Method to estimate the spread of the log differences (default: "mean")
+    outlier_multiplier : float
+        Number of standard deviations to use as threshold (default: 8.0)
     max_tail_length : int
         Length of tail to examine (default: 7)
 
@@ -50,12 +56,19 @@ def identify_outlier_tail(
     head_log_diff = log_diff[:-max_tail_length]
     tail_log_diff = log_diff[-max_tail_length:]
 
-    # Compute standard deviation of head
-    log_diff_sd = np.std(head_log_diff, ddof=1)
+    if spread_estimator == "median":
+        log_diff_spread = np.median(np.abs(head_log_diff))
+    elif spread_estimator == "mean":
+        log_diff_spread = np.mean(np.abs(head_log_diff))
+    else:
+        raise ValueError(f"Invalid spread_estimator: {spread_estimator}")
 
     # Identify first outlier in tail
-    threshold = log_diff_sd * outlier_sd_multiplier
-    outlier_indices = np.where(np.abs(tail_log_diff) > threshold)[0]
+    threshold = log_diff_spread * outlier_multiplier
+    if low_outliers_only:
+        outlier_indices = np.where(tail_log_diff < -threshold)[0]
+    else:
+        outlier_indices = np.where(np.abs(tail_log_diff) > threshold)[0]
 
     # Build exclusion boolean array
     exclude = np.zeros(n, dtype=bool)
@@ -72,7 +85,8 @@ def exclude_tail_auto(
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
     exclusion_calc_disease: str | list[str] = ["Influenza", "RSV", "COVID-19"],
-    outlier_sd_multiplier: float = 2.5,
+    spread_estimator: Literal["median", "mean"] = "mean",
+    outlier_multiplier: float = 8.0,
     max_tail_length: int = 7,
 ) -> pl.DataFrame:
     disease_pmf = (
@@ -145,7 +159,8 @@ def exclude_tail_auto(
                 pl.Series(
                     identify_outlier_tail(
                         df["adjusted_value"],
-                        outlier_sd_multiplier=outlier_sd_multiplier,
+                        spread_estimator=spread_estimator,
+                        outlier_multiplier=outlier_multiplier,
                         max_tail_length=max_tail_length,
                     )
                 ).alias("exclude")

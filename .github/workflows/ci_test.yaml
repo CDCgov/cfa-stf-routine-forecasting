@@ -127,9 +127,6 @@ jobs:
           if: >-
               ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
               ( github.event_name == 'push' && github.ref_name == 'jk-test-ci' && steps.dagster_changed.outputs.changed == 'true' )
-          with:
-            github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
-            github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
           run: |
               echo "Running update script"
               echo "DRY RUN"

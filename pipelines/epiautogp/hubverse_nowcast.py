@@ -255,15 +255,10 @@ class HubversePointerNowcast:
     def from_pointer_uri(
         cls,
         *,
-        pointer_uri: str | Path | None,
+        pointer_uri: str | Path,
         forecast_spec: ForecastSpec,
     ) -> HubversePointerNowcast:
         """Build a Hubverse nowcast source from a required pointer URI."""
-        if pointer_uri is None:
-            raise ValueError(
-                "hubverse_nowcast_pointer_uri is required when hubverse "
-                "nowcasting is requested."
-            )
         return cls(pointer_uri=pointer_uri, forecast_spec=forecast_spec)
 
     @staticmethod

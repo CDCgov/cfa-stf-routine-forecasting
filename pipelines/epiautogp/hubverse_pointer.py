@@ -7,76 +7,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
 
 from pipelines.epiautogp.forecast_spec import ForecastSpec
 
 
-def _repo_root() -> Path:
-    """Return the repository root for blobfuse mount discovery."""
-    return Path(__file__).resolve().parents[2]
-
-
-def _blobfuse_candidate_paths(*, container: str, blob_path: str) -> list[Path]:
-    """List local paths where a mounted Blob artifact may exist."""
-    roots = [
-        Path.cwd(),
-        _repo_root(),
-        Path.cwd() / "blobfuse" / "mounts",
-        _repo_root() / "blobfuse" / "mounts",
-        Path("/mnt"),
-    ]
-    candidates: list[Path] = []
-    for root in roots:
-        candidate = root / container / blob_path
-        if candidate not in candidates:
-            candidates.append(candidate)
-    return candidates
-
-
-def _blobfuse_path(raw_uri: str, *, source_label: str) -> Path:
-    """Resolve an az:// URI to an existing blobfuse-mounted path."""
-    rest = raw_uri.removeprefix("az://")
-    container, separator, blob_path = rest.partition("/")
-    if not container or not separator or not blob_path.strip("/"):
-        raise ValueError(f"Unsupported az:// {source_label} URI: {raw_uri}")
-
-    candidates = _blobfuse_candidate_paths(
-        container=container,
-        blob_path=blob_path.strip("/"),
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-
-    formatted_candidates = "\n".join(f"  - {path}" for path in candidates)
-    raise FileNotFoundError(
-        f"{source_label} az:// artifact is not available through known "
-        "mounted Blob paths. Mount blob storage with `make mount` or provide "
-        "a local/file:// URI.\n"
-        f"az URI: {raw_uri}\n"
-        f"Checked:\n{formatted_candidates}"
-    )
-
-
 def resolve_artifact_path(
-    raw_uri: str | Path,
+    raw_path: str | Path,
     *,
     base_path: Path | None = None,
     source_label: str,
 ) -> Path:
-    """Resolve local, file://, and blobfuse-backed az:// URIs to a local path."""
-    raw = str(raw_uri)
-    if raw.startswith("az://"):
-        return _blobfuse_path(raw, source_label=source_label)
-
-    parsed = urlparse(raw)
-    if parsed.scheme == "file":
-        return Path(unquote(parsed.path)).resolve()
-    if parsed.scheme:
-        raise ValueError(f"Unsupported {source_label} URI scheme: {raw}")
-
-    path = Path(raw)
+    """Resolve a local file path (absolute or relative) to a concrete path."""
+    path = Path(raw_path)
     if path.is_absolute():
         return path.resolve()
     if base_path is not None:

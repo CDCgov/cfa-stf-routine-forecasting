@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 import polars as pl
@@ -17,14 +14,7 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     setup_forecast_pipeline,
 )
 from pipelines.epiautogp.forecast_epiautogp import run_epiautogp_forecast
-from pipelines.epiautogp.hubverse_pointer import resolve_artifact_path
-
-RUN_ENV = "EPIAUTOGP_NHSN_NOWCAST_VM_TEST"
-TARGET_ENV = "EPIAUTOGP_NHSN_NOWCAST_VM_TARGET"
-LOCATION_ENV = "EPIAUTOGP_NHSN_NOWCAST_VM_LOCATION"
-CONTAINER_ENV = "EPIAUTOGP_NHSN_NOWCAST_VM_CONTAINER"
-POINTER_URI_ENV = "EPIAUTOGP_NHSN_NOWCAST_VM_POINTER_URI"
-FACILITY_NSSP_DIR_ENV = "EPIAUTOGP_NHSN_NOWCAST_VM_NSSP_DATA_DIR"
+from tests.cfa.stf.data.data_test_utils import requires_ext_catalog
 
 _TARGET_TO_DISEASE = {
     "covid": "COVID-19",
@@ -32,43 +22,8 @@ _TARGET_TO_DISEASE = {
     "rsv": "RSV",
 }
 
-
-def _skip_unless_enabled() -> None:
-    if os.environ.get(RUN_ENV) != "1":
-        pytest.skip(f"Set {RUN_ENV}=1 on a VM with nowcastnhsn-prod mounted to run.")
-
-
-def _require_r_packages(*packages: str) -> None:
-    rscript = shutil.which("Rscript")
-    if rscript is None:
-        pytest.fail("Rscript is required for the enabled NHSN nowcast smoke test.")
-
-    package_vector = ", ".join(json.dumps(package) for package in packages)
-    result = subprocess.run(
-        [
-            rscript,
-            "-e",
-            (
-                f"pkgs <- c({package_vector}); "
-                "missing <- pkgs[!vapply(pkgs, requireNamespace, "
-                "logical(1), quietly = TRUE)]; "
-                "if (length(missing)) { writeLines(missing); quit(status = 42) }"
-            ),
-        ],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    if result.returncode == 0:
-        return
-
-    missing = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    detail = ", ".join(missing) if missing else result.stderr.strip()
-    pytest.fail(
-        "R packages required for EpiAutoGP data preparation are unavailable: "
-        f"{detail}. Install the repo R dependencies or run this smoke test in "
-        "the production container image."
-    )
+NOWCAST_CONTAINER = "nowcastnhsn-prod"
+FACILITY_NSSP_DIR = Path("nssp-etl/gold")
 
 
 def _run_epiautogp_nhsn_nowcast_model(
@@ -137,6 +92,7 @@ def _run_epiautogp_nhsn_nowcast_model(
     return input_json_path, paths.model_output_dir / "samples.parquet"
 
 
+@requires_ext_catalog
 def test_epiautogp_runs_with_mounted_prod_nhsn_nowcasts(tmp_path):
     """Smoke the future Dagster EpiAutoGP NHSN-nowcast helper shape.
 
@@ -145,64 +101,33 @@ def test_epiautogp_runs_with_mounted_prod_nhsn_nowcasts(tmp_path):
     PyRenew-H's forecasttools NHSN HRD route, and reads the production-shaped
     nowcast pointer from mounted `nowcastnhsn-prod/latest`.
     """
-    _skip_unless_enabled()
-    if shutil.which("julia") is None:
-        pytest.skip("Julia is not available on PATH.")
-    _require_r_packages(
-        "argparser",
-        "dplyr",
-        "forecasttools",
-        "fs",
-        "lubridate",
-        "readr",
-        "stringr",
-        "tidyr",
-    )
+    target = "covid"
+    disease = _TARGET_TO_DISEASE[target]
+    loc = "CA"
 
-    target = os.environ.get(TARGET_ENV, "covid").lower()
-    try:
-        disease = _TARGET_TO_DISEASE[target]
-    except KeyError as exc:
-        valid_targets = ", ".join(sorted(_TARGET_TO_DISEASE))
-        raise ValueError(f"{TARGET_ENV} must be one of {valid_targets}") from exc
-
-    loc = os.environ.get(LOCATION_ENV, "CA").upper()
-    container = os.environ.get(CONTAINER_ENV, "nowcastnhsn-prod")
-    pointer_uri = os.environ.get(
-        POINTER_URI_ENV,
-        f"az://{container}/latest/{target}.json",
-    )
-    try:
-        resolve_artifact_path(
-            pointer_uri,
-            source_label="production NHSN nowcast pointer",
-        )
-    except (FileNotFoundError, PermissionError) as exc:
+    pointer_uri = str(Path(NOWCAST_CONTAINER) / "latest" / f"{target}.json")
+    if not Path(pointer_uri).exists():
         pytest.skip(
-            "Production NHSN nowcast Blob is not mounted/readable. "
-            "Run `make mount` on the VM, or make sure /mnt/nowcastnhsn-prod "
-            f"is available. Details: {exc}"
+            f"Production NHSN nowcast pointer not found at {pointer_uri}. "
+            "Ensure the nowcastnhsn-prod container is mounted."
         )
 
-    facility_nssp_data_dir = Path(
-        os.environ.get(FACILITY_NSSP_DIR_ENV, "nssp-etl/gold")
-    )
-    if not facility_nssp_data_dir.exists():
+    if not FACILITY_NSSP_DIR.exists():
         pytest.skip(
-            "Mounted facility-level NSSP data directory is not available. "
-            f"Set {FACILITY_NSSP_DIR_ENV} if needed: {facility_nssp_data_dir}"
+            "Mounted facility-level NSSP data directory is not available: "
+            f"{FACILITY_NSSP_DIR}"
         )
-    if not any(facility_nssp_data_dir.glob("*.parquet")):
+    if not any(FACILITY_NSSP_DIR.glob("*.parquet")):
         pytest.skip(
             "Mounted facility-level NSSP data directory has no report parquet "
-            f"files: {facility_nssp_data_dir}"
+            f"files: {FACILITY_NSSP_DIR}"
         )
 
     input_json_path, samples_path = _run_epiautogp_nhsn_nowcast_model(
         disease=disease,
         loc=loc,
         output_dir=tmp_path,
-        facility_level_nssp_data_dir=facility_nssp_data_dir,
+        facility_level_nssp_data_dir=FACILITY_NSSP_DIR,
         hubverse_nowcast_pointer_uri=pointer_uri,
     )
 

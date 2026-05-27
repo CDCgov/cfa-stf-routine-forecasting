@@ -132,7 +132,6 @@ docker_execution_config = ExecutionConfig(
                     f"{local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
                     f"{local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
                     f"{local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
-                    f"{local_workdir}/blobfuse/mounts/nowcastnhsn-prod:/cfa-stf-routine-forecasting/nowcastnhsn-prod",
                 ]
             },
         },
@@ -167,7 +166,6 @@ azure_batch_execution_config = ExecutionConfig(
                     "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
                     "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
                     "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
-                    "nowcastnhsn-prod:/cfa-stf-routine-forecasting/nowcastnhsn-prod",
                 ],
                 "working_dir": "/cfa-stf-routine-forecasting",
             },

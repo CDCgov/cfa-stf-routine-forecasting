@@ -186,6 +186,11 @@ def _build_hubverse_nowcast(
     hubverse_nowcast_pointer_uri: Path | str | None,
 ) -> HubversePointerNowcast:
     """Build a generic Hubverse handoff-pointer nowcast source."""
+    if hubverse_nowcast_pointer_uri is None:
+        raise ValueError(
+            "hubverse_nowcast_pointer_uri is required when hubverse "
+            "nowcasting is requested."
+        )
     return HubversePointerNowcast.from_pointer_uri(
         pointer_uri=hubverse_nowcast_pointer_uri,
         forecast_spec=forecast_spec,

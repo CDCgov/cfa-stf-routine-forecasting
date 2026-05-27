@@ -380,9 +380,8 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help=(
-            "Hubverse handoff pointer JSON. Required when "
-            "--nowcast-source=hubverse. Supports local paths, file:// URIs, "
-            "and az://container/blob URIs."
+            "Hubverse handoff pointer JSON path. Required when "
+            "--nowcast-source=hubverse."
         ),
     )
 

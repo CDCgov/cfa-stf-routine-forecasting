@@ -76,7 +76,7 @@ uv run python pipelines/epiautogp/forecast_epiautogp.py \
   --target nhsn \
   --frequency epiweekly \
   --nowcast-source hubverse \
-  --hubverse-nowcast-pointer-uri az://nowcastnhsn-prod/nowcastnhsn-prod/latest/covid.json \
+  --hubverse-nowcast-pointer-uri nowcastnhsn-prod/latest/covid.json \
   ...
 ```
 
@@ -84,7 +84,7 @@ The pointer must be a production `handoff_pointer` JSON whose `target` and `repo
 
 The Hubverse row target is inferred from `ForecastSpec`: disease maps to `covid`/`flu`/`rsv`, `target` and `ed_visit_type` choose the producer variable, and `frequency` adds the epiweekly `wk ` prefix. The inference mirrors the producer convention in `hewr/R/to_hubverse_tbl.R`.
 
-Supported URI forms are local paths, `file://` URIs, and `az://container/blob` URIs. `az://` paths are resolved through this repo's existing blobfuse mounts (`./blobfuse/mounts/<container>/...` or `/mnt/<container>/...`). The `nowcastnhsn-prod` container is included in `blobfuse/mount.sh`'s static mount list, so `make mount` makes the pointer reachable. For tests, provide a local or `file://` URI.
+The pointer URI is a plain file path (absolute or relative) to the mounted blob container. In Docker/Azure Batch execution, the `nowcastnhsn-prod` container is bind-mounted into the working directory. For local testing, ensure the container is mounted via `make mount` or provide a path to local test data.
 
 Only strictly negative Hubverse horizons are used as nowcast dates; horizon `0` is ignored. The source fails fast for missing rows, duplicate sample/date rows, incomplete sample grids, unsupported diseases, mismatched pointer metadata, or missing/non-finite/negative values.
 

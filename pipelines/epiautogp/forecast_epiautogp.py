@@ -108,6 +108,7 @@ def main(
     param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
     nowcast_source_name: str = "none",
     reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_pointer_uri: Path | str | None = None,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -168,9 +169,12 @@ def main(
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
     nowcast_source_name : str, default="none"
-        Nowcast source to use: "none" or "reporting-delay"
+        Nowcast source to use: "none", "reporting-delay", or "hubverse"
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Python API only.
+    hubverse_nowcast_pointer_uri : Path | str | None, default=None
+        Handoff pointer JSON whose hubverse.model_output_uri is a Hubverse
+        sample-format parquet. Required when nowcast_source_name="hubverse".
 
     Returns
     -------
@@ -266,6 +270,7 @@ def main(
         param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        hubverse_nowcast_pointer_uri=hubverse_nowcast_pointer_uri,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -365,7 +370,19 @@ if __name__ == "__main__":
         help=(
             "Nowcast source to use: 'none' disables nowcasting; "
             "'reporting-delay' inflates recent counts using a reporting-delay "
-            "PMF (default: none)."
+            "PMF; 'hubverse' reads Hubverse sample-format nowcasts through a "
+            "handoff pointer (default: none)."
+        ),
+    )
+
+    parser.add_argument(
+        "--hubverse-nowcast-pointer-uri",
+        type=str,
+        default=None,
+        help=(
+            "Hubverse handoff pointer JSON. Required when "
+            "--nowcast-source=hubverse. Supports local paths, file:// URIs, "
+            "and az://container/blob URIs."
         ),
     )
 

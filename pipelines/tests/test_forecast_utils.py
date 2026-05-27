@@ -30,6 +30,10 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     _resolve_nowcast_source,
     setup_forecast_pipeline,
 )
+from pipelines.epiautogp.hubverse_nowcast import (
+    HubversePointerNowcast,
+    hubverse_nowcast_config_from_forecast_spec,
+)
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
@@ -395,6 +399,105 @@ class TestSetupForecastPipeline:
                 nowcast_source_name="auto",
                 reporting_delay_pmf=None,
             )
+
+    def test_hubverse_returns_source_with_inferred_nhsn_config(self, tmp_path):
+        """Test hubverse builds a source with inferred NHSN target names."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 21),
+            target="nhsn",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
+            nowcast_source_name="hubverse",
+            hubverse_nowcast_pointer_uri=tmp_path / "latest.json",
+        )
+
+        assert isinstance(result, HubversePointerNowcast)
+        assert result.pointer_uri == tmp_path / "latest.json"
+        assert result.forecast_spec == spec
+        assert hubverse_nowcast_config_from_forecast_spec(spec) == (
+            "covid",
+            "wk inc covid hosp",
+        )
+
+    def test_hubverse_requires_pointer_uri(self):
+        """Test hubverse source selection requires a handoff pointer."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 21),
+            target="nhsn",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        )
+        with pytest.raises(
+            ValueError,
+            match="hubverse_nowcast_pointer_uri is required",
+        ):
+            _resolve_nowcast_source(
+                forecast_spec=spec,
+                nowcast_source_name="hubverse",
+                hubverse_nowcast_pointer_uri=None,
+            )
+
+    def test_hubverse_infers_nssp_observed_config(self, tmp_path):
+        """Test hubverse derives NSSP observed target names from the spec."""
+        spec = ForecastSpec(
+            disease="COVID-19",
+            loc="CA",
+            report_date=dt.date(2024, 12, 21),
+            target="nssp",
+            frequency="daily",
+            ed_visit_type="observed",
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
+            nowcast_source_name="hubverse",
+            hubverse_nowcast_pointer_uri=tmp_path / "latest.json",
+        )
+
+        assert isinstance(result, HubversePointerNowcast)
+        assert result.forecast_spec == spec
+        assert hubverse_nowcast_config_from_forecast_spec(spec) == (
+            "covid",
+            "inc covid ed visits",
+        )
+
+    @pytest.mark.parametrize(
+        ("ed_visit_type", "expected_target"),
+        [
+            ("other", "wk inc other ed visits"),
+            ("pct", "wk inc flu prop ed visits"),
+        ],
+    )
+    def test_hubverse_infers_other_nssp_configs(
+        self, ed_visit_type, expected_target, tmp_path
+    ):
+        """Test hubverse derives NSSP other and percentage target names."""
+        spec = ForecastSpec(
+            disease="Influenza",
+            loc="NY",
+            report_date=dt.date(2024, 12, 21),
+            target="nssp",
+            frequency="epiweekly",
+            ed_visit_type=ed_visit_type,
+        )
+        result = _resolve_nowcast_source(
+            forecast_spec=spec,
+            nowcast_source_name="hubverse",
+            hubverse_nowcast_pointer_uri=tmp_path / "latest.json",
+        )
+
+        assert isinstance(result, HubversePointerNowcast)
+        assert result.forecast_spec == spec
+        assert hubverse_nowcast_config_from_forecast_spec(spec) == (
+            "flu",
+            expected_target,
+        )
 
 
 class TestPrepareModelData:

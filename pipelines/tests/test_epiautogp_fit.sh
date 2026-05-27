@@ -45,10 +45,14 @@ if [ "$ed_visit_type" != "observed" ]; then
 	cmd_args+=(--ed-visit-type "$ed_visit_type")
 fi
 
-# NSSP counts use the test-data reporting-delay PMF; NHSN and NSSP
-# percentages have no nowcast (the reporting-delay estimator only applies
-# to count series).
-if [ "$target" = "nssp" ] && [ "$ed_visit_type" != "pct" ]; then
+# NHSN uses generated local Hubverse sample-format nowcasts. NSSP counts use
+# the test-data reporting-delay PMF; NSSP percentages have no nowcast.
+if [ "$target" = "nhsn" ]; then
+	cmd_args+=(
+		--nowcast-source hubverse
+		--hubverse-nowcast-pointer-uri "$BASE_DIR/private_data/hubverse_nowcasts/${disease}_${location}/latest.json"
+	)
+elif [ "$target" = "nssp" ] && [ "$ed_visit_type" != "pct" ]; then
 	cmd_args+=(--nowcast-source reporting-delay)
 fi
 

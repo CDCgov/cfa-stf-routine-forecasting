@@ -16,7 +16,7 @@ The forecasting pipeline consists of five main steps:
 
 1. **Setup**: Load data, validate dates, create directory structure
 2. **Data Preparation**: Process location data, evaluation data, and generate epiweekly datasets
-3. **Data nowcasting**: Either simple right-truncation correction or no nowcasting (further methods coming)
+3. **Data nowcasting**: Either simple right-truncation correction, production NHSN Hubverse nowcasts, or no nowcasting
 4. **Data Conversion**: Transform data into EpiAutoGP's JSON input format
 5. **Model Execution**: Run the Julia-based EpiAutoGP model
 6. **Post-processing**: Process outputs, create hubverse tables, and generate plots
@@ -39,6 +39,8 @@ Main entry point for the forecasting pipeline.
 - `--n-hmc`: HMC steps for GP kernel hyperparameters (default: 50)
 - `--n-forecast-draws`: Number of forecast draws (default: 2000)
 - `--smc-data-proportion`: Data proportion per SMC step (default: 0.1)
+- `--nowcast-source`: Nowcast source (`none`, `reporting-delay`, or `hubverse`)
+- `--hubverse-nowcast-pointer-uri`: Handoff pointer when using `hubverse`
 
 ### `forecast_spec.py`
 
@@ -54,15 +56,37 @@ Shared utilities for the forecast pipeline, containing modular functions for eac
 
 **Key Functions:**
 - **`setup_forecast_pipeline()`**: Builds the `ForecastSpec`, resolves the nowcast source, and assembles a `ForecastPipelineContext` for downstream stages.
-- **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`. Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
+- **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`. Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are read by the chosen builder, which validates them.
 
-### `nowcast.py` & `reporting_delay_nowcast.py`
+### `nowcast.py`, `reporting_delay_nowcast.py`, & `hubverse_nowcast.py`
 
 Pluggable nowcasting sources for nowcasting recent observations.
 
 - **`NowcastSource`** (Protocol): Declares `applies_to(*, forecast_spec) -> bool` (the predicate the resolver queries before constructing) and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
 - **`FixedNowcast`**: Trivial source wrapping a precomputed `NowcastData`.
 - **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF. Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.
+- **`HubversePointerNowcast`**: Generic reader for production handoff pointers whose `hubverse.model_output_uri` is a Hubverse sample-format parquet. It applies to any forecast spec; the pointer disease target and row target are inferred from `ForecastSpec`.
+
+#### Hubverse Nowcasts
+
+Use `--nowcast-source hubverse` to read negative-horizon samples from another model's Hubverse output:
+
+```bash
+uv run python pipelines/epiautogp/forecast_epiautogp.py \
+  --target nhsn \
+  --frequency epiweekly \
+  --nowcast-source hubverse \
+  --hubverse-nowcast-pointer-uri az://nowcastnhsn-prod/nowcastnhsn-prod/latest/covid.json \
+  ...
+```
+
+The pointer must be a production `handoff_pointer` JSON whose `target` and `report_date` match the EpiAutoGP run and whose `hubverse.validation_status` is `passed`. The source then reads `hubverse.model_output_uri`.
+
+The Hubverse row target is inferred from `ForecastSpec`: disease maps to `covid`/`flu`/`rsv`, `target` and `ed_visit_type` choose the producer variable, and `frequency` adds the epiweekly `wk ` prefix. The inference mirrors the producer convention in `hewr/R/to_hubverse_tbl.R`.
+
+Supported URI forms are local paths, `file://` URIs, and `az://container/blob` URIs. `az://` paths are resolved through this repo's existing blobfuse mounts (`./blobfuse/mounts/<container>/...` or `/mnt/<container>/...`). The `nowcastnhsn-prod` container is included in `blobfuse/mount.sh`'s static mount list, so `make mount` makes the pointer reachable. For tests, provide a local or `file://` URI.
+
+Only strictly negative Hubverse horizons are used as nowcast dates; horizon `0` is ignored. The source fails fast for missing rows, duplicate sample/date rows, incomplete sample grids, unsupported diseases, mismatched pointer metadata, or missing/non-finite/negative values.
 
 ### `prep_epiautogp_data.py`
 

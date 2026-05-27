@@ -90,6 +90,89 @@ PREDICTIVE_VAR_NAMES = [
 ]
 
 
+def write_hubverse_nhsn_nowcast_artifacts(
+    output_dir: Path,
+    *,
+    nhsn_data: pl.DataFrame,
+    disease: str,
+    location: str,
+    report_date: dt.date,
+    n_samples: int = 2,
+) -> Path:
+    """Write local Hubverse sample nowcasts and return the pointer JSON path."""
+    from pipelines.epiautogp.forecast_spec import ForecastSpec
+    from pipelines.epiautogp.hubverse_nowcast import (
+        hubverse_nowcast_config_from_forecast_spec,
+    )
+
+    pointer_target, hubverse_target = hubverse_nowcast_config_from_forecast_spec(
+        ForecastSpec(
+            disease=disease,
+            loc=location,
+            report_date=report_date,
+            target="nhsn",
+            frequency="epiweekly",
+            ed_visit_type="observed",
+        )
+    )
+    source = (
+        nhsn_data.with_columns(pl.col("weekendingdate").cast(pl.Date))
+        .filter(
+            pl.col("disease") == disease,
+            pl.col("jurisdiction") == location,
+            pl.col("weekendingdate") <= report_date,
+        )
+        .sort("weekendingdate")
+        .tail(3)
+    )
+    if source.height < 2:
+        raise ValueError(
+            f"Need at least 2 NHSN rows for {disease} {location} Hubverse nowcasts."
+        )
+
+    rows = [
+        {
+            "origin_date": report_date,
+            "target_end_date": target_end_date,
+            "horizon": (target_end_date - report_date).days // 7,
+            "target": hubverse_target,
+            "location": location.lower(),
+            "output_type": "sample",
+            "output_type_id": str(sample_idx + 1),
+            "value": float(value) * (1 + 0.05 * sample_idx),
+        }
+        for sample_idx in range(n_samples)
+        for target_end_date, value in source.select(
+            ["weekendingdate", "hospital_admissions"]
+        ).iter_rows()
+    ]
+
+    artifact_dir = output_dir / f"{disease}_{location}".replace(" ", "_")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_output_path = artifact_dir / "model-output.parquet"
+    pl.DataFrame(rows).write_parquet(model_output_path)
+
+    pointer_path = artifact_dir / "latest.json"
+    pointer_path.write_text(
+        json.dumps(
+            {
+                "artifact_type": "handoff_pointer",
+                "target": pointer_target,
+                "report_date": report_date.isoformat(),
+                "hubverse": {
+                    "model_output_uri": model_output_path.name,
+                    "round_id": report_date.isoformat(),
+                    "validation_status": "passed",
+                },
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return pointer_path
+
+
 def dirichlet_integer_split(n: int, k: int, alpha: float = 1.0) -> np.ndarray:
     """
     Split an integer n into k parts using Dirichlet distribution.

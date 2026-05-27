@@ -43,6 +43,7 @@ from pipelines.data.generate_test_data_lib import (
     create_default_param_estimates,
     dirichlet_integer_split,
     simulate_data_from_bootstrap,
+    write_hubverse_nhsn_nowcast_artifacts,
 )
 
 
@@ -334,6 +335,16 @@ def main(base_dir: Path, clean: bool):
     for name, data in nhsn_data_combined.group_by("disease", "jurisdiction"):
         data.select(cs.by_name(NHSN_COLS)).write_parquet(
             Path(nhsn_dir, f"{name[0]}_{name[1]}.parquet")
+        )
+
+    hubverse_nowcast_dir = Path(private_data_dir, "hubverse_nowcasts")
+    for name, data in nhsn_data_combined.group_by("disease", "jurisdiction"):
+        write_hubverse_nhsn_nowcast_artifacts(
+            hubverse_nowcast_dir,
+            nhsn_data=data,
+            disease=name[0],
+            location=name[1],
+            report_date=max_train_date,
         )
 
     print(f"Successfully generated test data in {private_data_dir}")

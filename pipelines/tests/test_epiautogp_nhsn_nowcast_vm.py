@@ -23,7 +23,12 @@ _TARGET_TO_DISEASE = {
 }
 
 NOWCAST_CONTAINER = "nowcastnhsn-prod"
-FACILITY_NSSP_DIR = Path("nssp-etl/gold")
+BLOBFUSE_MOUNTS_DIR = Path("blobfuse/mounts")
+NOWCAST_MOUNT_DIR = BLOBFUSE_MOUNTS_DIR / NOWCAST_CONTAINER
+# This mirrors `_run_pyrenew_model`: NSSP gold supplies the mounted report-date
+# anchor and facility-level ED data, while NHSN HRD is loaded via forecasttools
+# because `nhsn_data_path=None`.
+FACILITY_LEVEL_NSSP_DATA_DIR = BLOBFUSE_MOUNTS_DIR / "nssp-etl/gold"
 
 
 def _run_epiautogp_nhsn_nowcast_model(
@@ -96,38 +101,38 @@ def _run_epiautogp_nhsn_nowcast_model(
 def test_epiautogp_runs_with_mounted_prod_nhsn_nowcasts(tmp_path):
     """Smoke the future Dagster EpiAutoGP NHSN-nowcast helper shape.
 
-    The enabled test uses the same mounted `nssp-etl/gold` input convention as
-    `_run_pyrenew_model`, deliberately leaves `nhsn_data_path=None` to follow
-    PyRenew-H's forecasttools NHSN HRD route, and reads the production-shaped
-    nowcast pointer from mounted `nowcastnhsn-prod/latest`.
+    The enabled test uses the repo-local `blobfuse/mounts` symlinks created by
+    `mount.sh`, deliberately leaves `nhsn_data_path=None` to follow PyRenew-H's
+    forecasttools NHSN HRD route, and reads the production-shaped nowcast
+    pointer from mounted `nowcastnhsn-prod/latest`.
     """
     target = "covid"
     disease = _TARGET_TO_DISEASE[target]
     loc = "CA"
 
-    pointer_uri = str(Path(NOWCAST_CONTAINER) / "latest" / f"{target}.json")
+    pointer_uri = str(NOWCAST_MOUNT_DIR / "latest" / f"{target}.json")
     if not Path(pointer_uri).exists():
         pytest.skip(
             f"Production NHSN nowcast pointer not found at {pointer_uri}. "
-            "Ensure the nowcastnhsn-prod container is mounted."
+            "Run `make mount` so nowcastnhsn-prod is linked under blobfuse/mounts."
         )
 
-    if not FACILITY_NSSP_DIR.exists():
+    if not FACILITY_LEVEL_NSSP_DATA_DIR.exists():
         pytest.skip(
             "Mounted facility-level NSSP data directory is not available: "
-            f"{FACILITY_NSSP_DIR}"
+            f"{FACILITY_LEVEL_NSSP_DATA_DIR}"
         )
-    if not any(FACILITY_NSSP_DIR.glob("*.parquet")):
+    if not any(FACILITY_LEVEL_NSSP_DATA_DIR.glob("*.parquet")):
         pytest.skip(
             "Mounted facility-level NSSP data directory has no report parquet "
-            f"files: {FACILITY_NSSP_DIR}"
+            f"files: {FACILITY_LEVEL_NSSP_DATA_DIR}"
         )
 
     input_json_path, samples_path = _run_epiautogp_nhsn_nowcast_model(
         disease=disease,
         loc=loc,
         output_dir=tmp_path,
-        facility_level_nssp_data_dir=FACILITY_NSSP_DIR,
+        facility_level_nssp_data_dir=FACILITY_LEVEL_NSSP_DATA_DIR,
         hubverse_nowcast_pointer_uri=pointer_uri,
     )
 

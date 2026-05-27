@@ -49,7 +49,7 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 start_dev_env(__name__)
 
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["COVID-19", "Influenza", "RSV"]
+SUPPORTED_DISEASES = ["COVID-19"]
 
 # env variable set by Dagster CLI
 is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
@@ -265,7 +265,7 @@ class PostProcessConfig(dg.Config):
     skip_existing: bool = False
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
-    postprocess_diseases: list[str] = ["COVID-19", "Influenza", "RSV"]
+    postprocess_diseases: list[str] = ["COVID-19"]
 
 
 # ============================================================================

@@ -14,8 +14,8 @@ from cfa.stf.forecasttools import ensure_list
 def identify_outlier_tail(
     x: ArrayLike,
     low_outliers_only: bool = True,
-    spread_estimator: Literal["median", "mean"] = "mean",
-    outlier_multiplier: float = 8.0,
+    loc_estimator: Literal["median", "mean"] = "median",
+    outlier_multiplier: float = 11.0,
     max_tail_length: int = 7,
 ) -> list[bool]:
     """
@@ -25,10 +25,10 @@ def identify_outlier_tail(
     -----------
     x : array-like
         Input data
-    spread_estimator : Literal["median", "mean"]
-        Method to estimate the spread of the log differences (default: "mean")
+    loc_estimator : Literal["median", "mean"]
+        Method to estimate the central tendency of the log differences (default: "median")
     outlier_multiplier : float
-        Number of standard deviations to use as threshold (default: 8.0)
+        Number of times the central tendency to use as threshold (default: 11.0)
     max_tail_length : int
         Length of tail to examine (default: 7)
 
@@ -56,12 +56,12 @@ def identify_outlier_tail(
     head_log_diff = log_diff[:-max_tail_length]
     tail_log_diff = log_diff[-max_tail_length:]
 
-    if spread_estimator == "median":
+    if loc_estimator == "median":
         log_diff_spread = np.median(np.abs(head_log_diff))
-    elif spread_estimator == "mean":
+    elif loc_estimator == "mean":
         log_diff_spread = np.mean(np.abs(head_log_diff))
     else:
-        raise ValueError(f"Invalid spread_estimator: {spread_estimator}")
+        raise ValueError(f"Invalid loc_estimator: {loc_estimator}")
 
     # Identify first outlier in tail
     threshold = log_diff_spread * outlier_multiplier
@@ -85,15 +85,101 @@ def exclude_tail_auto(
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
     exclusion_calc_disease: str | list[str] = ["Influenza", "RSV", "COVID-19"],
-    spread_estimator: Literal["median", "mean"] = "mean",
-    outlier_multiplier: float = 8.0,
+    loc_estimator: Literal["median", "mean"] = "median",
+    outlier_multiplier: float = 11.0,
     max_tail_length: int = 7,
+    nowcast_adjustment: bool = False,
 ) -> pl.DataFrame:
-    disease_pmf = (
-        exclusion_calc_disease
-        if exclusion_calc_disease != "Total"
-        else ["Influenza", "RSV", "COVID-19"]
-    )
+    """
+    Identify dates to exclude from the tail of an NSSP time series.
+
+    This function retrieves NSSP data for one location and one or more
+    diseases, optionally adjusts recent observations for right truncation,
+    aggregates across the selected diseases by date, and flags the tail after
+    the first detected outlier. Outliers are detected from log differences by
+    `identify_outlier_tail`.
+
+    Parameters
+    ----------
+    loc_abb
+        Location abbreviation to filter for.
+    as_of
+        Reference date for data availability. Only data available as of this
+        date will be used. If None, all available data will be used.
+    start_date
+        Start date for filtering data, inclusive. If None, no lower bound is
+        applied.
+    end_date
+        End date for filtering data, inclusive. If None, no upper bound is
+        applied.
+    exclusion_calc_disease
+        Disease or diseases used to calculate exclusions. If "Total" and
+        `nowcast_adjustment` is True, right-truncation adjustments are averaged
+        across Influenza, RSV, and COVID-19.
+    loc_estimator
+        Summary statistic used by `identify_outlier_tail` to estimate the
+        typical absolute log difference in the non-tail portion of the series.
+        Must be "median" or "mean".
+    outlier_multiplier
+        Multiplier applied to the estimated typical log-difference size to set
+        the outlier threshold.
+    max_tail_length
+        Number of final log differences to inspect for outliers.
+    nowcast_adjustment
+        Whether to adjust recent values by the NNH right-truncation cumulative
+        distribution before detecting outliers. If False, all adjustment factors
+        are treated as 1.
+
+    Returns
+    -------
+    pl.DataFrame
+        Data frame with one row per `reference_date` and columns:
+        `reference_date` and `exclude`.
+    """
+
+    if nowcast_adjustment:
+        disease_pmf = (
+            exclusion_calc_disease
+            if exclusion_calc_disease != "Total"
+            else ["Influenza", "RSV", "COVID-19"]
+        )
+        pmf_df = (
+            pl.DataFrame(
+                {
+                    "disease": disease_pmf,
+                    "nnh_right_truncation_pmf": [
+                        get_nnh_right_truncation_pmf(
+                            as_of=as_of, loc_abb=loc_abb, disease=disease
+                        )
+                        for disease in ensure_list(disease_pmf)
+                    ],
+                }
+            )
+            .explode("nnh_right_truncation_pmf")
+            .with_columns(
+                right_truncation_cdf=pl.col("nnh_right_truncation_pmf")
+                .cum_sum()
+                .over("disease"),
+                offset_days=pl.row_index().over("disease") + 1,
+            )
+        )
+        # If exclusion_calc_disease is "Total", disease_pmf is all diseases,
+        # so we average the pmf across all of them
+        if exclusion_calc_disease == "Total":
+            pmf_df = (
+                pmf_df.group_by("offset_days")
+                .agg(pl.col("right_truncation_cdf").mean())
+                .sort("offset_days")
+                .with_columns(pl.lit(exclusion_calc_disease).alias("disease"))
+            )
+    else:
+        pmf_df = pl.DataFrame(
+            {
+                "disease": ensure_list(exclusion_calc_disease),
+                "right_truncation_cdf": 1.0,
+                "offset_days": 1,
+            }
+        )
 
     nssp_dat = (
         get_nssp(
@@ -110,36 +196,6 @@ def exclude_tail_auto(
             + 1
         )
     ).sort("reference_date")
-
-    pmf_df = (
-        pl.DataFrame(
-            {
-                "disease": disease_pmf,
-                "nnh_right_truncation_pmf": [
-                    get_nnh_right_truncation_pmf(
-                        as_of=as_of, loc_abb=loc_abb, disease=disease
-                    )
-                    for disease in ensure_list(disease_pmf)
-                ],
-            }
-        )
-        .explode("nnh_right_truncation_pmf")
-        .with_columns(
-            right_truncation_cdf=pl.col("nnh_right_truncation_pmf")
-            .cum_sum()
-            .over("disease"),
-            offset_days=pl.row_index().over("disease") + 1,
-        )
-    )
-    # If exclusion_calc_disease is "Total", disease_pmf is all diseases,
-    # so we average the pmf across all of them
-    if exclusion_calc_disease == "Total":
-        pmf_df = (
-            pmf_df.group_by("offset_days")
-            .agg(pl.col("right_truncation_cdf").mean())
-            .sort("offset_days")
-            .with_columns(pl.lit(exclusion_calc_disease).alias("disease"))
-        )
 
     joined_dat = (
         (
@@ -159,7 +215,7 @@ def exclude_tail_auto(
                 pl.Series(
                     identify_outlier_tail(
                         df["adjusted_value"],
-                        spread_estimator=spread_estimator,
+                        loc_estimator=loc_estimator,
                         outlier_multiplier=outlier_multiplier,
                         max_tail_length=max_tail_length,
                     )
@@ -172,6 +228,24 @@ def exclude_tail_auto(
 
 
 def exclude_tail_n(reference_dates: list[dt.date], n: int) -> pl.DataFrame:
+    """
+    Mark the final `n` dates in a set of reference dates for exclusion.
+
+    Parameters
+    ----------
+    reference_dates
+        Reference dates from the NSSP data. Duplicate dates are removed before
+        calculating exclusions.
+    n
+        Number of trailing dates to mark as excluded. A value of 1 excludes
+        only the latest date.
+
+    Returns
+    -------
+    pl.DataFrame
+        Data frame with one row per unique `reference_date`, sorted by date,
+        and columns: `reference_date` and `exclude`.
+    """
     exclusion_df = (
         pl.DataFrame({"reference_date": reference_dates})
         .unique("reference_date")
@@ -196,6 +270,59 @@ def get_nssp_with_exclusion(
     end_date: dt.date | None = None,
     **exclusion_strategy_args,
 ) -> pl.DataFrame:
+    """
+    Retrieve NSSP data and attach an exclusion flag for tail observations.
+
+    The exclusion flag is calculated for a single disease and location using
+    one of the supported strategies, then joined back to the requested NSSP
+    data by `reference_date`.
+
+    Parameters
+    ----------
+    disease
+        Disease to retrieve. Exactly one disease must be supplied.
+    loc_abb
+        Location abbreviation to retrieve. Exactly one location must be
+        supplied.
+    exclusion_strategy
+        Strategy used to calculate the exclusion flag:
+
+        - "tail_by_target_disease": detect tail outliers using the requested
+          disease only.
+        - "tail_by_all_disease": detect tail outliers using Influenza, RSV,
+          and COVID-19 summed by date.
+        - "tail_by_total": detect tail outliers using the NSSP "Total"
+          disease series.
+        - "tail_by_n": exclude the final `n` reference dates.
+    dataset
+        NSSP dataset to retrieve from datacat: "gold" or "comprehensive".
+    as_of
+        Reference date for data availability. Only data available as of this
+        date will be used. If None, all available data will be used.
+    start_date
+        Start date for filtering NSSP data, inclusive. If None, no lower bound
+        is applied.
+    end_date
+        End date for filtering NSSP data, inclusive. If None, no upper bound is
+        applied.
+    **exclusion_strategy_args
+        Additional keyword arguments passed to the selected exclusion strategy.
+        For automatic tail strategies, these are passed to `exclude_tail_auto`;
+        for "tail_by_n", pass `n`.
+
+    Returns
+    -------
+    pl.DataFrame
+        NSSP data for the requested disease and location with an added
+        `exclude` column indicating whether each `reference_date` should be
+        excluded.
+
+    Raises
+    ------
+    ValueError
+        If multiple diseases or locations are supplied, or if
+        `exclusion_strategy` is not supported.
+    """
     if len(ensure_list(disease)) != 1:
         raise ValueError(f"Only one disease can be processed at a time. Got {disease}.")
 

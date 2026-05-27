@@ -150,7 +150,8 @@ def write_hubverse_nhsn_nowcast_artifacts(
     artifact_dir = output_dir / f"{disease}_{location}".replace(" ", "_")
     artifact_dir.mkdir(parents=True, exist_ok=True)
     model_output_path = artifact_dir / "model-output.parquet"
-    pl.DataFrame(rows).write_parquet(model_output_path)
+    nowcast_samples = pl.DataFrame(rows)
+    nowcast_samples.write_parquet(model_output_path)
 
     pointer_path = artifact_dir / "latest.json"
     pointer_path.write_text(

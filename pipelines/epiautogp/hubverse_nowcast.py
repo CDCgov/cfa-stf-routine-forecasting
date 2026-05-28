@@ -278,7 +278,6 @@ class HubversePointerNowcast:
             self.pointer_path,
             expected_pointer_disease=pointer_disease,
             forecast_spec=self.forecast_spec,
-            source_label=self.source_label,
         )
         model_output = pl.read_parquet(model_output_path)
         return hubverse_samples_to_nowcast_data(

@@ -247,19 +247,9 @@ def hubverse_samples_to_nowcast_data(
 class HubversePointerNowcast:
     """Read Hubverse sample nowcasts through a production handoff pointer."""
 
-    pointer_uri: str | Path
+    pointer_path: str | Path
     forecast_spec: ForecastSpec
     source_label: str = "Hubverse nowcast"
-
-    @classmethod
-    def from_pointer_uri(
-        cls,
-        *,
-        pointer_uri: str | Path,
-        forecast_spec: ForecastSpec,
-    ) -> HubversePointerNowcast:
-        """Build a Hubverse nowcast source from a required pointer URI."""
-        return cls(pointer_uri=pointer_uri, forecast_spec=forecast_spec)
 
     @staticmethod
     def applies_to(
@@ -285,7 +275,7 @@ class HubversePointerNowcast:
             self.forecast_spec
         )
         model_output_path = load_hubverse_model_output_path(
-            self.pointer_uri,
+            self.pointer_path,
             expected_pointer_disease=pointer_disease,
             forecast_spec=self.forecast_spec,
             source_label=self.source_label,

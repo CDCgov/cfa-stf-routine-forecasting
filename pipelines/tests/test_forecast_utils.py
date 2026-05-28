@@ -413,18 +413,18 @@ class TestSetupForecastPipeline:
         result = _resolve_nowcast_source(
             forecast_spec=spec,
             nowcast_source_name="hubverse",
-            hubverse_nowcast_pointer_uri=tmp_path / "latest.json",
+            hubverse_nowcast_pointer_path=tmp_path / "latest.json",
         )
 
         assert isinstance(result, HubversePointerNowcast)
-        assert result.pointer_uri == tmp_path / "latest.json"
+        assert result.pointer_path == tmp_path / "latest.json"
         assert result.forecast_spec == spec
         assert hubverse_nowcast_config_from_forecast_spec(spec) == (
             "covid",
             "wk inc covid hosp",
         )
 
-    def test_hubverse_requires_pointer_uri(self):
+    def test_hubverse_requires_pointer_path(self):
         """Test hubverse source selection requires a handoff pointer."""
         spec = ForecastSpec(
             disease="COVID-19",
@@ -436,12 +436,12 @@ class TestSetupForecastPipeline:
         )
         with pytest.raises(
             ValueError,
-            match="hubverse_nowcast_pointer_uri is required",
+            match="hubverse_nowcast_pointer_path is required",
         ):
             _resolve_nowcast_source(
                 forecast_spec=spec,
                 nowcast_source_name="hubverse",
-                hubverse_nowcast_pointer_uri=None,
+                hubverse_nowcast_pointer_path=None,
             )
 
     def test_hubverse_infers_nssp_observed_config(self, tmp_path):
@@ -457,7 +457,7 @@ class TestSetupForecastPipeline:
         result = _resolve_nowcast_source(
             forecast_spec=spec,
             nowcast_source_name="hubverse",
-            hubverse_nowcast_pointer_uri=tmp_path / "latest.json",
+            hubverse_nowcast_pointer_path=tmp_path / "latest.json",
         )
 
         assert isinstance(result, HubversePointerNowcast)
@@ -489,7 +489,7 @@ class TestSetupForecastPipeline:
         result = _resolve_nowcast_source(
             forecast_spec=spec,
             nowcast_source_name="hubverse",
-            hubverse_nowcast_pointer_uri=tmp_path / "latest.json",
+            hubverse_nowcast_pointer_path=tmp_path / "latest.json",
         )
 
         assert isinstance(result, HubversePointerNowcast)

@@ -132,7 +132,7 @@ def _source_for_rows(
         validation_status=validation_status,
     )
     return HubversePointerNowcast(
-        pointer_uri=pointer_path,
+        pointer_path=pointer_path,
         forecast_spec=spec,
         source_label="NHSN Hubverse nowcast",
     )

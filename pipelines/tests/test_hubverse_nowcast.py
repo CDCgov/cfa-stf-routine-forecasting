@@ -108,7 +108,7 @@ def test_hubverse_pointer_nowcast_reads_generic_handoff(tmp_path):
         model_output_uri=hubverse_path.name,
     )
     source = HubversePointerNowcast(
-        pointer_uri=pointer_path,
+        pointer_path=pointer_path,
         forecast_spec=_spec(),
     )
 

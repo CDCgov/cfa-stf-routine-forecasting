@@ -40,7 +40,7 @@ Main entry point for the forecasting pipeline.
 - `--n-forecast-draws`: Number of forecast draws (default: 2000)
 - `--smc-data-proportion`: Data proportion per SMC step (default: 0.1)
 - `--nowcast-source`: Nowcast source (`none`, `reporting-delay`, or `hubverse`)
-- `--hubverse-nowcast-pointer-uri`: Handoff pointer when using `hubverse`
+- `--hubverse-nowcast-pointer-path`: Handoff pointer file path when using `hubverse`
 
 ### `forecast_spec.py`
 
@@ -76,7 +76,7 @@ uv run python pipelines/epiautogp/forecast_epiautogp.py \
   --target nhsn \
   --frequency epiweekly \
   --nowcast-source hubverse \
-  --hubverse-nowcast-pointer-uri nowcastnhsn-prod/latest/covid.json \
+  --hubverse-nowcast-pointer-path nowcastnhsn-prod/latest/covid.json \
   ...
 ```
 
@@ -84,7 +84,7 @@ The pointer must be a production `handoff_pointer` JSON whose `target` and `repo
 
 The Hubverse row target is inferred from `ForecastSpec`: disease maps to `covid`/`flu`/`rsv`, `target` and `ed_visit_type` choose the producer variable, and `frequency` adds the epiweekly `wk ` prefix. The inference mirrors the producer convention in `hewr/R/to_hubverse_tbl.R`.
 
-The pointer URI is a plain file path (absolute or relative) to the mounted blob container. In Docker/Azure Batch execution, the `nowcastnhsn-prod` container is bind-mounted into the working directory. For local testing, ensure the container is mounted via `make mount` or provide a path to local test data.
+The pointer path is a plain file path (absolute or relative) to the mounted blob container. In Docker/Azure Batch execution, the `nowcastnhsn-prod` container is bind-mounted into the working directory. For local testing, ensure the container is mounted via `make mount` or provide a path to local test data.
 
 Only strictly negative Hubverse horizons are used as nowcast dates; horizon `0` is ignored. The source fails fast for missing rows, duplicate sample/date rows, incomplete sample grids, unsupported diseases, mismatched pointer metadata, or missing/non-finite/negative values.
 

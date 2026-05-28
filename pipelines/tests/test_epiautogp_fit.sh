@@ -50,7 +50,7 @@ fi
 if [ "$target" = "nhsn" ]; then
 	cmd_args+=(
 		--nowcast-source hubverse
-		--hubverse-nowcast-pointer-uri "$BASE_DIR/private_data/hubverse_nowcasts/${disease}_${location}/latest.json"
+		--hubverse-nowcast-pointer-path "$BASE_DIR/private_data/hubverse_nowcasts/${disease}_${location}/latest.json"
 	)
 elif [ "$target" = "nssp" ] && [ "$ed_visit_type" != "pct" ]; then
 	cmd_args+=(--nowcast-source reporting-delay)

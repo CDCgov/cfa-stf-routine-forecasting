@@ -8,6 +8,7 @@ from pipelines.epiautogp import (
 )
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     VALID_NOWCAST_SOURCE_NAMES,
+    NowcastSourceName,
 )
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
@@ -106,9 +107,9 @@ def main(
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
     param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
-    nowcast_source_name: str = "none",
+    nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
-    hubverse_nowcast_pointer_uri: Path | str | None = None,
+    hubverse_nowcast_pointer_path: Path | str | None = None,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -168,12 +169,12 @@ def main(
         Proportion of data used in each SMC step
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
-    nowcast_source_name : str, default="none"
-        Nowcast source to use: "none", "reporting-delay", or "hubverse"
+    nowcast_source_name : {"none", "reporting-delay", "hubverse"}, default="none"
+        Nowcast source to use.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Python API only.
-    hubverse_nowcast_pointer_uri : Path | str | None, default=None
-        Handoff pointer JSON whose hubverse.model_output_uri is a Hubverse
+    hubverse_nowcast_pointer_path : Path | str | None, default=None
+        Handoff pointer JSON path whose hubverse.model_output_uri is a Hubverse
         sample-format parquet. Required when nowcast_source_name="hubverse".
 
     Returns
@@ -270,7 +271,7 @@ def main(
         param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
-        hubverse_nowcast_pointer_uri=hubverse_nowcast_pointer_uri,
+        hubverse_nowcast_pointer_path=hubverse_nowcast_pointer_path,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -376,7 +377,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--hubverse-nowcast-pointer-uri",
+        "--hubverse-nowcast-pointer-path",
         type=str,
         default=None,
         help=(

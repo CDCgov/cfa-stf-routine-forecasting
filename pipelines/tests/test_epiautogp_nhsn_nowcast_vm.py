@@ -37,7 +37,7 @@ def _run_epiautogp_nhsn_nowcast_model(
     loc: str,
     output_dir: Path,
     facility_level_nssp_data_dir: Path,
-    hubverse_nowcast_pointer_uri: str,
+    hubverse_nowcast_pointer_path: str,
 ) -> tuple[Path, Path]:
     """Run the Dagster-shaped EpiAutoGP NHSN nowcast route.
 
@@ -71,7 +71,7 @@ def _run_epiautogp_nhsn_nowcast_model(
         credentials_path=None,
         logger=logging.getLogger(__name__),
         nowcast_source_name="hubverse",
-        hubverse_nowcast_pointer_uri=hubverse_nowcast_pointer_uri,
+        hubverse_nowcast_pointer_path=hubverse_nowcast_pointer_path,
     )
 
     paths = context.prepare_model_data()
@@ -110,10 +110,10 @@ def test_epiautogp_runs_with_mounted_prod_nhsn_nowcasts(tmp_path):
     disease = _TARGET_TO_DISEASE[target]
     loc = "CA"
 
-    pointer_uri = str(NOWCAST_MOUNT_DIR / "latest" / f"{target}.json")
-    if not Path(pointer_uri).exists():
+    pointer_path = str(NOWCAST_MOUNT_DIR / "latest" / f"{target}.json")
+    if not Path(pointer_path).exists():
         pytest.skip(
-            f"Production NHSN nowcast pointer not found at {pointer_uri}. "
+            f"Production NHSN nowcast pointer not found at {pointer_path}. "
             "Run `make mount` so nowcastnhsn-prod is linked under blobfuse/mounts."
         )
 
@@ -133,7 +133,7 @@ def test_epiautogp_runs_with_mounted_prod_nhsn_nowcasts(tmp_path):
         loc=loc,
         output_dir=tmp_path,
         facility_level_nssp_data_dir=FACILITY_LEVEL_NSSP_DATA_DIR,
-        hubverse_nowcast_pointer_uri=pointer_uri,
+        hubverse_nowcast_pointer_path=pointer_path,
     )
 
     epiautogp_input = json.loads(input_json_path.read_text(encoding="utf-8"))

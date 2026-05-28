@@ -134,7 +134,6 @@ def _source_for_rows(
     return HubversePointerNowcast(
         pointer_path=pointer_path,
         forecast_spec=spec,
-        source_label="NHSN Hubverse nowcast",
     )
 
 
@@ -231,7 +230,7 @@ def test_no_matching_rows_fails_fast(tmp_path):
         _hubverse_rows(location="ny"),
     )
 
-    with pytest.raises(ValueError, match="No matching NHSN Hubverse nowcast"):
+    with pytest.raises(ValueError, match="No matching Hubverse nowcast"):
         source.get_nowcast_data(dates=[], reports=[])
 
 

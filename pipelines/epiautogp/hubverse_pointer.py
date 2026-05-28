@@ -14,30 +14,29 @@ from pipelines.epiautogp.forecast_spec import ForecastSpec
 def resolve_artifact_path(
     raw_path: str | Path,
     *,
-    base_path: Path | None = None,
-    source_label: str,
+    base_dir: Path | None = None,
 ) -> Path:
     """Resolve a local file path (absolute or relative) to a concrete path."""
     path = Path(raw_path)
     if path.is_absolute():
         return path.resolve()
-    if base_path is not None:
-        return (base_path.parent / path).resolve()
-    return (Path.cwd() / path).resolve()
+    if base_dir is not None:
+        return (base_dir / path).resolve()
+    return path.absolute()
 
 
 def _load_pointer(
-    pointer_uri: str | Path,
+    pointer_path: str | Path,
     *,
     source_label: str,
 ) -> tuple[dict[str, Any], Path]:
     """Read a handoff pointer JSON and return it with its resolved path."""
-    resolved = resolve_artifact_path(pointer_uri, source_label=source_label)
+    resolved = resolve_artifact_path(pointer_path)
     try:
         pointer = json.loads(resolved.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError(
-            f"{source_label} pointer is not valid JSON: {pointer_uri}"
+            f"{source_label} pointer is not valid JSON: {pointer_path}"
         ) from exc
     if not isinstance(pointer, dict):
         raise ValueError(f"{source_label} pointer JSON must be an object.")
@@ -129,15 +128,15 @@ def _validate_pointer(
 
 
 def load_hubverse_model_output_path(
-    pointer_uri: str | Path,
+    pointer_path: str | Path,
     *,
     expected_pointer_disease: str | None,
     forecast_spec: ForecastSpec,
     source_label: str,
 ) -> Path:
     """Load a pointer and resolve its Hubverse model-output artifact path."""
-    pointer, resolved_pointer_uri = _load_pointer(
-        pointer_uri,
+    pointer, resolved_pointer_path = _load_pointer(
+        pointer_path,
         source_label=source_label,
     )
     model_output_uri = _validate_pointer(
@@ -148,6 +147,5 @@ def load_hubverse_model_output_path(
     )
     return resolve_artifact_path(
         model_output_uri,
-        base_path=resolved_pointer_uri,
-        source_label=source_label,
+        base_dir=resolved_pointer_path.parent,
     )

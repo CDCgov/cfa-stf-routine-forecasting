@@ -107,7 +107,7 @@ def main(
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
     param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
-    nowcast_source_name: NowcastSourceName = "none",
+    nowcast_source_name: NowcastSourceName | None = None,
     reporting_delay_pmf: list[float] | None = None,
     hubverse_nowcast_pointer_path: Path | str | None = None,
 ) -> None:
@@ -169,8 +169,8 @@ def main(
         Proportion of data used in each SMC step
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
-    nowcast_source_name : {"none", "reporting-delay", "hubverse"}, default="none"
-        Nowcast source to use.
+    nowcast_source_name : {"reporting-delay", "hubverse"} | None, default=None
+        Nowcast source to use. None disables nowcasting.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Python API only.
     hubverse_nowcast_pointer_path : Path | str | None, default=None
@@ -366,13 +366,13 @@ if __name__ == "__main__":
         "--nowcast-source",
         dest="nowcast_source_name",
         type=str,
-        default="none",
+        default=None,
         choices=list(VALID_NOWCAST_SOURCE_NAMES),
         help=(
-            "Nowcast source to use: 'none' disables nowcasting; "
+            "Nowcast source to use. Omit to disable nowcasting. "
             "'reporting-delay' inflates recent counts using a reporting-delay "
             "PMF; 'hubverse' reads Hubverse sample-format nowcasts through a "
-            "handoff pointer (default: none)."
+            "handoff pointer."
         ),
     )
 

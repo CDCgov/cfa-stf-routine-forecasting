@@ -155,7 +155,7 @@ class TestSetupForecastPipeline:
             exclude_last_n_days=0,
             credentials_path=None,
             logger=None,
-            nowcast_source_name="none",
+            nowcast_source_name=None,
         )
 
         assert isinstance(context, ForecastPipelineContext)
@@ -190,7 +190,7 @@ class TestSetupForecastPipeline:
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
-            nowcast_source_name="none",
+            nowcast_source_name=None,
         )
 
         expected_batch_dir = (
@@ -376,7 +376,7 @@ class TestSetupForecastPipeline:
         result = _resolve_nowcast_source(
             forecast_spec=spec,
             param_data_dir=None,
-            nowcast_source_name="none",
+            nowcast_source_name=None,
             reporting_delay_pmf=[0.5, 0.5],
         )
 
@@ -392,7 +392,9 @@ class TestSetupForecastPipeline:
             frequency="daily",
             ed_visit_type="observed",
         )
-        with pytest.raises(ValueError, match="nowcast_source_name must be one of"):
+        with pytest.raises(
+            ValueError, match="nowcast_source_name must be None or one of"
+        ):
             _resolve_nowcast_source(
                 forecast_spec=spec,
                 param_data_dir=None,

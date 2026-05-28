@@ -30,7 +30,7 @@ from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
 )
 
-NowcastSourceName = Literal["none", "reporting-delay", "hubverse"]
+NowcastSourceName = Literal["reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
@@ -183,7 +183,7 @@ def _build_reporting_delay_nowcast(
 def _resolve_nowcast_source(
     *,
     forecast_spec: ForecastSpec,
-    nowcast_source_name: NowcastSourceName,
+    nowcast_source_name: NowcastSourceName | None,
     **options: Any,
 ) -> NowcastSource | None:
     """
@@ -194,7 +194,7 @@ def _resolve_nowcast_source(
     validating them. New nowcast approaches plug in by adding a new case here.
     """
     match nowcast_source_name:
-        case "none":
+        case None:
             return None
         case "reporting-delay":
             if not ReportingDelayNowcast.applies_to(forecast_spec=forecast_spec):
@@ -223,7 +223,7 @@ def _resolve_nowcast_source(
             )
         case _:
             raise ValueError(
-                "nowcast_source_name must be one of "
+                "nowcast_source_name must be None or one of "
                 f"{list(VALID_NOWCAST_SOURCE_NAMES)}, "
                 f"got {nowcast_source_name!r}"
             )
@@ -246,7 +246,7 @@ def setup_forecast_pipeline(
     credentials_path: Path | None = None,
     logger: logging.Logger | None = None,
     param_data_dir: Path | str | None = None,
-    nowcast_source_name: NowcastSourceName = "none",
+    nowcast_source_name: NowcastSourceName | None = None,
     reporting_delay_pmf: list[float] | None = None,
     hubverse_nowcast_pointer_path: Path | str | None = None,
 ) -> ForecastPipelineContext:
@@ -300,8 +300,8 @@ def setup_forecast_pipeline(
         Directory containing parameter estimates such as reporting-delay PMFs.
         Required when reporting-delay nowcasting is selected and no PMF is
         directly supplied.
-    nowcast_source_name : {"none", "reporting-delay", "hubverse"}, default="none"
-        Nowcast source selection for EpiAutoGP input.
+    nowcast_source_name : {"reporting-delay", "hubverse"} | None, default=None
+        Nowcast source selection for EpiAutoGP input. None disables nowcasting.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Takes precedence over
         param_data_dir when reporting-delay nowcasting is selected.

@@ -3,7 +3,7 @@ Validation for Hubverse handoff pointer JSON artifacts.
 
 A handoff pointer is a JSON file from the `stf-routine-nowcasting-nhsn` pipeline.
 It asserts that a model output passed validation, and other information about the run,
-and points at the parquet that holds the probabilistic nowcasts (and other metadata about 
+and points at the parquet that holds the probabilistic nowcasts (and other metadata about
 what was produced).
 """
 
@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 from pipelines.epiautogp.forecast_spec import ForecastSpec
+
 
 def _expect(
     data: dict,

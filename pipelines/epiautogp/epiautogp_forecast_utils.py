@@ -180,23 +180,6 @@ def _build_reporting_delay_nowcast(
     return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
 
 
-def _build_hubverse_nowcast(
-    *,
-    forecast_spec: ForecastSpec,
-    hubverse_nowcast_pointer_uri: Path | str | None,
-) -> HubversePointerNowcast:
-    """Build a generic Hubverse handoff-pointer nowcast source."""
-    if hubverse_nowcast_pointer_uri is None:
-        raise ValueError(
-            "hubverse_nowcast_pointer_uri is required when hubverse "
-            "nowcasting is requested."
-        )
-    return HubversePointerNowcast.from_pointer_uri(
-        pointer_uri=hubverse_nowcast_pointer_uri,
-        forecast_spec=forecast_spec,
-    )
-
-
 def _resolve_nowcast_source(
     *,
     forecast_spec: ForecastSpec,
@@ -228,11 +211,15 @@ def _resolve_nowcast_source(
         case "hubverse":
             if not HubversePointerNowcast.applies_to(forecast_spec=forecast_spec):
                 raise ValueError("hubverse nowcasting is not applicable.")
-            return _build_hubverse_nowcast(
+            pointer_path = options.get("hubverse_nowcast_pointer_path")
+            if pointer_path is None:
+                raise ValueError(
+                    "hubverse_nowcast_pointer_path is required when hubverse "
+                    "nowcasting is requested."
+                )
+            return HubversePointerNowcast(
+                pointer_path=pointer_path,
                 forecast_spec=forecast_spec,
-                hubverse_nowcast_pointer_uri=options.get(
-                    "hubverse_nowcast_pointer_uri"
-                ),
             )
         case _:
             raise ValueError(
@@ -261,7 +248,7 @@ def setup_forecast_pipeline(
     param_data_dir: Path | str | None = None,
     nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
-    hubverse_nowcast_pointer_uri: Path | str | None = None,
+    hubverse_nowcast_pointer_path: Path | str | None = None,
 ) -> ForecastPipelineContext:
     """
     Set up common forecast pipeline infrastructure.
@@ -318,8 +305,8 @@ def setup_forecast_pipeline(
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Takes precedence over
         param_data_dir when reporting-delay nowcasting is selected.
-    hubverse_nowcast_pointer_uri : Path | str | None, default=None
-        Handoff pointer JSON whose hubverse.model_output_uri is a Hubverse
+    hubverse_nowcast_pointer_path : Path | str | None, default=None
+        Handoff pointer JSON path whose hubverse.model_output_uri is a Hubverse
         sample-format parquet. Required when nowcast_source_name="hubverse".
 
     Returns
@@ -388,7 +375,7 @@ def setup_forecast_pipeline(
         nowcast_source_name=nowcast_source_name,
         param_data_dir=param_data_dir,
         reporting_delay_pmf=reporting_delay_pmf,
-        hubverse_nowcast_pointer_uri=hubverse_nowcast_pointer_uri,
+        hubverse_nowcast_pointer_path=hubverse_nowcast_pointer_path,
     )
 
     return ForecastPipelineContext(

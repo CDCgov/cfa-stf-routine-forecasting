@@ -110,7 +110,7 @@ def hubverse_nowcast_config_from_forecast_spec(
     return disease_abbr, hubverse_target
 
 
-def _normalize_hubverse_table(df: pl.DataFrame, *, source_label: str) -> pl.DataFrame:
+def _normalize_hubverse_table(df: pl.DataFrame) -> pl.DataFrame:
     origin_date_column = next(
         (column for column in ORIGIN_DATE_COLUMNS if column in df.columns),
         None,
@@ -120,7 +120,7 @@ def _normalize_hubverse_table(df: pl.DataFrame, *, source_label: str) -> pl.Data
         missing.insert(0, "origin_date/reference_date")
     if missing:
         raise ValueError(
-            f"{source_label} output missing required columns: " + ", ".join(missing)
+            "Hubverse nowcast output missing required columns: " + ", ".join(missing)
         )
 
     return df.select(
@@ -129,11 +129,7 @@ def _normalize_hubverse_table(df: pl.DataFrame, *, source_label: str) -> pl.Data
     ).cast(HUBVERSE_CAST_SCHEMA, strict=False)
 
 
-def _validate_required_candidate_fields(
-    df: pl.DataFrame,
-    *,
-    source_label: str,
-) -> None:
+def _validate_required_candidate_fields(df: pl.DataFrame) -> None:
     bad_fields = [
         field
         for field in REQUIRED_CANDIDATE_FIELDS
@@ -141,12 +137,12 @@ def _validate_required_candidate_fields(
     ]
     if bad_fields:
         raise ValueError(
-            f"{source_label} output has missing or malformed values in: "
+            "Hubverse nowcast output has missing or malformed values in: "
             + ", ".join(bad_fields)
         )
 
 
-def _validate_nowcast_values(df: pl.DataFrame, *, source_label: str) -> None:
+def _validate_nowcast_values(df: pl.DataFrame) -> None:
     if df.select(
         (
             pl.col("value").is_null()
@@ -156,19 +152,15 @@ def _validate_nowcast_values(df: pl.DataFrame, *, source_label: str) -> None:
         ).any()
     ).item():
         raise ValueError(
-            f"{source_label} output contains missing, non-finite, "
+            "Hubverse nowcast output contains missing, non-finite, "
             "or negative predicted values."
         )
 
 
-def _validate_no_duplicate_sample_dates(
-    df: pl.DataFrame,
-    *,
-    source_label: str,
-) -> None:
+def _validate_no_duplicate_sample_dates(df: pl.DataFrame) -> None:
     if df.select(["output_type_id", "target_end_date"]).is_duplicated().any():
         raise ValueError(
-            f"{source_label} output contains duplicate rows for the same sample "
+            "Hubverse nowcast output contains duplicate rows for the same sample "
             "and target_end_date."
         )
 
@@ -182,10 +174,9 @@ def hubverse_samples_to_nowcast_data(
     *,
     forecast_spec: ForecastSpec,
     hubverse_target: str,
-    source_label: str = "Hubverse nowcast",
 ) -> NowcastData:
     """Convert matching Hubverse sample rows into EpiAutoGP nowcast data."""
-    normalized = _normalize_hubverse_table(df, source_label=source_label)
+    normalized = _normalize_hubverse_table(df)
     loc = forecast_spec.loc.lower()
 
     candidate_rows = normalized.filter(
@@ -196,22 +187,22 @@ def hubverse_samples_to_nowcast_data(
     )
     if candidate_rows.height == 0:
         raise ValueError(
-            f"No matching {source_label} sample rows for "
+            "No matching Hubverse nowcast sample rows for "
             f"target={hubverse_target!r}, location={forecast_spec.loc!r}, "
             f"origin_date={forecast_spec.report_date.isoformat()!r}."
         )
 
-    _validate_required_candidate_fields(candidate_rows, source_label=source_label)
+    _validate_required_candidate_fields(candidate_rows)
 
     nowcast_rows = candidate_rows.filter(pl.col("horizon") < 0)
     if nowcast_rows.height == 0:
         raise ValueError(
-            f"No strictly negative-horizon {source_label} sample rows matched "
+            "No strictly negative-horizon Hubverse nowcast sample rows matched "
             "this EpiAutoGP run."
         )
 
-    _validate_nowcast_values(nowcast_rows, source_label=source_label)
-    _validate_no_duplicate_sample_dates(nowcast_rows, source_label=source_label)
+    _validate_nowcast_values(nowcast_rows)
+    _validate_no_duplicate_sample_dates(nowcast_rows)
 
     nowcast_dates = (
         nowcast_rows.select("target_end_date")
@@ -231,7 +222,7 @@ def hubverse_samples_to_nowcast_data(
         pl.any_horizontal(pl.exclude("output_type_id").is_null()).any()
     ).item():
         raise ValueError(
-            f"{source_label} output must contain the same target_end_date "
+            "Hubverse nowcast output must contain the same target_end_date "
             "values for every sample."
         )
 
@@ -249,7 +240,6 @@ class HubversePointerNowcast:
 
     pointer_path: str | Path
     forecast_spec: ForecastSpec
-    source_label: str = "Hubverse nowcast"
 
     @staticmethod
     def applies_to(
@@ -284,5 +274,4 @@ class HubversePointerNowcast:
             model_output,
             forecast_spec=self.forecast_spec,
             hubverse_target=hubverse_target,
-            source_label=self.source_label,
         )

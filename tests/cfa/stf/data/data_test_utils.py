@@ -17,10 +17,10 @@ def uses_catalog(request) -> bool:
 
 
 def lazy_catalog_loader(df):
-    def get_dataframe(output: str, version: str):
+    def get_dataframe(output: str, version_spec: str):
         if output != "pl_lazy":
             raise ValueError(f"Unexpected output={output!r}")
-        if version is None:
+        if version_spec is None:
             raise ValueError("Expected a version constraint")
         return df.lazy()
 

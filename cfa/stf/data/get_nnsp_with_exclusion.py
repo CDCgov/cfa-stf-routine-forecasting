@@ -138,6 +138,8 @@ def exclude_tail_auto(
     """
 
     if nowcast_adjustment:
+        # If adjusting for right truncation, we need to work with the right truncation PMFs
+        # There is no right truncation pmf for Total, so we use the average of the PMFs for the individual diseases as an approximation
         disease_pmf = (
             exclusion_calc_disease
             if exclusion_calc_disease != "Total"
@@ -172,7 +174,7 @@ def exclude_tail_auto(
                 .sort("offset_days")
                 .with_columns(pl.lit(exclusion_calc_disease).alias("disease"))
             )
-    else:
+    else:  # not adjusting for right truncation, so we fill the pmf_df with 1s
         pmf_df = pl.DataFrame(
             {
                 "disease": ensure_list(exclusion_calc_disease),
@@ -263,7 +265,7 @@ def get_nssp_with_exclusion(
     loc_abb: str,
     exclusion_strategy: Literal[
         "tail_by_target_disease", "tail_by_all_disease", "tail_by_total", "tail_by_n"
-    ],
+    ] = "tail_by_total",
     dataset: NSSPDataset = "gold",
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,

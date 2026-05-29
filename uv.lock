@@ -802,8 +802,8 @@ dev = [
 
 [[package]]
 name = "cfa-dataops"
-version = "2026.5.12.0"
-source = { git = "https://github.com/CDCgov/cfa-dataops.git?rev=main#2f3c60d81b0c7f8ec6abe24a44a1843584cb8bc7" }
+version = "2026.5.29.1"
+source = { git = "https://github.com/CDCgov/cfa-dataops.git?rev=main#8b2feda320b7ba5d9b7f78e5d665f0d1698dfc7e" }
 dependencies = [
     { name = "altair" },
     { name = "cfa-cloudops" },
@@ -819,6 +819,7 @@ dependencies = [
     { name = "mako" },
     { name = "matplotlib" },
     { name = "nbconvert" },
+    { name = "packaging" },
     { name = "pandas" },
     { name = "pandera", extra = ["pandas"] },
     { name = "papermill" },

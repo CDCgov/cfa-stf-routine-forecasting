@@ -151,6 +151,106 @@ def test_auto_strategies_use_expected_exclusion_series(
     ]
 
 
+def test_auto_strategy_forwards_exclusion_strategy_args(
+    monkeypatch, mock_get_nssp
+) -> None:
+    calls = []
+
+    def _exclude_tail_auto(**kwargs) -> pl.DataFrame:
+        calls.append(kwargs)
+        return pl.DataFrame(
+            {
+                "reference_date": [
+                    dt.date(2024, 1, 6),
+                    dt.date(2024, 1, 13),
+                    dt.date(2024, 1, 20),
+                    dt.date(2024, 1, 27),
+                ],
+                "exclude": [False, False, False, True],
+            }
+        )
+
+    monkeypatch.setattr(nssp_exclusion, "exclude_tail_auto", _exclude_tail_auto)
+
+    get_nssp_with_exclusion(
+        as_of=dt.date(2024, 2, 1),
+        loc_abb="LA",
+        disease="RSV",
+        exclusion_strategy="tail_by_target_disease",
+        loc_estimator="mean",
+        outlier_multiplier=4.5,
+        max_tail_length=2,
+        nowcast_adjustment=True,
+    )
+
+    assert calls == [
+        {
+            "loc_abb": "LA",
+            "as_of": dt.date(2024, 2, 1),
+            "start_date": None,
+            "end_date": None,
+            "exclusion_calc_disease": "RSV",
+            "loc_estimator": "mean",
+            "outlier_multiplier": 4.5,
+            "max_tail_length": 2,
+            "nowcast_adjustment": True,
+        }
+    ]
+
+
+def test_exclude_tail_auto_applies_nowcast_adjustment(monkeypatch) -> None:
+    nssp_data = make_nssp_series(
+        reference_dates=[
+            dt.date(2024, 1, 6),
+            dt.date(2024, 1, 13),
+            dt.date(2024, 1, 20),
+            dt.date(2024, 1, 27),
+            dt.date(2024, 2, 3),
+            dt.date(2024, 2, 10),
+        ],
+        values=[100, 105, 110, 115, 120, 10],
+    )
+    pmf_calls = []
+
+    def _get_nnh_right_truncation_pmf(**kwargs) -> list[float]:
+        pmf_calls.append(kwargs)
+        return [0.05, 0.95]
+
+    monkeypatch.setattr(nssp_exclusion, "get_nssp", lambda **kwargs: nssp_data)
+    monkeypatch.setattr(
+        nssp_exclusion,
+        "get_nnh_right_truncation_pmf",
+        _get_nnh_right_truncation_pmf,
+    )
+
+    unadjusted = nssp_exclusion.exclude_tail_auto(
+        as_of=dt.date(2024, 2, 15),
+        loc_abb="LA",
+        exclusion_calc_disease="RSV",
+        max_tail_length=2,
+        outlier_multiplier=4.5,
+        nowcast_adjustment=False,
+    )
+    adjusted = nssp_exclusion.exclude_tail_auto(
+        as_of=dt.date(2024, 2, 15),
+        loc_abb="LA",
+        exclusion_calc_disease="RSV",
+        max_tail_length=2,
+        outlier_multiplier=4.5,
+        nowcast_adjustment=True,
+    )
+
+    assert unadjusted["exclude"].to_list() == [False, False, False, False, False, True]
+    assert adjusted["exclude"].to_list() == [False] * 6
+    assert pmf_calls == [
+        {
+            "as_of": dt.date(2024, 2, 15),
+            "loc_abb": "LA",
+            "disease": "RSV",
+        }
+    ]
+
+
 def test_forwards_nssp_query_args(mock_get_nssp) -> None:
     get_nssp_with_exclusion(
         as_of=dt.date(2024, 2, 1),
@@ -220,9 +320,6 @@ def test_get_nssp_with_exclusion_placeholder(
     exclusion_strategy: str,
     exclusion_strategy_args: dict,
 ) -> None:
-    # For LA on 2026-05-06, the algorithm suggests excluding the last day
-    # because the adjusted value is too high, but the data quality report
-    # suggests excluding it because it is too low.
     get_nssp_with_exclusion(
         as_of=dt.date(2026, 5, 6),
         loc_abb="LA",

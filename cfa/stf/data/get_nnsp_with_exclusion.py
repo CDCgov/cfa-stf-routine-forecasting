@@ -254,9 +254,7 @@ def exclude_tail_n(reference_dates: list[dt.date], n: int) -> pl.DataFrame:
         .unique("reference_date")
         .sort("reference_date")
         .with_row_index("_reference_date_order")
-        .with_columns(
-            exclude=pl.col("_reference_date_order") >= exclusion_cutoff
-        )
+        .with_columns(exclude=pl.col("_reference_date_order") >= exclusion_cutoff)
         .drop("_reference_date_order")
     )
     return exclusion_df

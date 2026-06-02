@@ -15,6 +15,8 @@ from pipelines.utils.common_utils import (
     run_julia_script,
 )
 
+_FIT_SCRIPT = Path(__file__).parent / "fit_epiautogp.jl"
+
 
 def run_epiautogp_forecast(
     json_input_path: Path,
@@ -74,7 +76,7 @@ def run_epiautogp_forecast(
 
     # Run Julia script
     run_julia_script(
-        "pipelines/epiautogp/fit_epiautogp.jl",
+        str(_FIT_SCRIPT),
         args_to_epiautogp,
         executor_flags=executor_flags,
         function_name="run_epiautogp_forecast",

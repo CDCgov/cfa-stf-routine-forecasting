@@ -8,7 +8,7 @@ NowcastAutoGP = "7e9f7f4b-f590-4c14-8324-de4fcbed18f7"
 StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [sources]
-NowcastAutoGP = {rev = "v0.3.0", url = "https://github.com/CDCgov/NowcastAutoGP.git"}
+NowcastAutoGP = {rev = "v0.5.0", url = "https://github.com/CDCgov/NowcastAutoGP.git"}
 
 [compat]
 DBInterface = "2.6.1"

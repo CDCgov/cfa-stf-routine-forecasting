@@ -503,7 +503,7 @@ version = "1.2.0"
 [[deps.NowcastAutoGP]]
 deps = ["AutoGP", "BoxCox", "Dates", "LogExpFunctions"]
 git-tree-sha1 = "f01f3a1a0ae6c98450c179cc627a05d8ee358c9b"
-repo-rev = "v0.3.0"
+repo-rev = "v0.5.0"
 repo-url = "https://github.com/CDCgov/NowcastAutoGP.git"
 uuid = "7e9f7f4b-f590-4c14-8324-de4fcbed18f7"
 version = "0.3.0"

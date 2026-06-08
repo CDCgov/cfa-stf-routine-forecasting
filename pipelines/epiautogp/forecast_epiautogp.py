@@ -76,7 +76,7 @@ def run_epiautogp_forecast(
 
     # Run Julia script
     run_julia_script(
-        str(_FIT_SCRIPT),
+        f"{_FIT_SCRIPT}",
         args_to_epiautogp,
         executor_flags=executor_flags,
         function_name="run_epiautogp_forecast",

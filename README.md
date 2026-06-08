@@ -1,12 +1,14 @@
 # CFA STF Routine Forecasting
-| hewr                                                                                                                                                                | EpiAutoGP                                                                                                                                           | pipelines                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![hewr](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/branch/main/graph/badge.svg?flag=hewr)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![EpiAutoGP](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=epiautogp)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![pipelines](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=pipelines)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) |
+| hewr                                                                                                                                                                | pipelines                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![hewr](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/branch/main/graph/badge.svg?flag=hewr)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![pipelines](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=pipelines)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) |
 
 The STF Routine Forecasting project contains code for producing short-term forecasts of respiratory disease burden using several models:
 - [EpiAutoGp](pipelines/epiautogp)
 - [fable](pipelines/fable)
 - [pyrenew_hew](pipelines/pyrenew_hew)
+
+EpiAutoGP test coverage is included in the `pipelines` coverage badge above rather than reported separately.
 
 These forecasts are submitted to CDC's forecasting hubs:
 - [RSV Forecast Hub](https://github.com/CDCgov/rsv-forecast-hub/)

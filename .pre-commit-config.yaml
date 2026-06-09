@@ -1,7 +1,3 @@
-ci:
-  skip:
-    - runic
-
 repos:
   # Basic file cleanliness
   - repo: https://github.com/pre-commit/pre-commit-hooks

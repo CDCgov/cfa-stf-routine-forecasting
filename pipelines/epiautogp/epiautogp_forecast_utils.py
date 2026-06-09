@@ -16,6 +16,7 @@ import polars as pl
 
 from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
+from pipelines.epiautogp.hubverse_nowcast import HubversePointerNowcast
 from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.utils.common_utils import (
@@ -29,7 +30,7 @@ from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
 )
 
-NowcastSourceName = Literal["none", "reporting-delay"]
+NowcastSourceName = Literal["reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
@@ -182,32 +183,48 @@ def _build_reporting_delay_nowcast(
 def _resolve_nowcast_source(
     *,
     forecast_spec: ForecastSpec,
-    nowcast_source_name: NowcastSourceName,
+    nowcast_source_name: NowcastSourceName | None,
     **options: Any,
 ) -> NowcastSource | None:
     """
     Resolve the requested nowcast source for one EpiAutoGP run.
 
-    `forecast_spec` and `nowcast_source_name` are universal; remaining keyword
-    arguments are forwarded as-is to the chosen source's builder, which is
-    responsible for validating them. New nowcast approaches plug in by adding
-    a new case here and a builder that defines its own required kwargs.
+    `forecast_spec` and `nowcast_source_name` are universal; source-specific
+    options are read only by the chosen builder, which is responsible for
+    validating them. New nowcast approaches plug in by adding a new case here.
     """
     match nowcast_source_name:
-        case "none":
+        case None:
             return None
         case "reporting-delay":
             if not ReportingDelayNowcast.applies_to(forecast_spec=forecast_spec):
                 raise ValueError(
                     f"reporting-delay nowcasting is not applicable to "
-                    f"target={forecast_spec.target!r}, ed_visit_type={forecast_spec.ed_visit_type!r}."
+                    f"target={forecast_spec.target!r}, "
+                    f"ed_visit_type={forecast_spec.ed_visit_type!r}."
                 )
             return _build_reporting_delay_nowcast(
-                forecast_spec=forecast_spec, **options
+                forecast_spec=forecast_spec,
+                param_data_dir=options.get("param_data_dir"),
+                reporting_delay_pmf=options.get("reporting_delay_pmf"),
+            )
+        case "hubverse":
+            if not HubversePointerNowcast.applies_to(forecast_spec=forecast_spec):
+                raise ValueError("hubverse nowcasting is not applicable.")
+            pointer_path = options.get("hubverse_nowcast_pointer_path")
+            if pointer_path is None:
+                raise ValueError(
+                    "hubverse_nowcast_pointer_path is required when hubverse "
+                    "nowcasting is requested."
+                )
+            return HubversePointerNowcast(
+                pointer_path=pointer_path,
+                forecast_spec=forecast_spec,
             )
         case _:
             raise ValueError(
-                f"nowcast_source_name must be one of {list(VALID_NOWCAST_SOURCE_NAMES)}, "
+                "nowcast_source_name must be None or one of "
+                f"{list(VALID_NOWCAST_SOURCE_NAMES)}, "
                 f"got {nowcast_source_name!r}"
             )
 
@@ -229,8 +246,9 @@ def setup_forecast_pipeline(
     credentials_path: Path | None = None,
     logger: logging.Logger | None = None,
     param_data_dir: Path | str | None = None,
-    nowcast_source_name: NowcastSourceName = "none",
+    nowcast_source_name: NowcastSourceName | None = None,
     reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_pointer_path: Path | str | None = None,
 ) -> ForecastPipelineContext:
     """
     Set up common forecast pipeline infrastructure.
@@ -282,11 +300,14 @@ def setup_forecast_pipeline(
         Directory containing parameter estimates such as reporting-delay PMFs.
         Required when reporting-delay nowcasting is selected and no PMF is
         directly supplied.
-    nowcast_source_name : {"none", "reporting-delay"}, default="none"
-        Nowcast source selection for EpiAutoGP input.
+    nowcast_source_name : {"reporting-delay", "hubverse"} | None, default=None
+        Nowcast source selection for EpiAutoGP input. None disables nowcasting.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Takes precedence over
         param_data_dir when reporting-delay nowcasting is selected.
+    hubverse_nowcast_pointer_path : Path | str | None, default=None
+        Handoff pointer JSON path whose hubverse.model_output_uri is a Hubverse
+        sample-format parquet. Required when nowcast_source_name="hubverse".
 
     Returns
     -------
@@ -354,6 +375,7 @@ def setup_forecast_pipeline(
         nowcast_source_name=nowcast_source_name,
         param_data_dir=param_data_dir,
         reporting_delay_pmf=reporting_delay_pmf,
+        hubverse_nowcast_pointer_path=hubverse_nowcast_pointer_path,
     )
 
     return ForecastPipelineContext(

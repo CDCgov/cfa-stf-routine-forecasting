@@ -8,6 +8,7 @@ from pipelines.epiautogp import (
 )
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     VALID_NOWCAST_SOURCE_NAMES,
+    NowcastSourceName,
 )
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
@@ -106,8 +107,9 @@ def main(
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
     param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
-    nowcast_source_name: str = "none",
+    nowcast_source_name: NowcastSourceName | None = None,
     reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_pointer_path: Path | str | None = None,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -167,10 +169,13 @@ def main(
         Proportion of data used in each SMC step
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
-    nowcast_source_name : str, default="none"
-        Nowcast source to use: "none" or "reporting-delay"
+    nowcast_source_name : {"reporting-delay", "hubverse"} | None, default=None
+        Nowcast source to use. None disables nowcasting.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Python API only.
+    hubverse_nowcast_pointer_path : Path | str | None, default=None
+        Handoff pointer JSON path whose hubverse.model_output_uri is a Hubverse
+        sample-format parquet. Required when nowcast_source_name="hubverse".
 
     Returns
     -------
@@ -266,6 +271,7 @@ def main(
         param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        hubverse_nowcast_pointer_path=hubverse_nowcast_pointer_path,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -360,12 +366,23 @@ if __name__ == "__main__":
         "--nowcast-source",
         dest="nowcast_source_name",
         type=str,
-        default="none",
+        default=None,
         choices=list(VALID_NOWCAST_SOURCE_NAMES),
         help=(
-            "Nowcast source to use: 'none' disables nowcasting; "
+            "Nowcast source to use. Omit to disable nowcasting. "
             "'reporting-delay' inflates recent counts using a reporting-delay "
-            "PMF (default: none)."
+            "PMF; 'hubverse' reads Hubverse sample-format nowcasts through a "
+            "handoff pointer."
+        ),
+    )
+
+    parser.add_argument(
+        "--hubverse-nowcast-pointer-path",
+        type=str,
+        default=None,
+        help=(
+            "Hubverse handoff pointer JSON path. Required when "
+            "--nowcast-source=hubverse."
         ),
     )
 

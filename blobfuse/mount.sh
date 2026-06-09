@@ -22,6 +22,7 @@ TO_MOUNT=(
 	"pyrenew-test-output"
 	"nwss-vintages"
 	"pyrenew-hew-config"
+	"nowcastnhsn-prod"
 )
 
 for dir in "${TO_MOUNT[@]}"; do
@@ -82,6 +83,13 @@ if [[ -L "./blobfuse/mounts/nssp-archival-vintages" ]]; then
 else
 	ln -s "/mnt/nssp-archival-vintages" "./blobfuse/mounts/nssp-archival-vintages"
 	echo "Created symlink './blobfuse/mounts/nssp-archival-vintages' -> '/mnt/nssp-archival-vintages'"
+fi
+
+if [[ -L "./blobfuse/mounts/nowcastnhsn-prod" ]]; then
+	echo "Symlink './blobfuse/mounts/nowcastnhsn-prod' already exists, skipping."
+else
+	ln -s "/mnt/nowcastnhsn-prod" "./blobfuse/mounts/nowcastnhsn-prod"
+	echo "Created symlink './blobfuse/mounts/nowcastnhsn-prod' -> '/mnt/nowcastnhsn-prod'"
 fi
 
 echo "Setting environment variables for the Azure Command Center..."

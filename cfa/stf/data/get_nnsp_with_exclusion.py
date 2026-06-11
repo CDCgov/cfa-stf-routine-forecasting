@@ -248,6 +248,8 @@ def exclude_tail_n(reference_dates: list[dt.date], n: int) -> pl.DataFrame:
         Data frame with one row per unique `reference_date`, sorted by date,
         and columns: `reference_date` and `exclude`.
     """
+    if n < 0:
+        raise ValueError(f"n must be non-negative; got {n}.")
     exclusion_cutoff = max(len(set(reference_dates)) - n, 0)
     exclusion_df = (
         pl.DataFrame({"reference_date": reference_dates})

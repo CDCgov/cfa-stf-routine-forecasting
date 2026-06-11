@@ -3,7 +3,7 @@ import datetime as dt
 import polars as pl
 import pytest
 
-import cfa.stf.data.get_nnsp_with_exclusion as nssp_exclusion
+import cfa.stf.data.get_nssp_with_exclusion as nssp_exclusion
 from cfa.stf.data import get_nssp_with_exclusion
 from tests.cfa.stf.data.data_test_utils import requires_ext_catalog
 

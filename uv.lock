@@ -739,8 +739,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-cloudops"
-version = "0.4.0"
-source = { git = "https://github.com/CDCgov/cfa-cloudops.git#828a2c778236ae03cba5f40f049bf41aa30a88bc" }
+version = "0.5.4"
+source = { git = "https://github.com/CDCgov/cfa-cloudops.git#4776c42ee2f2a265c00d4f25111acddd8d18d8b1" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
@@ -759,6 +759,7 @@ dependencies = [
     { name = "duckdb" },
     { name = "griddler" },
     { name = "humanize" },
+    { name = "ipykernel" },
     { name = "msrest" },
     { name = "msrestazure" },
     { name = "networkx" },

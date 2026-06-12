@@ -1,5 +1,6 @@
 # Basic Imports
 import datetime as dt
+import logging
 import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -733,6 +734,14 @@ storage_account = "cfadagster" if is_production else "cfadagsterdev"
 
 # collect Dagster definitions from the current file
 collected_defs = collect_definitions(globals())
+
+# Set Azure HTTP Logging Level
+# this will limit excessive IO logs in stderr 
+# for any assets making azure http requests
+azure_http_logger = logging.getLogger(
+    "azure.core.pipeline.policies.http_logging_policy"
+)
+azure_http_logger.setLevel(logging.WARNING) 
 
 # Create Definitions object
 defs = dg.Definitions(

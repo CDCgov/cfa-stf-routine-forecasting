@@ -736,12 +736,12 @@ storage_account = "cfadagster" if is_production else "cfadagsterdev"
 collected_defs = collect_definitions(globals())
 
 # Set Azure HTTP Logging Level
-# this will limit excessive IO logs in stderr 
+# this will limit excessive IO logs in stderr
 # for any assets making azure http requests
 azure_http_logger = logging.getLogger(
     "azure.core.pipeline.policies.http_logging_policy"
 )
-azure_http_logger.setLevel(logging.WARNING) 
+azure_http_logger.setLevel(logging.WARNING)
 
 # Create Definitions object
 defs = dg.Definitions(

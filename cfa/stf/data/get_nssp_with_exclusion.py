@@ -1,4 +1,5 @@
 import datetime as dt
+from collections.abc import Iterable
 from functools import partial
 from typing import Literal
 
@@ -9,6 +10,8 @@ from jax.typing import ArrayLike
 from cfa.stf.data import get_nnh_right_truncation_pmf, get_nssp
 from cfa.stf.data.get_data import NSSPDataset
 from cfa.stf.forecasttools import ensure_list
+
+DEFAULT_EXCLUSION_CALC_DISEASES = ("Influenza", "RSV", "COVID-19")
 
 
 def identify_outlier_tail(
@@ -84,7 +87,7 @@ def exclude_tail_auto(
     as_of: dt.date | None = None,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
-    exclusion_calc_disease: str | list[str] = ["Influenza", "RSV", "COVID-19"],
+    exclusion_calc_disease: str | Iterable[str] | None = None,
     loc_estimator: Literal["median", "mean"] = "median",
     outlier_multiplier: float = 11.0,
     max_tail_length: int = 7,
@@ -136,14 +139,20 @@ def exclude_tail_auto(
         Data frame with one row per `reference_date` and columns:
         `reference_date` and `exclude`.
     """
+    exclusion_calc_diseases = ensure_list(
+        DEFAULT_EXCLUSION_CALC_DISEASES
+        if exclusion_calc_disease is None
+        else exclusion_calc_disease
+    )
+    use_total_pmf = exclusion_calc_diseases == ["Total"]
 
     if nowcast_adjustment:
         # If adjusting for right truncation, we need to work with the right truncation PMFs
         # There is no right truncation pmf for Total, so we use the average of the PMFs for the individual diseases as an approximation
         disease_pmf = (
-            exclusion_calc_disease
-            if exclusion_calc_disease != "Total"
-            else ["Influenza", "RSV", "COVID-19"]
+            DEFAULT_EXCLUSION_CALC_DISEASES
+            if use_total_pmf
+            else exclusion_calc_diseases
         )
         pmf_df = (
             pl.DataFrame(
@@ -167,17 +176,17 @@ def exclude_tail_auto(
         )
         # If exclusion_calc_disease is "Total", disease_pmf is all diseases,
         # so we average the pmf across all of them
-        if exclusion_calc_disease == "Total":
+        if use_total_pmf:
             pmf_df = (
                 pmf_df.group_by("offset_days")
                 .agg(pl.col("right_truncation_cdf").mean())
                 .sort("offset_days")
-                .with_columns(pl.lit(exclusion_calc_disease).alias("disease"))
+                .with_columns(pl.lit("Total").alias("disease"))
             )
     else:  # not adjusting for right truncation, so we fill the pmf_df with 1s
         pmf_df = pl.DataFrame(
             {
-                "disease": ensure_list(exclusion_calc_disease),
+                "disease": exclusion_calc_diseases,
                 "right_truncation_cdf": 1.0,
                 "offset_days": 1,
             }
@@ -189,7 +198,7 @@ def exclude_tail_auto(
             loc_abb=loc_abb,
             start_date=start_date,
             end_date=end_date,
-            disease=exclusion_calc_disease,
+            disease=exclusion_calc_diseases,
             lazy=False,
         ).with_columns(
             offset_days=(
@@ -229,7 +238,7 @@ def exclude_tail_auto(
     return joined_dat
 
 
-def exclude_tail_n(reference_dates: list[dt.date], n: int) -> pl.DataFrame:
+def exclude_tail_n(reference_dates: Iterable[dt.date], n: int) -> pl.DataFrame:
     """
     Mark the final `n` dates in a set of reference dates for exclusion.
 
@@ -250,6 +259,7 @@ def exclude_tail_n(reference_dates: list[dt.date], n: int) -> pl.DataFrame:
     """
     if n < 0:
         raise ValueError(f"n must be non-negative; got {n}.")
+    reference_dates = list(reference_dates)
     exclusion_cutoff = max(len(set(reference_dates)) - n, 0)
     exclusion_df = (
         pl.DataFrame({"reference_date": reference_dates})

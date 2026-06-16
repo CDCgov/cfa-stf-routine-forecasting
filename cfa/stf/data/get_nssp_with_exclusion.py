@@ -393,6 +393,8 @@ def get_nssp_with_exclusion(
 
     exclusion_dat = exclusion_strategies[exclusion_strategy](**exclusion_strategy_args)
 
-    nssp_with_exclusion = nssp_dat.join(exclusion_dat, on="reference_date", how="left")
+    nssp_with_exclusion = nssp_dat.join(
+        exclusion_dat, on="reference_date", how="left"
+    ).with_columns(pl.col("exclude").fill_null(False))
 
     return nssp_with_exclusion

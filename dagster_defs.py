@@ -2,6 +2,7 @@
 import datetime as dt
 import logging
 import os
+import subprocess
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -91,7 +92,8 @@ tag = (
     if (is_production or current_branch_name == "main")
     else current_branch_name
 )
-image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
+registry = "cfaprdbatchcr.azurecr.io"
+image = f"{registry}/cfa-stf-routine-forecasting:{tag}"
 
 # ---------- Execution Configuration ----------
 
@@ -721,6 +723,106 @@ def postprocess_forecasts(
         local_copy_dir=daily_forecast_output_dir,
     )
 
+# ============================================================================
+# JOBS AND OPS
+# These can create images.
+# ============================================================================
+
+# These are only used in dev - they should not appear on the production webserver
+if not is_production:
+
+    # Build and Push Image ---------------------------
+
+    @dg.op
+    def build_image_op(
+        context: dg.OpExecutionContext,
+        should_push: bool,
+        should_deploy_to_prod: bool,
+        dockerfile_path: str,
+        build_context: str,
+        image: str,
+    ):
+        """
+        Builds the image used by dagster.
+
+        should_push: bool - should the image be pushed to the Container Registry?
+        should_deploy_to_prod: bool - should the prod server be updated with the newest image? (usually you do not want to do this)
+        dockerfile_path: str - where is the Dockerfile located locally? (has a default)
+        build_context: str - where should we build from? (has a default)
+        image: str - the full name (including registry and tag) of the image
+        """
+        cmd = f"docker build -t {image} -f {dockerfile_path} {build_context}"
+
+        if should_push:
+            subprocess.run(
+                f"az login --identity && az acr login -n {registry}",
+                check=True,
+                shell=True,
+            )
+            cmd += " --push"
+
+        context.log.debug(f"Running {cmd}")
+        subprocess.run(cmd, check=True, shell=True)
+
+        update_script_url = "https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py"
+
+        if should_deploy_to_prod:
+            subprocess.run(
+                f"uv run {update_script_url} --registry_image {image}",
+                check=True,
+                shell=True,
+            )
+
+    @dg.job(
+        config=dg.RunConfig(
+            ops={
+                "build_image_op": {
+                    "inputs": {
+                        "should_push": True,
+                        "should_deploy_to_prod": False,
+                        "dockerfile_path": f"{local_workdir}/Containerfile",
+                        # the build context should be the top level of the repo, not the covid_2602 folder (for now)
+                        "build_context": local_workdir,
+                        "image": image,
+                    }
+                }
+            },
+            # configure this job to run on your computer
+            execution=basic_execution_config.to_run_config(),
+        ),
+        executor_def=dynamic_executor(),
+    )
+    def build_image():
+        build_image_op()
+
+    # Explore the image you built as it will be run with dagster ---------------------------
+
+    @dg.op
+    def explore_image_op(
+        context: dg.OpExecutionContext,
+    ):
+        """
+        Allows you to run the container you previously built and explore the filesystem that will be used by dagster.
+        """
+        print(
+            "Check the terminal from which you ran the webserver to interact; stdout from your terminal will appear below."
+        )
+        cmd = (
+            "docker run -it "
+            f"-v {local_workdir}/blobfuse/mounts/nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
+            f"-v {local_workdir}/blobfuse/mounts/nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
+            f"-v {local_workdir}/blobfuse/mounts/nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
+            f"-v {local_workdir}/blobfuse/mounts/params:/cfa-stf-routine-forecasting/params",
+            f"-v {local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
+            f"-v {local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
+            f"-v {local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
+            f"--rm {image} bash"
+        )
+        subprocess.run(cmd, check=True, shell=True)
+
+    @dg.job(executor_def=dg.in_process_executor)
+    def explore_image():
+        explore_image_op()
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

@@ -26,9 +26,9 @@ def identify_outlier_tail(
     x : array-like
         Input data
     loc_estimator : Literal["median", "mean"]
-        Method to estimate the central tendency of the log differences (default: "median")
+        Method to estimate the typical absolute log-difference size in the non-tail portion (default: "median")
     outlier_multiplier : float
-        Number of times the central tendency to use as threshold (default: 11.0)
+        Multiplier applied to the typical absolute log-difference size to set the threshold (default: 11.0)
     max_tail_length : int
         Length of tail to examine (default: 7)
 

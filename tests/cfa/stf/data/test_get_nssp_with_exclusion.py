@@ -1,11 +1,13 @@
 import datetime as dt
+import importlib
 
 import polars as pl
 import pytest
 
-import cfa.stf.data.get_nssp_with_exclusion as nssp_exclusion
 from cfa.stf.data import get_nssp_with_exclusion
 from tests.cfa.stf.data.data_test_utils import requires_ext_catalog
+
+nssp_exclusion = importlib.import_module("cfa.stf.data.get_nssp_with_exclusion")
 
 
 def make_nssp_series(
@@ -183,6 +185,17 @@ def test_auto_strategy_forwards_exclusion_strategy_args(
         nowcast_adjustment=True,
     )
 
+    assert mock_get_nssp == [
+        {
+            "as_of": dt.date(2024, 2, 1),
+            "loc_abb": "LA",
+            "disease": "RSV",
+            "dataset": "gold",
+            "start_date": None,
+            "end_date": None,
+            "lazy": False,
+        }
+    ]
     assert calls == [
         {
             "loc_abb": "LA",

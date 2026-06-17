@@ -4,7 +4,8 @@ client = cfa.cloudops.CloudClient(keyvault="cfa-predict")
 
 client.create_pool(
     pool_name="stf-routine-forecasting-pool",
-    container_image_name="ubuntu-hpc-2404",
+    container_image_name="python:latest",  # shouldn't have to specify
+    vm_size="Standard_D4ads_v5",
     max_autoscale_nodes=400,
     low_priority_nodes=0,
     cache_blobfuse=False,

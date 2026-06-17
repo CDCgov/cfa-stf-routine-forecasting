@@ -144,7 +144,7 @@ azure_batch_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "pyrenew-dagster-pool",
+            "pool_name": "stf-routine-forecasting-pool",
             **(
                 {}
                 if is_production  # image will come from the code location in prod
@@ -165,8 +165,8 @@ azure_batch_execution_config = ExecutionConfig(
                     "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
                     "prod-param-estimates:/cfa-stf-routine-forecasting/params",
                     "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
-                    "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
-                    "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
+                    "stf-routine-forecasting-prod-output:/cfa-stf-routine-forecasting/output",
+                    "stf-routine-forecasting-test-output:/cfa-stf-routine-forecasting/test-output",
                 ],
                 "working_dir": "/cfa-stf-routine-forecasting",
             },

@@ -18,8 +18,8 @@ TO_MOUNT=(
 	"nssp-etl"
 	"nssp-archival-vintages"
 	"prod-param-estimates"
-	"pyrenew-hew-prod-output"
-	"pyrenew-test-output"
+	"stf-routine-forecasting-prod-output"
+	"stf-routine-forecasting-test-output"
 	"nwss-vintages"
 	"pyrenew-hew-config"
 )
@@ -45,15 +45,15 @@ fi
 if [[ -L "./blobfuse/mounts/output" ]]; then
 	echo "Symlink './blobfuse/mounts/output' already exists, skipping."
 else
-	ln -s "/mnt/pyrenew-hew-prod-output" "./blobfuse/mounts/output"
-	echo "Created symlink './blobfuse/mounts/output' -> '/mnt/pyrenew-hew-prod-output'"
+	ln -s "/mnt/stf-routine-forecasting-prod-output" "./blobfuse/mounts/output"
+	echo "Created symlink './blobfuse/mounts/output' -> '/mnt/stf-routine-forecasting-prod-output'"
 fi
 
 if [[ -L "./blobfuse/mounts/test-output" ]]; then
 	echo "Symlink './blobfuse/mounts/test-output' already exists, skipping."
 else
-	ln -s "/mnt/pyrenew-test-output" "./blobfuse/mounts/test-output"
-	echo "Created symlink './blobfuse/mounts/test-output' -> '/mnt/pyrenew-test-output'"
+	ln -s "/mnt/stf-routine-forecasting-test-output" "./blobfuse/mounts/test-output"
+	echo "Created symlink './blobfuse/mounts/test-output' -> '/mnt/stf-routine-forecasting-test-output'"
 fi
 
 if [[ -L "./blobfuse/mounts/nwss-vintages" ]]; then

@@ -112,6 +112,6 @@ config:
 
 post_process: config
 	uv run python pipelines/utils/postprocess_forecast_batches.py \
-    	--input "./blobfuse/mounts/pyrenew-hew-prod-output/${FORECAST_DATE}_forecasts" \
+    	--input "./blobfuse/mounts/stf-routine-forecasting-prod-output/${FORECAST_DATE}_forecasts" \
     	--output "./blobfuse/mounts/nssp-etl/gold/${FORECAST_DATE}_forecasts.parquet" \
 		${ARGS}

@@ -50,7 +50,7 @@ help:
 	@echo "  unmount            : Unmount blob storage containers and clean up"
 	@echo ""
 	@echo "Container Build Targets: "
-	@echo "  ghcr_login          : Log in to the Github Container Registry. Requires GH_USERNAME and GH_PAT env vars"
+	@echo "  ghcr_login          : Log in to the Github Container Registry using gh auth or GH_USERNAME/GH_PAT"
 	@echo "  container_build     : Build the container image"
 	@echo "  container_tag	     : Tag the container image for pushing to the registry"
 	@echo "  container_push	     : Push the container image"
@@ -78,11 +78,18 @@ unmount:
 # ----------------------- #
 
 ghcr_login:
-	@if [ -z "$(GH_PAT)" ] || [ -z "$(GH_USERNAME)" ]; then \
-		echo "Error: GH_PAT and GH_USERNAME environment variables must be set to log in to GitHub Container Registry"; \
+	@if [ -n "$(GH_PAT)" ] && [ -n "$(GH_USERNAME)" ]; then \
+		echo "$$GH_PAT" | $(ENGINE) login ghcr.io -u "$(GH_USERNAME)" --password-stdin; \
+	elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then \
+		if ! gh auth status -h github.com 2>&1 | grep -q "write:packages"; then \
+			gh auth refresh -h github.com -s write:packages; \
+		fi; \
+		GH_LOGIN=$$(gh api user --jq .login); \
+		gh auth token | $(ENGINE) login ghcr.io -u "$$GH_LOGIN" --password-stdin; \
+	else \
+		echo "Error: run 'gh auth login' or set GH_USERNAME and GH_PAT to log in to GitHub Container Registry"; \
 		exit 1; \
-	fi; \
-	echo "$$GH_PAT" | $(ENGINE) login ghcr.io -u "$(GH_USERNAME)" --password-stdin
+	fi
 
 container_build:
 	$(ENGINE) build . -t $(CONTAINER_REMOTE_NAME) -f $(CONTAINERFILE) \

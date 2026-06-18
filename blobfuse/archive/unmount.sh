@@ -13,10 +13,10 @@ TO_UNMOUNT=(
 	"nssp-etl"
 	"nssp-archival-vintages"
 	"prod-param-estimates"
-	"pyrenew-hew-prod-output"
-	"pyrenew-test-output"
+	"stf-routine-forecasting-prod-output"
+	"stf-routine-forecasting-test-output"
 	"nwss-vintages"
-	"pyrenew-hew-config"
+	"stf-routine-forecasting-config"
 )
 
 for dir in "${TO_UNMOUNT[@]}"; do

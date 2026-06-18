@@ -17,6 +17,6 @@ client.create_pool(
     ],
     max_autoscale_nodes=400,
     low_priority_nodes=0,
-    cache_blobfuse=False,
+    cache_blobfuse=True,
     replace_existing_pool=True,
 )

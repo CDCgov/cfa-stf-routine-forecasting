@@ -164,7 +164,7 @@ azure_batch_execution_config = ExecutionConfig(
                     "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
                     "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
                     "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                    "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
+                    "stf-routine-forecasting-config:/cfa-stf-routine-forecasting/config",
                     "stf-routine-forecasting-prod-output:/cfa-stf-routine-forecasting/output",
                     "stf-routine-forecasting-test-output:/cfa-stf-routine-forecasting/test-output",
                 ],

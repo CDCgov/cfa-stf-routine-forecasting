@@ -16,7 +16,7 @@ TO_UNMOUNT=(
 	"stf-routine-forecasting-prod-output"
 	"stf-routine-forecasting-test-output"
 	"nwss-vintages"
-	"pyrenew-hew-config"
+	"stf-routine-forecasting-config"
 )
 
 for dir in "${TO_UNMOUNT[@]}"; do

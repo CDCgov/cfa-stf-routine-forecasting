@@ -21,7 +21,7 @@ TO_MOUNT=(
 	"stf-routine-forecasting-prod-output"
 	"stf-routine-forecasting-test-output"
 	"nwss-vintages"
-	"pyrenew-hew-config"
+	"stf-routine-forecasting-config"
 )
 
 for dir in "${TO_MOUNT[@]}"; do
@@ -66,8 +66,8 @@ fi
 if [[ -L "./blobfuse/mounts/config" ]]; then
 	echo "Symlink './blobfuse/mounts/config' already exists, skipping."
 else
-	ln -s "/mnt/pyrenew-hew-config" "./blobfuse/mounts/config"
-	echo "Created symlink './blobfuse/mounts/config' -> '/mnt/pyrenew-hew-config'"
+	ln -s "/mnt/stf-routine-forecasting-config" "./blobfuse/mounts/config"
+	echo "Created symlink './blobfuse/mounts/config' -> '/mnt/stf-routine-forecasting-config'"
 fi
 
 if [[ -L "./blobfuse/mounts/nssp-etl" ]]; then

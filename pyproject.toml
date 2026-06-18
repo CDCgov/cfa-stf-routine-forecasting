@@ -41,11 +41,16 @@ allow-direct-references = true
 
 [dependency-groups]
 dev = [
+  {include-group = "dagster-config-editor"},
   {include-group = "test"},
   "ipykernel",
   "ipywidgets",
   "jupyter>=1.0.0",
   "cfa-dagster[dev]"
+]
+dagster-config-editor = [
+    "py-yaml12",
+    "rich",
 ]
 test = [
     "pytest>=8.3.2",

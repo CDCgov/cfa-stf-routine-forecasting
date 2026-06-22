@@ -3,12 +3,18 @@ name: Pipeline Run Check
 on:
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - "pipelines/batch/**"
+    paths:
+      - "pipelines/**"
+      - "cfa/**"
+      - "hewr/**"
+      - "uv.lock"
   push:
     branches: [ main ]
-    paths-ignore:
-      - "pipelines/batch/**"
+    paths:
+      - "pipelines/**"
+      - "cfa/**"
+      - "hewr/**"
+      - "uv.lock"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}

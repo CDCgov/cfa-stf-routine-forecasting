@@ -608,25 +608,18 @@ def get_all_forecast_dirs(
 
 
 def build_pyrenew_hew_model_from_dir(
-    model_dir: Path | str = None,
-    prior_path: Path | str = None,
-    model_params_path: Path | str = None,
+    model_dir: Path | str,
     fit_ed_visits: bool = False,
     fit_hospital_admissions: bool = False,
     fit_wastewater: bool = False,
 ):
     """
-    Build a PyRenew HEW model from a directory or specified paths.
+    Build a PyRenew HEW model from a directory.
 
     Parameters
     ----------
-    model_dir : Path | str, optional
+    model_dir : Path | str
         Directory containing priors.py and data/model_params.json.
-        If provided, prior_path and model_params_path are ignored.
-    prior_path : Path | str, optional
-        Path to the priors.py file. Required if model_dir is not provided.
-    model_params_path : Path | str, optional
-        Path to the model_params.json file. Required if model_dir is not provided.
     fit_ed_visits : bool, optional
         Whether to fit ED visits data, by default False.
     fit_hospital_admissions : bool, optional
@@ -638,24 +631,9 @@ def build_pyrenew_hew_model_from_dir(
     -------
     model
         The built PyRenew HEW model.
-
-    Raises
-    ------
-    ValueError
-        If neither model_dir nor both prior_path and model_params_path are provided.
     """
-    if model_dir is not None:
-        prior_path = Path(model_dir) / "priors.py"
-        model_params_path = Path(model_dir) / "data" / "model_params.json"
-    else:
-        if prior_path is None or model_params_path is None:
-            raise ValueError(
-                "Either model_dir must be provided, "
-                "or both prior_path and model_params_path "
-                "must be provided."
-            )
-        prior_path = Path(prior_path)
-        model_params_path = Path(model_params_path)
+    prior_path = Path(model_dir) / "priors.py"
+    model_params_path = Path(model_dir) / "data" / "model_params.json"
 
     priors = runpy.run_path(str(prior_path))
     model_params = PyrenewHEWParam.from_json(model_params_path)

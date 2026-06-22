@@ -140,7 +140,7 @@ def _write_fable_reference_model_samples(batch_dir: Path) -> Path:
         library(dplyr)
         library(forecasttools)
         library(fs)
-        library(hewr)
+        library(stfroutineforecasting)
 
         fable_model_fit_dir <- {_quote_for_embedded_code(fable_model_fit_dir)}
         dir_create(fable_model_fit_dir, recurse = TRUE)
@@ -154,7 +154,7 @@ def _write_fable_reference_model_samples(batch_dir: Path) -> Path:
           observed_ed_visits = c(101, 201, 102, 202),
           other_ed_visits = c(1001, 2001, 1002, 2002)
         ) |>
-          hewr::format_timeseries_output(
+          stfroutineforecasting::format_timeseries_output(
             geo_value = "US",
             disease = "COVID-19",
             resolution = "daily",
@@ -254,7 +254,7 @@ def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
         "dplyr",
         "forecasttools",
         "fs",
-        "hewr",
+        "stfroutineforecasting",
         "tidybayes",
     )
     try:

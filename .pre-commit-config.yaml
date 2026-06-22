@@ -15,7 +15,7 @@ repos:
       - id: trailing-whitespace
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.17
+    rev: v0.15.18
     hooks:
       # Sort imports
       - id: ruff-check
@@ -23,7 +23,7 @@ repos:
       - id: ruff-format
     # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.21
+    rev: 0.11.23
     hooks:
       - id: uv-lock
   # Bash
@@ -40,7 +40,7 @@ repos:
         exclude: ^(package\.lock\.json|pipelines/epiautogp/Manifest\.toml)$
   # R
   - repo: https://github.com/posit-dev/air-pre-commit
-    rev: 0.9.0
+    rev: 0.10.0
     hooks:
       - id: air-format
   - repo: https://github.com/etiennebacher/jarl-pre-commit

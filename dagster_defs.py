@@ -76,13 +76,9 @@ try:
     print("You are running inside a .git repository; getting branchname from .git")
     repo = Repository(os.getcwd())
     current_branch_name = str(repo.head.shorthand)
-    git_commit_sha = str(repo.head.target)
 except Exception:
-    print(
-        "No .git folder detected; attempting to get branch name from build-arg $GIT_BRANCH_NAME"
-    )
-    current_branch_name = os.getenv("GIT_BRANCH_NAME", "unknown_branch")
-    git_commit_sha = os.getenv("GIT_COMMIT_SHA", "unknown_commit_hash")
+    print("No .git folder detected; using main as the branch name")
+    current_branch_name = "main"
 
 print(f"Current branch name is {current_branch_name}")
 

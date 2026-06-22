@@ -1,5 +1,5 @@
 name: "Set up routine forecasting R"
-description: "Set up R and install the hewr package."
+description: "Set up R and install the stfroutineforecasting package."
 inputs: {}
 runs:
   using: "composite"
@@ -11,13 +11,13 @@ runs:
         use-public-rspm: true
         extra-repositories: https://hubverse-org.r-universe.dev
 
-    - name: "Set up dependencies for hewr"
+    - name: "Set up dependencies for stfroutineforecasting"
       uses: r-lib/actions/setup-r-dependencies@v2
       with:
-        working-directory: hewr
+        working-directory: stfroutineforecasting
         needs: check, coverage
         extra-packages: any::covr, any::xml2
 
-    - name: Install hewr
-      run: pak::local_install("hewr", ask = FALSE, upgrade = FALSE)
+    - name: Install stfroutineforecasting
+      run: pak::local_install("stfroutineforecasting", ask = FALSE, upgrade = FALSE)
       shell: Rscript {0}

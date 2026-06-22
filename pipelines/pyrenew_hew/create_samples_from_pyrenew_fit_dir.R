@@ -1,5 +1,5 @@
 library(argparser)
-library(hewr)
+library(stfroutineforecasting)
 
 variable_resolution_key <-
   c(
@@ -9,7 +9,7 @@ variable_resolution_key <-
     "site_level_log_ww_conc" = "daily"
   )
 
-# put this list in hewr
+# put this list in stfroutineforecasting
 required_columns_e <- c(
   ".chain",
   ".iteration",

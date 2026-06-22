@@ -24,14 +24,25 @@ jobs:
       - name: Set up Pyrenew-HEW via UV
         uses: ./.github/actions/setup-pyrenew-hew
 
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: "1.11"
+
+      - name: Install Julia dependencies
+        run: |
+          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Set up R with hewr
+        uses: ./.github/actions/setup-hewr
+
       - name: run tests
         env:
           XLA_FLAGS: --xla_force_host_platform_device_count=2
         run: |
           uv run pytest \
-            --ignore=pipelines/tests/test_epiautogp_parquet_interop.py \
-            --ignore=pipelines/tests/test_epiautogp_parquet.py \
-            --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml .
+            --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml \
+            pipelines/tests
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v7
@@ -40,6 +51,51 @@ jobs:
           fail_ci_if_error: true
           flags: pipelines
           files: pipelines-coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+
+  cfa-stf-test:
+    name: Run cfa/stf ${{ matrix.submodule }} tests and collect coverage
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - submodule: data
+            tests: tests/cfa/stf/data
+            coverage-include: cfa/stf/data/*
+            coverage-file: cfa-stf-data-coverage.xml
+            coverage-flag: cfa-stf-data
+          - submodule: forecasttools
+            tests: tests/cfa/stf/forecasttools
+            coverage-include: cfa/stf/forecasttools/*
+            coverage-file: cfa-stf-forecasttools-coverage.xml
+            coverage-flag: cfa-stf-forecasttools
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Pyrenew-HEW via UV
+        uses: ./.github/actions/setup-pyrenew-hew
+
+      - name: run tests
+        run: |
+          uv run pytest \
+            --cov=cfa/stf \
+            --cov-report= \
+            ${{ matrix.tests }}
+          uv run coverage report --include='${{ matrix.coverage-include }}'
+          uv run coverage xml \
+            --include='${{ matrix.coverage-include }}' \
+            -o ${{ matrix.coverage-file }}
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          env_vars: OS,PYTHON
+          fail_ci_if_error: true
+          flags: ${{ matrix.coverage-flag }}
+          files: ${{ matrix.coverage-file }}
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
@@ -87,33 +143,3 @@ jobs:
         with:
           name: coverage-test-failures
           path: ${{ runner.temp }}/package
-
-  epiautogp-test:
-    name: Run EpiAutoGP runner output tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Julia
-        uses: julia-actions/setup-julia@v3
-        with:
-          version: "1.11"
-
-      - name: Install Julia dependencies
-        run: |
-          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Set up R with hewr
-        uses: ./.github/actions/setup-hewr
-
-      - name: Set up Pyrenew-HEW via UV
-        uses: ./.github/actions/setup-pyrenew-hew
-
-      - name: Run direct EpiAutoGP parquet test
-        run: |
-          uv run pytest pipelines/tests/test_epiautogp_parquet.py -q
-
-      - name: Run EpiAutoGP parquet interop test
-        run: |
-          uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q

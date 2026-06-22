@@ -13,13 +13,12 @@ CONTAINER_NAME = cfa-stf-routine-forecasting
 endif
 
 # Determine container tag from git branch: "main" -> "latest", otherwise use branch name
-GIT_BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
-GIT_COMMIT_SHA := $(shell git rev-parse HEAD)
+BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
 
-ifeq ($(GIT_BRANCH_NAME),main)
+ifeq ($(BRANCH_NAME),main)
 CONTAINER_TAG ?= latest
 else
-CONTAINER_TAG ?= $(GIT_BRANCH_NAME)
+CONTAINER_TAG ?= $(BRANCH_NAME)
 endif
 
 
@@ -93,9 +92,7 @@ ghcr_login:
 
 container_build:
 	$(ENGINE) build . -t $(CONTAINER_REMOTE_NAME) -f $(CONTAINERFILE) \
-	--platform linux/amd64 \
-	--build-arg GIT_COMMIT_SHA=$(GIT_COMMIT_SHA) \
-	--build-arg GIT_BRANCH_NAME=$(GIT_BRANCH_NAME)
+	--platform linux/amd64
 
 container_tag:
 	$(ENGINE) tag $(CONTAINER_REMOTE_NAME) $(CONTAINER_REMOTE_NAME)

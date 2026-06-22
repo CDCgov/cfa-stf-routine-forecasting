@@ -77,9 +77,6 @@ jobs:
             builder: ${{ steps.buildx.outputs.name }}
             tags: |
               ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}
-            build-args: |
-              GIT_COMMIT_SHA=${{ github.event.pull_request.head.sha || github.sha }}
-              GIT_BRANCH_NAME=${{ steps.branch-name.outputs.branch }}
             cache-from: |
               type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache
               type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:latest-cache

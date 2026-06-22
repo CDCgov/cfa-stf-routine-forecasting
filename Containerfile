@@ -88,12 +88,3 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Dagster
 COPY dagster_defs.py ./dagster_defs.py
-
-#
-# General Build Args and Environment Variables
-#
-
-ARG GIT_COMMIT_SHA
-ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
-ARG GIT_BRANCH_NAME
-ENV GIT_BRANCH_NAME=$GIT_BRANCH_NAME

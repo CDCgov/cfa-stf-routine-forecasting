@@ -1,11 +1,9 @@
-name: "Set up hewr"
-description: "This action sets up R with the hewr package installed."
+name: "Set up routine forecasting R"
+description: "Set up R and install the hewr package."
 inputs: {}
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v6
-
     - name: Set up R
       uses: r-lib/actions/setup-r@v2
       with:

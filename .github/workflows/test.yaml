@@ -21,20 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Pyrenew-HEW via UV
-        uses: ./.github/actions/setup-pyrenew-hew
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
 
-      - name: Set up Julia
-        uses: julia-actions/setup-julia@v3
-        with:
-          version: "1.11"
+      - name: Set up routine forecasting Julia
+        uses: ./.github/actions/setup-routine-forecasting-julia
 
-      - name: Install Julia dependencies
-        run: |
-          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Set up R with hewr
-        uses: ./.github/actions/setup-hewr
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
 
       - name: run tests
         env:
@@ -75,8 +69,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Pyrenew-HEW via UV
-        uses: ./.github/actions/setup-pyrenew-hew
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
 
       - name: run tests
         run: |
@@ -108,8 +102,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up R with hewr
-        uses: ./.github/actions/setup-hewr
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
 
       - name: Test coverage
         run: |

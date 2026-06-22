@@ -4,7 +4,7 @@
 # Called by test_epiautogp_end_to_end.sh
 #
 # Usage:
-#   bash test_epiautogp_fit.sh <base_dir> <disease> <location> <target> <frequency> [ed_visit_type]
+#   bash pipelines/tests/epiautogp/test_epiautogp_fit.sh <base_dir> <disease> <location> <target> <frequency> [ed_visit_type]
 
 if [[ $# -lt 5 || $# -gt 6 ]]; then
 	echo "Usage: $0 <base_dir> <disease> <location> <target> <frequency> [ed_visit_type]"

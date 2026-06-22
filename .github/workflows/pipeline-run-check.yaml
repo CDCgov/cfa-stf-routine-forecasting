@@ -73,7 +73,7 @@ jobs:
           for disease in COVID-19 Influenza RSV; do
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP weekly NHSN model for $disease, $location"
-              uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
+              uv run bash pipelines/tests/epiautogp/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
                 "$disease" "$location" nhsn epiweekly
             done
           done
@@ -116,7 +116,7 @@ jobs:
           for disease in COVID-19 Influenza RSV; do
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP weekly NSSP percentage model for $disease, $location"
-              uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
+              uv run bash pipelines/tests/epiautogp/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
                 "$disease" "$location" nssp epiweekly pct
             done
           done
@@ -159,7 +159,7 @@ jobs:
           for disease in COVID-19 Influenza RSV; do
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP daily NSSP count model for $disease, $location"
-              uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
+              uv run bash pipelines/tests/epiautogp/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
                 "$disease" "$location" nssp daily observed
             done
           done
@@ -202,7 +202,7 @@ jobs:
           for disease in COVID-19 Influenza RSV; do
             for location in US CA MT DC; do
               echo "Fitting EpiAutoGP daily NSSP other ED visits model for $disease, $location"
-              uv run bash pipelines/tests/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
+              uv run bash pipelines/tests/epiautogp/test_epiautogp_fit.sh ${{ env.BASE_DIR }} \
                 "$disease" "$location" nssp daily other
             done
           done
@@ -238,7 +238,7 @@ jobs:
 
       - name: Fit model
         run: |
-          uv run bash pipelines/tests/test_ts_fit.sh ${{ env.BASE_DIR }} \
+          uv run bash pipelines/tests/fable/test_ts_fit.sh ${{ env.BASE_DIR }} \
           ${{ matrix.disease }} ${{ matrix.location }}
 
       - name: Upload model fitting output
@@ -304,7 +304,7 @@ jobs:
 
       - name: Fit model
         run: |
-          uv run bash pipelines/tests/test_pyrenew_fit.sh ${{ env.BASE_DIR }} \
+          uv run bash pipelines/tests/pyrenew_hew/test_pyrenew_fit.sh ${{ env.BASE_DIR }} \
           ${{ matrix.disease }} ${{ matrix.location }} ${{ matrix.model }}
 
       - name: Upload model fitting output

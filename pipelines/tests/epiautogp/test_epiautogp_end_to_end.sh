@@ -4,7 +4,7 @@
 # Tests multiple locations and targets (weekly NHSN and weekly percentage NSSP)
 #
 # Usage:
-#   bash pipelines/tests/test_epiautogp_end_to_end.sh [--force]
+#   bash pipelines/tests/epiautogp/test_epiautogp_end_to_end.sh [--force]
 #
 # Options:
 #   --force    Delete existing test output directory
@@ -61,7 +61,7 @@ for location in "${LOCATIONS[@]}"; do
 	for disease in "${DISEASES[@]}"; do
 		# Test weekly NHSN (hospital admissions)
 		echo "TEST-MODE: Running EpiAutoGP weekly NHSN forecast for $disease, $location"
-		bash pipelines/tests/test_epiautogp_fit.sh \
+		bash pipelines/tests/epiautogp/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
@@ -78,7 +78,7 @@ for location in "${LOCATIONS[@]}"; do
 
 		# Test weekly NSSP percentage (ED visits as percentage)
 		echo "TEST-MODE: Running EpiAutoGP weekly NSSP percentage forecast for $disease, $location"
-		bash pipelines/tests/test_epiautogp_fit.sh \
+		bash pipelines/tests/epiautogp/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
@@ -95,7 +95,7 @@ for location in "${LOCATIONS[@]}"; do
 
 		# Test daily NSSP counts (ED visit counts, not percentages)
 		echo "TEST-MODE: Running EpiAutoGP daily NSSP count forecast for $disease, $location"
-		bash pipelines/tests/test_epiautogp_fit.sh \
+		bash pipelines/tests/epiautogp/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \
@@ -112,7 +112,7 @@ for location in "${LOCATIONS[@]}"; do
 
 		# Test daily NSSP other ED visits (non-target background)
 		echo "TEST-MODE: Running EpiAutoGP daily NSSP other ED visits forecast for $disease, $location"
-		bash pipelines/tests/test_epiautogp_fit.sh \
+		bash pipelines/tests/epiautogp/test_epiautogp_fit.sh \
 			"$BASE_DIR" \
 			"$disease" \
 			"$location" \

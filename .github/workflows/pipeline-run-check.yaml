@@ -312,9 +312,6 @@ jobs:
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
 
-      - name: Set up routine forecasting R
-        uses: ./.github/actions/setup-routine-forecasting-r
-
       - name: Download model fitting output
         uses: actions/download-artifact@v8
         with:

@@ -9,7 +9,7 @@ script_packages <- c(
   "glue",
   "argparser",
   "rlang",
-  "hewr",
+  "stfroutineforecasting",
   "forecasttools"
 )
 
@@ -88,7 +88,10 @@ main <- function(
   n_forecast_days = 28,
   n_samples = 2000
 ) {
-  training_data <- hewr::load_training_data(model_dir, "combined_data")
+  training_data <- stfroutineforecasting::load_training_data(
+    model_dir,
+    "combined_data"
+  )
 
   target_and_other_data <- training_data$data
   geo_value <- training_data$geo_value
@@ -119,7 +122,7 @@ main <- function(
       ts_ensemble_other_e,
       by = join_by(date, .draw)
     ) |>
-    hewr::format_timeseries_output(
+    stfroutineforecasting::format_timeseries_output(
       geo_value = geo_value,
       disease = disease,
       resolution = resolution,

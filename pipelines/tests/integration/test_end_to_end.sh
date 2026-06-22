@@ -17,13 +17,13 @@ if [ -d "$BASE_DIR" ]; then
 		exit 1
 	fi
 fi
-Rscript -e "pak::local_install('hewr', dependencies = F, upgrade = FALSE)"
+Rscript -e "pak::local_install('stfroutineforecasting', dependencies = F, upgrade = FALSE)"
 
 if [ "$?" -ne 0 ]; then
-	echo "TEST-MODE FAIL: Installing hewr package failed"
+	echo "TEST-MODE FAIL: Installing stfroutineforecasting package failed"
 	exit 1
 else
-	echo "TEST-MODE: Finished installing hewr package"
+	echo "TEST-MODE: Finished installing stfroutineforecasting package"
 fi
 
 mkdir -p "$BASE_DIR"

@@ -1,6 +1,14 @@
 FROM rocker/tidyverse:4.5.3
 
+#
+# General Build Args and Environment Variables
+#
+
 ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
+ARG GIT_COMMIT_SHA
+ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
+ARG GIT_BRANCH_NAME
+ENV GIT_BRANCH_NAME=$GIT_BRANCH_NAME
 
 #
 # Additional programming language compilers/interpreters
@@ -41,9 +49,6 @@ WORKDIR /cfa-stf-routine-forecasting
 # environment under pipelines/epiautogp, so we commit its Manifest.toml for a
 # reproducible EpiAutoGP dependency set.
 RUN julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
-
-
-
 
 # Install hewr
 RUN Rscript -e "install.packages('pak')"
@@ -88,12 +93,3 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Dagster
 COPY dagster_defs.py ./dagster_defs.py
-
-#
-# General Build Args and Environment Variables
-#
-
-ARG GIT_COMMIT_SHA
-ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
-ARG GIT_BRANCH_NAME
-ENV GIT_BRANCH_NAME=$GIT_BRANCH_NAME

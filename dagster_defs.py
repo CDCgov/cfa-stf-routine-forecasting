@@ -50,9 +50,6 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
-DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["COVID-19"]
-
 # env variable set by Dagster CLI
 is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
 
@@ -67,8 +64,11 @@ user = os.getenv("DAGSTER_USER")
 
 # ---------- Working Directory, Branch, and Image Tag ----------
 
-workdir = "cfa-stf-routine-forecasting"
-local_workdir = Path(__file__).parent.resolve()
+# This is always the same
+container_workdir = "/cfa-stf-routine-forecasting"
+
+# gets you the workdir relative to the dagster_defs.py file, not the execution environment
+local_workdir = Path(__file__).parent.resolve() 
 
 # If the tag is prod, use 'latest'.
 # Else iteratively test on our dev images
@@ -93,7 +93,7 @@ tag = (
     else current_branch_name
 )
 registry = "cfaprdbatchcr.azurecr.io"
-image = f"{registry}/cfa-stf-routine-forecasting:{tag}"
+image = f"{registry}{container_workdir}:{tag}"
 
 # ---------- Execution Configuration ----------
 
@@ -117,7 +117,7 @@ docker_execution_config = ExecutionConfig(
             "image": image,
             "env_vars": [
                 f"DAGSTER_USER={user}",
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
+                "VIRTUAL_ENV={container_workdir}/.venv",
             ],
             "retries": {"enabled": {}},
             "container_kwargs": {
@@ -126,15 +126,15 @@ docker_execution_config = ExecutionConfig(
                     f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    f"{__file__}:/{workdir}/{os.path.basename(__file__)}",
+                    f"{__file__}:{container_workdir}/{os.path.basename(__file__)}",
                     # blob container mounts for cfa-stf-routine-forecasting
-                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    f"{local_workdir}/blobfuse/mounts/nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    f"{local_workdir}/blobfuse/mounts/params:/cfa-stf-routine-forecasting/params",
-                    f"{local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
-                    f"{local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
-                    f"{local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
+                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
+                    f"{local_workdir}/blobfuse/mounts/nssp-etl:{container_workdir}/nssp-etl",
+                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:{container_workdir}/nwss-vintages",
+                    f"{local_workdir}/blobfuse/mounts/params:{container_workdir}/params",
+                    f"{local_workdir}/blobfuse/mounts/config:{container_workdir}/config",
+                    f"{local_workdir}/blobfuse/mounts/output:{container_workdir}/output",
+                    f"{local_workdir}/blobfuse/mounts/test-output:{container_workdir}/test-output",
                 ]
             },
         },
@@ -153,7 +153,7 @@ azure_batch_execution_config = ExecutionConfig(
                 else {"image": image}
             ),
             "env_vars": [
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
+                f"VIRTUAL_ENV={container_workdir}/.venv",
             ],
             "container_kwargs": {
                 "volumes": [
@@ -162,15 +162,15 @@ azure_batch_execution_config = ExecutionConfig(
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
                     # blob container mounts for cfa-stf-routine-forecasting
-                    "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                    "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
-                    "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
-                    "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
+                    f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
+                    f"nssp-etl:{container_workdir}/nssp-etl",
+                    f"nwss-vintages:{container_workdir}/nwss-vintages",
+                    f"prod-param-estimates:{container_workdir}/params",
+                    f"pyrenew-hew-config:{container_workdir}/config",
+                    f"pyrenew-hew-prod-output:{container_workdir}/output",
+                    f"pyrenew-test-output:{container_workdir}/test-output",
                 ],
-                "working_dir": "/cfa-stf-routine-forecasting",
+                "working_dir": "{container_workdir}",
             },
         },
     ),
@@ -178,8 +178,11 @@ azure_batch_execution_config = ExecutionConfig(
 
 # ============================================================================
 # GRAPH DIMENSIONS AND PARTITIONS
-# ============================================================================
 # How are the data split and processed in Azure Batch?
+# ============================================================================
+
+DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
+SUPPORTED_DISEASES = ["COVID-19"]
 
 # Disease dimensions
 DISEASES = SUPPORTED_DISEASES
@@ -274,7 +277,6 @@ class PostProcessConfig(dg.Config):
 # ============================================================================
 # MODEL CONSTRUCTOR FUNCTIONS - these are used later, in Asset Definitions
 # ============================================================================
-
 
 def _throw_if_backfill(
     context: DynamicGraphAssetExecutionContext | dg.AssetExecutionContext,
@@ -751,7 +753,8 @@ if not is_production:
         build_context: str - where should we build from? (has a default)
         image: str - the full name (including registry and tag) of the image
         """
-        cmd = f"docker build -t {image} -f {dockerfile_path} {build_context}"
+        
+        build_command = f"docker build -t {image} -f {dockerfile_path} {build_context}"
 
         if should_push:
             subprocess.run(
@@ -759,10 +762,10 @@ if not is_production:
                 check=True,
                 shell=True,
             )
-            cmd += " --push"
+            build_command += " --push"
 
-        context.log.debug(f"Running {cmd}")
-        subprocess.run(cmd, check=True, shell=True)
+        context.log.debug(f"Running {build_command}")
+        subprocess.run(build_command, check=True, shell=True)
 
         update_script_url = "https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py"
 
@@ -782,7 +785,7 @@ if not is_production:
                         "should_deploy_to_prod": False,
                         "dockerfile_path": f"{local_workdir}/Containerfile",
                         # the build context should be the top level of the repo, not the covid_2602 folder (for now)
-                        "build_context": local_workdir,
+                        "build_context": str(local_workdir),
                         "image": image,
                     }
                 }
@@ -807,18 +810,18 @@ if not is_production:
         print(
             "Check the terminal from which you ran the webserver to interact; stdout from your terminal will appear below."
         )
-        cmd = (
+        explore_command = (
             "docker run -it "
-            f"-v {local_workdir}/blobfuse/mounts/nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-            f"-v {local_workdir}/blobfuse/mounts/nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-            f"-v {local_workdir}/blobfuse/mounts/nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-            f"-v {local_workdir}/blobfuse/mounts/params:/cfa-stf-routine-forecasting/params",
-            f"-v {local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
-            f"-v {local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
-            f"-v {local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
+            f"-v {local_workdir}/blobfuse/mounts/nssp-archival-vintages:{container_workdir}/nssp-archival-vintages "
+            f"-v {local_workdir}/blobfuse/mounts/nssp-etl:{container_workdir}/nssp-etl "
+            f"-v {local_workdir}/blobfuse/mounts/nwss-vintages:{container_workdir}/nwss-vintages "
+            f"-v {local_workdir}/blobfuse/mounts/params:{container_workdir}/params "
+            f"-v {local_workdir}/blobfuse/mounts/config:{container_workdir}/config "
+            f"-v {local_workdir}/blobfuse/mounts/output:{container_workdir}/output "
+            f"-v {local_workdir}/blobfuse/mounts/test-output:{container_workdir}/test-output "
             f"--rm {image} bash"
         )
-        subprocess.run(cmd, check=True, shell=True)
+        subprocess.run(explore_command, check=True, shell=True)
 
     @dg.job(executor_def=dg.in_process_executor)
     def explore_image():

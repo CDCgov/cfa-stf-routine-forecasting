@@ -19,17 +19,11 @@ The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
 
 ## Containers
 
-The project uses GitHub Actions for automatically building container images based on the project's [Containerfile](Containerfile). The images are currently hosted on Github Container Registry and are built and pushed via the [containers.yaml](.github/workflows/containers.yaml) GitHub Actions workflow.
-
-Images can also be built locally. The [Makefile](Makefile) contains several targets for building and pushing images. Although the Makefile uses Docker as the default engine, the `ENGINE` environment variable can be set to `podman` to use Podman instead, for example:
-
-```bash
-ENGINE=podman make container_build
-# Equivalent to:
-# podman build . -t cfa-stf-routine-forecasting -f Containerfile
-```
+The project uses GitHub Actions for automatically building container images based on the project's [Containerfile](Containerfile). The images are currently hosted on Azure Container Registry and are built and pushed via the [containers.yaml](.github/workflows/containers.yaml) GitHub Actions workflow.
 
 Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch). After a branch is deleted, the image tag is remove from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
+
+Containers can also be built using a dagster job on the dev webserver as defined in `dagster_defs.py`. You can choose whether to push the image (generally you should) or to even push to the dagster production server (do only in coordination with the STF team).
 
 ## Running Model Pipelines with Dagster
 > [!NOTE]
@@ -42,12 +36,10 @@ To execute dagster workflows fully locally with this project, you'll need to hav
 > - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
 > - Permissions to push to the container registry and both `$GH_USERNAME` and `$GH_PAT` set as environment variables in your shell.
 
-The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` to test using the local Docker Executor - this will require you to have setup Blobfuse. See [Using the local docker executor](#using-the-local-docker-executor).
+The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` or in the dagster launchpad to test using the local Docker Executor - this will require you to have setup Blobfuse. See [Using the local docker executor](#using-the-local-docker-executor).
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
-    - `make container_build` (requires Docker or Podman)
-    - `make container_push` to build and push (set `$GH_USERNAME` and `$GH_PAT` first)
-    - `make container_explore` for local testing
+    - Use the `build_image` job in dagster, making sure to push the image.
 2. Run `uv run dagster_defs.py` and open the terminal link (usually http://127.0.0.1:4000/)
 
 Dagster is now ready to use locally.
@@ -55,7 +47,7 @@ Dagster is now ready to use locally.
 > [!NOTE]
 > The following process has been changing frequently. We will work to firm it up over the coming weeks and months.
 
-In development, whenever you update code, rerun `make container_push` and then `Reload Definitions` from the dagster lineage page.
+In development, whenever you update code, rerun the `build_image` job and then `Reload Definitions` from the dagster lineage page.
 Pushing your code to github will also re-build and push the container image, but will typically take longer and you will have to wait for completion in Github Actions.
 
 By default, on this repository, Dagster will submit tasks to Azure Batch for execution.
@@ -64,8 +56,8 @@ By default, on this repository, Dagster will submit tasks to Azure Batch for exe
 If you'd like to test a few "tasks" locally, you can have dagster execute on your machine, which is much faster than waiting for Azure Batch to pick up jobs. Dagster can leverage your VM's own docker daemon to emulate Azure Batch. When doing this, take care not to run more than two or three state x disease combinations at a time or you will quickly put your VM into a coma.
 
 When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
-- `make mount`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
-- `make unmount`: gracefully unmounts the pyrenew-relevant bslobs.
+- `sudo bash -c "source ./blobfuse/mount.sh"`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
+- `sudo bash -c "source ./blobfuse/cleanup.sh"`: gracefully unmounts the pyrenew-relevant bslobs.
 
 #### Production Scheduling
 

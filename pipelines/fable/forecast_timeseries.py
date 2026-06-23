@@ -20,7 +20,7 @@ from pipelines.utils.common_utils import (
 )
 
 
-def timeseries_ensemble_forecasts(
+def fable_e_other_forecasts(
     model_dir: Path, n_forecast_days: int, n_samples: int
 ) -> None:
     script_args = [
@@ -55,10 +55,10 @@ def main(
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     prefix = "epiweekly" if epiweekly else "daily"
-    ensemble_model_name = f"{prefix}_ts_ensemble_e"
+    ensemble_model_name = f"{prefix}_fable_e_other"
 
     logger.info(
-        "Starting single-location timeseries forecasting pipeline for "
+        "Starting single-location fable E-other forecasting pipeline for "
         f"location {loc}, and latest report date."
     )
 
@@ -119,8 +119,8 @@ def main(
 
     n_days_past_last_training = n_forecast_days + exclude_last_n_days
 
-    logger.info("Performing timeseries ensemble forecasting")
-    timeseries_ensemble_forecasts(
+    logger.info("Performing fable E-other forecasting")
+    fable_e_other_forecasts(
         ensemble_model_output_dir, n_days_past_last_training, n_samples
     )
 
@@ -137,7 +137,7 @@ def main(
     logger.info("Postprocessing complete.")
 
     logger.info(
-        "Single-location timeseries pipeline complete "
+        "Single-location fable E-other pipeline complete "
         f"for location {loc}, and "
         f"report date {report_date}."
     )
@@ -145,14 +145,12 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Create fit data for disease modeling."
-    )
+    parser = argparse.ArgumentParser(description="Create fable E-other forecasts.")
 
     # Add common arguments
     add_common_forecast_arguments(parser)
 
-    # Add timeseries-specific arguments
+    # Add fable-specific arguments
     parser.add_argument(
         "--n-samples",
         type=int,
@@ -163,7 +161,7 @@ if __name__ == "__main__":
         "--epiweekly",
         action="store_true",
         help=(
-            "Whether to generate epiweekly forecasts in addition to daily. "
+            "Whether to generate epiweekly fable E-other forecasts. "
             "If set, will generate epiweekly datasets and forecasts, and "
             "append 'epiweekly' to the model name."
         ),

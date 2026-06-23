@@ -14,6 +14,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dagster-defs-test:
+    name: Validate Dagster definitions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: run Dagster definitions test
+        run: uv run pytest tests/test_dagster_defs.py
+
   pipelines-test:
     name: Run python tests and collect coverage
     runs-on: ubuntu-latest

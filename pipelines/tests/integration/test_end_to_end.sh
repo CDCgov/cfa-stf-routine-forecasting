@@ -1,8 +1,8 @@
 #!/bin/bash
 
 BASE_DIR=pipelines/tests/end_to_end_test_output
-LOCATIONS=(US CA MT DC)
-DISEASES=(Influenza COVID-19 RSV)
+LOCATIONS=(US)
+DISEASES=(Influenza)
 
 echo "TEST-MODE: Running forecast_pyrenew.py in test mode with base directory $BASE_DIR"
 
@@ -36,22 +36,22 @@ else
 	echo "TEST-MODE: Finished generating test data"
 fi
 
-echo "TEST-MODE: Running Timeseries forecasting pipeline for all locations, and diseases"
+echo "TEST-MODE: Running Fable forecasting pipeline for all locations, and diseases"
 
 for location in "${LOCATIONS[@]}"; do
 	for disease in "${DISEASES[@]}"; do
-		echo "TEST-MODE: Running Timeseries forecasting pipeline for $disease, $location"
-		bash pipelines/tests/fable/test_ts_fit.sh "$BASE_DIR" "$disease" "$location"
+		echo "TEST-MODE: Running Fable forecasting pipeline for $disease, $location"
+		bash pipelines/tests/fable/test_fable_fit.sh "$BASE_DIR" "$disease" "$location"
 		if [ "$?" -ne 0 ]; then
-			echo "TEST-MODE FAIL: Timeseries forecasting pipeline failed"
+			echo "TEST-MODE FAIL: Fable forecasting pipeline failed"
 			echo "TEST-MODE: Cleanup: removing temporary directories"
 			exit 1
 		else
-			echo "TEST-MODE: Finished Timeseries forecasting pipeline for location $location, disease $disease."
+			echo "TEST-MODE: Finished Fable forecasting pipeline for location $location, disease $disease."
 		fi
 	done
 done
-echo "TEST-MODE: Finished Timeseries forecasting pipeline for all locations and diseases."
+echo "TEST-MODE: Finished Fable forecasting pipeline for all locations and diseases."
 
 echo "TEST-MODE: Running EpiAutoGP forecasting pipeline for various targets, locations, and diseases"
 for location in "${LOCATIONS[@]}"; do

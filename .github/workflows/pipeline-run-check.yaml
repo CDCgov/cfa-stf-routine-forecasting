@@ -220,7 +220,7 @@ jobs:
 
       - name: Fit model
         run: |
-          uv run bash pipelines/tests/fable/test_ts_fit.sh ${{ env.BASE_DIR }} \
+          uv run bash pipelines/tests/fable/test_fable_fit.sh ${{ env.BASE_DIR }} \
           ${{ matrix.disease }} ${{ matrix.location }}
 
       - name: Upload model fitting output

@@ -195,7 +195,7 @@ jobs:
           name: test-fit-epiautogp-nssp-daily-other
           path: ${{ env.BASE_DIR }}
 
-  fit-timeseries-models:
+  fit-fable-models:
     needs: generate-data
     runs-on: ubuntu-latest
     strategy:
@@ -220,18 +220,18 @@ jobs:
 
       - name: Fit model
         run: |
-          uv run bash pipelines/tests/fable/test_ts_fit.sh ${{ env.BASE_DIR }} \
+          uv run bash pipelines/tests/fable/test_fable_fit.sh ${{ env.BASE_DIR }} \
           ${{ matrix.disease }} ${{ matrix.location }}
 
       - name: Upload model fitting output
         uses: actions/upload-artifact@v7
         with:
           name: |
-            test-fit-ts-${{ matrix.disease }}-${{ matrix.location }}-${{ matrix.model }}
+            test-fit-fable-${{ matrix.disease }}-${{ matrix.location }}-${{ matrix.model }}
           path: ${{ env.BASE_DIR }}
 
   fit-pyrenew-models:
-    needs: fit-timeseries-models
+    needs: fit-fable-models
     runs-on: ubuntu-latest
     env:
       NHSN_API_KEY_ID: ${{ secrets.NHSN_API_KEY_ID }}
@@ -276,11 +276,11 @@ jobs:
           name: test-data
           path: ${{ env.DATA_DIR }}
 
-      - name: Download timeseries output
+      - name: Download Fable output
         if: ${{ matrix.model != 'hw' && matrix.model != 'h' }}
         uses: actions/download-artifact@v8
         with:
-          pattern: test-fit-ts-*
+          pattern: test-fit-fable-*
           path: ${{ env.BASE_DIR }}
           merge-multiple: true
 

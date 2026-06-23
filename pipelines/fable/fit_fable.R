@@ -100,7 +100,7 @@ main <- function(
 
   ## Fit and forecast other (non-target-disease) ED visits using a combination
   ## ensemble model
-  ts_ensemble_other_e <- fit_and_forecast_ensemble(
+  fable_e_other <- fit_and_forecast_ensemble(
     target_and_other_data,
     n_forecast_days,
     n_samples,
@@ -108,20 +108,8 @@ main <- function(
     output_col = "other_ed_visits"
   )
 
-  ts_ensemble_count_e <- fit_and_forecast_ensemble(
-    target_and_other_data,
-    n_forecast_days,
-    n_samples,
-    target_col = "observed_ed_visits",
-    output_col = "observed_ed_visits"
-  )
-
-  ts_ensemble_forecast_e <-
-    inner_join(
-      ts_ensemble_count_e,
-      ts_ensemble_other_e,
-      by = join_by(date, .draw)
-    ) |>
+  fable_e_other_forecast <-
+    fable_e_other |>
     stfroutineforecasting::format_timeseries_output(
       geo_value = geo_value,
       disease = disease,
@@ -131,7 +119,7 @@ main <- function(
 
   # Save the forecast
   write_tabular(
-    ts_ensemble_forecast_e,
+    fable_e_other_forecast,
     path(
       model_dir,
       "samples",

@@ -44,7 +44,7 @@ Imports:
     urca
 Additional_repositories: https://hubverse-org.r-universe.dev
 Remotes:
-    github::cdcgov/forecasttools,
+    github::cdcgov/forecasttools@c80829c,
     github::mjskay/ggdist,
     hubUtils=github::damonbayer/hubUtils@dmb_faster_convert_output_type
 Suggests:

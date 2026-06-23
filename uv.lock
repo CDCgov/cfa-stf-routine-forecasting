@@ -8,7 +8,11 @@ resolution-markers = [
 ]
 
 [manifest]
-overrides = [{ name = "arviz-base", extras = ["h5netcdf"], git = "https://github.com/arviz-devs/arviz-base?rev=main" }]
+overrides = [
+    { name = "arviz-base", extras = ["h5netcdf"], git = "https://github.com/arviz-devs/arviz-base?rev=main" },
+    { name = "arviz-plots", git = "https://github.com/arviz-devs/arviz-plots?rev=main" },
+    { name = "arviz-stats", extras = ["xarray"], git = "https://github.com/arviz-devs/arviz-stats?rev=main" },
+]
 
 [[package]]
 name = "adal"
@@ -195,28 +199,20 @@ h5netcdf = [
 
 [[package]]
 name = "arviz-plots"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.3.0.dev0"
+source = { git = "https://github.com/arviz-devs/arviz-plots?rev=main#66e20e5284d9f7d5dcaadf5bdb52be28b889db96" }
 dependencies = [
     { name = "arviz-base", extra = ["h5netcdf"] },
     { name = "arviz-stats", extra = ["xarray"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/d4/738cd3abcc27d681e9876a897d7bab4aa1ad0321257e1a65d2cdc52849bd/arviz_plots-1.2.0.tar.gz", hash = "sha256:e1f462aa0ac02fb957aabcae2cfcbee9bc089a029c94dab83fa2ed02d02098f3", size = 158834, upload-time = "2026-06-12T17:12:10.83Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/06/85b6f3d07c8b0bd232c05c236188575074fcb9006174e5a5ca5b6dd12a9f/arviz_plots-1.2.0-py3-none-any.whl", hash = "sha256:2e16ed95ce6d6fbb171d60f7300f50c520ebeeb132be7539591a018076f66f16", size = 243949, upload-time = "2026-06-12T17:12:08.906Z" },
-]
 
 [[package]]
 name = "arviz-stats"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.3.0.dev0"
+source = { git = "https://github.com/arviz-devs/arviz-stats?rev=main#856b31057adff449d1c9bf1975e2db6c31f8c212" }
 dependencies = [
     { name = "numpy" },
     { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/97/fd555a4b16ac349f297c786dab1a3270b3540677b0222a84e517441eb338/arviz_stats-1.2.0.tar.gz", hash = "sha256:fc49e6e75f4fce953987a9bf17dc39950e1f12e7cd73f865257e5d1b6a5ee114", size = 157554, upload-time = "2026-06-12T16:20:11.552Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/8f/73f43d90534d49a4af4c8e35d5b60e2838435b0318f44262dc6fe2dd39d8/arviz_stats-1.2.0-py3-none-any.whl", hash = "sha256:f9084addeb1abdbab6e9816f0a063118bc4ff7c48ce9141a4dad20b0e41410ae", size = 183844, upload-time = "2026-06-12T16:20:10.191Z" },
 ]
 
 [package.optional-dependencies]
@@ -653,7 +649,7 @@ wheels = [
 [[package]]
 name = "cfa-catalog-public"
 version = "2026.6.2.0"
-source = { git = "https://github.com/cdcgov/cfa-catalog-pub.git#a633cab2abe31c3dd9c8c58fe9954476e7086b0d" }
+source = { git = "https://github.com/cdcgov/cfa-catalog-pub?rev=main#a633cab2abe31c3dd9c8c58fe9954476e7086b0d" }
 dependencies = [
     { name = "cfa-dataops" },
     { name = "duckdb" },
@@ -704,7 +700,7 @@ dependencies = [
 [[package]]
 name = "cfa-dagster"
 version = "1.2.1"
-source = { git = "https://github.com/cdcgov/cfa-dagster.git?rev=main#3db9699f8c5393f73ee5e7b7350de31c8cf36d12" }
+source = { git = "https://github.com/cdcgov/cfa-dagster?rev=main#3db9699f8c5393f73ee5e7b7350de31c8cf36d12" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },
@@ -806,11 +802,11 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "arviz", extras = ["h5netcdf"], specifier = ">=1.1.0" },
-    { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub.git" },
-    { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
-    { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops.git?rev=main" },
+    { name = "cfa-catalog-public", git = "https://github.com/cdcgov/cfa-catalog-pub?rev=main" },
+    { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=main" },
+    { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops?rev=main" },
     { name = "jax", specifier = "<0.10" },
-    { name = "polarbayes", git = "https://github.com/cdcgov/polarbayes" },
+    { name = "polarbayes", git = "https://github.com/cdcgov/polarbayes?rev=main" },
     { name = "polars", extras = ["pyarrow", "numpy"], specifier = ">=1.36" },
     { name = "pygit2", specifier = ">=1.17.0" },
     { name = "pypdf", specifier = ">=6.10.1" },
@@ -825,7 +821,7 @@ dagster-config-editor = [
     { name = "rich" },
 ]
 dev = [
-    { name = "cfa-dagster", extras = ["dev"], git = "https://github.com/cdcgov/cfa-dagster.git?rev=main" },
+    { name = "cfa-dagster", extras = ["dev"], git = "https://github.com/cdcgov/cfa-dagster?rev=main" },
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyter", specifier = ">=1.0.0" },
@@ -3099,7 +3095,7 @@ wheels = [
 [[package]]
 name = "polarbayes"
 version = "0.1.0"
-source = { git = "https://github.com/cdcgov/polarbayes#33a353198166c07de0d39b4a1f2ae9dce3f52082" }
+source = { git = "https://github.com/cdcgov/polarbayes?rev=main#33a353198166c07de0d39b4a1f2ae9dce3f52082" }
 dependencies = [
     { name = "arviz-base", extra = ["h5netcdf"] },
     { name = "polars" },

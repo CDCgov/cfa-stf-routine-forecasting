@@ -29,7 +29,7 @@ jobs:
   generate-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -51,7 +51,7 @@ jobs:
     needs: generate-data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -88,7 +88,7 @@ jobs:
     needs: generate-data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -125,7 +125,7 @@ jobs:
     needs: generate-data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -162,7 +162,7 @@ jobs:
     needs: generate-data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -204,7 +204,7 @@ jobs:
         disease: [ COVID-19, Influenza, RSV ]
         location: [ US, CA, MT, DC ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -262,7 +262,7 @@ jobs:
           - model: hew
             location: US
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
@@ -307,7 +307,7 @@ jobs:
       ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python

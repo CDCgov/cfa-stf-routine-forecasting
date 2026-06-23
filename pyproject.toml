@@ -39,6 +39,14 @@ build-backend = "hatchling.build"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "dagster_defs"
+defs_module = "dagster_defs"
+code_location_target_module = "dagster_defs"
+
 [dependency-groups]
 dev = [
   {include-group = "dagster-config-editor"},

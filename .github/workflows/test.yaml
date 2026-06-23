@@ -19,13 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up routine forecasting Python
         uses: ./.github/actions/setup-routine-forecasting-python
 
-      - name: run Dagster definitions test
-        run: uv run pytest tests/test_dagster_defs.py
+      - name: Check Dagster definitions
+        env:
+          DAGSTER_USER: test
+        run: uv run dg check defs
 
   pipelines-test:
     name: Run python tests and collect coverage

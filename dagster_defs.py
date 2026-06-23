@@ -31,7 +31,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.forecasttools import LOCATION_LIST
 
 # Model Code
-from pipelines.fable.forecast_timeseries import main as forecast_timeseries
+from pipelines.fable.forecast_fable import main as forecast_fable
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from pipelines.utils.common_utils import (
     calculate_training_dates,
@@ -303,7 +303,7 @@ def _run_fable_e_other(
 
     context.log.info(f"config: '{config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
-    forecast_timeseries(
+    forecast_fable(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),

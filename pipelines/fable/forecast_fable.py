@@ -32,9 +32,9 @@ def fable_e_other_forecasts(
         f"{n_samples}",
     ]
     run_r_script(
-        "pipelines/fable/fit_timeseries.R",
+        "pipelines/fable/fit_fable.R",
         script_args,
-        function_name="fit_timeseries",
+        function_name="fit_fable",
     )
     return None
 

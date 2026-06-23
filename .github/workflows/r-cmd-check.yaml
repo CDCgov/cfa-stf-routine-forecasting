@@ -27,7 +27,7 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on:  ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Set up routine forecasting R
       uses: ./.github/actions/setup-routine-forecasting-r

@@ -56,8 +56,8 @@ By default, on this repository, Dagster will submit tasks to Azure Batch for exe
 If you'd like to test a few "tasks" locally, you can have dagster execute on your machine, which is much faster than waiting for Azure Batch to pick up jobs. Dagster can leverage your VM's own docker daemon to emulate Azure Batch. When doing this, take care not to run more than two or three state x disease combinations at a time or you will quickly put your VM into a coma.
 
 When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
-- `sudo bash -c "source ./blobfuse/mount.sh"`: mounts the pyrenew-relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
-- `sudo bash -c "source ./blobfuse/cleanup.sh"`: gracefully unmounts the pyrenew-relevant bslobs.
+- `sudo bash -c "source ./blobfuse/mount.sh"`: mounts the relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
+- `sudo bash -c "source ./blobfuse/cleanup.sh"`: gracefully unmounts the relevant bslobs.
 
 #### Production Scheduling
 

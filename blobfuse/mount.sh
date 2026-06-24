@@ -17,10 +17,10 @@ echo "Mounting containers specified in mounts.txt using blobfuse2..."
 TO_MOUNT=(
 	"nssp-etl"
 	"nssp-archival-vintages"
+	"nwss-vintages"
 	"prod-param-estimates"
 	"stf-routine-forecasting-prod-output"
 	"stf-routine-forecasting-test-output"
-	"nwss-vintages"
 	"stf-routine-forecasting-config"
 )
 
@@ -83,10 +83,5 @@ else
 	ln -s "/mnt/nssp-archival-vintages" "./blobfuse/mounts/nssp-archival-vintages"
 	echo "Created symlink './blobfuse/mounts/nssp-archival-vintages' -> '/mnt/nssp-archival-vintages'"
 fi
-
-echo "Setting environment variables for the Azure Command Center..."
-export NSSP_ETL_PATH="$(pwd)/blobfuse/mounts/nssp-etl"
-export PYRENEW_HEW_PROD_OUTPUT_PATH="$(pwd)/blobfuse/mounts/output"
-export NWSS_VINTAGES_PATH="$(pwd)/blobfuse/mounts/nwss-vintages"
 
 echo "Done."

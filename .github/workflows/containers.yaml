@@ -72,7 +72,7 @@ jobs:
           uses: docker/build-push-action@v7
           with:
             context: .
-            file: Containerfile
+            file: Dockerfile
             push: true
             builder: ${{ steps.buildx.outputs.name }}
             tags: |

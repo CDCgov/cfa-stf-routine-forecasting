@@ -85,8 +85,60 @@ jobs:
               type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:latest-cache
             cache-to: type=registry,ref=ghcr.io/cdcgov/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}-cache,mode=max
 
+    acr-import:
+        needs: build-pipeline-image
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write # This is required for requesting the JWT
+          contents: read  # This is required for actions/checkout
+          packages: write # This is required for ACR import
+
+        name: Copy image from GHCR to ACR
+        outputs:
+          tag: ${{ needs.build-pipeline-image.outputs.tag }}
+        steps:
+
+          # From: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-cloud-providers#requesting-the-jwt-using-the-actions-core-toolkit
+          - name: Install OIDC Client from Core Package
+            run: npm install @actions/core@1.6.0 @actions/http-client
+          - name: Get Id Token
+            uses: actions/github-script@v8
+            id: idtoken
+            with:
+              script: |
+                const coredemo = require('@actions/core')
+                const id_token = await coredemo.getIDToken('api://AzureADTokenExchange')
+                coredemo.setOutput('id_token', id_token)
+
+          - name: ACR Import
+            uses: CDCgov/cfa-actions/runner-action@v1.5.0
+            with:
+              github_app_id: ${{ secrets.CDCENT_ACTOR_APP_ID }}
+              github_app_pem: ${{ secrets.CDCENT_ACTOR_APP_PEM }}
+              wait_for_completion: true
+              print_logs: true
+              script: |
+                echo "Logging into Azure CLI"
+                az login --service-principal \
+                --username ${{ secrets.AZURE_STFT_SP_CLIENT_ID }} \
+                --tenant ${{ secrets.AZURE_TENANT_ID }} \
+                --federated-token ${{ steps.idtoken.outputs.id_token }} \
+                --output none
+
+                IMAGE_TAG=${{ env.IMAGE_NAME }}:${{ needs.build-pipeline-image.outputs.tag }}
+                az acr import --name ${{ env.REGISTRY }} \
+                  --source "ghcr.io/cdcgov/$IMAGE_TAG" \
+                  --username ${{ github.actor }} \
+                  --password ${{ secrets.GITHUB_TOKEN }} \
+                  --image "$IMAGE_TAG" \
+                  --force && echo 'Copied image!'
+
+                  if [ $? -ne 0 ]; then
+                    echo "Failed to copy image"
+                  fi
+
     check_and_deploy_dagster_code:
-      needs: [ build-pipeline-image ]
+      needs: [ build-pipeline-image, acr-import ]
       # Conditional step execution that runs only when:
       # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
       # OR
@@ -134,6 +186,8 @@ jobs:
             github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
             script: |
               echo "Running update script"
+              IMAGE_TAG=${{ env.IMAGE_NAME }}:${{ needs.build-pipeline-image.outputs.tag }}
+              echo $IMAGE_TAG
               uv run \
                 https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py \
-                --registry_image ghcr.io/cdcgov/cfa-stf-routine-forecasting:${{ needs.build-pipeline-image.outputs.tag }}
+                --registry_image "cfaprdbatchcr.azurecr.io/$IMAGE_TAG"

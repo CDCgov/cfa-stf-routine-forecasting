@@ -4,7 +4,7 @@
 # Download the Azure configuration script from blob storage
 az storage blob download \
 	--account-name "cfaazurebatchprd" \
-	--container-name "pyrenew-hew-config" \
+	--container-name "stf-routine-forecasting-config" \
 	--name "azureconfig.sh" \
 	--file "./azureconfig.sh" \
 	--auth-mode login \
@@ -15,7 +15,7 @@ source ./azureconfig.sh
 # Download the blobfuse config yaml from blob storage
 az storage blob download \
 	--account-name "cfaazurebatchprd" \
-	--container-name "pyrenew-hew-config" \
+	--container-name "stf-routine-forecasting-config" \
 	--name "blobfuse_config.yaml" \
 	--file "./config.yaml" \
 	--auth-mode login \

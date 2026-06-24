@@ -1,38 +1,38 @@
-name: R CMD check hewr
+name: R CMD check stfroutineforecasting
 
 on:
   pull_request:
     branches: [main]
     paths:
       # Explicitly include paths that should trigger the workflow
-      - 'hewr/**'
+      - 'stfroutineforecasting/**'
       - '.github/workflows/r-cmd-check.yaml'
-      - '.github/actions/setup-hewr.yaml'
+      - '.github/actions/setup-routine-forecasting-r/action.yaml'
   push:
     branches: [main]
     paths:
       # Explicitly include paths that should trigger the workflow
-      - 'hewr/**'
+      - 'stfroutineforecasting/**'
       - '.github/workflows/r-cmd-check.yaml'
-      - '.github/actions/setup-hewr.yaml'
+      - '.github/actions/setup-routine-forecasting-r/action.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check-hewr:
+  check-stfroutineforecasting:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on:  ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
-    - name: Set up R with hewr
-      uses: ./.github/actions/setup-hewr
+    - name: Set up routine forecasting R
+      uses: ./.github/actions/setup-routine-forecasting-r
 
-    - name: "Check hewr package"
+    - name: "Check stfroutineforecasting package"
       uses: r-lib/actions/check-r-package@v2
       with:
-        working-directory: hewr
+        working-directory: stfroutineforecasting

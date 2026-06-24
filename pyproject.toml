@@ -39,13 +39,26 @@ build-backend = "hatchling.build"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "dagster_defs"
+defs_module = "dagster_defs"
+code_location_target_module = "dagster_defs"
+
 [dependency-groups]
 dev = [
+  {include-group = "dagster-config-editor"},
   {include-group = "test"},
   "ipykernel",
   "ipywidgets",
   "jupyter>=1.0.0",
   "cfa-dagster[dev]"
+]
+dagster-config-editor = [
+    "py-yaml12",
+    "rich",
 ]
 test = [
     "pytest>=8.3.2",
@@ -60,9 +73,19 @@ fix = true
 [tool.ruff.lint]
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
+[tool.uv]
+override-dependencies = [
+    "arviz-base[h5netcdf]==1.3.0.dev0",
+    "arviz-plots==1.3.0.dev0",
+    "arviz-stats[xarray]==1.3.0.dev0",
+]
+
 [tool.uv.sources]
-cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster.git", rev = "main" }
+cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "main" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
-polarbayes = { git = "https://github.com/cdcgov/polarbayes" }
-cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops.git", rev = "main"}
-cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub.git"}
+polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "main" }
+cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops", rev = "main"}
+cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub", rev = "main" }
+arviz-base = { git = "https://github.com/arviz-devs/arviz-base", rev = "main" }
+arviz-plots = { git = "https://github.com/arviz-devs/arviz-plots", rev = "main" }
+arviz-stats = { git = "https://github.com/arviz-devs/arviz-stats", rev = "main" }

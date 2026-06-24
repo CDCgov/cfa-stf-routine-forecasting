@@ -8,7 +8,6 @@ from pathlib import Path
 
 import polars as pl
 import tomli_w
-from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import (
     flags_from_hew_letters,
     pyrenew_model_name_from_flags,
@@ -32,35 +31,6 @@ from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
     run_r_script,
 )
-
-
-def record_git_info(model_dir: Path):
-    metadata_file = Path(model_dir, "metadata.toml")
-
-    if metadata_file.exists():
-        with open(metadata_file, "rb") as file:
-            metadata = tomllib.load(file)
-    else:
-        metadata = {}
-
-    try:
-        repo = Repository(os.getcwd())
-        branch_name = repo.head.shorthand
-        commit_sha = str(repo.head.target)
-    except Exception:
-        branch_name = os.environ.get("GIT_BRANCH_NAME", "unknown")
-        commit_sha = os.environ.get("GIT_COMMIT_SHA", "unknown")
-
-    new_metadata = {
-        "branch_name": branch_name,
-        "commit_sha": commit_sha,
-    }
-
-    metadata.update(new_metadata)
-
-    metadata_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(metadata_file, "wb") as file:
-        tomli_w.dump(metadata, file)
 
 
 def copy_and_record_priors(priors_path: Path, model_dir: Path):
@@ -219,9 +189,6 @@ def main(
     model_dir = Path(model_run_dir, pyrenew_model_name)
     data_dir = Path(model_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
-
-    logger.info("Recording git info...")
-    record_git_info(model_dir)
 
     logger.info(f"Copying and recording priors from {priors_path}...")
     copy_and_record_priors(priors_path, model_dir)

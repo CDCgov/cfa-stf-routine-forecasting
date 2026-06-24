@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(hewr)
+library(stfroutineforecasting)
 
-test_check("hewr")
+test_check("stfroutineforecasting")

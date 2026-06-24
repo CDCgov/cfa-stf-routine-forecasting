@@ -14,24 +14,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dagster-defs-test:
+    name: Validate Dagster definitions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: Check Dagster definitions
+        env:
+          DAGSTER_USER: test
+        run: uv run dg check defs
+
   pipelines-test:
     name: Run python tests and collect coverage
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Set up Pyrenew-HEW via UV
-        uses: ./.github/actions/setup-pyrenew-hew
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: Set up routine forecasting Julia
+        uses: ./.github/actions/setup-routine-forecasting-julia
+
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
 
       - name: run tests
         env:
           XLA_FLAGS: --xla_force_host_platform_device_count=2
         run: |
           uv run pytest \
-            --ignore=pipelines/tests/test_epiautogp_parquet_interop.py \
-            --ignore=pipelines/tests/test_epiautogp_parquet.py \
-            --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml .
+            --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml \
+            pipelines/tests
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v7
@@ -43,22 +63,67 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
-  hewr-test:
-    name: Run hewr tests and collect coverage
+  cfa-stf-test:
+    name: Run cfa/stf ${{ matrix.submodule }} tests and collect coverage
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - submodule: data
+            tests: tests/cfa/stf/data
+            coverage-include: cfa/stf/data/*
+            coverage-file: cfa-stf-data-coverage.xml
+            coverage-flag: cfa-stf-data
+          - submodule: forecasttools
+            tests: tests/cfa/stf/forecasttools
+            coverage-include: cfa/stf/forecasttools/*
+            coverage-file: cfa-stf-forecasttools-coverage.xml
+            coverage-flag: cfa-stf-forecasttools
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: run tests
+        run: |
+          uv run pytest \
+            --cov=cfa/stf \
+            --cov-report= \
+            ${{ matrix.tests }}
+          uv run coverage report --include='${{ matrix.coverage-include }}'
+          uv run coverage xml \
+            --include='${{ matrix.coverage-include }}' \
+            -o ${{ matrix.coverage-file }}
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          env_vars: OS,PYTHON
+          fail_ci_if_error: true
+          flags: ${{ matrix.coverage-flag }}
+          files: ${{ matrix.coverage-file }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+
+  stfroutineforecasting-test:
+    name: Run stfroutineforecasting tests and collect coverage
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - name: Set up R with hewr
-        uses: ./.github/actions/setup-hewr
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
 
       - name: Test coverage
         run: |
           cov <- covr::package_coverage(
-            path = "hewr",
+            path = "stfroutineforecasting",
             quiet = FALSE,
             clean = FALSE,
             install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "package")
@@ -71,7 +136,7 @@ jobs:
           fail_ci_if_error: true
           files: ./cobertura.xml
           plugins: noop
-          flags: hewr
+          flags: stfroutineforecasting
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -87,33 +152,3 @@ jobs:
         with:
           name: coverage-test-failures
           path: ${{ runner.temp }}/package
-
-  epiautogp-test:
-    name: Run EpiAutoGP runner output tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Julia
-        uses: julia-actions/setup-julia@v3
-        with:
-          version: "1.11"
-
-      - name: Install Julia dependencies
-        run: |
-          julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Set up R with hewr
-        uses: ./.github/actions/setup-hewr
-
-      - name: Set up Pyrenew-HEW via UV
-        uses: ./.github/actions/setup-pyrenew-hew
-
-      - name: Run direct EpiAutoGP parquet test
-        run: |
-          uv run pytest pipelines/tests/test_epiautogp_parquet.py -q
-
-      - name: Run EpiAutoGP parquet interop test
-        run: |
-          uv run pytest pipelines/tests/test_epiautogp_parquet_interop.py -q

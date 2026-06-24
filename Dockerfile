@@ -30,8 +30,8 @@ ENV UV_PYTHON_CACHE_DIR=/root/.cache/uv/python
 # Copy local dependencies into our container, then install them
 #
 
-# R package - hewr
-COPY ./hewr /cfa-stf-routine-forecasting/hewr
+# R package - stfroutineforecasting
+COPY ./stfroutineforecasting /cfa-stf-routine-forecasting/stfroutineforecasting
 
 # Julia environment for direct NowcastAutoGP runner
 # Copy only Julia environment metadata first so dependency installation is cached
@@ -50,11 +50,11 @@ WORKDIR /cfa-stf-routine-forecasting
 # reproducible EpiAutoGP dependency set.
 RUN julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
 
-# Install hewr
+# Install stfroutineforecasting
 RUN Rscript -e "install.packages('pak')"
 RUN Rscript -e "\
     pak::repo_add(hubverse = 'https://hubverse-org.r-universe.dev'); \
-    pak::local_install('hewr', upgrade = FALSE) \
+    pak::local_install('stfroutineforecasting', upgrade = FALSE) \
 "
 
 #

@@ -32,7 +32,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.forecasttools import LOCATION_LIST
 
 # Model Code
-from pipelines.fable.forecast_timeseries import main as forecast_timeseries
+from pipelines.fable.forecast_fable import main as forecast_fable
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from pipelines.utils.common_utils import (
     calculate_training_dates,
@@ -77,13 +77,9 @@ try:
     print("You are running inside a .git repository; getting branchname from .git")
     repo = Repository(os.getcwd())
     current_branch_name = str(repo.head.shorthand)
-    git_commit_sha = str(repo.head.target)
 except Exception:
-    print(
-        "No .git folder detected; attempting to get branch name from build-arg $GIT_BRANCH_NAME"
-    )
-    current_branch_name = os.getenv("GIT_BRANCH_NAME", "unknown_branch")
-    git_commit_sha = os.getenv("GIT_COMMIT_SHA", "unknown_commit_hash")
+    print("No .git folder detected; using main as the branch name")
+    current_branch_name = "main"
 
 print(f"Current branch name is {current_branch_name}")
 
@@ -146,7 +142,7 @@ azure_batch_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "pyrenew-dagster-pool",
+            "pool_name": "stf-routine-forecasting-pool",
             **(
                 {}
                 if is_production  # image will come from the code location in prod
@@ -166,9 +162,9 @@ azure_batch_execution_config = ExecutionConfig(
                     f"nssp-etl:{container_workdir}/nssp-etl",
                     f"nwss-vintages:{container_workdir}/nwss-vintages",
                     f"prod-param-estimates:{container_workdir}/params",
-                    f"pyrenew-hew-config:{container_workdir}/config",
-                    f"pyrenew-hew-prod-output:{container_workdir}/output",
-                    f"pyrenew-test-output:{container_workdir}/test-output",
+                    f"stf-routine-forecasting-config:{container_workdir}/config",
+                    f"stf-routine-forecasting-prod-output:{container_workdir}/output",
+                    f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
                 ],
                 "working_dir": "{container_workdir}",
             },
@@ -208,7 +204,7 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 class ModelBaseConfig(dg.Config):
     """
     Base configuration for all model assets.
-    Contains parameters common to both Timeseries and Pyrenew models.
+    Contains parameters common to Fable and Pyrenew models.
     """
 
     output_basedir: str = "output" if is_production else "test-output"
@@ -218,13 +214,14 @@ class ModelBaseConfig(dg.Config):
     locations: list[str] = LOCATIONS
 
 
-class TimeseriesConfig(ModelBaseConfig):
+class FableEOtherConfig(ModelBaseConfig):
     """
-    Configuration for timeseries model assets (timeseries_e, epiweekly_timeseries_e).
+    Configuration for fable E-other model assets
+    (fable_e_other, epiweekly_fable_e_other).
     These default values can be modified in the Dagster asset materialization launchpad.
     """
 
-    n_samples: int = 400 if not is_production else 2000  # Total samples for timeseries
+    n_samples: int = 400 if not is_production else 2000
 
 
 class PyrenewConfig(ModelBaseConfig):
@@ -288,13 +285,13 @@ def _throw_if_backfill(
         raise RuntimeError("STF forecast models do not support backfills")
 
 
-def _run_timeseries_e(
+def _run_fable_e_other(
     context: DynamicGraphAssetExecutionContext,
-    config: TimeseriesConfig,
+    config: FableEOtherConfig,
     epiweekly: bool,
 ) -> str | None:
     """
-    Helper function to run timeseries-e model with optional epiweekly mode.
+    Helper function to run fable E-other model with optional epiweekly mode.
     """
     _throw_if_backfill(context, daily_partitions_def)
 
@@ -310,7 +307,7 @@ def _run_timeseries_e(
 
     context.log.info(f"config: '{config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
-    forecast_timeseries(
+    forecast_fable(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
@@ -439,14 +436,14 @@ def _run_fusion_model(
     context.log.debug(f"config: '{config}'")
 
 
-def _fuse_pyrenew_timeseries(
+def _fuse_pyrenew_fable_e_other(
     context, config: FusionConfig, pyrenew_model_name, epiweekly: bool
 ):
-    other_model_name = "epiweekly_ts_ensemble_e" if epiweekly else "daily_ts_ensemble_e"
+    other_model_name = "epiweekly_fable_e_other" if epiweekly else "daily_fable_e_other"
     fusion_model_name = (
-        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
+        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_fable_e_other"
         if epiweekly
-        else f"prop_{pyrenew_model_name}_daily_ts_ensemble_e"
+        else f"prop_{pyrenew_model_name}_daily_fable_e_other"
     )
     aggregate_num = epiweekly
     _run_fusion_model(
@@ -570,24 +567,26 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # ---------------- Weekly Forecasts --------------
 
 
-# Timeseries E
+# Fable E Other
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
-def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
-    _run_timeseries_e(context, config, epiweekly=False)
-
-
-# Epiweekly Timeseries E
-@dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
-    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
-)
-def epiweekly_timeseries_e(
-    context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig
+def fable_e_other(
+    context: DynamicGraphAssetExecutionContext, config: FableEOtherConfig
 ):
-    _run_timeseries_e(context, config, epiweekly=True)
+    _run_fable_e_other(context, config, epiweekly=False)
+
+
+# Epiweekly Fable E Other
+@dynamic_graph_asset(
+    **weekly_forecast_initial_asset_args,
+    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+)
+def epiweekly_fable_e_other(
+    context: DynamicGraphAssetExecutionContext, config: FableEOtherConfig
+):
+    _run_fable_e_other(context, config, epiweekly=True)
 
 
 # Pyrenew E
@@ -635,46 +634,52 @@ def pyrenew_he(
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+    ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
-    _fuse_pyrenew_timeseries(
+    _fuse_pyrenew_fable_e_other(
         context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
     )
 
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+    ins={
+        "pyrenew_e": dg.In(dg.Nothing),
+        "epiweekly_fable_e_other": dg.In(dg.Nothing),
+    },
 )
 def fuse_pyrenew_e_ts_epiweekly(
     context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ):
-    _fuse_pyrenew_timeseries(
+    _fuse_pyrenew_fable_e_other(
         context, config, pyrenew_model_name="pyrenew_e", epiweekly=True
     )
 
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+    ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
     context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ):
-    _fuse_pyrenew_timeseries(
+    _fuse_pyrenew_fable_e_other(
         context, config, pyrenew_model_name="pyrenew_he", epiweekly=False
     )
 
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+    ins={
+        "pyrenew_he": dg.In(dg.Nothing),
+        "epiweekly_fable_e_other": dg.In(dg.Nothing),
+    },
 )
 def fuse_pyrenew_he_ts_epiweekly(
     context: DynamicGraphAssetExecutionContext, config: FusionConfig
 ):
-    _fuse_pyrenew_timeseries(
+    _fuse_pyrenew_fable_e_other(
         context, config, pyrenew_model_name="pyrenew_he", epiweekly=True
     )
 

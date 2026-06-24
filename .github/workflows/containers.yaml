@@ -91,8 +91,8 @@ jobs:
           packages: write # This is required for ACR import
         env:
           REGISTRY: cfaprdbatchcr.azurecr.io
-        
-        # If we're on the main branch, the deployment environment (for use with OIDC cred on the SP) will be main, 
+
+        # If we're on the main branch, the deployment environment (for use with OIDC cred on the SP) will be main,
         # otherwise it will be test
         environment: |-
           ${{ (github.ref_name == 'main') && 'production' || 'test' }}

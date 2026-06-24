@@ -68,7 +68,7 @@ user = os.getenv("DAGSTER_USER")
 container_workdir = "/cfa-stf-routine-forecasting"
 
 # gets you the workdir relative to the dagster_defs.py file, not the execution environment
-local_workdir = Path(__file__).parent.resolve() 
+local_workdir = Path(__file__).parent.resolve()
 
 # If the tag is prod, use 'latest'.
 # Else iteratively test on our dev images
@@ -274,6 +274,7 @@ class PostProcessConfig(dg.Config):
 # ============================================================================
 # MODEL CONSTRUCTOR FUNCTIONS - these are used later, in Asset Definitions
 # ============================================================================
+
 
 def _throw_if_backfill(
     context: DynamicGraphAssetExecutionContext | dg.AssetExecutionContext,
@@ -730,6 +731,7 @@ def postprocess_forecasts(
         local_copy_dir=daily_forecast_output_dir,
     )
 
+
 # ============================================================================
 # JOBS AND OPS
 # These can create images.
@@ -737,7 +739,6 @@ def postprocess_forecasts(
 
 # These are only used in dev - they should not appear on the production webserver
 if not is_production:
-
     # Build and Push Image ---------------------------
 
     @dg.op
@@ -758,7 +759,7 @@ if not is_production:
         build_context: str - where should we build from? (has a default)
         image: str - the full name (including registry and tag) of the image
         """
-        
+
         build_command = f"docker build -t {image} -f {dockerfile_path} {build_context}"
 
         if should_push:

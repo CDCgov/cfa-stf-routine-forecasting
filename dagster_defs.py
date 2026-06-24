@@ -3,7 +3,6 @@ import datetime as dt
 import logging
 import os
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 # Direct use of dagster

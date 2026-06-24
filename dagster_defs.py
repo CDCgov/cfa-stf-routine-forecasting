@@ -111,10 +111,6 @@ docker_execution_config = ExecutionConfig(
         class_name=docker_executor.__name__,
         config={
             "image": image,
-            "env_vars": [
-                f"DAGSTER_USER={user}",
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-            ],
             "retries": {"enabled": {}},
             "container_kwargs": {
                 "volumes": [
@@ -124,13 +120,13 @@ docker_execution_config = ExecutionConfig(
                     # the container image for workflow changes
                     f"{__file__}:/{workdir}/{os.path.basename(__file__)}",
                     # blob container mounts for cfa-stf-routine-forecasting
-                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    f"{local_workdir}/blobfuse/mounts/nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    f"{local_workdir}/blobfuse/mounts/params:/cfa-stf-routine-forecasting/params",
-                    f"{local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
-                    f"{local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
-                    f"{local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
+                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:/{workdir}/nssp-archival-vintages",
+                    f"{local_workdir}/blobfuse/mounts/nssp-etl:/{workdir}/nssp-etl",
+                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:/{workdir}/nwss-vintages",
+                    f"{local_workdir}/blobfuse/mounts/params:/{workdir}/params",
+                    f"{local_workdir}/blobfuse/mounts/config:/{workdir}/config",
+                    f"{local_workdir}/blobfuse/mounts/output:/{workdir}/output",
+                    f"{local_workdir}/blobfuse/mounts/test-output:/{workdir}/test-output",
                 ]
             },
         },
@@ -148,9 +144,6 @@ azure_batch_execution_config = ExecutionConfig(
                 if is_production  # image will come from the code location in prod
                 else {"image": image}
             ),
-            "env_vars": [
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-            ],
             "container_kwargs": {
                 "volumes": [
                     # bind the ~/.azure folder for optional cli login
@@ -158,15 +151,15 @@ azure_batch_execution_config = ExecutionConfig(
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
                     # blob container mounts for cfa-stf-routine-forecasting
-                    "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                    "stf-routine-forecasting-config:/cfa-stf-routine-forecasting/config",
-                    "stf-routine-forecasting-prod-output:/cfa-stf-routine-forecasting/output",
-                    "stf-routine-forecasting-test-output:/cfa-stf-routine-forecasting/test-output",
+                    f"nssp-archival-vintages:/{workdir}/nssp-archival-vintages",
+                    f"nssp-etl:/{workdir}/nssp-etl",
+                    f"nwss-vintages:/{workdir}/nwss-vintages",
+                    f"prod-param-estimates:/{workdir}/params",
+                    f"stf-routine-forecasting-config:/{workdir}/config",
+                    f"stf-routine-forecasting-prod-output:/{workdir}/output",
+                    f"stf-routine-forecasting-test-output:/{workdir}/test-output",
                 ],
-                "working_dir": "/cfa-stf-routine-forecasting",
+                "working_dir": f"{workdir}",
             },
         },
     ),

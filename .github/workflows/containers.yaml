@@ -96,7 +96,7 @@ jobs:
         # otherwise it will be test
         environment: |-
           ${{ (github.ref_name == 'main') && 'production' || 'test' }}
-        
+
         name: Copy image from GHCR to ACR
         outputs:
           tag: ${{ needs.build-pipeline-image.outputs.tag }}

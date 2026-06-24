@@ -3,14 +3,15 @@ import datetime as dt
 import logging
 import os
 from pathlib import Path
+from typing import Any, TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 # Direct use of dagster
 import dagster as dg
 from cfa_dagster import (
     ADLS2PickleIOManager,
-    DynamicGraphAssetExecutionContext,
     ExecutionConfig,
+    GraphDimension,
     SelectorConfig,
     azure_batch_executor,
     azure_container_app_job_executor,
@@ -25,6 +26,8 @@ from dagster_azure.blob import (
     AzureBlobStorageResource,
 )
 from pygit2.repository import Repository
+from pydantic import Field, field_validator
+from enum import StrEnum
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 # Helper Libraries
@@ -177,11 +180,13 @@ azure_batch_execution_config = ExecutionConfig(
 
 # Disease dimensions
 DISEASES = SUPPORTED_DISEASES
+Disease = StrEnum("Disease", {v: v for v in DISEASES})
 
 # Location dimensions
 LOCATIONS = [
     location for location in LOCATION_LIST if location not in DEFAULT_EXCLUDED_LOCATIONS
 ]
+Location = StrEnum("Location", {v: v for v in LOCATIONS})
 
 # Daily Partitions
 tz = "America/New_York"
@@ -196,7 +201,12 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # ============================================================================
 
 
-class ModelBaseConfig(dg.Config):
+class ModelGraphDimensions(dg.ConfigurableResource):
+    diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
+    locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
+
+
+class ModelBaseConfig(dg.ConfigurableResource):
     """
     Base configuration for all model assets.
     Contains parameters common to Fable and Pyrenew models.
@@ -205,11 +215,33 @@ class ModelBaseConfig(dg.Config):
     output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
-    diseases: list[str] = DISEASES
-    locations: list[str] = LOCATIONS
+    loc_exclude_last_n_days: dict[str, int] = Field(
+            description=(
+                "Location-specific override for exclude_last_n_days"
+                ),
+            default={
+                "GA": 2,
+                "MN": 2,
+                "NY": 3,
+                "AZ": 5,
+                "SD": 5,
+                "ND": 5,
+                }
+            )
+
+    # Runtime validation since Dagster doesn't support dict[Location, int]
+    @field_validator("loc_exclude_last_n_days")
+    @classmethod
+    def validate_locations(cls, value):
+        invalid = set(value) - set(LOCATIONS)
+        if invalid:
+            raise ValueError(
+                f"Invalid locations: {sorted(invalid)}"
+            )
+        return value
 
 
-class FableEOtherConfig(ModelBaseConfig):
+class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     """
     Configuration for fable E-other model assets
     (fable_e_other, epiweekly_fable_e_other).
@@ -219,7 +251,7 @@ class FableEOtherConfig(ModelBaseConfig):
     n_samples: int = 400 if not is_production else 2000
 
 
-class PyrenewConfig(ModelBaseConfig):
+class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -232,26 +264,40 @@ class PyrenewConfig(ModelBaseConfig):
     additional_forecast_letters: str = ""
 
 
-class FusionConfig(ModelBaseConfig):
+class FusionGraphDimensions(
+    ModelGraphDimensions
+):  # used to inherit ModelBaseConfig, used to be called FusionConfig
     # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    locations: GraphDimension[Location] = GraphDimension(  # type: ignore[reportInvalidTypeForm]
+        [loc for loc in LOCATIONS if loc != "WY"]
+    )
 
 
-class PyrenewEConfig(PyrenewConfig):
+class PyrenewEGraphDimensions(
+    ModelGraphDimensions
+):  # used to inherit PyrenewConfig, used to be called PyrenewEConfig
     # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    locations: GraphDimension[Location] = GraphDimension(  # type: ignore[reportInvalidTypeForm]
+        [loc for loc in LOCATIONS if loc != "WY"]
+    )
 
 
-class PyrenewWConfig(PyrenewConfig):
+class PyrenewWGraphDimensions(
+    ModelGraphDimensions
+):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
     # only COVID-19 is valid for W
-    diseases: list[str] = ["COVID-19"]
+    diseases: GraphDimension[Disease] = GraphDimension(["COVID-19"])  # type: ignore[reportInvalidTypeForm]
 
 
-class PyrenewEWConfig(PyrenewConfig):
+class PyrenewEWGraphDimensions(
+    ModelGraphDimensions
+):  # used to inherit PyrenewConfig, used to be called PyrenewEWConfig
     # only COVID-19 is valid for W
-    diseases: list[str] = ["COVID-19"]
+    diseases: GraphDimension[Disease] = GraphDimension(["COVID-19"])  # type: ignore[reportInvalidTypeForm]
     # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    locations: GraphDimension[Location] = GraphDimension(  # type: ignore[reportInvalidTypeForm]
+        [loc for loc in LOCATIONS if loc != "WY"]
+    )
 
 
 class PostProcessConfig(dg.Config):
@@ -272,7 +318,7 @@ class PostProcessConfig(dg.Config):
 
 
 def _throw_if_backfill(
-    context: DynamicGraphAssetExecutionContext | dg.AssetExecutionContext,
+    context: dg.OpExecutionContext | dg.AssetExecutionContext,
     partition_def: dg.PartitionsDefinition,
 ):
     current_partition = context.partition_key
@@ -282,8 +328,10 @@ def _throw_if_backfill(
 
 
 def _run_fable_e_other(
-    context: DynamicGraphAssetExecutionContext,
+    context: dg.OpExecutionContext,
     config: FableEOtherConfig,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
     epiweekly: bool,
 ) -> str | None:
     """
@@ -291,15 +339,20 @@ def _run_fable_e_other(
     """
     _throw_if_backfill(context, daily_partitions_def)
 
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
+    disease = model_graph_dimensions.diseases.current_value
+    location = model_graph_dimensions.locations.current_value
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        config.output_basedir,
+        model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
+    exclude_last_n_days = model_base_config.loc_exclude_last_n_days.get(
+            location,
+            model_base_config.exclude_last_n_days
+            )
+    context.log.debug(f"exclude_last_n_days: '{exclude_last_n_days}'")
 
     context.log.info(f"config: '{config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
@@ -308,18 +361,20 @@ def _run_fable_e_other(
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
         output_dir=daily_forecast_output_dir,
-        n_training_days=config.n_training_days,
+        n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
         n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
+        exclude_last_n_days=exclude_last_n_days,
         epiweekly=epiweekly,
         credentials_path=Path("config/creds.toml"),
     )
 
 
 def _run_pyrenew_model(
-    context: DynamicGraphAssetExecutionContext,
+    context: dg.OpExecutionContext,
     config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
     model_letters: str,
 ) -> str | None:
     """
@@ -327,13 +382,13 @@ def _run_pyrenew_model(
     """
     _throw_if_backfill(context, daily_partitions_def)
 
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
+    disease = model_graph_dimensions.diseases.current_value
+    location = model_graph_dimensions.locations.current_value
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        config.output_basedir, f"{context.partition_key}_forecasts"
+        model_base_config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
@@ -341,6 +396,12 @@ def _run_pyrenew_model(
         f"{model_letters}{config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
+    exclude_last_n_days = model_base_config.loc_exclude_last_n_days.get(
+            location,
+            model_base_config.exclude_last_n_days
+            )
+    context.log.debug(f"exclude_last_n_days: '{exclude_last_n_days}'")
+
     context.log.info(f"config: '{config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
@@ -351,12 +412,12 @@ def _run_pyrenew_model(
         param_data_dir=Path("params"),
         priors_path=Path("pipelines/priors/prod_priors.py"),
         output_dir=daily_forecast_output_dir,
-        n_training_days=config.n_training_days,
+        n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
         n_chains=config.n_chains,
         n_warmup=config.n_warmup,
         n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
+        exclude_last_n_days=exclude_last_n_days,
         credentials_path=Path("config/creds.toml"),
         rng_key=config.rng_key,
         **fit_flags,
@@ -365,16 +426,24 @@ def _run_pyrenew_model(
 
 
 def get_model_loc_dir(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
 ) -> Path:
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
+    disease = model_graph_dimensions.diseases.current_value
+    location = model_graph_dimensions.locations.current_value
+
+    exclude_last_n_days = model_base_config.loc_exclude_last_n_days.get(
+            location,
+            model_base_config.exclude_last_n_days
+            )
+    context.log.debug(f"exclude_last_n_days: '{exclude_last_n_days}'")
 
     report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     first_training_date, last_training_date = calculate_training_dates(
         report_date=report_date,
-        n_training_days=config.n_training_days,
-        exclude_last_n_days=config.exclude_last_n_days,
+        n_training_days=model_base_config.n_training_days,
+        exclude_last_n_days=exclude_last_n_days,
         logger=context.log,
     )
 
@@ -386,7 +455,7 @@ def get_model_loc_dir(
     )
 
     model_loc_dir = Path(
-        config.output_basedir,
+        model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
         model_batch_dir_name,
         "model_runs",
@@ -396,8 +465,9 @@ def get_model_loc_dir(
 
 
 def _run_fusion_model(
-    context: DynamicGraphAssetExecutionContext,
-    config: FusionConfig,
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
     num_model_name,
     other_model_name,
     aggregate_num,
@@ -408,7 +478,9 @@ def _run_fusion_model(
     Helper function to run fusion model.
     """
     _throw_if_backfill(context, daily_partitions_def)
-    model_loc_dir = get_model_loc_dir(context, config)
+    model_loc_dir = get_model_loc_dir(
+        context, model_base_config, model_graph_dimensions
+    )
     create_prop_samples(
         model_run_dir=model_loc_dir,
         num_model_name=num_model_name,
@@ -429,11 +501,15 @@ def _run_fusion_model(
     )
     model_fit_dir_to_hub_tbl(fusion_model_fit_dir)
 
-    context.log.debug(f"config: '{config}'")
+    context.log.debug(f"config: '{model_base_config}'")
 
 
 def _fuse_pyrenew_fable_e_other(
-    context, config: FusionConfig, pyrenew_model_name, epiweekly: bool
+    context,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
+    pyrenew_model_name,
+    epiweekly: bool,
 ):
     other_model_name = "epiweekly_fable_e_other" if epiweekly else "daily_fable_e_other"
     fusion_model_name = (
@@ -444,7 +520,8 @@ def _fuse_pyrenew_fable_e_other(
     aggregate_num = epiweekly
     _run_fusion_model(
         context=context,
-        config=config,
+        model_base_config=model_base_config,
+        model_graph_dimensions=model_graph_dimensions,
         num_model_name=pyrenew_model_name,
         other_model_name=other_model_name,
         aggregate_num=aggregate_num,
@@ -518,7 +595,6 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
 
 weekly_forecast_base_asset_args = {
     "partitions_def": daily_partitions_def,
-    "graph_dimensions": ["diseases", "locations"],
 }
 
 weekly_forecast_initial_asset_args = {
@@ -569,9 +645,18 @@ nhsn_hrd_prelim = dg.AssetSpec(
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def fable_e_other(
-    context: DynamicGraphAssetExecutionContext, config: FableEOtherConfig
+    context: dg.OpExecutionContext,
+    fable_e_other_config: FableEOtherConfig,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
 ):
-    _run_fable_e_other(context, config, epiweekly=False)
+    _run_fable_e_other(
+        context,
+        fable_e_other_config,
+        model_base_config,
+        model_graph_dimensions,
+        epiweekly=False,
+    )
 
 
 # Epiweekly Fable E Other
@@ -580,9 +665,18 @@ def fable_e_other(
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
 def epiweekly_fable_e_other(
-    context: DynamicGraphAssetExecutionContext, config: FableEOtherConfig
+    context: dg.OpExecutionContext,
+    fable_e_other_config: FableEOtherConfig,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
 ):
-    _run_fable_e_other(context, config, epiweekly=True)
+    _run_fable_e_other(
+        context,
+        fable_e_other_config,
+        model_base_config,
+        model_graph_dimensions,
+        epiweekly=True,
+    )
 
 
 # Pyrenew E
@@ -593,10 +687,14 @@ def epiweekly_fable_e_other(
     },
 )
 def pyrenew_e(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewEConfig,
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+    pyrenew_e_graph_dimensions: PyrenewEGraphDimensions,
 ):
-    _run_pyrenew_model(context, config, "e")
+    _run_pyrenew_model(
+        context, pyrenew_config, model_base_config, pyrenew_e_graph_dimensions, "e"
+    )
 
 
 # Pyrenew H
@@ -606,8 +704,15 @@ def pyrenew_e(
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
 )
-def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
-    _run_pyrenew_model(context, config, "h")
+def pyrenew_h(
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+    model_graph_dimensions: ModelGraphDimensions,
+):
+    _run_pyrenew_model(
+        context, pyrenew_config, model_base_config, model_graph_dimensions, "h"
+    )
 
 
 # Pyrenew HE
@@ -619,10 +724,14 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
     },
 )
 def pyrenew_he(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewEConfig,
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+    pyrenew_e_graph_dimensions: PyrenewEGraphDimensions,
 ):
-    _run_pyrenew_model(context, config, "he")
+    _run_pyrenew_model(
+        context, pyrenew_config, model_base_config, pyrenew_e_graph_dimensions, "he"
+    )
 
 
 # ---------- Fusion Forecasts ----------
@@ -632,9 +741,17 @@ def pyrenew_he(
     **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
 )
-def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
+def fuse_pyrenew_e_ts(
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    fusion_graph_dimensions: FusionGraphDimensions,
+):
     _fuse_pyrenew_fable_e_other(
-        context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
+        context,
+        model_base_config,
+        fusion_graph_dimensions,
+        pyrenew_model_name="pyrenew_e",
+        epiweekly=False,
     )
 
 
@@ -646,10 +763,16 @@ def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: Fusion
     },
 )
 def fuse_pyrenew_e_ts_epiweekly(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    fusion_graph_dimensions: FusionGraphDimensions,
 ):
     _fuse_pyrenew_fable_e_other(
-        context, config, pyrenew_model_name="pyrenew_e", epiweekly=True
+        context,
+        model_base_config,
+        fusion_graph_dimensions,
+        pyrenew_model_name="pyrenew_e",
+        epiweekly=True,
     )
 
 
@@ -658,10 +781,16 @@ def fuse_pyrenew_e_ts_epiweekly(
     ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    fusion_graph_dimensions: FusionGraphDimensions,
 ):
     _fuse_pyrenew_fable_e_other(
-        context, config, pyrenew_model_name="pyrenew_he", epiweekly=False
+        context,
+        model_base_config,
+        fusion_graph_dimensions,
+        pyrenew_model_name="pyrenew_he",
+        epiweekly=False,
     )
 
 
@@ -673,10 +802,16 @@ def fuse_pyrenew_he_ts(
     },
 )
 def fuse_pyrenew_he_ts_epiweekly(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    fusion_graph_dimensions: FusionGraphDimensions,
 ):
     _fuse_pyrenew_fable_e_other(
-        context, config, pyrenew_model_name="pyrenew_he", epiweekly=True
+        context,
+        model_base_config,
+        fusion_graph_dimensions,
+        pyrenew_model_name="pyrenew_he",
+        epiweekly=True,
     )
 
 
@@ -760,6 +895,15 @@ defs = dg.Definitions(
             account_url=f"{storage_account}.blob.core.windows.net",
             credential=AzureBlobStorageDefaultCredential(),
         ),
+        # Shared resources for model assets
+        "model_base_config": ModelBaseConfig(),
+        "model_graph_dimensions": ModelGraphDimensions(),
+        "pyrenew_config": PyrenewConfig(),
+        "fable_e_other_config": FableEOtherConfig(),
+        "fusion_graph_dimensions": FusionGraphDimensions(),
+        "pyrenew_e_graph_dimensions": PyrenewEGraphDimensions(),
+        "pyrenew_w_graph_dimensions": PyrenewWGraphDimensions(),
+        "pyrenew_ew_graph_dimensions": PyrenewEWGraphDimensions(),
     },
     executor=dynamic_executor(
         default_config=azure_batch_execution_config,

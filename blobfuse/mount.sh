@@ -36,24 +36,24 @@ echo "Creating symlinks in $(pwd)/blobfuse/mounts..."
 
 # Create symlinks only if they do not already exist, and inform the user
 if [[ -L "./blobfuse/mounts/params" ]]; then
-	echo "Symlink './blobfuse/mounts/params' already exists, skipping."
+	echo "Symlink './blobfuse/mounts/prod-param-estimates' already exists, skipping."
 else
-	ln -s "/mnt/prod-param-estimates" "./blobfuse/mounts/params"
-	echo "Created symlink './blobfuse/mounts/params' -> '/mnt/prod-param-estimates'"
+	ln -s "/mnt/prod-param-estimates" "./blobfuse/mounts/prod-param-estimates"
+	echo "Created symlink './blobfuse/mounts/prod-param-estimates' -> '/mnt/prod-param-estimates'"
 fi
 
 if [[ -L "./blobfuse/mounts/output" ]]; then
-	echo "Symlink './blobfuse/mounts/output' already exists, skipping."
+	echo "Symlink './blobfuse/mounts/stf-routine-forecasting-prod-output' already exists, skipping."
 else
-	ln -s "/mnt/stf-routine-forecasting-prod-output" "./blobfuse/mounts/output"
-	echo "Created symlink './blobfuse/mounts/output' -> '/mnt/stf-routine-forecasting-prod-output'"
+	ln -s "/mnt/stf-routine-forecasting-prod-output" "./blobfuse/mounts/stf-routine-forecasting-prod-output"
+	echo "Created symlink './blobfuse/mounts/stf-routine-forecasting-prod-output' -> '/mnt/stf-routine-forecasting-prod-output'"
 fi
 
 if [[ -L "./blobfuse/mounts/test-output" ]]; then
-	echo "Symlink './blobfuse/mounts/test-output' already exists, skipping."
+	echo "Symlink './blobfuse/mounts/stf-routine-forecasting-test-output' already exists, skipping."
 else
-	ln -s "/mnt/stf-routine-forecasting-test-output" "./blobfuse/mounts/test-output"
-	echo "Created symlink './blobfuse/mounts/test-output' -> '/mnt/stf-routine-forecasting-test-output'"
+	ln -s "/mnt/stf-routine-forecasting-test-output" "./blobfuse/mounts/stf-routine-forecasting-test-output"
+	echo "Created symlink './blobfuse/mounts/stf-routine-forecasting-test-output' -> '/mnt/stf-routine-forecasting-test-output'"
 fi
 
 if [[ -L "./blobfuse/mounts/nwss-vintages" ]]; then
@@ -64,10 +64,10 @@ else
 fi
 
 if [[ -L "./blobfuse/mounts/config" ]]; then
-	echo "Symlink './blobfuse/mounts/config' already exists, skipping."
+	echo "Symlink './blobfuse/mounts/stf-routine-forecasting-config' already exists, skipping."
 else
-	ln -s "/mnt/stf-routine-forecasting-config" "./blobfuse/mounts/config"
-	echo "Created symlink './blobfuse/mounts/config' -> '/mnt/stf-routine-forecasting-config'"
+	ln -s "/mnt/stf-routine-forecasting-config" "./blobfuse/mounts/stf-routine-forecasting-config"
+	echo "Created symlink './blobfuse/mounts/stf-routine-forecasting-config' -> '/mnt/stf-routine-forecasting-config'"
 fi
 
 if [[ -L "./blobfuse/mounts/nssp-etl" ]]; then

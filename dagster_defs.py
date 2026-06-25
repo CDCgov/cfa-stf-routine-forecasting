@@ -57,7 +57,7 @@ is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
 user = os.getenv("DAGSTER_USER")
 
 # ============================================================================
-# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS
+# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
 # ============================================================================
 # Executors define the runtime-location of an asset job
 # See later on for Asset job definitions
@@ -91,6 +91,22 @@ tag = (
 registry = "cfaprdbatchcr.azurecr.io"
 image = f"{registry}{container_workdir}:{tag}"
 
+# ----------- Azure blob storage mount strings ---------------
+
+# Used in the cloud, and combined with the local mounting dir, used locally
+blob_mounts = {
+    "nssp_archival": f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
+    "nssp_etl": f"nssp-etl:{container_workdir}/nssp-etl",
+    "nwss_vintages": f"nwss-vintages:{container_workdir}/nwss-vintages",
+    "params": f"prod-param-estiamtes:{container_workdir}/params",
+    "config": f"stf-routine-forecasting-config:{container_workdir}/config",
+    "output": f"stf-routine-forecasting-output:{container_workdir}/output",
+    "test_output": f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
+}
+
+# Used when mounting with docker
+local_mounting_dir=f"{local_workdir}/blobfuse/mounts/"
+
 # ---------- Execution Configuration ----------
 
 # Most basic execution - in dev, launches and runs locally
@@ -111,10 +127,6 @@ docker_execution_config = ExecutionConfig(
         class_name=docker_executor.__name__,
         config={
             "image": image,
-            "env_vars": [
-                f"DAGSTER_USER={user}",
-                "VIRTUAL_ENV={container_workdir}/.venv",
-            ],
             "retries": {"enabled": {}},
             "container_kwargs": {
                 "volumes": [
@@ -124,13 +136,14 @@ docker_execution_config = ExecutionConfig(
                     # the container image for workflow changes
                     f"{__file__}:{container_workdir}/{os.path.basename(__file__)}",
                     # blob container mounts for cfa-stf-routine-forecasting
-                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
-                    f"{local_workdir}/blobfuse/mounts/nssp-etl:{container_workdir}/nssp-etl",
-                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:{container_workdir}/nwss-vintages",
-                    f"{local_workdir}/blobfuse/mounts/params:{container_workdir}/params",
-                    f"{local_workdir}/blobfuse/mounts/config:{container_workdir}/config",
-                    f"{local_workdir}/blobfuse/mounts/output:{container_workdir}/output",
-                    f"{local_workdir}/blobfuse/mounts/test-output:{container_workdir}/test-output",
+                    # with the docker executor we need the local mounting dir as well
+                    local_mounting_dir + blob_mounts["nssp_archival"],
+                    local_mounting_dir + blob_mounts["nssp_etl"],
+                    local_mounting_dir + blob_mounts["nwss_vintages"],
+                    local_mounting_dir + blob_mounts["params"],
+                    local_mounting_dir + blob_mounts["config"],
+                    local_mounting_dir + blob_mounts["output"],
+                    local_mounting_dir + blob_mounts["test_output"],
                 ]
             },
         },
@@ -148,9 +161,6 @@ azure_batch_execution_config = ExecutionConfig(
                 if is_production  # image will come from the code location in prod
                 else {"image": image}
             ),
-            "env_vars": [
-                f"VIRTUAL_ENV={container_workdir}/.venv",
-            ],
             "container_kwargs": {
                 "volumes": [
                     # bind the ~/.azure folder for optional cli login
@@ -158,15 +168,16 @@ azure_batch_execution_config = ExecutionConfig(
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
                     # blob container mounts for cfa-stf-routine-forecasting
-                    f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
-                    f"nssp-etl:{container_workdir}/nssp-etl",
-                    f"nwss-vintages:{container_workdir}/nwss-vintages",
-                    f"prod-param-estimates:{container_workdir}/params",
-                    f"stf-routine-forecasting-config:{container_workdir}/config",
-                    f"stf-routine-forecasting-prod-output:{container_workdir}/output",
-                    f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
+                    # we do not need the local mounting dir for azure batch
+                    blob_mounts["nssp_archival"],
+                    blob_mounts["nssp_etl"],
+                    blob_mounts["nwss_vintages"],
+                    blob_mounts["params"],
+                    blob_mounts["config"],
+                    blob_mounts["output"],
+                    blob_mounts["test_output"],
                 ],
-                "working_dir": "{container_workdir}",
+                "working_dir": f"{container_workdir}",
             },
         },
     ),
@@ -818,13 +829,13 @@ if not is_production:
         )
         explore_command = (
             "docker run -it "
-            f"-v {local_workdir}/blobfuse/mounts/nssp-archival-vintages:{container_workdir}/nssp-archival-vintages "
-            f"-v {local_workdir}/blobfuse/mounts/nssp-etl:{container_workdir}/nssp-etl "
-            f"-v {local_workdir}/blobfuse/mounts/nwss-vintages:{container_workdir}/nwss-vintages "
-            f"-v {local_workdir}/blobfuse/mounts/params:{container_workdir}/params "
-            f"-v {local_workdir}/blobfuse/mounts/config:{container_workdir}/config "
-            f"-v {local_workdir}/blobfuse/mounts/output:{container_workdir}/output "
-            f"-v {local_workdir}/blobfuse/mounts/test-output:{container_workdir}/test-output "
+            f"-v {local_mounting_dir + blob_mounts['nssp_archival']} "
+            f"-v {local_mounting_dir + blob_mounts['nssp_etl']} "
+            f"-v {local_mounting_dir + blob_mounts['nwss_vintages']} "
+            f"-v {local_mounting_dir + blob_mounts['params']} "
+            f"-v {local_mounting_dir + blob_mounts['config']} "
+            f"-v {local_mounting_dir + blob_mounts['output']} "
+            f"-v {local_mounting_dir + blob_mounts['test_output']} "
             f"--rm {image} bash"
         )
         subprocess.run(explore_command, check=True, shell=True)
@@ -868,9 +879,9 @@ defs = dg.Definitions(
         ),
     },
     executor=dynamic_executor(
-        default_config=azure_batch_execution_config,
+        # default_config=azure_batch_execution_config,
         # default_config=basic_execution_config,
-        # default_config=docker_execution_config,
+        default_config=docker_execution_config,
         alternate_configs=[basic_execution_config, docker_execution_config],
     ),
 )

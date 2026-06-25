@@ -21,9 +21,9 @@ The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
 
 The project uses GitHub Actions for automatically building container images based on the project's [Dockerfile](Dockerfile). The images are currently hosted on Azure Container Registry and are built and pushed via the [containers.yaml](.github/workflows/containers.yaml) GitHub Actions workflow.
 
-Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch). After a branch is deleted, the image tag is remove from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
+Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch). After a branch is deleted, the image tag is removed from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
 
-Containers can also be built using a dagster job on the dev webserver as defined in `dagster_defs.py`. You can choose whether to push the image (generally you should) or to even push to the dagster production server (do only in coordination with the STF team).
+Containers can also be built using a dagster job on the dev webserver as defined in `dagster_defs.py`. You can choose whether to push the image (generally you should) or to even push to the dagster production server (do so only in coordination with the STF team).
 
 ## Running Model Pipelines with Dagster
 > [!NOTE]
@@ -34,7 +34,7 @@ To execute dagster workflows fully locally with this project, you'll need to hav
 #### Local Development and Testing
 > Prerequisites:
 > - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
-> - Permissions to push to the container registry and both `$GH_USERNAME` and `$GH_PAT` set as environment variables in your shell.
+> - Permissions to push to the container registry.
 
 The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` or in the dagster launchpad to test using the local Docker Executor - this will require you to have setup Blobfuse. See [Using the local docker executor](#using-the-local-docker-executor).
 
@@ -56,8 +56,8 @@ By default, on this repository, Dagster will submit tasks to Azure Batch for exe
 If you'd like to test a few "tasks" locally, you can have dagster execute on your machine, which is much faster than waiting for Azure Batch to pick up jobs. Dagster can leverage your VM's own docker daemon to emulate Azure Batch. When doing this, take care not to run more than two or three state x disease combinations at a time or you will quickly put your VM into a coma.
 
 When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
-- `sudo bash -c "source ./blobfuse/mount.sh"`: mounts the relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
-- `sudo bash -c "source ./blobfuse/cleanup.sh"`: gracefully unmounts the relevant bslobs.
+- `sudo bash "./blobfuse/cleanup.sh"`: gracefully unmounts the relevant blobs. It is often worth running this first to make sure you're mounting to a clean setup.
+- `sudo bash "./blobfuse/mount.sh"`: mounts the relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
 
 #### Production Scheduling
 
@@ -70,9 +70,9 @@ From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), yo
 1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch. Use this for testing in pre-prod with a non-`main` branch.
     - Let people know when you do this so they don't override your test with their own.
     - Pushes to main that do not include changes to the `dagster_defs.py` file will NOT automatically update the server.
-2. As mentioned, pushes to main that target `dagster_defs.py` will push to the server.
-3. Powerusers: `make prod_test` will build and push your own local branch to the server.
-    - Communicate that you are running this command to the STF team before doing so.
+2. As mentioned, pushes to `main` that include a change to `dagster_defs.py` since the previous commit (or PR) will push to the server.
+3. Powerusers: `build_image` in dagster's Jobs will build and push your own local branch to the server if you set `should_push` to `True`.
+    - Communicate that you are running this job to the STF team before doing so.
 
 ## General Disclaimer
 This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/organization/mission.htm).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise.

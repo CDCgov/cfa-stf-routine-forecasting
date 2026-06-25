@@ -5,10 +5,6 @@ FROM rocker/tidyverse:4.5.3
 #
 
 ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
-ARG GIT_COMMIT_SHA
-ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
-ARG GIT_BRANCH_NAME
-ENV GIT_BRANCH_NAME=$GIT_BRANCH_NAME
 
 #
 # Additional programming language compilers/interpreters

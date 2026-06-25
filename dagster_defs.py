@@ -105,7 +105,7 @@ blob_mounts = {
 }
 
 # Used when mounting with docker
-local_mounting_dir=f"{local_workdir}/blobfuse/mounts/"
+local_mounting_dir = f"{local_workdir}/blobfuse/mounts/"
 
 # ---------- Execution Configuration ----------
 

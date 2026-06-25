@@ -790,7 +790,7 @@ if not is_production:
                         "should_push": True,
                         "should_deploy_to_prod": False,
                         "dockerfile_path": f"{local_workdir}/Dockerfile",
-                        # the build context should be the top level of the repo, not the covid_2602 folder (for now)
+                        # the build context should be the top level of the repo
                         "build_context": str(local_workdir),
                         "image": image,
                     }

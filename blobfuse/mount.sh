@@ -42,7 +42,7 @@ else
 	echo "Created symlink './blobfuse/mounts/prod-param-estimates' -> '/mnt/prod-param-estimates'"
 fi
 
-if [[ -L "./blobfuse/mounts/output" ]]; then
+if [[ -L "./blobfuse/mounts/stf-routine-forecasting-prod-output" ]]; then
 	echo "Symlink './blobfuse/mounts/stf-routine-forecasting-prod-output' already exists, skipping."
 else
 	ln -s "/mnt/stf-routine-forecasting-prod-output" "./blobfuse/mounts/stf-routine-forecasting-prod-output"

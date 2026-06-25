@@ -578,7 +578,6 @@ nhsn_hrd_prelim = dg.AssetSpec(
 
 # ---------------- Weekly Forecasts --------------
 
-
 # Fable E Other
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
@@ -771,26 +770,28 @@ if not is_production:
         image: str - the full name (including registry and tag) of the image
         """
 
-        build_command = f"docker build -t {image} -f {dockerfile_path} {build_context}"
+        build_command = ["docker", "buildx", "build", "-t", image, "-f", dockerfile_path, build_context]
 
         if should_push:
             subprocess.run(
-                f"az login --identity && az acr login -n {registry}",
+                ["az", "login", "--identity"],
                 check=True,
-                shell=True,
             )
-            build_command += " --push"
+            subprocess.run(
+                ["az", "acr", "login", "-n", registry],
+                check=True
+            )
+            build_command.append("--push")
 
-        context.log.debug(f"Running {build_command}")
-        subprocess.run(build_command, check=True, shell=True)
+        context.log.info(f"Running {" ".join(build_command)}")
+        subprocess.run(build_command, check=True)
 
         update_script_url = "https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py"
 
         if should_deploy_to_prod:
             subprocess.run(
-                f"uv run {update_script_url} --registry_image {image}",
-                check=True,
-                shell=True,
+                ["uv", "run", update_script_url, "--registry_image", image],
+                check=True
             )
 
     @dg.job(
@@ -824,21 +825,32 @@ if not is_production:
         """
         Allows you to run the container you previously built and explore the filesystem that will be used by dagster.
         """
-        print(
+        context.log.info(
             "Check the terminal from which you ran the webserver to interact; stdout from your terminal will appear below."
         )
-        explore_command = (
-            "docker run -it "
-            f"-v {local_mounting_dir + blob_mounts['nssp_archival']} "
-            f"-v {local_mounting_dir + blob_mounts['nssp_etl']} "
-            f"-v {local_mounting_dir + blob_mounts['nwss_vintages']} "
-            f"-v {local_mounting_dir + blob_mounts['params']} "
-            f"-v {local_mounting_dir + blob_mounts['config']} "
-            f"-v {local_mounting_dir + blob_mounts['output']} "
-            f"-v {local_mounting_dir + blob_mounts['test_output']} "
-            f"--rm {image} bash"
-        )
-        subprocess.run(explore_command, check=True, shell=True)
+        explore_cmd = [
+             "docker",
+             "run",
+             "-it",
+             "-v",
+             local_mounting_dir + blob_mounts["nssp_archival"],
+             "-v",
+             local_mounting_dir + blob_mounts["nssp_etl"],
+             "-v",
+             local_mounting_dir + blob_mounts["nwss_vintages"],
+             "-v",
+             local_mounting_dir + blob_mounts["params"],
+             "-v",
+             local_mounting_dir + blob_mounts["config"],
+             "-v",
+             local_mounting_dir + blob_mounts["output"],
+             "-v",
+             local_mounting_dir + blob_mounts["test_output"],
+             "--rm",
+             image,
+             "bash",
+        ]
+        subprocess.run(explore_cmd, check=True)
 
     @dg.job(executor_def=dg.in_process_executor)
     def explore_image():

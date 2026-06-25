@@ -46,7 +46,7 @@ Additional_repositories: https://hubverse-org.r-universe.dev
 Remotes:
     github::cdcgov/forecasttools,
     github::mjskay/ggdist,
-    hubUtils=github::damonbayer/hubUtils@dmb_faster_convert_output_type
+    hubUtils=github::hubverse-org/hubUtils@perf-convert-output-type-282
 Suggests:
     checkmate,
     rcmdcheck,

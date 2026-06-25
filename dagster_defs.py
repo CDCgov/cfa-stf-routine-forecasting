@@ -100,7 +100,7 @@ blob_mounts = {
     "nwss_vintages": f"nwss-vintages:{container_workdir}/nwss-vintages",
     "params": f"prod-param-estimates:{container_workdir}/params",
     "config": f"stf-routine-forecasting-config:{container_workdir}/config",
-    "output": f"stf-routine-forecasting-output:{container_workdir}/output",
+    "output": f"stf-routine-forecasting-prod-output:{container_workdir}/output",
     "test_output": f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
 }
 

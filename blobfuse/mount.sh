@@ -63,7 +63,7 @@ else
 	echo "Created symlink './blobfuse/mounts/nwss-vintages' -> '/mnt/nwss-vintages'"
 fi
 
-if [[ -L "./blobfuse/mounts/config" ]]; then
+if [[ -L "./blobfuse/mounts/stf-routine-forecasting-config" ]]; then
 	echo "Symlink './blobfuse/mounts/stf-routine-forecasting-config' already exists, skipping."
 else
 	ln -s "/mnt/stf-routine-forecasting-config" "./blobfuse/mounts/stf-routine-forecasting-config"

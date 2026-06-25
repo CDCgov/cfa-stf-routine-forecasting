@@ -33,8 +33,8 @@ To execute dagster workflows fully locally with this project, you'll need to hav
 
 #### Local Development and Testing
 > Prerequisites:
-> - `uv`. `docker`, a VAP VM with a registered managed identity in Azure.
-> - Permissions to push to the container registry.
+> - `uv`, `docker`, a VAP VM with a registered managed identity in Azure.
+> - Permissions to push to the Azure Container Registry.
 
 The following instructions will set up Dagster on your VAP. However, based on the current configuration, actual execution will still run in the cloud via Azure Batch. You can change the `executor` option in `dagster_defs.py` or in the dagster launchpad to test using the local Docker Executor - this will require you to have setup Blobfuse. See [Using the local docker executor](#using-the-local-docker-executor).
 

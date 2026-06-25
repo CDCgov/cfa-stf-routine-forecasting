@@ -35,7 +35,7 @@ mkdir -p ./blobfuse/mounts
 echo "Creating symlinks in $(pwd)/blobfuse/mounts..."
 
 # Create symlinks only if they do not already exist, and inform the user
-if [[ -L "./blobfuse/mounts/params" ]]; then
+if [[ -L "./blobfuse/mounts/prod-param-estimates" ]]; then
 	echo "Symlink './blobfuse/mounts/prod-param-estimates' already exists, skipping."
 else
 	ln -s "/mnt/prod-param-estimates" "./blobfuse/mounts/prod-param-estimates"

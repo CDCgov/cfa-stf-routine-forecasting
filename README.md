@@ -57,7 +57,7 @@ If you'd like to test a few "tasks" locally, you can have dagster execute on you
 
 When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
 - `sudo bash -c "source ./blobfuse/mount.sh"`: mounts the relevant blobs using blobfuse. Use this before launching locally-executed dagster jobs.
-- `sudo bash -c "source ./blobfuse/cleanup.sh"`: gracefully unmounts the relevant bslobs.
+- `sudo bash -c "source ./blobfuse/cleanup.sh"`: gracefully unmounts the relevant blobs.
 
 #### Production Scheduling
 

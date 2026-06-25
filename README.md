@@ -21,7 +21,7 @@ The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
 
 The project uses GitHub Actions for automatically building container images based on the project's [Dockerfile](Dockerfile). The images are currently hosted on Azure Container Registry and are built and pushed via the [containers.yaml](.github/workflows/containers.yaml) GitHub Actions workflow.
 
-Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch). After a branch is deleted, the image tag is remove from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
+Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch). After a branch is deleted, the image tag is removed from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
 
 Containers can also be built using a dagster job on the dev webserver as defined in `dagster_defs.py`. You can choose whether to push the image (generally you should) or to even push to the dagster production server (do only in coordination with the STF team).
 

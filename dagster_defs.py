@@ -98,7 +98,7 @@ blob_mounts = {
     "nssp_archival": f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
     "nssp_etl": f"nssp-etl:{container_workdir}/nssp-etl",
     "nwss_vintages": f"nwss-vintages:{container_workdir}/nwss-vintages",
-    "params": f"prod-param-estiamtes:{container_workdir}/params",
+    "params": f"prod-param-estimates:{container_workdir}/params",
     "config": f"stf-routine-forecasting-config:{container_workdir}/config",
     "output": f"stf-routine-forecasting-output:{container_workdir}/output",
     "test_output": f"stf-routine-forecasting-test-output:{container_workdir}/test-output",

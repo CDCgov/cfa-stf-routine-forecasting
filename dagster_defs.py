@@ -2,9 +2,9 @@
 import datetime as dt
 import logging
 import os
+from enum import StrEnum
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from typing import Optional
 
 # Direct use of dagster
 import dagster as dg
@@ -26,9 +26,8 @@ from dagster_azure.blob import (
     AzureBlobStorageDefaultCredential,
     AzureBlobStorageResource,
 )
+from pydantic import BaseModel, Field
 from pygit2.repository import Repository
-from pydantic import BaseModel, Field, field_validator
-from enum import StrEnum
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 # Helper Libraries
@@ -197,9 +196,9 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 
 # using default_factory to prevent ConfigOverrides from populating fields in the Launchpad
 class _ModelTrainingFields(BaseModel):
-    output_basedir: str = Field(default_factory=lambda: str())
-    n_training_days: int = Field(default_factory=lambda: int())
-    exclude_last_n_days: int = Field(default_factory=lambda: int())
+    output_basedir: str = Field(default_factory=lambda: "")
+    n_training_days: int = Field(default_factory=lambda: 0)
+    exclude_last_n_days: int = Field(default_factory=lambda: 0)
 
     @classmethod
     def extract_from(cls, instance: BaseModel) -> dict:
@@ -219,9 +218,7 @@ class ConfigOverride(_ModelTrainingFields, dg.Config):
         loc: Location,  # type: ignore[reportInvalidTypeForm]
         overrides: dict | None = None,
     ):
-        return cls.model_construct(
-            **{**base, "location": loc, **(overrides or {})}
-        )
+        return cls.model_construct(**{**base, "location": loc, **(overrides or {})})
 
 
 class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
@@ -229,22 +226,23 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     Base configuration for all model assets.
     Contains parameters common to Fable and Pyrenew models.
     """
+
     output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
     locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
     config_overrides: list[ConfigOverride] = [
-            ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
-            ConfigOverride(location="MN", exclude_last_n_days=2).as_dict(),
-            ConfigOverride(location="NY", exclude_last_n_days=3).as_dict(),
-            ConfigOverride(location="AZ", exclude_last_n_days=5).as_dict(),
-            ConfigOverride(location="SD", exclude_last_n_days=5).as_dict(),
-            ConfigOverride(location="ND", exclude_last_n_days=5).as_dict(),
-            ]  # type: ignore[reportInvalidTypeForm]
+        ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
+        ConfigOverride(location="MN", exclude_last_n_days=2).as_dict(),
+        ConfigOverride(location="NY", exclude_last_n_days=3).as_dict(),
+        ConfigOverride(location="AZ", exclude_last_n_days=5).as_dict(),
+        ConfigOverride(location="SD", exclude_last_n_days=5).as_dict(),
+        ConfigOverride(location="ND", exclude_last_n_days=5).as_dict(),
+    ]  # type: ignore[reportInvalidTypeForm]
 
-    def get_by_location(self, loc: Location) -> "ModelBaseConfig":  #type: ignore[reportInvalidTypeForm]
-        """ Returns location-specific config if provided via config_overrides """
+    def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
+        """Returns location-specific config if provided via config_overrides"""
         overrides = {}
         for entry in self.config_overrides:
             if entry["location"] == loc:
@@ -455,9 +453,7 @@ def _run_fusion_model(
     Helper function to run fusion model.
     """
     _throw_if_backfill(context, daily_partitions_def)
-    model_loc_dir = get_model_loc_dir(
-        context, model_base_config, model_base_config
-    )
+    model_loc_dir = get_model_loc_dir(context, model_base_config, model_base_config)
     create_prop_samples(
         model_run_dir=model_loc_dir,
         num_model_name=num_model_name,
@@ -663,9 +659,7 @@ def pyrenew_e(
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
 ):
-    _run_pyrenew_model(
-        context, pyrenew_config, model_base_config, "e"
-    )
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, "e")
 
 
 # Pyrenew H
@@ -680,9 +674,7 @@ def pyrenew_h(
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
 ):
-    _run_pyrenew_model(
-        context, pyrenew_config, model_base_config, "h"
-    )
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, "h")
 
 
 # Pyrenew HE
@@ -699,9 +691,7 @@ def pyrenew_he(
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
 ):
-    _run_pyrenew_model(
-        context, pyrenew_config, model_base_config, "he"
-    )
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
 
 
 # ---------- Fusion Forecasts ----------

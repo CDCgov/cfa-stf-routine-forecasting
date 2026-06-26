@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from typing import Optional
 
 # Direct use of dagster
 import dagster as dg
@@ -11,6 +12,7 @@ from cfa_dagster import (
     ADLS2PickleIOManager,
     ExecutionConfig,
     GraphDimension,
+    GraphDimensionExclusion,
     SelectorConfig,
     azure_batch_executor,
     azure_container_app_job_executor,
@@ -25,7 +27,7 @@ from dagster_azure.blob import (
     AzureBlobStorageResource,
 )
 from pygit2.repository import Repository
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from enum import StrEnum
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
@@ -193,44 +195,62 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # ============================================================================
 
 
-class ModelGraphDimensions(dg.ConfigurableResource):
-    diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
-    locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
+# using default_factory to prevent ConfigOverrides from populating fields in the Launchpad
+class _ModelTrainingFields(BaseModel):
+    output_basedir: str = Field(default_factory=lambda: str())
+    n_training_days: int = Field(default_factory=lambda: int())
+    exclude_last_n_days: int = Field(default_factory=lambda: int())
+
+    @classmethod
+    def extract_from(cls, instance: BaseModel) -> dict:
+        return {f: getattr(instance, f) for f in cls.model_fields}
 
 
-class ModelBaseConfig(dg.ConfigurableResource):
+class ConfigOverride(_ModelTrainingFields, dg.Config):
+    location: Location  # type: ignore[reportInvalidTypeForm]
+
+    def as_dict(self) -> dict:  # type: ignore[reportInvalidTypeForm]
+        return self.model_dump(mode="json", exclude_unset=True)
+
+    @classmethod
+    def from_dict(
+        cls,
+        base: dict,
+        loc: Location,  # type: ignore[reportInvalidTypeForm]
+        overrides: dict | None = None,
+    ):
+        return cls.model_construct(
+            **{**base, "location": loc, **(overrides or {})}
+        )
+
+
+class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     """
     Base configuration for all model assets.
     Contains parameters common to Fable and Pyrenew models.
     """
-
     output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
-    loc_exclude_last_n_days: dict[str, int] = Field(
-            description=(
-                "Location-specific override for exclude_last_n_days"
-                ),
-            default={
-                "GA": 2,
-                "MN": 2,
-                "NY": 3,
-                "AZ": 5,
-                "SD": 5,
-                "ND": 5,
-                }
-            )
+    diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
+    locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
+    config_overrides: list[ConfigOverride] = [
+            ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
+            ConfigOverride(location="MN", exclude_last_n_days=2).as_dict(),
+            ConfigOverride(location="NY", exclude_last_n_days=3).as_dict(),
+            ConfigOverride(location="AZ", exclude_last_n_days=5).as_dict(),
+            ConfigOverride(location="SD", exclude_last_n_days=5).as_dict(),
+            ConfigOverride(location="ND", exclude_last_n_days=5).as_dict(),
+            ]  # type: ignore[reportInvalidTypeForm]
 
-    # Runtime validation since Dagster doesn't support dict[Location, int]
-    @field_validator("loc_exclude_last_n_days")
-    @classmethod
-    def validate_locations(cls, value):
-        invalid = set(value) - set(LOCATIONS)
-        if invalid:
-            raise ValueError(
-                f"Invalid locations: {sorted(invalid)}"
-            )
-        return value
+    def get_by_location(self, loc: Location) -> "ModelBaseConfig":  #type: ignore[reportInvalidTypeForm]
+        """ Returns location-specific config if provided via config_overrides """
+        overrides = {}
+        for entry in self.config_overrides:
+            if entry["location"] == loc:
+                overrides = {k: v for k, v in entry.items() if k != "location"}
+                break
+        return self.model_copy(update=overrides)
 
 
 class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
@@ -256,40 +276,18 @@ class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     additional_forecast_letters: str = ""
 
 
-class FusionGraphDimensions(
-    ModelGraphDimensions
+class EModelExclusions(
+    dg.ConfigurableResource
 ):  # used to inherit ModelBaseConfig, used to be called FusionConfig
     # filter out WY
-    locations: GraphDimension[Location] = GraphDimension(  # type: ignore[reportInvalidTypeForm]
-        [loc for loc in LOCATIONS if loc != "WY"]
-    )
+    locations: GraphDimensionExclusion[Location] = GraphDimensionExclusion(["WY"])  # type: ignore[reportInvalidTypeForm]
 
 
-class PyrenewEGraphDimensions(
-    ModelGraphDimensions
-):  # used to inherit PyrenewConfig, used to be called PyrenewEConfig
-    # filter out WY
-    locations: GraphDimension[Location] = GraphDimension(  # type: ignore[reportInvalidTypeForm]
-        [loc for loc in LOCATIONS if loc != "WY"]
-    )
-
-
-class PyrenewWGraphDimensions(
-    ModelGraphDimensions
+class WModelExclusions(
+    dg.ConfigurableResource
 ):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
     # only COVID-19 is valid for W
     diseases: GraphDimension[Disease] = GraphDimension(["COVID-19"])  # type: ignore[reportInvalidTypeForm]
-
-
-class PyrenewEWGraphDimensions(
-    ModelGraphDimensions
-):  # used to inherit PyrenewConfig, used to be called PyrenewEWConfig
-    # only COVID-19 is valid for W
-    diseases: GraphDimension[Disease] = GraphDimension(["COVID-19"])  # type: ignore[reportInvalidTypeForm]
-    # filter out WY
-    locations: GraphDimension[Location] = GraphDimension(  # type: ignore[reportInvalidTypeForm]
-        [loc for loc in LOCATIONS if loc != "WY"]
-    )
 
 
 class PostProcessConfig(dg.Config):
@@ -323,7 +321,6 @@ def _run_fable_e_other(
     context: dg.OpExecutionContext,
     config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
     epiweekly: bool,
 ) -> str | None:
     """
@@ -331,8 +328,8 @@ def _run_fable_e_other(
     """
     _throw_if_backfill(context, daily_partitions_def)
 
-    disease = model_graph_dimensions.diseases.current_value
-    location = model_graph_dimensions.locations.current_value
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
@@ -340,11 +337,8 @@ def _run_fable_e_other(
         model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
-    exclude_last_n_days = model_base_config.loc_exclude_last_n_days.get(
-            location,
-            model_base_config.exclude_last_n_days
-            )
-    context.log.debug(f"exclude_last_n_days: '{exclude_last_n_days}'")
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
 
     context.log.info(f"config: '{config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
@@ -356,7 +350,7 @@ def _run_fable_e_other(
         n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
         n_samples=config.n_samples,
-        exclude_last_n_days=exclude_last_n_days,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
         epiweekly=epiweekly,
         credentials_path=Path("config/creds.toml"),
     )
@@ -366,7 +360,6 @@ def _run_pyrenew_model(
     context: dg.OpExecutionContext,
     config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
     model_letters: str,
 ) -> str | None:
     """
@@ -374,8 +367,8 @@ def _run_pyrenew_model(
     """
     _throw_if_backfill(context, daily_partitions_def)
 
-    disease = model_graph_dimensions.diseases.current_value
-    location = model_graph_dimensions.locations.current_value
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
@@ -388,11 +381,8 @@ def _run_pyrenew_model(
         f"{model_letters}{config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
-    exclude_last_n_days = model_base_config.loc_exclude_last_n_days.get(
-            location,
-            model_base_config.exclude_last_n_days
-            )
-    context.log.debug(f"exclude_last_n_days: '{exclude_last_n_days}'")
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
 
     context.log.info(f"config: '{config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
@@ -409,7 +399,7 @@ def _run_pyrenew_model(
         n_chains=config.n_chains,
         n_warmup=config.n_warmup,
         n_samples=config.n_samples,
-        exclude_last_n_days=exclude_last_n_days,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
         credentials_path=Path("config/creds.toml"),
         rng_key=config.rng_key,
         **fit_flags,
@@ -420,22 +410,18 @@ def _run_pyrenew_model(
 def get_model_loc_dir(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
 ) -> Path:
-    disease = model_graph_dimensions.diseases.current_value
-    location = model_graph_dimensions.locations.current_value
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
 
-    exclude_last_n_days = model_base_config.loc_exclude_last_n_days.get(
-            location,
-            model_base_config.exclude_last_n_days
-            )
-    context.log.debug(f"exclude_last_n_days: '{exclude_last_n_days}'")
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
 
     report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     first_training_date, last_training_date = calculate_training_dates(
         report_date=report_date,
         n_training_days=model_base_config.n_training_days,
-        exclude_last_n_days=exclude_last_n_days,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
         logger=context.log,
     )
 
@@ -459,7 +445,6 @@ def get_model_loc_dir(
 def _run_fusion_model(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
     num_model_name,
     other_model_name,
     aggregate_num,
@@ -471,7 +456,7 @@ def _run_fusion_model(
     """
     _throw_if_backfill(context, daily_partitions_def)
     model_loc_dir = get_model_loc_dir(
-        context, model_base_config, model_graph_dimensions
+        context, model_base_config, model_base_config
     )
     create_prop_samples(
         model_run_dir=model_loc_dir,
@@ -499,7 +484,6 @@ def _run_fusion_model(
 def _fuse_pyrenew_fable_e_other(
     context,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
     pyrenew_model_name,
     epiweekly: bool,
 ):
@@ -513,7 +497,6 @@ def _fuse_pyrenew_fable_e_other(
     _run_fusion_model(
         context=context,
         model_base_config=model_base_config,
-        model_graph_dimensions=model_graph_dimensions,
         num_model_name=pyrenew_model_name,
         other_model_name=other_model_name,
         aggregate_num=aggregate_num,
@@ -640,13 +623,11 @@ def fable_e_other(
     context: dg.OpExecutionContext,
     fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
 ):
     _run_fable_e_other(
         context,
         fable_e_other_config,
         model_base_config,
-        model_graph_dimensions,
         epiweekly=False,
     )
 
@@ -660,13 +641,11 @@ def epiweekly_fable_e_other(
     context: dg.OpExecutionContext,
     fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
 ):
     _run_fable_e_other(
         context,
         fable_e_other_config,
         model_base_config,
-        model_graph_dimensions,
         epiweekly=True,
     )
 
@@ -682,10 +661,10 @@ def pyrenew_e(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
-    pyrenew_e_graph_dimensions: PyrenewEGraphDimensions,
+    e_model_exclusions: EModelExclusions,
 ):
     _run_pyrenew_model(
-        context, pyrenew_config, model_base_config, pyrenew_e_graph_dimensions, "e"
+        context, pyrenew_config, model_base_config, "e"
     )
 
 
@@ -700,10 +679,9 @@ def pyrenew_h(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
-    model_graph_dimensions: ModelGraphDimensions,
 ):
     _run_pyrenew_model(
-        context, pyrenew_config, model_base_config, model_graph_dimensions, "h"
+        context, pyrenew_config, model_base_config, "h"
     )
 
 
@@ -719,10 +697,10 @@ def pyrenew_he(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
-    pyrenew_e_graph_dimensions: PyrenewEGraphDimensions,
+    e_model_exclusions: EModelExclusions,
 ):
     _run_pyrenew_model(
-        context, pyrenew_config, model_base_config, pyrenew_e_graph_dimensions, "he"
+        context, pyrenew_config, model_base_config, "he"
     )
 
 
@@ -736,12 +714,11 @@ def pyrenew_he(
 def fuse_pyrenew_e_ts(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    fusion_graph_dimensions: FusionGraphDimensions,
+    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
-        fusion_graph_dimensions,
         pyrenew_model_name="pyrenew_e",
         epiweekly=False,
     )
@@ -757,12 +734,11 @@ def fuse_pyrenew_e_ts(
 def fuse_pyrenew_e_ts_epiweekly(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    fusion_graph_dimensions: FusionGraphDimensions,
+    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
-        fusion_graph_dimensions,
         pyrenew_model_name="pyrenew_e",
         epiweekly=True,
     )
@@ -775,12 +751,11 @@ def fuse_pyrenew_e_ts_epiweekly(
 def fuse_pyrenew_he_ts(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    fusion_graph_dimensions: FusionGraphDimensions,
+    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
-        fusion_graph_dimensions,
         pyrenew_model_name="pyrenew_he",
         epiweekly=False,
     )
@@ -796,12 +771,11 @@ def fuse_pyrenew_he_ts(
 def fuse_pyrenew_he_ts_epiweekly(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    fusion_graph_dimensions: FusionGraphDimensions,
+    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
-        fusion_graph_dimensions,
         pyrenew_model_name="pyrenew_he",
         epiweekly=True,
     )
@@ -889,13 +863,10 @@ defs = dg.Definitions(
         ),
         # Shared resources for model assets
         "model_base_config": ModelBaseConfig(),
-        "model_graph_dimensions": ModelGraphDimensions(),
         "pyrenew_config": PyrenewConfig(),
         "fable_e_other_config": FableEOtherConfig(),
-        "fusion_graph_dimensions": FusionGraphDimensions(),
-        "pyrenew_e_graph_dimensions": PyrenewEGraphDimensions(),
-        "pyrenew_w_graph_dimensions": PyrenewWGraphDimensions(),
-        "pyrenew_ew_graph_dimensions": PyrenewEWGraphDimensions(),
+        "e_model_exclusions": EModelExclusions(),
+        "w_model_exclusions": WModelExclusions(),
     },
     executor=dynamic_executor(
         default_config=azure_batch_execution_config,

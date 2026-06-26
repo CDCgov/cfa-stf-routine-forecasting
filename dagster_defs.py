@@ -875,6 +875,10 @@ defs = dg.Definitions(
         default_config=azure_batch_execution_config,
         # default_config=basic_execution_config,
         # default_config=docker_execution_config,
-        alternate_configs=[basic_execution_config, docker_execution_config, azure_batch_execution_config],
+        alternate_configs=[
+            basic_execution_config,
+            docker_execution_config,
+            azure_batch_execution_config,
+        ],
     ),
 )

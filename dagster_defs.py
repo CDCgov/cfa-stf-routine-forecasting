@@ -64,8 +64,10 @@ user = os.getenv("DAGSTER_USER")
 
 # Instead of hardcoding the repo name, this will always find the containing directory of this defs file
 # As of 6/2026, cfa-stf-routine-forecasting
-local_workdir = Path(__file__).parent.resolve() # absolute path to the workdir 
-container_workdir = Path(f"/{local_workdir.name}") # in the container, workdir is mounted at /
+local_workdir = Path(__file__).parent.resolve()  # absolute path to the workdir
+container_workdir = Path(
+    f"/{local_workdir.name}"
+)  # in the container, workdir is mounted at /
 
 # Get branch name from git, defaulting to main if not in a git repo
 try:

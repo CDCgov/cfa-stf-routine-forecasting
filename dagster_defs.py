@@ -750,7 +750,7 @@ if not is_production:
         image: str,
     ):
         """
-        Builds the image used by dagster.
+        Builds the image used by dagster. Requires that your VM be registered with an Azure managed identity.
 
         should_push: bool - should the image be pushed to the Container Registry?
         should_deploy_to_prod: bool - should the prod server be updated with the newest image? (usually you do not want to do this)
@@ -781,14 +781,26 @@ if not is_production:
         context.log.info(f"Running {' '.join(build_command)}")
         subprocess.run(build_command, check=True)
 
-        update_script_url = "https://raw.githubusercontent.com/CDCgov/cfa-dagster/refs/heads/main/scripts/update_code_location.py"
+        update_script_url = (
+            # repo
+            "https://raw.githubusercontent.com/CDCgov/cfa-dagster/"
+            # ref
+            "refs/heads/main/"
+            # file
+            "scripts/update_code_location.py"
+        )
 
         if should_deploy_to_prod:
+            context.log.info(f"Deploying {image} to the dagster prod server.")
             subprocess.run(
                 ["uv", "run", update_script_url, "--registry_image", image], check=True
             )
 
     @dg.job(
+        description=(
+            "Build the container image used by dagster to run this project's asset pipelines."
+            "Run after making any change and before running the pipelines."
+        ),
         config=dg.RunConfig(
             ops={
                 "build_image_op": {
@@ -833,7 +845,13 @@ if not is_production:
         )
         subprocess.run(explore_cmd, check=True)
 
-    @dg.job(executor_def=dg.in_process_executor)
+    @dg.job(
+        description=(
+            "Interactively navigate the filesystem of your last-built container, "
+            "as it would be used in Docker or Azure Batch execution."
+        ),
+        executor_def=dg.in_process_executor,
+    )
     def explore_image():
         explore_image_op()
 

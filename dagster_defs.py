@@ -64,32 +64,27 @@ user = os.getenv("DAGSTER_USER")
 
 # ---------- Working Directory, Branch, and Image Tag ----------
 
-# This is always the same
-container_workdir = "/cfa-stf-routine-forecasting"
-
-# gets you the workdir relative to the dagster_defs.py file, not the execution environment
+# Instead of hardcoding the repo name, this will always find the containing directory of this defs file
+# As of 6/2026, cfa-stf-routine-forecasting
 local_workdir = Path(__file__).parent.resolve()
+container_workdir = Path(f"/{local_workdir.name}")
 
-# If the tag is prod, use 'latest'.
-# Else iteratively test on our dev images
-# (You can always manually specify an override in the GUI)
+# Get branch name from git, defaulting to main if not in a git repo
 try:
-    print("You are running inside a .git repository; getting branchname from .git")
-    repo = Repository(os.getcwd())
-    current_branch_name = str(repo.head.shorthand)
+    current_branch_name = str(Repository(local_workdir).head.shorthand)
+    print(f"Branch name from git: {current_branch_name}")
 except Exception:
-    print("No .git folder detected; using main as the branch name")
     current_branch_name = "main"
+    print("No .git folder detected; using main as the branch name")
 
-print(f"Current branch name is {current_branch_name}")
-
+# Use 'latest' tag for production or main branch, otherwise use branch name
+registry = "cfaprdbatchcr.azurecr.io"
 tag = (
     "latest"
     if (is_production or current_branch_name == "main")
     else current_branch_name
 )
-registry = "cfaprdbatchcr.azurecr.io"
-image = f"{registry}{container_workdir}:{tag}"
+image = f"{registry}/{local_workdir.name}:{tag}"
 
 # ----------- Azure blob storage mount strings ---------------
 

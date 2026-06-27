@@ -2,6 +2,7 @@
 import datetime as dt
 import logging
 import os
+import subprocess
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -18,6 +19,7 @@ from cfa_dagster import (
     docker_executor,
     dynamic_executor,
     dynamic_graph_asset,
+    is_production,
     start_dev_env,
 )
 from dagster_azure.blob import (
@@ -49,45 +51,56 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
-DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["COVID-19"]
-
-# env variable set by Dagster CLI
-is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
-
 # get the user running the Dagster instance
 user = os.getenv("DAGSTER_USER")
 
 # ============================================================================
-# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS
+# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
 # ============================================================================
 # Executors define the runtime-location of an asset job
 # See later on for Asset job definitions
 
 # ---------- Working Directory, Branch, and Image Tag ----------
 
-workdir = "cfa-stf-routine-forecasting"
-local_workdir = Path(__file__).parent.resolve()
+# Instead of hardcoding the repo name, this will always find the containing directory of this defs file
+# As of 6/2026, cfa-stf-routine-forecasting
+local_workdir = Path(__file__).parent.resolve()  # absolute path to the workdir
+container_workdir = Path(
+    f"/{local_workdir.name}"
+)  # in the container, workdir is mounted at /
 
-# If the tag is prod, use 'latest'.
-# Else iteratively test on our dev images
-# (You can always manually specify an override in the GUI)
+# Get branch name from git, defaulting to main if not in a git repo
 try:
-    print("You are running inside a .git repository; getting branchname from .git")
-    repo = Repository(os.getcwd())
-    current_branch_name = str(repo.head.shorthand)
+    current_branch_name = str(Repository(local_workdir).head.shorthand)
+    print(f"Branch name from git: {current_branch_name}")
 except Exception:
-    print("No .git folder detected; using main as the branch name")
     current_branch_name = "main"
+    print("No .git folder detected; using main as the branch name")
 
-print(f"Current branch name is {current_branch_name}")
-
+# Use 'latest' tag for production or main branch, otherwise use branch name
+registry = "cfaprdbatchcr.azurecr.io"
 tag = (
     "latest"
     if (is_production or current_branch_name == "main")
     else current_branch_name
 )
-image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
+image = f"{registry}/{local_workdir.name}:{tag}"
+
+# ----------- Azure blob storage mount strings ---------------
+
+# Used in the cloud, and combined with the local mounting dir, used locally
+blob_mounts = [
+    f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
+    f"nssp-etl:{container_workdir}/nssp-etl",
+    f"nwss-vintages:{container_workdir}/nwss-vintages",
+    f"prod-param-estimates:{container_workdir}/params",
+    f"stf-routine-forecasting-config:{container_workdir}/config",
+    f"stf-routine-forecasting-prod-output:{container_workdir}/output",
+    f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
+]
+
+# Used when mounting with docker
+local_mounting_dir = f"{local_workdir}/blobfuse/mounts/"
 
 # ---------- Execution Configuration ----------
 
@@ -109,10 +122,6 @@ docker_execution_config = ExecutionConfig(
         class_name=docker_executor.__name__,
         config={
             "image": image,
-            "env_vars": [
-                f"DAGSTER_USER={user}",
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-            ],
             "retries": {"enabled": {}},
             "container_kwargs": {
                 "volumes": [
@@ -120,16 +129,11 @@ docker_execution_config = ExecutionConfig(
                     f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    f"{__file__}:/{workdir}/{os.path.basename(__file__)}",
+                    f"{__file__}:{container_workdir}/{os.path.basename(__file__)}",
                     # blob container mounts for cfa-stf-routine-forecasting
-                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    f"{local_workdir}/blobfuse/mounts/nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    f"{local_workdir}/blobfuse/mounts/params:/cfa-stf-routine-forecasting/params",
-                    f"{local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
-                    f"{local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
-                    f"{local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
+                    # with the docker executor we need the local mounting dir as well
                 ]
+                + [local_mounting_dir + mount for mount in blob_mounts]
             },
         },
     ),
@@ -146,9 +150,6 @@ azure_batch_execution_config = ExecutionConfig(
                 if is_production  # image will come from the code location in prod
                 else {"image": image}
             ),
-            "env_vars": [
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-            ],
             "container_kwargs": {
                 "volumes": [
                     # bind the ~/.azure folder for optional cli login
@@ -156,15 +157,10 @@ azure_batch_execution_config = ExecutionConfig(
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
                     # blob container mounts for cfa-stf-routine-forecasting
-                    "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                    "stf-routine-forecasting-config:/cfa-stf-routine-forecasting/config",
-                    "stf-routine-forecasting-prod-output:/cfa-stf-routine-forecasting/output",
-                    "stf-routine-forecasting-test-output:/cfa-stf-routine-forecasting/test-output",
-                ],
-                "working_dir": "/cfa-stf-routine-forecasting",
+                    # we do not need the local mounting dir for azure batch
+                ]
+                + blob_mounts,
+                "working_dir": f"{container_workdir}",
             },
         },
     ),
@@ -172,8 +168,11 @@ azure_batch_execution_config = ExecutionConfig(
 
 # ============================================================================
 # GRAPH DIMENSIONS AND PARTITIONS
-# ============================================================================
 # How are the data split and processed in Azure Batch?
+# ============================================================================
+
+DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
+SUPPORTED_DISEASES = ["COVID-19"]
 
 # Disease dimensions
 DISEASES = SUPPORTED_DISEASES
@@ -728,6 +727,130 @@ def postprocess_forecasts(
 
 
 # ============================================================================
+# JOBS AND OPS
+# These can create images.
+# ============================================================================
+
+# These are only used in dev - they should not appear on the production webserver
+if not is_production():
+    # Build and Push Image ---------------------------
+
+    @dg.op
+    def build_image_op(
+        context: dg.OpExecutionContext,
+        should_push: bool,
+        should_deploy_to_prod: bool,
+        dockerfile_path: str,
+        build_context: str,
+        image: str,
+    ):
+        """
+        Builds the image used by dagster. Requires that your VM be registered with an Azure managed identity.
+
+        should_push: bool - should the image be pushed to the Container Registry?
+        should_deploy_to_prod: bool - should the prod server be updated with the newest image? (usually you do not want to do this)
+        dockerfile_path: str - where is the Dockerfile located locally? (has a default)
+        build_context: str - where should we build from? (has a default)
+        image: str - the full name (including registry and tag) of the image
+        """
+
+        build_command = [
+            "docker",
+            "buildx",
+            "build",
+            "-t",
+            image,
+            "-f",
+            dockerfile_path,
+            build_context,
+        ]
+
+        if should_push:
+            subprocess.run(
+                ["az", "login", "--identity"],
+                check=True,
+            )
+            subprocess.run(["az", "acr", "login", "-n", registry], check=True)
+            build_command.append("--push")
+
+        context.log.info(f"Running {' '.join(build_command)}")
+        subprocess.run(build_command, check=True)
+
+        update_script_url = (
+            # repo
+            "https://raw.githubusercontent.com/CDCgov/cfa-dagster/"
+            # ref
+            "refs/heads/main/"
+            # file
+            "scripts/update_code_location.py"
+        )
+
+        if should_deploy_to_prod:
+            context.log.info(f"Deploying {image} to the dagster prod server.")
+            subprocess.run(
+                ["uv", "run", update_script_url, "--registry_image", image], check=True
+            )
+
+    @dg.job(
+        description=(
+            "Build the container image used by dagster to run this project's asset pipelines."
+            "Run after making any change and before running the pipelines."
+        ),
+        config=dg.RunConfig(
+            ops={
+                "build_image_op": {
+                    "inputs": {
+                        "should_push": True,
+                        "should_deploy_to_prod": False,
+                        "dockerfile_path": f"{local_workdir}/Dockerfile",
+                        # the build context should be the top level of the repo
+                        "build_context": str(local_workdir),
+                        "image": image,
+                    }
+                }
+            },
+            # configure this job to run on your computer
+            execution=basic_execution_config.to_run_config(),
+        ),
+        executor_def=dynamic_executor(),
+    )
+    def build_image():
+        build_image_op()
+
+    # Explore the image you built as it will be run with dagster ---------------------------
+
+    @dg.op
+    def explore_image_op(
+        context: dg.OpExecutionContext,
+    ):
+        """
+        Allows you to run the container you previously built and explore the filesystem that will be used by dagster.
+        """
+        context.log.info(
+            "Check the terminal from which you ran the webserver to interact; stdout from your terminal will appear below."
+        )
+        explore_cmd = (
+            ["docker", "run", "-it"]
+            + [
+                item
+                for mount in blob_mounts
+                for item in ("-v", local_mounting_dir + mount)
+            ]
+            + ["--rm", image, "bash"]
+        )
+        subprocess.run(explore_cmd, check=True)
+
+    @dg.job(
+        description=(
+            "Interactively navigate the filesystem of your last-built container, "
+            "as it would be used in Docker or Azure Batch execution."
+        ),
+        executor_def=dg.in_process_executor,
+    )
+    def explore_image():
+        explore_image_op()
+
+# ============================================================================
 # DAGSTER DEFINITIONS OBJECT
 # ============================================================================
 # This code allows us to collect all of the above definitions into a single
@@ -765,6 +888,10 @@ defs = dg.Definitions(
         default_config=azure_batch_execution_config,
         # default_config=basic_execution_config,
         # default_config=docker_execution_config,
-        alternate_configs=[basic_execution_config, docker_execution_config],
+        alternate_configs=[
+            basic_execution_config,
+            docker_execution_config,
+            azure_batch_execution_config,
+        ],
     ),
 )

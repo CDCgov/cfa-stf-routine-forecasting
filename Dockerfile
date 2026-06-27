@@ -1,5 +1,9 @@
 FROM rocker/tidyverse:4.5.3
 
+#
+# General Build Args and Environment Variables
+#
+
 ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 
 #
@@ -41,9 +45,6 @@ WORKDIR /cfa-stf-routine-forecasting
 # environment under pipelines/epiautogp, so we commit its Manifest.toml for a
 # reproducible EpiAutoGP dependency set.
 RUN julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
-
-
-
 
 # Install stfroutineforecasting
 RUN Rscript -e "install.packages('pak')"

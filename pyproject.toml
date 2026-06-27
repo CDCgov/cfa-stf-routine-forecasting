@@ -54,7 +54,8 @@ dev = [
   "ipykernel",
   "ipywidgets",
   "jupyter>=1.0.0",
-  "cfa-dagster[dev]"
+  "cfa-dagster[dev]",
+  "pre-commit>=4.6.0",
 ]
 dagster-config-editor = [
     "py-yaml12",

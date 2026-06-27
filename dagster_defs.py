@@ -19,6 +19,7 @@ from cfa_dagster import (
     docker_executor,
     dynamic_executor,
     dynamic_graph_asset,
+    is_production,
     start_dev_env,
 )
 from dagster_azure.blob import (
@@ -50,9 +51,6 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
-# env variable set by Dagster CLI
-is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
-
 # get the user running the Dagster instance
 user = os.getenv("DAGSTER_USER")
 
@@ -66,8 +64,8 @@ user = os.getenv("DAGSTER_USER")
 
 # Instead of hardcoding the repo name, this will always find the containing directory of this defs file
 # As of 6/2026, cfa-stf-routine-forecasting
-local_workdir = Path(__file__).parent.resolve()
-container_workdir = Path(f"/{local_workdir.name}")
+local_workdir = Path(__file__).parent.resolve() # absolute path to the workdir 
+container_workdir = Path(f"/{local_workdir.name}") # in the container, workdir is mounted at /
 
 # Get branch name from git, defaulting to main if not in a git repo
 try:
@@ -732,7 +730,7 @@ def postprocess_forecasts(
 # ============================================================================
 
 # These are only used in dev - they should not appear on the production webserver
-if not is_production:
+if not is_production():
     # Build and Push Image ---------------------------
 
     @dg.op

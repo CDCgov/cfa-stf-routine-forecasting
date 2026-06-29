@@ -39,6 +39,14 @@ build-backend = "hatchling.build"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "dagster_defs"
+defs_module = "dagster_defs"
+code_location_target_module = "dagster_defs"
+
 [dependency-groups]
 dev = [
   {include-group = "dagster-config-editor"},
@@ -46,7 +54,8 @@ dev = [
   "ipykernel",
   "ipywidgets",
   "jupyter>=1.0.0",
-  "cfa-dagster[dev]"
+  "cfa-dagster[dev]",
+  "pre-commit>=4.6.0",
 ]
 dagster-config-editor = [
     "py-yaml12",

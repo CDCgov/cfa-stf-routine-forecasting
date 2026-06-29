@@ -9,6 +9,10 @@ ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 # Julia 1.11 from official image
 COPY --from=julia:1.11 /usr/local/julia /usr/local/julia
 ENV PATH="/usr/local/julia/bin:${PATH}"
+ENV JULIA_DEPOT_DIR=/opt/julia-depot
+ENV JULIA_DEPOT_PATH=${JULIA_DEPOT_DIR}:
+ENV JULIA_CPU_TARGET=generic
+ENV JULIA_PKG_PRECOMPILE_AUTO=0
 
 # Python from https://docs.astral.sh/uv/guides/integration/docker/
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -40,7 +44,9 @@ WORKDIR /cfa-stf-routine-forecasting
 # the EpiAutoGP subprocess without downloading packages. This is a script
 # environment under pipelines/epiautogp, so we commit its Manifest.toml for a
 # reproducible EpiAutoGP dependency set.
-RUN julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+RUN mkdir -p "${JULIA_DEPOT_DIR}" \
+    && julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
+    && chmod -R a+rwX "${JULIA_DEPOT_DIR}"
 
 
 

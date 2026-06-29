@@ -16,13 +16,14 @@ from cfa_dagster import (
     GraphDimensionExclusion,
     SelectorConfig,
     azure_batch_executor,
-    azure_container_app_job_executor,
     collect_definitions,
     docker_executor,
     dynamic_executor,
     dynamic_graph_asset,
-    is_production as is_prod,
     start_dev_env,
+)
+from cfa_dagster import (
+    is_production as is_prod,
 )
 from pydantic import BaseModel, Field
 from pygit2.repository import Repository
@@ -108,9 +109,7 @@ local_mounting_dir = f"{local_workdir}/blobfuse/mounts/"
 # Launches locally in a new system process
 # Used for lightweight assets and jobs, etc. where volume mounts are not needed
 basic_execution_config = ExecutionConfig(
-    executor=SelectorConfig(
-        class_name=dg.multiprocess_executor.__name__
-    ),
+    executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
 )
 
 # Launches locally, executes in a docker container as configured below

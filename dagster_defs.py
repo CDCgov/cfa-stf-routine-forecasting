@@ -21,7 +21,7 @@ from cfa_dagster import (
     docker_executor,
     dynamic_executor,
     dynamic_graph_asset,
-    is_production,
+    is_production as is_prod,
     start_dev_env,
 )
 from pydantic import BaseModel, Field
@@ -52,6 +52,8 @@ start_dev_env(__name__)
 
 # get the user running the Dagster instance
 user = os.getenv("DAGSTER_USER")
+
+is_production = is_prod()
 
 # ============================================================================
 # RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
@@ -103,14 +105,11 @@ local_mounting_dir = f"{local_workdir}/blobfuse/mounts/"
 
 # ---------- Execution Configuration ----------
 
-# Most basic execution - in dev, launches and runs locally
-# In prod, launches on the code location but runs in Azure Container App Jobs
+# Launches locally in a new system process
 # Used for lightweight assets and jobs, etc. where volume mounts are not needed
 basic_execution_config = ExecutionConfig(
     executor=SelectorConfig(
-        class_name=azure_container_app_job_executor.__name__
-        if is_production
-        else dg.multiprocess_executor.__name__
+        class_name=dg.multiprocess_executor.__name__
     ),
 )
 
@@ -826,7 +825,7 @@ def postprocess_forecasts(
 # ============================================================================
 
 # These are only used in dev - they should not appear on the production webserver
-if not is_production():
+if not is_production:
     # Build and Push Image ---------------------------
 
     @dg.op

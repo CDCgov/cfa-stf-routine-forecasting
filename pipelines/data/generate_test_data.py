@@ -102,7 +102,9 @@ def main(base_dir: Path, clean: bool):
         diseases_to_simulate=diseases_to_simulate,
         clean=False,
         rng_key=jr.key(461),
-        priors_source_path=Path("pipelines/priors/data_generation_test_priors.py"),
+        priors_source_path=Path(
+            "pipelines/pyrenew_hew/priors/data_generation_test_priors.py"
+        ),
     )
 
     # Simulate data for states without reference subpopulation
@@ -121,7 +123,9 @@ def main(base_dir: Path, clean: bool):
         diseases_to_simulate=diseases_to_simulate,
         clean=clean,
         rng_key=jr.key(461),
-        priors_source_path=Path("pipelines/priors/data_generation_test_priors.py"),
+        priors_source_path=Path(
+            "pipelines/pyrenew_hew/priors/data_generation_test_priors.py"
+        ),
     )
 
     # Concatenate dataframes by variable names

@@ -246,7 +246,7 @@ def simulate_data_from_bootstrap(
     diseases_to_simulate: list[str],
     clean: bool = True,
     rng_key: Array = jr.key(123),
-    priors_source_path: Path = Path("pipelines/priors/prod_priors.py"),
+    priors_source_path: Path = Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
 ) -> dict[str, pl.DataFrame]:
     """
     Simulate data from bootstrap model.

@@ -9,6 +9,9 @@ runs:
       with:
         version: "1.11"
 
+    - name: Cache Julia packages
+      uses: julia-actions/cache@v3
+
     - name: Install Julia dependencies
       run: julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
       shell: bash

@@ -25,7 +25,6 @@ from pipelines.utils.common_utils import (
 from pipelines.utils.postprocess_forecast_batches import main as postprocess_batches
 
 FORECAST_DIR_NAME = "2024-12-21_forecasts"
-POSTPROCESSED_FIGURES_DIR_NAME = "postprocessed_figures"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
 EXPECTED_OMIT_DAYS = 1
@@ -229,7 +228,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace):
             workspace / FORECAST_DIR_NAME,
             diseases=DEFAULT_DISEASES,
             skip_existing=False,
-            local_copy_dir=workspace / POSTPROCESSED_FIGURES_DIR_NAME,
+            local_copy_dir=workspace / FORECAST_DIR_NAME,
         )
 
     for disease in DEFAULT_DISEASES:
@@ -249,7 +248,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace):
 
             copied_figures_dir = (
                 workspace
-                / POSTPROCESSED_FIGURES_DIR_NAME
+                / FORECAST_DIR_NAME
                 / f"lookback-{N_TRAINING_DAYS}-omit-{EXPECTED_OMIT_DAYS}"
                 / disease
             )

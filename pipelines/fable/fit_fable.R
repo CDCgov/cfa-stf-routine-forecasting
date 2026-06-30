@@ -48,7 +48,6 @@ fit_and_forecast_ensemble <- function(
 ) {
   forecast_horizon <- glue::glue("{n_forecast_days} days")
   target_sym <- rlang::sym(target_col)
-  output_sym <- rlang::sym(output_col)
 
   offset <- 1
 

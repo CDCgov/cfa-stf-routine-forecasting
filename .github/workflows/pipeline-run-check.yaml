@@ -2,14 +2,14 @@ name: Pipeline Run Check
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - "pipelines/**"
       - "cfa/**"
       - "stfroutineforecasting/**"
       - "uv.lock"
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - "pipelines/**"
       - "cfa/**"
@@ -37,5 +37,5 @@ jobs:
       - name: Set up routine forecasting Julia
         uses: ./.github/actions/setup-routine-forecasting-julia
 
-      - name: Run reduced pipeline integration test
+      - name: Run pipeline integration test
         run: uv run pytest -s -m pipeline_e2e pipelines/tests/integration

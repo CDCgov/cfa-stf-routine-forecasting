@@ -30,9 +30,11 @@ N_FORECAST_DAYS = 14
 EXPECTED_OMIT_DAYS = 1
 EXPECTED_MODELS = [
     "daily_fable_e_other",
+    "epiweekly_fable_e_other",
     "pyrenew_e",
     "epiautogp_nssp_daily_other",
     "prop_pyrenew_e_daily_fable_e_other",
+    "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other",
     "prop_pyrenew_e_epiautogp_nssp_daily_other",
 ]
 
@@ -79,7 +81,9 @@ def pipeline_workspace(request, tmp_path, monkeypatch):
     return workspace
 
 
-def _run_fable(workspace: Path, disease: str, location: str) -> None:
+def _run_fable(
+    workspace: Path, disease: str, location: str, *, epiweekly: bool = False
+) -> None:
     forecast_fable(
         disease=disease,
         loc=location,
@@ -88,6 +92,7 @@ def _run_fable(workspace: Path, disease: str, location: str) -> None:
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
         n_samples=40,
+        epiweekly=epiweekly,
         nhsn_data_path=(
             workspace
             / "private_data"
@@ -161,18 +166,37 @@ def _model_batch_dir(workspace: Path, disease: str) -> Path:
 
 
 def _run_fusions(model_run_dir: Path) -> None:
-    fusion_pairs = [
-        ("pyrenew_e", "daily_fable_e_other"),
-        ("pyrenew_e", "epiautogp_nssp_daily_other"),
+    fusion_specs = [
+        {
+            "num_model_name": "pyrenew_e",
+            "other_model_name": "daily_fable_e_other",
+            "aggregate_num": False,
+            "fusion_model_name": "prop_pyrenew_e_daily_fable_e_other",
+        },
+        {
+            "num_model_name": "pyrenew_e",
+            "other_model_name": "epiweekly_fable_e_other",
+            "aggregate_num": True,
+            "fusion_model_name": (
+                "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other"
+            ),
+        },
+        {
+            "num_model_name": "pyrenew_e",
+            "other_model_name": "epiautogp_nssp_daily_other",
+            "aggregate_num": False,
+            "fusion_model_name": "prop_pyrenew_e_epiautogp_nssp_daily_other",
+        },
     ]
-    for num_model_name, other_model_name in fusion_pairs:
+    for fusion_spec in fusion_specs:
         create_prop_samples(
             model_run_dir=model_run_dir,
-            num_model_name=num_model_name,
-            other_model_name=other_model_name,
+            num_model_name=fusion_spec["num_model_name"],
+            other_model_name=fusion_spec["other_model_name"],
+            aggregate_num=fusion_spec["aggregate_num"],
             save=True,
         )
-        fusion_model_dir = model_run_dir / f"prop_{num_model_name}_{other_model_name}"
+        fusion_model_dir = model_run_dir / fusion_spec["fusion_model_name"]
         make_figures_from_model_fit_dir(
             fusion_model_dir,
             save_figs=True,
@@ -207,6 +231,9 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace):
         for location in DEFAULT_LOCATIONS:
             with _status_step(f"Running Fable for {disease}, {location}"):
                 _run_fable(workspace, disease, location)
+
+            with _status_step(f"Running epiweekly Fable for {disease}, {location}"):
+                _run_fable(workspace, disease, location, epiweekly=True)
 
             with _status_step(f"Running PyRenew for {disease}, {location}"):
                 _run_pyrenew(workspace, disease, location)

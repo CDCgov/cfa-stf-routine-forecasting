@@ -14,7 +14,7 @@ augment_samples_with_obs <- function(samples, obs) {
 
   checkmate::assert_set_equal(sample_resolution, obs_resolution)
   target_draws <- samples[[".draw"]] |> unique() |> sort()
-  obs_as_samples <- obs |>
+  obs |>
     dplyr::filter(.data[["date"]] < !!first_forecast_date) |>
     tidyr::expand_grid(.draw = target_draws) |>
     mutate(data_type = "train") |>

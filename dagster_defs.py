@@ -390,7 +390,7 @@ def _run_pyrenew_model(
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
         nwss_data_dir=Path("nwss-vintages"),
         param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
+        priors_path=Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
         output_dir=daily_forecast_output_dir,
         n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,

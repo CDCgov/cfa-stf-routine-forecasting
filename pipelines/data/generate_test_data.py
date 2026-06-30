@@ -2,11 +2,13 @@
 
 import argparse
 import datetime as dt
+from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
 import polars.selectors as cs
 
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.data.generate_test_data_lib import (
     FACILITY_LEVEL_NSSP_DATA_COLS,
     LOC_LEVEL_NSSP_DATA_COLS,
@@ -23,22 +25,31 @@ FIRST_OBS_DATE = REPORT_DATE - dt.timedelta(days=OBS_WINDOW_DAYS)
 N_FACILITIES = 3
 FIRST_FACILITY_ID = 1
 
-ED_BASELINE = 12
-ED_LOCATION_INCREMENT = 4
-ED_DISEASE_INCREMENT = 3
+ED_BASELINE_PERCENT = 0.0012
+ED_DISEASE_INCREMENT_PERCENT = 0.0003
+ED_FACILITY_INCREMENT_PERCENT = 0.0001
+ED_TREND_INCREMENT_PERCENT = 0.0001
+ED_SEASONAL_INCREMENT_PERCENT = 0.0001
 ED_TREND_PERIOD_DAYS = 21
 ED_SEASONAL_PERIOD_DAYS = 7
-TOTAL_ED_BASELINE_OFFSET = 250
-TOTAL_ED_FACILITY_INCREMENT = 10
+TOTAL_ED_BASELINE_OFFSET_PERCENT = 0.025
+TOTAL_ED_FACILITY_INCREMENT_PERCENT = 0.001
 
-NHSN_BASELINE = 20
-NHSN_LOCATION_INCREMENT = 4
-NHSN_DISEASE_INCREMENT = 5
+NHSN_BASELINE_PERCENT = 0.002
+NHSN_DISEASE_INCREMENT_PERCENT = 0.0005
+NHSN_WEEKLY_TREND_INCREMENT_PERCENT = 0.0001
+NHSN_SEASONAL_INCREMENT_PERCENT = 0.0001
 NHSN_SEASONAL_PERIOD_WEEKS = 4
 WEEK_ENDING_WEEKDAY = 5
 DAYS_PER_WEEK = 7
 
 _NSSP_DISEASE_NAMES = {"COVID-19": "COVID-19/Omicron"}
+
+
+@dataclass(frozen=True)
+class LocationData:
+    abbr: str
+    population: int
 
 
 def _date_range(start: dt.date, end: dt.date, step_days: int = 1) -> list[dt.date]:
@@ -56,75 +67,187 @@ def _nssp_disease_name(disease: str) -> str:
     return _NSSP_DISEASE_NAMES.get(disease, disease)
 
 
+def _population_by_location(locations: list[str]) -> dict[str, int]:
+    population_table = get_us_loc_pop_tbl().filter(pl.col("abbr").is_in(locations))
+    population_by_location = dict(
+        zip(
+            population_table.get_column("abbr").to_list(),
+            population_table.get_column("population").to_list(),
+            strict=True,
+        )
+    )
+    missing_locations = sorted(set(locations) - set(population_by_location))
+    if missing_locations:
+        raise ValueError(
+            "No population found for location(s): " + ", ".join(missing_locations)
+        )
+    return population_by_location
+
+
+def _location_data(locations: list[str]) -> list[LocationData]:
+    population_by_location = _population_by_location(locations)
+    return [
+        LocationData(abbr=location, population=population_by_location[location])
+        for location in locations
+    ]
+
+
+def _count_from_population_percent(population: int, percent: float) -> int:
+    return max(1, round(population * percent / 100))
+
+
+def _ed_percent(date: dt.date, disease_index: int, facility: int) -> float:
+    day_index = (date - FIRST_OBS_DATE).days
+    trend = day_index // ED_TREND_PERIOD_DAYS
+    seasonal = (day_index + facility + disease_index) % ED_SEASONAL_PERIOD_DAYS
+    return (
+        ED_BASELINE_PERCENT
+        + ED_DISEASE_INCREMENT_PERCENT * disease_index
+        + ED_FACILITY_INCREMENT_PERCENT * facility
+        + ED_TREND_INCREMENT_PERCENT * trend
+        + ED_SEASONAL_INCREMENT_PERCENT * seasonal
+    )
+
+
+def _total_ed_offset_percent(facility: int) -> float:
+    return (
+        TOTAL_ED_BASELINE_OFFSET_PERCENT
+        + TOTAL_ED_FACILITY_INCREMENT_PERCENT * facility
+    )
+
+
+def _nhsn_percent(week_index: int, disease_index: int) -> float:
+    seasonal = week_index % NHSN_SEASONAL_PERIOD_WEEKS
+    return (
+        NHSN_BASELINE_PERCENT
+        + NHSN_DISEASE_INCREMENT_PERCENT * disease_index
+        + NHSN_WEEKLY_TREND_INCREMENT_PERCENT * week_index
+        + NHSN_SEASONAL_INCREMENT_PERCENT * seasonal
+    )
+
+
 def _daily_count(
     *,
     date: dt.date,
-    location_index: int,
+    population: int,
     disease_index: int,
     facility: int,
 ) -> int:
-    day_index = (date - FIRST_OBS_DATE).days
-    baseline = (
-        ED_BASELINE
-        + ED_LOCATION_INCREMENT * location_index
-        + ED_DISEASE_INCREMENT * disease_index
-        + facility
+    return _count_from_population_percent(
+        population,
+        _ed_percent(date, disease_index, facility),
     )
-    trend = day_index // ED_TREND_PERIOD_DAYS
-    seasonal = (day_index + facility + disease_index) % ED_SEASONAL_PERIOD_DAYS
-    return baseline + trend + seasonal
+
+
+def _nssp_row(
+    *,
+    location: str,
+    date: dt.date,
+    facility: int,
+    disease: str,
+    value: int,
+) -> dict:
+    return {
+        "reference_date": date,
+        "report_date": REPORT_DATE,
+        "geo_type": "state",
+        "geo_value": location,
+        "asof": REPORT_DATE,
+        "metric": "count_ed_visits",
+        "run_id": 0,
+        "facility": facility,
+        "disease": disease,
+        "value": value,
+    }
+
+
+def _facility_ids() -> range:
+    return range(FIRST_FACILITY_ID, N_FACILITIES + 1)
+
+
+def _observation_dates() -> list[dt.date]:
+    return _date_range(FIRST_OBS_DATE, REPORT_DATE)
+
+
+def _weekending_dates() -> list[dt.date]:
+    first_week = _first_weekday_on_or_after(FIRST_OBS_DATE, WEEK_ENDING_WEEKDAY)
+    return _date_range(first_week, REPORT_DATE, step_days=DAYS_PER_WEEK)
+
+
+def _write_parquet(data: pl.DataFrame, directory: Path, file_name: str) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    data.write_parquet(directory / file_name)
+
+
+def _resolve_values(
+    values: list[str] | None,
+    default: list[str],
+    name: str,
+) -> list[str]:
+    resolved = default if values is None else values
+    if not resolved:
+        raise ValueError(f"{name} must include at least one {name[:-1]}")
+    return resolved
+
+
+def _write_param_estimates(
+    private_data_dir: Path,
+    locations: list[str],
+    diseases: list[str],
+) -> None:
+    param_estimates = create_default_param_estimates(
+        states_to_simulate=locations,
+        diseases_to_simulate=diseases,
+        max_train_date_str=REPORT_DATE.isoformat(),
+        max_train_date=REPORT_DATE,
+    )
+    _write_parquet(
+        param_estimates,
+        private_data_dir / "prod_param_estimates",
+        "prod.parquet",
+    )
 
 
 def _make_facility_level_nssp(
     *,
-    locations: list[str],
+    locations: list[LocationData],
     diseases: list[str],
 ) -> pl.DataFrame:
     rows = []
-    for location_index, location in enumerate(locations):
-        for date in _date_range(FIRST_OBS_DATE, REPORT_DATE):
-            for facility in range(FIRST_FACILITY_ID, N_FACILITIES + 1):
+    for location in locations:
+        for date in _observation_dates():
+            for facility in _facility_ids():
                 disease_total = 0
                 for disease_index, disease in enumerate(diseases):
                     value = _daily_count(
                         date=date,
-                        location_index=location_index,
+                        population=location.population,
                         disease_index=disease_index,
                         facility=facility,
                     )
                     disease_total += value
                     rows.append(
-                        {
-                            "reference_date": date,
-                            "report_date": REPORT_DATE,
-                            "geo_type": "state",
-                            "geo_value": location,
-                            "asof": REPORT_DATE,
-                            "metric": "count_ed_visits",
-                            "run_id": 0,
-                            "facility": facility,
-                            "disease": _nssp_disease_name(disease),
-                            "value": value,
-                        }
+                        _nssp_row(
+                            location=location.abbr,
+                            date=date,
+                            facility=facility,
+                            disease=_nssp_disease_name(disease),
+                            value=value,
+                        )
                     )
 
+                total_value = disease_total + _count_from_population_percent(
+                    location.population,
+                    _total_ed_offset_percent(facility),
+                )
                 rows.append(
-                    {
-                        "reference_date": date,
-                        "report_date": REPORT_DATE,
-                        "geo_type": "state",
-                        "geo_value": location,
-                        "asof": REPORT_DATE,
-                        "metric": "count_ed_visits",
-                        "run_id": 0,
-                        "facility": facility,
-                        "disease": "Total",
-                        "value": (
-                            disease_total
-                            + TOTAL_ED_BASELINE_OFFSET
-                            + TOTAL_ED_FACILITY_INCREMENT * facility
-                        ),
-                    }
+                    _nssp_row(
+                        location=location.abbr,
+                        date=date,
+                        facility=facility,
+                        disease="Total",
+                        value=total_value,
+                    )
                 )
 
     return pl.DataFrame(rows).select(cs.by_name(FACILITY_LEVEL_NSSP_DATA_COLS))
@@ -142,26 +265,20 @@ def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
 
 def _make_nhsn(
     *,
-    location: str,
-    location_index: int,
-    disease: str,
+    location: LocationData,
     disease_index: int,
 ) -> pl.DataFrame:
     rows = []
-    first_week = _first_weekday_on_or_after(FIRST_OBS_DATE, WEEK_ENDING_WEEKDAY)
-    for week_index, weekendingdate in enumerate(
-        _date_range(first_week, REPORT_DATE, step_days=DAYS_PER_WEEK)
-    ):
+    for week_index, weekendingdate in enumerate(_weekending_dates()):
         rows.append(
             {
-                "jurisdiction": location,
+                "jurisdiction": location.abbr,
                 "weekendingdate": weekendingdate,
                 "hospital_admissions": (
-                    NHSN_BASELINE
-                    + NHSN_LOCATION_INCREMENT * location_index
-                    + NHSN_DISEASE_INCREMENT * disease_index
-                    + week_index
-                    + (week_index % NHSN_SEASONAL_PERIOD_WEEKS)
+                    _count_from_population_percent(
+                        location.population,
+                        _nhsn_percent(week_index, disease_index),
+                    )
                 ),
             }
         )
@@ -169,62 +286,64 @@ def _make_nhsn(
     return pl.DataFrame(rows).select(cs.by_name(NHSN_COLS))
 
 
+def _write_nssp_data(private_data_dir: Path, facility_level_nssp: pl.DataFrame) -> None:
+    _write_parquet(
+        facility_level_nssp,
+        private_data_dir / "nssp_etl_gold",
+        f"{REPORT_DATE}.parquet",
+    )
+
+    state_level_nssp = _make_state_level_nssp(facility_level_nssp)
+    _write_parquet(
+        state_level_nssp,
+        private_data_dir / "nssp_state_level_gold",
+        f"{REPORT_DATE}.parquet",
+    )
+    _write_parquet(
+        state_level_nssp.select(cs.exclude("any_update_this_day")),
+        private_data_dir / "nssp-etl",
+        "latest_comprehensive.parquet",
+    )
+
+
+def _write_nhsn_data(
+    private_data_dir: Path,
+    locations: list[LocationData],
+    diseases: list[str],
+) -> None:
+    nhsn_dir = private_data_dir / "nhsn_test_data"
+    nhsn_dir.mkdir(parents=True, exist_ok=True)
+    for location in locations:
+        for disease_index, disease in enumerate(diseases):
+            _make_nhsn(
+                location=location,
+                disease_index=disease_index,
+            ).write_parquet(nhsn_dir / f"{disease}_{location.abbr}.parquet")
+
+
 def main(
     base_dir: Path,
     locations: list[str] | None = None,
     diseases: list[str] | None = None,
 ) -> None:
-    locations = DEFAULT_LOCATIONS if locations is None else locations
-    diseases = DEFAULT_DISEASES if diseases is None else diseases
-
-    if not locations:
-        raise ValueError("locations must include at least one location")
-    if not diseases:
-        raise ValueError("diseases must include at least one disease")
+    locations = _resolve_values(locations, DEFAULT_LOCATIONS, "locations")
+    diseases = _resolve_values(diseases, DEFAULT_DISEASES, "diseases")
+    location_data = _location_data(locations)
 
     private_data_dir = base_dir / "private_data"
     private_data_dir.mkdir(parents=True, exist_ok=True)
 
-    param_estimates_dir = private_data_dir / "prod_param_estimates"
-    param_estimates_dir.mkdir(parents=True, exist_ok=True)
-    create_default_param_estimates(
-        states_to_simulate=locations,
-        diseases_to_simulate=diseases,
-        max_train_date_str=REPORT_DATE.isoformat(),
-        max_train_date=REPORT_DATE,
-    ).write_parquet(param_estimates_dir / "prod.parquet")
+    _write_param_estimates(private_data_dir, locations, diseases)
 
     facility_level_nssp = _make_facility_level_nssp(
-        locations=locations,
+        locations=location_data,
         diseases=diseases,
     )
-    nssp_etl_gold_dir = private_data_dir / "nssp_etl_gold"
-    nssp_etl_gold_dir.mkdir(parents=True, exist_ok=True)
-    facility_level_nssp.write_parquet(nssp_etl_gold_dir / f"{REPORT_DATE}.parquet")
+    _write_nssp_data(private_data_dir, facility_level_nssp)
+    _write_nhsn_data(private_data_dir, location_data, diseases)
 
-    state_level_nssp = _make_state_level_nssp(facility_level_nssp)
-    nssp_state_level_gold_dir = private_data_dir / "nssp_state_level_gold"
-    nssp_state_level_gold_dir.mkdir(parents=True, exist_ok=True)
-    state_level_nssp.write_parquet(nssp_state_level_gold_dir / f"{REPORT_DATE}.parquet")
-
-    nssp_etl_dir = private_data_dir / "nssp-etl"
-    nssp_etl_dir.mkdir(parents=True, exist_ok=True)
-    state_level_nssp.select(cs.exclude("any_update_this_day")).write_parquet(
-        nssp_etl_dir / "latest_comprehensive.parquet"
-    )
-
-    nhsn_dir = private_data_dir / "nhsn_test_data"
-    nhsn_dir.mkdir(parents=True, exist_ok=True)
-    for location_index, location in enumerate(locations):
-        for disease_index, disease in enumerate(diseases):
-            _make_nhsn(
-                location=location,
-                location_index=location_index,
-                disease=disease,
-                disease_index=disease_index,
-            ).write_parquet(nhsn_dir / f"{disease}_{location}.parquet")
-
-    (private_data_dir / "nwss_vintages").mkdir(parents=True, exist_ok=True)
+    # PyRenew accepts an NWSS directory even when wastewater is not fit.
+    (private_data_dir / "nwss_vintages").mkdir(exist_ok=True)
     print(f"Successfully generated test data in {private_data_dir}")
 
 

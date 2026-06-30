@@ -74,6 +74,11 @@ fix = true
 [tool.ruff.lint]
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
+[tool.pytest.ini_options]
+markers = [
+    "pipeline_e2e: end-to-end pipeline integration test",
+]
+
 [tool.uv]
 override-dependencies = [
     "arviz-base[h5netcdf]==1.3.0.dev0",

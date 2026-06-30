@@ -453,7 +453,7 @@ def _run_fusion_model(
     Helper function to run fusion model.
     """
     _throw_if_backfill(context, daily_partitions_def)
-    model_loc_dir = get_model_loc_dir(context, model_base_config, model_base_config)
+    model_loc_dir = get_model_loc_dir(context, model_base_config)
     create_prop_samples(
         model_run_dir=model_loc_dir,
         num_model_name=num_model_name,

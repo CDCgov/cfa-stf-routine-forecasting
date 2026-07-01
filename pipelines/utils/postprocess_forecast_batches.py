@@ -63,7 +63,9 @@ def model_batch_dir_to_target_path(
 ) -> Path:
     parts = parse_model_batch_dir_name(model_batch_dir)
     lookback = (parts["last_training_date"] - parts["first_training_date"]).days + 1
-    omit = (parts["report_date"] - parts["last_training_date"]).days - 1
+    omit = (
+        parts["report_date"] - parts["last_training_date"]
+    ).days - 1  # NSSP data available through report_date - 1
     target_path = Path(
         pre_path,
         f"lookback-{lookback}-omit-{omit}",

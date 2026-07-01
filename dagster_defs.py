@@ -232,13 +232,14 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     exclude_last_n_days: int = 1
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
     locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
+    # Add defaults here, or add in the launchpad with ctrl+space
     config_overrides: list[ConfigOverride] = [
-        ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
-        ConfigOverride(location="MN", exclude_last_n_days=2).as_dict(),
-        ConfigOverride(location="NY", exclude_last_n_days=3).as_dict(),
-        ConfigOverride(location="AZ", exclude_last_n_days=5).as_dict(),
-        ConfigOverride(location="SD", exclude_last_n_days=5).as_dict(),
-        ConfigOverride(location="ND", exclude_last_n_days=5).as_dict(),
+        # ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
+        # ConfigOverride(location="MN", exclude_last_n_days=2).as_dict(),
+        # ConfigOverride(location="NY", exclude_last_n_days=3).as_dict(),
+        # ConfigOverride(location="AZ", exclude_last_n_days=5).as_dict(),
+        # ConfigOverride(location="SD", exclude_last_n_days=5).as_dict(),
+        # ConfigOverride(location="ND", exclude_last_n_days=5).as_dict(),
     ]  # type: ignore[reportInvalidTypeForm]
 
     def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]

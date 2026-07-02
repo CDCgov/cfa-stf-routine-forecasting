@@ -200,25 +200,12 @@ class _ModelTrainingFields(BaseModel):
     n_training_days: int = Field(default_factory=lambda: 0)
     exclude_last_n_days: int = Field(default_factory=lambda: 0)
 
-    @classmethod
-    def extract_from(cls, instance: BaseModel) -> dict:
-        return {f: getattr(instance, f) for f in cls.model_fields}
-
 
 class ConfigOverride(_ModelTrainingFields, dg.Config):
     location: Location  # type: ignore[reportInvalidTypeForm]
 
     def as_dict(self) -> dict:  # type: ignore[reportInvalidTypeForm]
         return self.model_dump(mode="json", exclude_unset=True)
-
-    @classmethod
-    def from_dict(
-        cls,
-        base: dict,
-        loc: Location,  # type: ignore[reportInvalidTypeForm]
-        overrides: dict | None = None,
-    ):
-        return cls.model_construct(**{**base, "location": loc, **(overrides or {})})
 
 
 class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
@@ -233,14 +220,17 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
     locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
     # Add defaults here, or add in the launchpad with ctrl+space
-    config_overrides: list[ConfigOverride] = [
-        # ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
-        # ConfigOverride(location="MN", exclude_last_n_days=2).as_dict(),
-        # ConfigOverride(location="NY", exclude_last_n_days=3).as_dict(),
-        # ConfigOverride(location="AZ", exclude_last_n_days=5).as_dict(),
-        # ConfigOverride(location="SD", exclude_last_n_days=5).as_dict(),
-        # ConfigOverride(location="ND", exclude_last_n_days=5).as_dict(),
-    ]  # type: ignore[reportInvalidTypeForm]
+    config_overrides: list[ConfigOverride] = Field(
+        default=[
+            # ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
+        ],
+        description=(
+            "Provide location-specific overrides as a list of dicts. "
+            "The Launchpad accepts both yaml and json-style lists e.g."
+            "config_overrides: [{ location: GA, exclude_last_n_days: 2 }]"
+            ""
+        ),
+    )  # type: ignore[reportInvalidTypeForm]
 
     def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
         """Returns location-specific config if provided via config_overrides"""
@@ -318,7 +308,7 @@ def _throw_if_backfill(
 
 def _run_fable_e_other(
     context: dg.OpExecutionContext,
-    config: FableEOtherConfig,
+    fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
     epiweekly: bool,
 ) -> str | None:
@@ -339,7 +329,7 @@ def _run_fable_e_other(
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
 
-    context.log.info(f"config: '{config}'")
+    context.log.info(f"fable_e_other_config: '{fable_e_other_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_fable(
         disease=disease,
@@ -348,7 +338,7 @@ def _run_fable_e_other(
         output_dir=daily_forecast_output_dir,
         n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
-        n_samples=config.n_samples,
+        n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         epiweekly=epiweekly,
         credentials_path=Path("config/creds.toml"),
@@ -357,7 +347,7 @@ def _run_fable_e_other(
 
 def _run_pyrenew_model(
     context: dg.OpExecutionContext,
-    config: PyrenewConfig,
+    pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
     model_letters: str,
 ) -> str | None:
@@ -377,13 +367,13 @@ def _run_pyrenew_model(
 
     fit_flags = flags_from_hew_letters(model_letters)
     forecast_flags = flags_from_hew_letters(
-        f"{model_letters}{config.additional_forecast_letters}",
+        f"{model_letters}{pyrenew_config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
 
-    context.log.info(f"config: '{config}'")
+    context.log.info(f"config: '{pyrenew_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
         disease=disease,
@@ -395,12 +385,12 @@ def _run_pyrenew_model(
         output_dir=daily_forecast_output_dir,
         n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
+        n_chains=pyrenew_config.n_chains,
+        n_warmup=pyrenew_config.n_warmup,
+        n_samples=pyrenew_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
+        rng_key=pyrenew_config.rng_key,
         **fit_flags,
         **forecast_flags,
     )

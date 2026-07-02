@@ -27,7 +27,7 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess_bat
 FORECAST_DIR_NAME = "2024-12-21_forecasts"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
-EXPECTED_OMIT_DAYS = 1
+EXPECTED_OMIT_DAYS = 0
 EXPECTED_MODELS = [
     "daily_fable_e_other",
     "epiweekly_fable_e_other",

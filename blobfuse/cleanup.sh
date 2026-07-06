@@ -19,9 +19,9 @@ echo "Clearing the cache"
 rm -rf .blobfuse_cache/*
 
 echo "Removing empty directories"
-find . -type d -empty -delete
+find ./blobfuse/ -type d -empty -delete
 
 echo "Removing symlinks"
-find . -type l -delete
+find ./blobfuse/ -type l -delete
 
 echo "Done!"

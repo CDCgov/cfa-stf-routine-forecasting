@@ -1,10 +1,10 @@
-# Test data folder
+# Pipeline Tests
 
-This folder is aimed at running test-mode scripts for validating the inference
-pipeline on the test data. The test data is stored in subdirectories.
+Tests are organized to match the `pipelines` package layout:
 
-To run the test scripts, execute the following command from the `pipelines` directory:
-
-```bash
-% bash ./tests/test_run.sh ./tests/covid-19_r_2024-01-29_f_2023-11-01_t_2024-01-29/model_runs 1000 28
-```
+- `data/`: tests for `pipelines/data`
+- `epiautogp/`: tests and smoke-test scripts for `pipelines/epiautogp`
+- `fable/`: smoke-test scripts for `pipelines/fable`
+- `pyrenew_hew/`: smoke-test scripts for `pipelines/pyrenew_hew`
+- `utils/`: tests for `pipelines/utils`
+- `integration/`: cross-pipeline end-to-end test drivers

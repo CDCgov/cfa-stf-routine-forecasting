@@ -9,7 +9,7 @@ script_packages <- c(
   "glue",
   "argparser",
   "rlang",
-  "hewr",
+  "stfroutineforecasting",
   "forecasttools"
 )
 
@@ -48,7 +48,6 @@ fit_and_forecast_ensemble <- function(
 ) {
   forecast_horizon <- glue::glue("{n_forecast_days} days")
   target_sym <- rlang::sym(target_col)
-  output_sym <- rlang::sym(output_col)
 
   offset <- 1
 
@@ -88,7 +87,10 @@ main <- function(
   n_forecast_days = 28,
   n_samples = 2000
 ) {
-  training_data <- hewr::load_training_data(model_dir, "combined_data")
+  training_data <- stfroutineforecasting::load_training_data(
+    model_dir,
+    "combined_data"
+  )
 
   target_and_other_data <- training_data$data
   geo_value <- training_data$geo_value
@@ -97,7 +99,7 @@ main <- function(
 
   ## Fit and forecast other (non-target-disease) ED visits using a combination
   ## ensemble model
-  ts_ensemble_other_e <- fit_and_forecast_ensemble(
+  fable_e_other <- fit_and_forecast_ensemble(
     target_and_other_data,
     n_forecast_days,
     n_samples,
@@ -105,21 +107,9 @@ main <- function(
     output_col = "other_ed_visits"
   )
 
-  ts_ensemble_count_e <- fit_and_forecast_ensemble(
-    target_and_other_data,
-    n_forecast_days,
-    n_samples,
-    target_col = "observed_ed_visits",
-    output_col = "observed_ed_visits"
-  )
-
-  ts_ensemble_forecast_e <-
-    inner_join(
-      ts_ensemble_count_e,
-      ts_ensemble_other_e,
-      by = join_by(date, .draw)
-    ) |>
-    hewr::format_timeseries_output(
+  fable_e_other_forecast <-
+    fable_e_other |>
+    stfroutineforecasting::format_timeseries_output(
       geo_value = geo_value,
       disease = disease,
       resolution = resolution,
@@ -128,7 +118,7 @@ main <- function(
 
   # Save the forecast
   write_tabular(
-    ts_ensemble_forecast_e,
+    fable_e_other_forecast,
     path(
       model_dir,
       "samples",

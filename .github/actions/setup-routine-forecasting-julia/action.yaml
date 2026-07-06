@@ -1,0 +1,17 @@
+name: "Set up routine forecasting Julia"
+description: "Set up Julia and instantiate the EpiAutoGP project."
+inputs: {}
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Julia
+      uses: julia-actions/setup-julia@v3
+      with:
+        version: "1.11"
+
+    - name: Cache Julia packages
+      uses: julia-actions/cache@v3
+
+    - name: Install Julia dependencies
+      run: julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+      shell: bash

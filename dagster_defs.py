@@ -1,6 +1,9 @@
 # Basic Imports
 import datetime as dt
+import logging
 import os
+import subprocess
+from enum import StrEnum
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -8,21 +11,21 @@ from zoneinfo import ZoneInfo
 import dagster as dg
 from cfa_dagster import (
     ADLS2PickleIOManager,
-    DynamicGraphAssetExecutionContext,
     ExecutionConfig,
+    GraphDimension,
+    GraphDimensionExclusion,
     SelectorConfig,
     azure_batch_executor,
-    azure_container_app_job_executor,
     collect_definitions,
     docker_executor,
     dynamic_executor,
     dynamic_graph_asset,
     start_dev_env,
 )
-from dagster_azure.blob import (
-    AzureBlobStorageDefaultCredential,
-    AzureBlobStorageResource,
+from cfa_dagster import (
+    is_production as is_prod,
 )
+from pydantic import BaseModel, Field
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
@@ -30,7 +33,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.forecasttools import LOCATION_LIST
 
 # Model Code
-from pipelines.fable.forecast_timeseries import main as forecast_timeseries
+from pipelines.fable.forecast_fable import main as forecast_fable
 from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from pipelines.utils.common_utils import (
     calculate_training_dates,
@@ -48,61 +51,65 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess
 # function to start the dev server
 start_dev_env(__name__)
 
-DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["COVID-19"]
-
-# env variable set by Dagster CLI
-is_production: bool = not os.getenv("DAGSTER_IS_DEV_CLI")
-
 # get the user running the Dagster instance
 user = os.getenv("DAGSTER_USER")
 
+is_production = is_prod()
+
 # ============================================================================
-# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS
+# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
 # ============================================================================
 # Executors define the runtime-location of an asset job
 # See later on for Asset job definitions
 
 # ---------- Working Directory, Branch, and Image Tag ----------
 
-workdir = "cfa-stf-routine-forecasting"
-local_workdir = Path(__file__).parent.resolve()
+# Instead of hardcoding the repo name, this will always find the containing directory of this defs file
+# As of 6/2026, cfa-stf-routine-forecasting
+local_workdir = Path(__file__).parent.resolve()  # absolute path to the workdir
+container_workdir = Path(
+    f"/{local_workdir.name}"
+)  # in the container, workdir is mounted at /
 
-# If the tag is prod, use 'latest'.
-# Else iteratively test on our dev images
-# (You can always manually specify an override in the GUI)
+# Get branch name from git, defaulting to main if not in a git repo
 try:
-    print("You are running inside a .git repository; getting branchname from .git")
-    repo = Repository(os.getcwd())
-    current_branch_name = str(repo.head.shorthand)
-    git_commit_sha = str(repo.head.target)
+    current_branch_name = str(Repository(local_workdir).head.shorthand)
+    print(f"Branch name from git: {current_branch_name}")
 except Exception:
-    print(
-        "No .git folder detected; attempting to get branch name from build-arg $GIT_BRANCH_NAME"
-    )
-    current_branch_name = os.getenv("GIT_BRANCH_NAME", "unknown_branch")
-    git_commit_sha = os.getenv("GIT_COMMIT_SHA", "unknown_commit_hash")
+    current_branch_name = "main"
+    print("No .git folder detected; using main as the branch name")
 
-print(f"Current branch name is {current_branch_name}")
-
+# Use 'latest' tag for production or main branch, otherwise use branch name
+registry = "cfaprdbatchcr.azurecr.io"
 tag = (
     "latest"
     if (is_production or current_branch_name == "main")
     else current_branch_name
 )
-image = f"ghcr.io/cdcgov/cfa-stf-routine-forecasting:{tag}"
+image = f"{registry}/{local_workdir.name}:{tag}"
+
+# ----------- Azure blob storage mount strings ---------------
+
+# Used in the cloud, and combined with the local mounting dir, used locally
+blob_mounts = [
+    f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
+    f"nssp-etl:{container_workdir}/nssp-etl",
+    f"nwss-vintages:{container_workdir}/nwss-vintages",
+    f"prod-param-estimates:{container_workdir}/params",
+    f"stf-routine-forecasting-config:{container_workdir}/config",
+    f"stf-routine-forecasting-prod-output:{container_workdir}/output",
+    f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
+]
+
+# Used when mounting with docker
+local_mounting_dir = f"{local_workdir}/blobfuse/mounts/"
 
 # ---------- Execution Configuration ----------
 
-# Most basic execution - in dev, launches and runs locally
-# In prod, launches on the code location but runs in Azure Container App Jobs
+# Launches locally in a new system process
 # Used for lightweight assets and jobs, etc. where volume mounts are not needed
 basic_execution_config = ExecutionConfig(
-    executor=SelectorConfig(
-        class_name=azure_container_app_job_executor.__name__
-        if is_production
-        else dg.multiprocess_executor.__name__
-    ),
+    executor=SelectorConfig(class_name=dg.multiprocess_executor.__name__),
 )
 
 # Launches locally, executes in a docker container as configured below
@@ -112,10 +119,6 @@ docker_execution_config = ExecutionConfig(
         class_name=docker_executor.__name__,
         config={
             "image": image,
-            "env_vars": [
-                f"DAGSTER_USER={user}",
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-            ],
             "retries": {"enabled": {}},
             "container_kwargs": {
                 "volumes": [
@@ -123,16 +126,11 @@ docker_execution_config = ExecutionConfig(
                     f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    f"{__file__}:/{workdir}/{os.path.basename(__file__)}",
+                    f"{__file__}:{container_workdir}/{os.path.basename(__file__)}",
                     # blob container mounts for cfa-stf-routine-forecasting
-                    f"{local_workdir}/blobfuse/mounts/nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    f"{local_workdir}/blobfuse/mounts/nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    f"{local_workdir}/blobfuse/mounts/nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    f"{local_workdir}/blobfuse/mounts/params:/cfa-stf-routine-forecasting/params",
-                    f"{local_workdir}/blobfuse/mounts/config:/cfa-stf-routine-forecasting/config",
-                    f"{local_workdir}/blobfuse/mounts/output:/cfa-stf-routine-forecasting/output",
-                    f"{local_workdir}/blobfuse/mounts/test-output:/cfa-stf-routine-forecasting/test-output",
+                    # with the docker executor we need the local mounting dir as well
                 ]
+                + [local_mounting_dir + mount for mount in blob_mounts]
             },
         },
     ),
@@ -143,15 +141,12 @@ azure_batch_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "pyrenew-dagster-pool",
+            "pool_name": "stf-routine-forecasting-pool",
             **(
                 {}
                 if is_production  # image will come from the code location in prod
                 else {"image": image}
             ),
-            "env_vars": [
-                "VIRTUAL_ENV=/cfa-stf-routine-forecasting/.venv",
-            ],
             "container_kwargs": {
                 "volumes": [
                     # bind the ~/.azure folder for optional cli login
@@ -159,15 +154,10 @@ azure_batch_execution_config = ExecutionConfig(
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
                     # blob container mounts for cfa-stf-routine-forecasting
-                    "nssp-archival-vintages:/cfa-stf-routine-forecasting/nssp-archival-vintages",
-                    "nssp-etl:/cfa-stf-routine-forecasting/nssp-etl",
-                    "nwss-vintages:/cfa-stf-routine-forecasting/nwss-vintages",
-                    "prod-param-estimates:/cfa-stf-routine-forecasting/params",
-                    "pyrenew-hew-config:/cfa-stf-routine-forecasting/config",
-                    "pyrenew-hew-prod-output:/cfa-stf-routine-forecasting/output",
-                    "pyrenew-test-output:/cfa-stf-routine-forecasting/test-output",
-                ],
-                "working_dir": "/cfa-stf-routine-forecasting",
+                    # we do not need the local mounting dir for azure batch
+                ]
+                + blob_mounts,
+                "working_dir": f"{container_workdir}",
             },
         },
     ),
@@ -175,16 +165,21 @@ azure_batch_execution_config = ExecutionConfig(
 
 # ============================================================================
 # GRAPH DIMENSIONS AND PARTITIONS
-# ============================================================================
 # How are the data split and processed in Azure Batch?
+# ============================================================================
+
+DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
+SUPPORTED_DISEASES = ["COVID-19"]
 
 # Disease dimensions
 DISEASES = SUPPORTED_DISEASES
+Disease = StrEnum("Disease", {v: v for v in DISEASES})
 
 # Location dimensions
 LOCATIONS = [
     location for location in LOCATION_LIST if location not in DEFAULT_EXCLUDED_LOCATIONS
 ]
+Location = StrEnum("Location", {v: v for v in LOCATIONS})
 
 # Daily Partitions
 tz = "America/New_York"
@@ -199,29 +194,65 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # ============================================================================
 
 
-class ModelBaseConfig(dg.Config):
+# using default_factory to prevent ConfigOverrides from populating fields in the Launchpad
+class _ModelTrainingFields(BaseModel):
+    output_basedir: str = Field(default_factory=lambda: "")
+    n_training_days: int = Field(default_factory=lambda: 0)
+    exclude_last_n_days: int = Field(default_factory=lambda: 0)
+
+
+class ConfigOverride(_ModelTrainingFields, dg.Config):
+    location: Location  # type: ignore[reportInvalidTypeForm]
+
+    def as_dict(self) -> dict:  # type: ignore[reportInvalidTypeForm]
+        return self.model_dump(mode="json", exclude_unset=True)
+
+
+class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     """
     Base configuration for all model assets.
-    Contains parameters common to both Timeseries and Pyrenew models.
+    Contains parameters common to Fable and Pyrenew models.
     """
 
     output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
-    diseases: list[str] = DISEASES
-    locations: list[str] = LOCATIONS
+    diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
+    locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
+    # Add defaults here, or add in the launchpad with ctrl+space
+    config_overrides: list[ConfigOverride] = Field(
+        default=[
+            # ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
+        ],
+        description=(
+            "Provide location-specific overrides as a list of dicts. "
+            "The Launchpad accepts both yaml and json-style lists e.g."
+            "config_overrides: [{ location: GA, exclude_last_n_days: 2 }]"
+            ""
+        ),
+    )  # type: ignore[reportInvalidTypeForm]
+
+    def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
+        """Returns location-specific config if provided via config_overrides"""
+        overrides = {}
+        for entry in self.config_overrides:
+            if entry["location"] == loc:
+                overrides = {k: v for k, v in entry.items() if k != "location"}
+                break
+        return self.model_copy(update=overrides)
 
 
-class TimeseriesConfig(ModelBaseConfig):
+class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     """
-    Configuration for timeseries model assets (timeseries_e, epiweekly_timeseries_e).
+    Configuration for fable E-other model assets
+    (fable_e_other, epiweekly_fable_e_other).
     These default values can be modified in the Dagster asset materialization launchpad.
     """
 
-    n_samples: int = 400 if not is_production else 2000  # Total samples for timeseries
+    n_samples: int = 400 if not is_production else 2000
 
 
-class PyrenewConfig(ModelBaseConfig):
+class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -234,26 +265,18 @@ class PyrenewConfig(ModelBaseConfig):
     additional_forecast_letters: str = ""
 
 
-class FusionConfig(ModelBaseConfig):
+class EModelExclusions(
+    dg.ConfigurableResource
+):  # used to inherit ModelBaseConfig, used to be called FusionConfig
     # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    locations: GraphDimensionExclusion[Location] = GraphDimensionExclusion(["WY"])  # type: ignore[reportInvalidTypeForm]
 
 
-class PyrenewEConfig(PyrenewConfig):
-    # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
-
-
-class PyrenewWConfig(PyrenewConfig):
+class WModelExclusions(
+    dg.ConfigurableResource
+):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
     # only COVID-19 is valid for W
-    diseases: list[str] = ["COVID-19"]
-
-
-class PyrenewEWConfig(PyrenewConfig):
-    # only COVID-19 is valid for W
-    diseases: list[str] = ["COVID-19"]
-    # filter out WY
-    locations: list[str] = [loc for loc in LOCATIONS if loc != "WY"]
+    diseases: GraphDimension[Disease] = GraphDimension(["COVID-19"])  # type: ignore[reportInvalidTypeForm]
 
 
 class PostProcessConfig(dg.Config):
@@ -274,7 +297,7 @@ class PostProcessConfig(dg.Config):
 
 
 def _throw_if_backfill(
-    context: DynamicGraphAssetExecutionContext | dg.AssetExecutionContext,
+    context: dg.OpExecutionContext | dg.AssetExecutionContext,
     partition_def: dg.PartitionsDefinition,
 ):
     current_partition = context.partition_key
@@ -283,45 +306,49 @@ def _throw_if_backfill(
         raise RuntimeError("STF forecast models do not support backfills")
 
 
-def _run_timeseries_e(
-    context: DynamicGraphAssetExecutionContext,
-    config: TimeseriesConfig,
+def _run_fable_e_other(
+    context: dg.OpExecutionContext,
+    fable_e_other_config: FableEOtherConfig,
+    model_base_config: ModelBaseConfig,
     epiweekly: bool,
 ) -> str | None:
     """
-    Helper function to run timeseries-e model with optional epiweekly mode.
+    Helper function to run fable E-other model with optional epiweekly mode.
     """
     _throw_if_backfill(context, daily_partitions_def)
 
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        config.output_basedir,
+        model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
 
-    context.log.info(f"config: '{config}'")
+    context.log.info(f"fable_e_other_config: '{fable_e_other_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
-    forecast_timeseries(
+    forecast_fable(
         disease=disease,
         loc=location,
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
         output_dir=daily_forecast_output_dir,
-        n_training_days=config.n_training_days,
+        n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
+        n_samples=fable_e_other_config.n_samples,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
         epiweekly=epiweekly,
         credentials_path=Path("config/creds.toml"),
     )
 
 
 def _run_pyrenew_model(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewConfig,
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
     model_letters: str,
 ) -> str | None:
     """
@@ -329,21 +356,24 @@ def _run_pyrenew_model(
     """
     _throw_if_backfill(context, daily_partitions_def)
 
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
     daily_forecast_output_dir: Path = Path(
-        config.output_basedir, f"{context.partition_key}_forecasts"
+        model_base_config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
     forecast_flags = flags_from_hew_letters(
-        f"{model_letters}{config.additional_forecast_letters}",
+        f"{model_letters}{pyrenew_config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
-    context.log.info(f"config: '{config}'")
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
+
+    context.log.info(f"config: '{pyrenew_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
         disease=disease,
@@ -351,32 +381,36 @@ def _run_pyrenew_model(
         facility_level_nssp_data_dir=Path("nssp-etl/gold"),
         nwss_data_dir=Path("nwss-vintages"),
         param_data_dir=Path("params"),
-        priors_path=Path("pipelines/priors/prod_priors.py"),
+        priors_path=Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
         output_dir=daily_forecast_output_dir,
-        n_training_days=config.n_training_days,
+        n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
-        n_chains=config.n_chains,
-        n_warmup=config.n_warmup,
-        n_samples=config.n_samples,
-        exclude_last_n_days=config.exclude_last_n_days,
+        n_chains=pyrenew_config.n_chains,
+        n_warmup=pyrenew_config.n_warmup,
+        n_samples=pyrenew_config.n_samples,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
         credentials_path=Path("config/creds.toml"),
-        rng_key=config.rng_key,
+        rng_key=pyrenew_config.rng_key,
         **fit_flags,
         **forecast_flags,
     )
 
 
 def get_model_loc_dir(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
 ) -> Path:
-    disease = context.graph_dimension["diseases"]
-    location = context.graph_dimension["locations"]
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
+
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
 
     report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     first_training_date, last_training_date = calculate_training_dates(
         report_date=report_date,
-        n_training_days=config.n_training_days,
-        exclude_last_n_days=config.exclude_last_n_days,
+        n_training_days=model_base_config.n_training_days,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
         logger=context.log,
     )
 
@@ -388,7 +422,7 @@ def get_model_loc_dir(
     )
 
     model_loc_dir = Path(
-        config.output_basedir,
+        model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
         model_batch_dir_name,
         "model_runs",
@@ -398,8 +432,8 @@ def get_model_loc_dir(
 
 
 def _run_fusion_model(
-    context: DynamicGraphAssetExecutionContext,
-    config: FusionConfig,
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
     num_model_name,
     other_model_name,
     aggregate_num,
@@ -410,7 +444,7 @@ def _run_fusion_model(
     Helper function to run fusion model.
     """
     _throw_if_backfill(context, daily_partitions_def)
-    model_loc_dir = get_model_loc_dir(context, config)
+    model_loc_dir = get_model_loc_dir(context, model_base_config)
     create_prop_samples(
         model_run_dir=model_loc_dir,
         num_model_name=num_model_name,
@@ -431,22 +465,25 @@ def _run_fusion_model(
     )
     model_fit_dir_to_hub_tbl(fusion_model_fit_dir)
 
-    context.log.debug(f"config: '{config}'")
+    context.log.debug(f"config: '{model_base_config}'")
 
 
-def _fuse_pyrenew_timeseries(
-    context, config: FusionConfig, pyrenew_model_name, epiweekly: bool
+def _fuse_pyrenew_fable_e_other(
+    context,
+    model_base_config: ModelBaseConfig,
+    pyrenew_model_name,
+    epiweekly: bool,
 ):
-    other_model_name = "epiweekly_ts_ensemble_e" if epiweekly else "daily_ts_ensemble_e"
+    other_model_name = "epiweekly_fable_e_other" if epiweekly else "daily_fable_e_other"
     fusion_model_name = (
-        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_ts_ensemble_e"
+        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_fable_e_other"
         if epiweekly
-        else f"prop_{pyrenew_model_name}_daily_ts_ensemble_e"
+        else f"prop_{pyrenew_model_name}_daily_fable_e_other"
     )
     aggregate_num = epiweekly
     _run_fusion_model(
         context=context,
-        config=config,
+        model_base_config=model_base_config,
         num_model_name=pyrenew_model_name,
         other_model_name=other_model_name,
         aggregate_num=aggregate_num,
@@ -520,7 +557,6 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
 
 weekly_forecast_base_asset_args = {
     "partitions_def": daily_partitions_def,
-    "graph_dimensions": ["diseases", "locations"],
 }
 
 weekly_forecast_initial_asset_args = {
@@ -565,24 +601,40 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # ---------------- Weekly Forecasts --------------
 
 
-# Timeseries E
+# Fable E Other
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
 )
-def timeseries_e(context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig):
-    _run_timeseries_e(context, config, epiweekly=False)
-
-
-# Epiweekly Timeseries E
-@dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
-    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
-)
-def epiweekly_timeseries_e(
-    context: DynamicGraphAssetExecutionContext, config: TimeseriesConfig
+def fable_e_other(
+    context: dg.OpExecutionContext,
+    fable_e_other_config: FableEOtherConfig,
+    model_base_config: ModelBaseConfig,
 ):
-    _run_timeseries_e(context, config, epiweekly=True)
+    _run_fable_e_other(
+        context,
+        fable_e_other_config,
+        model_base_config,
+        epiweekly=False,
+    )
+
+
+# Epiweekly Fable E Other
+@dynamic_graph_asset(
+    **weekly_forecast_initial_asset_args,
+    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+)
+def epiweekly_fable_e_other(
+    context: dg.OpExecutionContext,
+    fable_e_other_config: FableEOtherConfig,
+    model_base_config: ModelBaseConfig,
+):
+    _run_fable_e_other(
+        context,
+        fable_e_other_config,
+        model_base_config,
+        epiweekly=True,
+    )
 
 
 # Pyrenew E
@@ -593,10 +645,12 @@ def epiweekly_timeseries_e(
     },
 )
 def pyrenew_e(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewEConfig,
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+    e_model_exclusions: EModelExclusions,
 ):
-    _run_pyrenew_model(context, config, "e")
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, "e")
 
 
 # Pyrenew H
@@ -606,8 +660,12 @@ def pyrenew_e(
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
 )
-def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig):
-    _run_pyrenew_model(context, config, "h")
+def pyrenew_h(
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+):
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, "h")
 
 
 # Pyrenew HE
@@ -619,10 +677,12 @@ def pyrenew_h(context: DynamicGraphAssetExecutionContext, config: PyrenewConfig)
     },
 )
 def pyrenew_he(
-    context: DynamicGraphAssetExecutionContext,
-    config: PyrenewEConfig,
+    context: dg.OpExecutionContext,
+    pyrenew_config: PyrenewConfig,
+    model_base_config: ModelBaseConfig,
+    e_model_exclusions: EModelExclusions,
 ):
-    _run_pyrenew_model(context, config, "he")
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
 
 
 # ---------- Fusion Forecasts ----------
@@ -630,47 +690,75 @@ def pyrenew_he(
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_e": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+    ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
 )
-def fuse_pyrenew_e_ts(context: DynamicGraphAssetExecutionContext, config: FusionConfig):
-    _fuse_pyrenew_timeseries(
-        context, config, pyrenew_model_name="pyrenew_e", epiweekly=False
+def fuse_pyrenew_e_ts(
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    e_model_exclusions: EModelExclusions,
+):
+    _fuse_pyrenew_fable_e_other(
+        context,
+        model_base_config,
+        pyrenew_model_name="pyrenew_e",
+        epiweekly=False,
     )
 
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_e": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+    ins={
+        "pyrenew_e": dg.In(dg.Nothing),
+        "epiweekly_fable_e_other": dg.In(dg.Nothing),
+    },
 )
 def fuse_pyrenew_e_ts_epiweekly(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    e_model_exclusions: EModelExclusions,
 ):
-    _fuse_pyrenew_timeseries(
-        context, config, pyrenew_model_name="pyrenew_e", epiweekly=True
+    _fuse_pyrenew_fable_e_other(
+        context,
+        model_base_config,
+        pyrenew_model_name="pyrenew_e",
+        epiweekly=True,
     )
 
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_he": dg.In(dg.Nothing), "timeseries_e": dg.In(dg.Nothing)},
+    ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
 )
 def fuse_pyrenew_he_ts(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    e_model_exclusions: EModelExclusions,
 ):
-    _fuse_pyrenew_timeseries(
-        context, config, pyrenew_model_name="pyrenew_he", epiweekly=False
+    _fuse_pyrenew_fable_e_other(
+        context,
+        model_base_config,
+        pyrenew_model_name="pyrenew_he",
+        epiweekly=False,
     )
 
 
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
-    ins={"pyrenew_he": dg.In(dg.Nothing), "epiweekly_timeseries_e": dg.In(dg.Nothing)},
+    ins={
+        "pyrenew_he": dg.In(dg.Nothing),
+        "epiweekly_fable_e_other": dg.In(dg.Nothing),
+    },
 )
 def fuse_pyrenew_he_ts_epiweekly(
-    context: DynamicGraphAssetExecutionContext, config: FusionConfig
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    e_model_exclusions: EModelExclusions,
 ):
-    _fuse_pyrenew_timeseries(
-        context, config, pyrenew_model_name="pyrenew_he", epiweekly=True
+    _fuse_pyrenew_fable_e_other(
+        context,
+        model_base_config,
+        pyrenew_model_name="pyrenew_he",
+        epiweekly=True,
     )
 
 
@@ -722,17 +810,146 @@ def postprocess_forecasts(
 
 
 # ============================================================================
+# JOBS AND OPS
+# These can create images.
+# ============================================================================
+
+# These are only used in dev - they should not appear on the production webserver
+if not is_production:
+    # Build and Push Image ---------------------------
+
+    @dg.op
+    def build_image_op(
+        context: dg.OpExecutionContext,
+        should_push: bool,
+        should_deploy_to_prod: bool,
+        dockerfile_path: str,
+        build_context: str,
+        image: str,
+    ):
+        """
+        Builds the image used by dagster. Requires that your VM be registered with an Azure managed identity.
+
+        should_push: bool - should the image be pushed to the Container Registry?
+        should_deploy_to_prod: bool - should the prod server be updated with the newest image? (usually you do not want to do this)
+        dockerfile_path: str - where is the Dockerfile located locally? (has a default)
+        build_context: str - where should we build from? (has a default)
+        image: str - the full name (including registry and tag) of the image
+        """
+
+        build_command = [
+            "docker",
+            "buildx",
+            "build",
+            "-t",
+            image,
+            "-f",
+            dockerfile_path,
+            build_context,
+        ]
+
+        if should_push:
+            subprocess.run(
+                ["az", "login", "--identity"],
+                check=True,
+            )
+            subprocess.run(["az", "acr", "login", "-n", registry], check=True)
+            build_command.append("--push")
+
+        context.log.info(f"Running {' '.join(build_command)}")
+        subprocess.run(build_command, check=True)
+
+        update_script_url = (
+            # repo
+            "https://raw.githubusercontent.com/CDCgov/cfa-dagster/"
+            # ref
+            "refs/heads/main/"
+            # file
+            "scripts/update_code_location.py"
+        )
+
+        if should_deploy_to_prod:
+            context.log.info(f"Deploying {image} to the dagster prod server.")
+            subprocess.run(
+                ["uv", "run", update_script_url, "--registry_image", image], check=True
+            )
+
+    @dg.job(
+        description=(
+            "Build the container image used by dagster to run this project's asset pipelines."
+            "Run after making any change and before running the pipelines."
+        ),
+        config=dg.RunConfig(
+            ops={
+                "build_image_op": {
+                    "inputs": {
+                        "should_push": True,
+                        "should_deploy_to_prod": False,
+                        "dockerfile_path": f"{local_workdir}/Dockerfile",
+                        # the build context should be the top level of the repo
+                        "build_context": str(local_workdir),
+                        "image": image,
+                    }
+                }
+            },
+            # configure this job to run on your computer
+            execution=basic_execution_config.to_run_config(),
+        ),
+        executor_def=dynamic_executor(),
+    )
+    def build_image():
+        build_image_op()
+
+    # Explore the image you built as it will be run with dagster ---------------------------
+
+    @dg.op
+    def explore_image_op(
+        context: dg.OpExecutionContext,
+    ):
+        """
+        Allows you to run the container you previously built and explore the filesystem that will be used by dagster.
+        """
+        context.log.info(
+            "Check the terminal from which you ran the webserver to interact; stdout from your terminal will appear below."
+        )
+        explore_cmd = (
+            ["docker", "run", "-it"]
+            + [
+                item
+                for mount in blob_mounts
+                for item in ("-v", local_mounting_dir + mount)
+            ]
+            + ["--rm", image, "bash"]
+        )
+        subprocess.run(explore_cmd, check=True)
+
+    @dg.job(
+        description=(
+            "Interactively navigate the filesystem of your last-built container, "
+            "as it would be used in Docker or Azure Batch execution."
+        ),
+        executor_def=dg.in_process_executor,
+    )
+    def explore_image():
+        explore_image_op()
+
+# ============================================================================
 # DAGSTER DEFINITIONS OBJECT
 # ============================================================================
 # This code allows us to collect all of the above definitions into a single
 # Definitions object for Dagster to read. By doing this, we can keep our
 # Dagster code in a single file instead of splitting it across multiple files.
 
-# change storage accounts between dev and prod
-storage_account = "cfadagster" if is_production else "cfadagsterdev"
-
 # collect Dagster definitions from the current file
 collected_defs = collect_definitions(globals())
+
+# Set Azure HTTP Logging Level
+# this will limit excessive IO logs in stderr
+# for any assets making azure http requests
+azure_http_logger = logging.getLogger(
+    "azure.core.pipeline.policies.http_logging_policy"
+)
+azure_http_logger.setLevel(logging.WARNING)
 
 # Create Definitions object
 defs = dg.Definitions(
@@ -741,16 +958,21 @@ defs = dg.Definitions(
         # These IOManagers let Dagster serialize asset outputs and store them
         # in Azure to pass between assets
         "io_manager": ADLS2PickleIOManager(),
-        # an example storage account
-        "azure_blob_storage": AzureBlobStorageResource(
-            account_url=f"{storage_account}.blob.core.windows.net",
-            credential=AzureBlobStorageDefaultCredential(),
-        ),
+        # Shared resources for model assets
+        "model_base_config": ModelBaseConfig(),
+        "pyrenew_config": PyrenewConfig(),
+        "fable_e_other_config": FableEOtherConfig(),
+        "e_model_exclusions": EModelExclusions(),
+        "w_model_exclusions": WModelExclusions(),
     },
     executor=dynamic_executor(
         default_config=azure_batch_execution_config,
         # default_config=basic_execution_config,
         # default_config=docker_execution_config,
-        alternate_configs=[basic_execution_config, docker_execution_config],
+        alternate_configs=[
+            basic_execution_config,
+            docker_execution_config,
+            azure_batch_execution_config,
+        ],
     ),
 )

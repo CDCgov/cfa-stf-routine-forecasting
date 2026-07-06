@@ -12,7 +12,7 @@ disease="$2"
 location="$3"
 
 for epiweekly_flag in "" "--epiweekly"; do
-	python pipelines/fable/forecast_timeseries.py \
+	python pipelines/fable/forecast_fable.py \
 		--disease "$disease" \
 		--loc "$location" \
 		--facility-level-nssp-data-dir "$BASE_DIR/private_data/nssp_etl_gold" \

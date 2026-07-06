@@ -1,5 +1,9 @@
 FROM rocker/tidyverse:4.5.3
 
+#
+# General Build Args and Environment Variables
+#
+
 ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 
 #
@@ -9,6 +13,10 @@ ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 # Julia 1.11 from official image
 COPY --from=julia:1.11 /usr/local/julia /usr/local/julia
 ENV PATH="/usr/local/julia/bin:${PATH}"
+ENV JULIA_DEPOT_DIR=/opt/julia-depot
+ENV JULIA_DEPOT_PATH=${JULIA_DEPOT_DIR}:
+ENV JULIA_CPU_TARGET=generic
+ENV JULIA_PKG_PRECOMPILE_AUTO=0
 
 # Python from https://docs.astral.sh/uv/guides/integration/docker/
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -22,8 +30,8 @@ ENV UV_PYTHON_CACHE_DIR=/root/.cache/uv/python
 # Copy local dependencies into our container, then install them
 #
 
-# R package - hewr
-COPY ./hewr /cfa-stf-routine-forecasting/hewr
+# R package - stfroutineforecasting
+COPY ./stfroutineforecasting /cfa-stf-routine-forecasting/stfroutineforecasting
 
 # Julia environment for direct NowcastAutoGP runner
 # Copy only Julia environment metadata first so dependency installation is cached
@@ -40,16 +48,15 @@ WORKDIR /cfa-stf-routine-forecasting
 # the EpiAutoGP subprocess without downloading packages. This is a script
 # environment under pipelines/epiautogp, so we commit its Manifest.toml for a
 # reproducible EpiAutoGP dependency set.
-RUN julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+RUN mkdir -p "${JULIA_DEPOT_DIR}" \
+    && julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
+    && chmod -R a+rwX "${JULIA_DEPOT_DIR}"
 
-
-
-
-# Install hewr
+# Install stfroutineforecasting
 RUN Rscript -e "install.packages('pak')"
 RUN Rscript -e "\
     pak::repo_add(hubverse = 'https://hubverse-org.r-universe.dev'); \
-    pak::local_install('hewr', upgrade = FALSE) \
+    pak::local_install('stfroutineforecasting', upgrade = FALSE) \
 "
 
 #
@@ -88,12 +95,3 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Dagster
 COPY dagster_defs.py ./dagster_defs.py
-
-#
-# General Build Args and Environment Variables
-#
-
-ARG GIT_COMMIT_SHA
-ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
-ARG GIT_BRANCH_NAME
-ENV GIT_BRANCH_NAME=$GIT_BRANCH_NAME

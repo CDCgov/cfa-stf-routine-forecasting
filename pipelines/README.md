@@ -7,4 +7,4 @@ Functions to run Pyrenew-HEW forecasting pipeline. Uses the following data direc
 
  And the following files:
 
- - priors-path `pipelines/priors/prod_priors.py`
+ - priors-path `pipelines/pyrenew_hew/priors/prod_priors.py`

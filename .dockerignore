@@ -1,4 +1,4 @@
-Containerfile
+Dockerfile
 nssp_demo/private_data
 notebooks
 blobfuse/mounts

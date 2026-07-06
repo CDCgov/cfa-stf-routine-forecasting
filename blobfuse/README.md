@@ -6,14 +6,9 @@ This directory serves as a project-specific fork of the [cfa-blobfuse-tutorial](
 
 > Make sure you have blobfuse2 installed before running this module.
 
-This directory will mount pyrenew-hew blobs to `/mnt` and then symlink to a directory you specify (or the current directory if you don't supply an argument).
+This directory will mount blobs to `/mnt` and then symlinks to `./blobfuse/mounts/`.
 
-To run, make sure you're in the top level as your working directory (`pyrenew-hew`, and not `pyrenew-hew/blobfuse`).
-1. Run `sudo chmod +x ./blobfuse/mount.sh`.
-2. Run `sudo source bash -c "./blobfuse/mount.sh"`. This will mount to the top-level (pyrenew-hew)
-3. Check to make sure `/mnt` has pyrenew blobs mounted and that symlinks have been created under `cfa-stf-routine-forecasting/blobfuse/mounts/`.
-4. Before attempting to remount, run the cleanup script `sudo source bash -c "./blobfuse/cleanup.sh"`.
-
-You can, for convenience, also use make commands:
-- `make mount` - runs the mount script.
-- `make unmount` - runs the cleanup script.
+To run, make sure you're in the top level as your working directory (`cfa-stf-routine-forecasting`, and not `cfa-stf-routine-forecasting/blobfuse`).
+1. Run `sudo "./blobfuse/mount.sh"`. It is good practice to run `sudo "./blobfuse/cleanup.sh"` to make sure your setup is clean (see below).
+1. Check to make sure `/mnt` has blobs mounted and that symlinks have been created under `cfa-stf-routine-forecasting/blobfuse/mounts/`.
+1. Before attempting to remount, always run the cleanup script `sudo "./blobfuse/cleanup.sh"` and make sure there are no empty directories in `./blobfuse/mounts/`.

@@ -23,7 +23,7 @@ repos:
       - id: ruff-format
     # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.25
+    rev: 0.11.26
     hooks:
       - id: uv-lock
   # Bash
@@ -55,7 +55,7 @@ repos:
       - id: runic
   # Typos
   - repo: https://github.com/adhtruong/mirrors-typos
-    rev: v1.47.2
+    rev: v1.48.0
     hooks:
       - id: typos
         args: ["--force-exclude"]

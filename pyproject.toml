@@ -12,19 +12,23 @@ authors = [
 ]
 
 dependencies = [
-    "jax<0.10",
     "arviz[h5netcdf]>=1.1.0",
-    "cfa-catalog-public>=2026.3.23.0",
     "cfa-dagster",
     "cfa-dataops",
     "cfa-stf-data",
     "cfa-stf-forecasttools",
+    "dagster",
+    "jax",
+    "numpy",
+    "numpyro",
     "polarbayes",
     "polars[pyarrow,numpy]>=1.36",
+    "pydantic",
     "pygit2>=1.17.0",
     "pyrenew",
     "pyrenew-multisignal",
     "pypdf>=6.10.1",
+    "scipy",
     "tomli-w>=1.1.0",
 ]
 
@@ -91,6 +95,7 @@ pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", re
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "main" }
 cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops", rev = "main"}
 cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub", rev = "main" }
+arviz = { git = "https://github.com/arviz-devs/arviz", rev = "main" }
 arviz-base = { git = "https://github.com/arviz-devs/arviz-base", rev = "main" }
 arviz-plots = { git = "https://github.com/arviz-devs/arviz-plots", rev = "main" }
 arviz-stats = { git = "https://github.com/arviz-devs/arviz-stats", rev = "main" }

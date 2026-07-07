@@ -10,10 +10,10 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
-
 from cfa.stf.data import ensure_list
 from cfa.stf.forecasttools import LOCATION_LIST
+from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
+
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations

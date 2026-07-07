@@ -17,6 +17,8 @@ dependencies = [
     "cfa-catalog-public>=2026.3.23.0",
     "cfa-dagster",
     "cfa-dataops",
+    "cfa-stf-data",
+    "cfa-stf-forecasttools",
     "polarbayes",
     "polars[pyarrow,numpy]>=1.36",
     "pygit2>=1.17.0",
@@ -27,10 +29,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["pipelines", "cfa"]
-
-[tool.hatch.build.targets.sdist]
-include = ["tests/cfa/stf/forecasttools/test_data/*.nc"]
+packages = ["pipelines"]
 
 [build-system]
 requires = ["hatchling"]
@@ -95,3 +94,5 @@ cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub", rev = "
 arviz-base = { git = "https://github.com/arviz-devs/arviz-base", rev = "main" }
 arviz-plots = { git = "https://github.com/arviz-devs/arviz-plots", rev = "main" }
 arviz-stats = { git = "https://github.com/arviz-devs/arviz-stats", rev = "main" }
+cfa-stf-data = { git = "https://github.com/CDCgov/cfa-stf-data", rev = "main" }
+cfa-stf-forecasttools = { git = "https://github.com/CDCgov/forecasttools-py", rev = "main" }

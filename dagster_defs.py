@@ -9,9 +9,6 @@ from zoneinfo import ZoneInfo
 
 # Direct use of dagster
 import dagster as dg
-
-# Helper Libraries
-from cfa.stf.forecasttools import LOCATION_LIST
 from cfa_dagster import (
     ADLS2PickleIOManager,
     ExecutionConfig,
@@ -31,6 +28,9 @@ from cfa_dagster import (
 from pydantic import BaseModel, Field
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
+
+# Helper Libraries
+from cfa.stf.forecasttools import LOCATION_LIST
 
 # Model Code
 from pipelines.fable.forecast_fable import main as forecast_fable

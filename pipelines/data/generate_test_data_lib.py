@@ -18,11 +18,11 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 import xarray as xr
-from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from jax._src.typing import Array
 from pyrenew_multisignal.hew import PyrenewHEWData
 from scipy.stats import expon, norm
 
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.data.prep_data import (
     process_and_save_loc_data,
     process_and_save_loc_param,

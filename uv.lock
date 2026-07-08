@@ -783,7 +783,7 @@ dependencies = [
 [[package]]
 name = "cfa-stf-forecasttools"
 version = "0.1.0"
-source = { git = "https://github.com/CDCgov/forecasttools-py?rev=main#9f569bb23277925a688df3bb3378e1f379b1b5eb" }
+source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#9f569bb23277925a688df3bb3378e1f379b1b5eb" }
 dependencies = [
     { name = "numpy" },
     { name = "polars", extra = ["numpy", "pyarrow"] },
@@ -844,7 +844,7 @@ requires-dist = [
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=v1.3.2" },
     { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops?rev=main" },
     { name = "cfa-stf-data", git = "https://github.com/CDCgov/cfa-stf-data?rev=main" },
-    { name = "cfa-stf-forecasttools", git = "https://github.com/CDCgov/forecasttools-py?rev=main" },
+    { name = "cfa-stf-forecasttools", git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main" },
     { name = "dagster" },
     { name = "jax" },
     { name = "numpy" },

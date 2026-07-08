@@ -100,4 +100,4 @@ arviz-base = { git = "https://github.com/arviz-devs/arviz-base", rev = "main" }
 arviz-plots = { git = "https://github.com/arviz-devs/arviz-plots", rev = "main" }
 arviz-stats = { git = "https://github.com/arviz-devs/arviz-stats", rev = "main" }
 cfa-stf-data = { git = "https://github.com/CDCgov/cfa-stf-data", rev = "main" }
-cfa-stf-forecasttools = { git = "https://github.com/CDCgov/forecasttools-py", rev = "main" }
+cfa-stf-forecasttools = { git = "https://github.com/CDCgov/cfa-stf-forecasttools", rev = "main" }

@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
+from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations
@@ -732,17 +732,22 @@ def append_prop_data_to_combined_data(data_path: Path | str) -> None:
 
     if suffix == ".tsv":
         data = pl.read_csv(path, separator="\t", null_values="NA")
-        append_prop_data(data).write_csv(path, separator="\t", null_value="NA")
     elif suffix == ".csv":
         data = pl.read_csv(path, null_values="NA")
-        append_prop_data(data).write_csv(path, null_value="NA")
     elif suffix == ".parquet":
         data = pl.read_parquet(path)
-        append_prop_data(data).write_parquet(path)
     else:
         raise ValueError(
             "data_path must have a supported tabular extension: .tsv, .csv, or .parquet"
         )
+
+    data = append_prop_data(data)
+    if suffix == ".tsv":
+        data.write_csv(path, separator="\t", null_value="NA")
+    elif suffix == ".csv":
+        data.write_csv(path, null_value="NA")
+    elif suffix == ".parquet":
+        data.write_parquet(path)
 
 
 def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> None:

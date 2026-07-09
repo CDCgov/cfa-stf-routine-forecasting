@@ -6,14 +6,13 @@ from pathlib import Path
 import jax.numpy as jnp
 import polars as pl
 import polars.selectors as cs
-from pyrenew_multisignal.hew import approx_lognorm
-
 from cfa.stf.data import (
     get_nnh_delay_pmf,
     get_nnh_generation_interval_pmf,
     get_nnh_right_truncation_pmf,
 )
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
+from pyrenew_multisignal.hew import approx_lognorm
 
 _disease_map = {
     "COVID-19": "COVID-19/Omicron",

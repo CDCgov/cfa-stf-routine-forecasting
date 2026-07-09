@@ -1,4 +1,5 @@
 import argparse
+import datetime as dt
 import logging
 from pathlib import Path
 
@@ -88,7 +89,6 @@ def main(
     disease: str,
     report_date: str,
     loc: str,
-    facility_level_nssp_data_dir: Path | str,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
@@ -105,9 +105,9 @@ def main(
     n_forecast_draws: int = 2000,
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
-    param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
     nowcast_source_name: str = "none",
     reporting_delay_pmf: list[float] | None = None,
+    fail_on_stale_data: bool = False,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -128,10 +128,6 @@ def main(
         Report date in YYYY-MM-DD format or "latest"
     loc : str
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
-    facility_level_nssp_data_dir : Path | str
-        Directory containing facility-level NSSP ED visit data
-    param_data_dir : Path | str
-        Directory containing parameter estimates such as reporting-delay PMFs
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -244,6 +240,11 @@ def main(
         "Starting single-location EpiAutoGP forecasting pipeline for "
         f"location {loc}, and report date {report_date}"
     )
+    run_date = (
+        None
+        if report_date == "latest"
+        else dt.datetime.strptime(report_date, "%Y-%m-%d").date()
+    )
 
     # Step 1: Setup pipeline (loads data, validates dates, creates directories)
     # This is the context of the forecast pipeline
@@ -255,7 +256,6 @@ def main(
         ed_visit_type=ed_visit_type,
         model_name=model_name,
         nhsn_data_path=nhsn_data_path,
-        facility_level_nssp_data_dir=facility_level_nssp_data_dir,
         output_dir=output_dir,
         n_training_days=n_training_days,
         n_forecast_days=n_forecast_days,
@@ -263,9 +263,10 @@ def main(
         exclude_date_ranges=parsed_exclude_date_ranges,
         credentials_path=credentials_path,
         logger=logger,
-        param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        run_date=run_date,
+        fail_on_stale_data=fail_on_stale_data,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -350,13 +351,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--param-data-dir",
-        type=Path,
-        default=Path("private_data", "prod_param_estimates"),
-        help="Directory containing parameter estimates such as reporting-delay PMFs.",
-    )
-
-    parser.add_argument(
         "--nowcast-source",
         dest="nowcast_source_name",
         type=str,
@@ -367,6 +361,11 @@ if __name__ == "__main__":
             "'reporting-delay' inflates recent counts using a reporting-delay "
             "PMF (default: none)."
         ),
+    )
+    parser.add_argument(
+        "--fail-on-stale-data",
+        action="store_true",
+        help="Fail instead of warning when selected input data is stale.",
     )
 
     parser.add_argument(

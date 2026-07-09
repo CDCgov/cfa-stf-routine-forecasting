@@ -25,13 +25,6 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
     parser.add_argument(
-        "--facility-level-nssp-data-dir",
-        type=Path,
-        default=Path("private_data", "nssp_etl_gold"),
-        help="Directory in which to look for facility-level NSSP ED visit data.",
-    )
-
-    parser.add_argument(
         "--output-dir",
         type=Path,
         default="private_data",

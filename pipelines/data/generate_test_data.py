@@ -7,8 +7,9 @@ from pathlib import Path
 
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
+from pipelines.data.data_access import ForecastData
 from pipelines.data.generate_test_data_lib import (
     FACILITY_LEVEL_NSSP_DATA_COLS,
     LOC_LEVEL_NSSP_DATA_COLS,
@@ -145,21 +146,17 @@ def _write_parquet(data: pl.DataFrame, directory: Path, file_name: str) -> None:
     data.write_parquet(directory / file_name)
 
 
-def _write_param_estimates(
-    private_data_dir: Path,
-    locations: list[str],
-    diseases: list[str],
-) -> None:
-    param_estimates = create_default_param_estimates(
+def make_param_estimates(
+    locations: list[str] | None = None,
+    diseases: list[str] | None = None,
+) -> pl.DataFrame:
+    locations = locations or DEFAULT_LOCATIONS
+    diseases = diseases or DEFAULT_DISEASES
+    return create_default_param_estimates(
         states_to_simulate=locations,
         diseases_to_simulate=diseases,
         max_train_date_str=REPORT_DATE.isoformat(),
         max_train_date=REPORT_DATE,
-    )
-    _write_parquet(
-        param_estimates,
-        private_data_dir / "prod_param_estimates",
-        "prod.parquet",
     )
 
 
@@ -241,26 +238,6 @@ def _make_nhsn(
     return pl.DataFrame(rows).select(cs.by_name(NHSN_COLS))
 
 
-def _write_nssp_data(private_data_dir: Path, facility_level_nssp: pl.DataFrame) -> None:
-    _write_parquet(
-        facility_level_nssp,
-        private_data_dir / "nssp_etl_gold",
-        f"{REPORT_DATE}.parquet",
-    )
-
-    state_level_nssp = _make_state_level_nssp(facility_level_nssp)
-    _write_parquet(
-        state_level_nssp,
-        private_data_dir / "nssp_state_level_gold",
-        f"{REPORT_DATE}.parquet",
-    )
-    _write_parquet(
-        state_level_nssp.select(cs.exclude("any_update_this_day")),
-        private_data_dir / "nssp-etl",
-        "latest_comprehensive.parquet",
-    )
-
-
 def _write_nhsn_data(
     private_data_dir: Path,
     locations: list[LocationData],
@@ -275,6 +252,41 @@ def _write_nhsn_data(
             )
 
 
+def make_forecast_data(location: str, disease: str) -> ForecastData:
+    locations = sorted(set(DEFAULT_LOCATIONS + [location]))
+    diseases = sorted(set(DEFAULT_DISEASES + [disease]))
+    location_data = _location_data(locations)
+    location_by_abbr = {item.abbr: item for item in location_data}
+    disease_index = diseases.index(disease)
+    nssp_disease = _NSSP_DISEASE_NAMES.get(disease, disease)
+
+    facility_level_nssp = _make_facility_level_nssp(
+        locations=location_data,
+        diseases=diseases,
+    )
+    nssp_data = (
+        _make_state_level_nssp(facility_level_nssp)
+        .filter(
+            pl.col("geo_value") == location,
+            pl.col("disease").is_in([nssp_disease, "Total"]),
+        )
+        .with_columns(disease=pl.col("disease").replace({nssp_disease: disease}))
+        .rename({"reference_date": "date", "value": "ed_visits"})
+        .select(["date", "geo_value", "disease", "ed_visits"])
+    )
+    nhsn_data = _make_nhsn(
+        location=location_by_abbr[location],
+        disease_index=disease_index,
+    ).with_columns(pl.lit(disease).alias("disease"))
+
+    return ForecastData(
+        report_date=REPORT_DATE,
+        nssp_data=nssp_data,
+        nhsn_data=nhsn_data,
+        freshness=(),
+    )
+
+
 def main(
     base_dir: Path,
     locations: list[str] | None = None,
@@ -287,17 +299,8 @@ def main(
     private_data_dir = base_dir / "private_data"
     private_data_dir.mkdir(parents=True, exist_ok=True)
 
-    _write_param_estimates(private_data_dir, locations, diseases)
-
-    facility_level_nssp = _make_facility_level_nssp(
-        locations=location_data,
-        diseases=diseases,
-    )
-    _write_nssp_data(private_data_dir, facility_level_nssp)
     _write_nhsn_data(private_data_dir, location_data, diseases)
 
-    # PyRenew accepts an NWSS directory even when wastewater is not fit.
-    (private_data_dir / "nwss_vintages").mkdir(exist_ok=True)
     print(f"Successfully generated test data in {private_data_dir}")
 
 

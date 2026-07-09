@@ -1,17 +1,19 @@
 import datetime as dt
 import json
 import logging
-import os
-import tempfile
 from pathlib import Path
 
 import jax.numpy as jnp
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pyrenew_multisignal.hew import approx_lognorm
 
-from pipelines.utils.common_utils import py_scalar_to_r_scalar, run_r_code
+from cfa.stf.data import (
+    get_nnh_delay_pmf,
+    get_nnh_generation_interval_pmf,
+    get_nnh_right_truncation_pmf,
+)
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 _disease_map = {
     "COVID-19": "COVID-19/Omicron",
@@ -64,70 +66,10 @@ def clean_nssp_data(
     )
 
 
-def get_nhsn(
-    start_date: dt.date | None,
-    end_date: dt.date | None,
-    disease: str,
-    loc_abb: str,
-    temp_dir: Path | None = None,
-    credentials_dict: dict | None = None,
-    local_data_file: Path | None = None,
-) -> pl.DataFrame:
-    if local_data_file is None:
-        if temp_dir is None:
-            temp_dir = tempfile.mkdtemp()
-        if credentials_dict is None:
-            credentials_dict = dict()
-
-        disease_nhsn_key = {
-            "COVID-19": "totalconfc19newadm",
-            "Influenza": "totalconfflunewadm",
-            "RSV": "totalconfrsvnewadm",
-        }
-
-        columns = disease_nhsn_key[disease]
-
-        loc_abb_for_query = loc_abb if loc_abb != "US" else "USA"
-
-        local_data_file = Path(temp_dir, "nhsn_temp.parquet")
-        api_key_id = credentials_dict.get(
-            "nhsn_api_key_id", os.getenv("NHSN_API_KEY_ID")
-        )
-        api_key_secret = credentials_dict.get(
-            "nhsn_api_key_secret", os.getenv("NHSN_API_KEY_SECRET")
-        )
-
-        run_r_code(
-            f"""
-            forecasttools::pull_data_cdc_gov_dataset(
-                dataset = "nhsn_hrd_prelim",
-                api_key_id = {py_scalar_to_r_scalar(api_key_id)},
-                api_key_secret = {py_scalar_to_r_scalar(api_key_secret)},
-                start_date = {py_scalar_to_r_scalar(start_date)},
-                end_date = {py_scalar_to_r_scalar(end_date)},
-                columns = {py_scalar_to_r_scalar(columns)},
-                locations = {py_scalar_to_r_scalar(loc_abb_for_query)}
-            ) |>
-            dplyr::mutate(weekendingdate = as.Date(weekendingdate)) |>
-            dplyr::mutate(jurisdiction = dplyr::if_else(jurisdiction == "USA", "US",
-            jurisdiction
-            )) |>
-            dplyr::rename(hospital_admissions = {py_scalar_to_r_scalar(columns)}) |>
-            dplyr::mutate(hospital_admissions = as.numeric(hospital_admissions)) |>
-            forecasttools::write_tabular("{str(local_data_file)}")
-            """,
-            function_name="get_nhsn",
-        )
-    raw_dat = pl.read_parquet(local_data_file)
-    dat = raw_dat.with_columns(weekendingdate=pl.col("weekendingdate").cast(pl.Date))
-    return dat
-
-
 def combine_surveillance_data(
     disease: str,
     nssp_data: pl.DataFrame | None = None,
     nhsn_data: pl.DataFrame | None = None,
-    nwss_data: pl.DataFrame | None = None,
 ):
     nssp_data_long = (
         nssp_data.unpivot(
@@ -161,39 +103,9 @@ def combine_surveillance_data(
         else pl.DataFrame()
     )
 
-    nwss_data_long = (
-        nwss_data.rename(
-            {
-                "log_genome_copies_per_ml": "site_level_log_ww_conc",
-                "location": "geo_value",
-            }
-        )
-        .select(
-            cs.exclude(
-                [
-                    "lab",
-                    "log_lod",
-                    "below_lod",
-                    "site",
-                    "site_index",
-                    "site_pop",
-                    "lab_site_name",
-                ]
-            )
-        )
-        .unpivot(
-            on="site_level_log_ww_conc",
-            index=cs.exclude("site_level_log_ww_conc"),
-            variable_name=".variable",
-            value_name=".value",
-        )
-        if nwss_data is not None
-        else pl.DataFrame()
-    )
-
     combined_dat = (
         pl.concat(
-            [nssp_data_long, nhsn_data_long, nwss_data_long],
+            [nssp_data_long, nhsn_data_long],
             how="diagonal_relaxed",
         )
         .with_columns(pl.lit(disease).alias("disease"))
@@ -363,7 +275,7 @@ def _validate_and_extract(
 
 
 def get_pmfs(
-    param_estimates: pl.LazyFrame,
+    param_estimates: pl.LazyFrame | None,
     loc_abb: str,
     disease: str,
     as_of: dt.date | None = None,
@@ -421,6 +333,30 @@ def get_pmfs(
       parameter name, and validity date range.
     - For right_truncation: additionally filters by location.
     """
+    if param_estimates is None:
+        delay_pmf = get_nnh_delay_pmf(disease=disease, as_of=as_of)
+        delay_pmf[0] = 0.0
+        delay_pmf = jnp.array(delay_pmf)
+        delay_pmf = delay_pmf / delay_pmf.sum()
+        result = {
+            "generation_interval_pmf": get_nnh_generation_interval_pmf(
+                disease=disease, as_of=as_of
+            ),
+            "delay_pmf": delay_pmf.tolist(),
+        }
+        try:
+            result["right_truncation_pmf"] = get_nnh_right_truncation_pmf(
+                loc_abb=loc_abb,
+                disease=disease,
+                as_of=as_of,
+                reference_date=as_of,
+            )
+        except ValueError:
+            if right_truncation_required:
+                raise
+            result["right_truncation_pmf"] = [1]
+        return result
+
     as_of = as_of or dt.date.max - dt.timedelta(days=1)
     if loc_abb == "GA" and as_of > dt.date(2025, 10, 14):
         as_of = dt.date(2025, 10, 14)
@@ -474,17 +410,15 @@ def process_and_save_loc_data(
     report_date: dt.date,
     first_training_date: dt.date,
     last_training_date: dt.date,
-    facility_level_nssp_data: pl.LazyFrame,
+    nssp_data: pl.DataFrame,
+    nhsn_data: pl.DataFrame,
     save_dir: Path,
     logger: logging.Logger | None = None,
-    loc_level_nwss_data: pl.DataFrame | None = None,
-    credentials_dict: dict | None = None,
-    nhsn_data_path: Path | str | None = None,
 ) -> None:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    os.makedirs(save_dir, exist_ok=True)
+    Path(save_dir).mkdir(parents=True, exist_ok=True)
 
     loc_pop_df = get_us_loc_pop_tbl()
 
@@ -494,66 +428,30 @@ def process_and_save_loc_data(
     # First entry of source right truncation PMFs corresponds to reports
     # for ref date = report_date - 1 as of report_date
 
-    aggregated_facility_data = aggregate_facility_level_nssp_to_loc(
-        facility_level_nssp_data=facility_level_nssp_data,
-        loc_abb=loc_abb,
-        disease=disease,
-        first_training_date=first_training_date,
-        loc_pop_df=loc_pop_df,
-    )
-
     nssp_full_data = clean_nssp_data(
-        data=aggregated_facility_data,
+        data=nssp_data,
         disease=disease,
         last_training_date=last_training_date,
     )
 
     nssp_training_data = nssp_full_data.filter(pl.col("data_type") == "train")
 
-    nhsn_full_data = (
-        get_nhsn(
-            start_date=first_training_date,
-            end_date=None,
-            disease=disease,
-            loc_abb=loc_abb,
-            credentials_dict=credentials_dict,
-            local_data_file=nhsn_data_path,
-        )
-        .filter(
-            pl.col("weekendingdate") >= first_training_date
-        )  # in testing mode, this isn't guaranteed'
-        .with_columns(
-            data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
-            resolution=pl.lit("epiweekly"),
-        )
+    nhsn_full_data = nhsn_data.filter(
+        pl.col("weekendingdate") >= first_training_date
+    ).with_columns(  # in testing mode, this isn't guaranteed'
+        data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+        .then(pl.lit("train"))
+        .otherwise(pl.lit("eval")),
+        resolution=pl.lit("epiweekly"),
     )
     nhsn_training_data = nhsn_full_data.filter(pl.col("data_type") == "train")
 
     nhsn_step_size = 7
 
-    if loc_level_nwss_data is not None:
-        nwss_full_data = loc_level_nwss_data.with_columns(
-            data_type=pl.when(pl.col("date") <= last_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
-            resolution=pl.lit("daily"),
-        )
-        nwss_training_data_dict = (
-            nwss_full_data.filter(pl.col("date") <= last_training_date)
-            .drop("resolution")
-            .to_dict(as_series=False)
-        )
-
-    else:
-        nwss_full_data = None
-        nwss_training_data_dict = None
-
     data_for_model_fit = {
         "loc_pop": loc_pop,
         "right_truncation_offset": right_truncation_offset,
-        "nwss_training_data": nwss_training_data_dict,
+        "nwss_training_data": None,
         "nssp_training_data": nssp_training_data.drop("resolution").to_dict(
             as_series=False
         ),
@@ -571,7 +469,6 @@ def process_and_save_loc_data(
     combined_data = combine_surveillance_data(
         nssp_data=nssp_full_data,
         nhsn_data=nhsn_full_data,
-        nwss_data=nwss_full_data,
         disease=disease,
     )
 
@@ -585,40 +482,21 @@ def process_and_save_loc_data(
 def process_and_save_loc_param(
     loc_abb,
     disease,
-    loc_level_nwss_data,
     param_estimates,
     fit_ed_visits,
     save_dir,
+    as_of: dt.date | None = None,
 ) -> None:
     loc_pop_df = get_us_loc_pop_tbl()
     loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
-
-    if loc_level_nwss_data is None:
-        pop_fraction = jnp.array([1])
-    else:
-        subpop_sizes = (
-            loc_level_nwss_data.select(["site_index", "site", "site_pop"])
-            .unique()
-            .sort("site_pop", descending=True)
-            .get_column("site_pop")
-            .to_numpy()
-        )
-        if loc_pop > sum(subpop_sizes):
-            pop_fraction = (
-                jnp.concatenate(
-                    (jnp.array([loc_pop - sum(subpop_sizes)]), subpop_sizes)
-                )
-                / loc_pop
-            )
-        else:
-            pop_fraction = subpop_sizes / sum(subpop_sizes)
+    pop_fraction = jnp.array([1])
 
     pmfs = get_pmfs(
         param_estimates=param_estimates,
         loc_abb=loc_abb,
         disease=disease,
         right_truncation_required=fit_ed_visits,
-        as_of=None,
+        as_of=as_of,
     )
 
     inf_to_hosp_admit_lognormal_loc, inf_to_hosp_admit_lognormal_scale = approx_lognorm(

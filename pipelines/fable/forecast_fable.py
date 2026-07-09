@@ -1,19 +1,17 @@
 import argparse
+import datetime as dt
 import logging
 import os
 from pathlib import Path
 
-import polars as pl
-
+from pipelines.data.data_access import load_forecast_data, resolve_nssp_report_date
 from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
     generate_epiweekly_data,
-    get_available_reports,
     get_model_batch_dir_name,
-    load_credentials,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
     run_r_script,
@@ -42,7 +40,6 @@ def fable_e_other_forecasts(
 def main(
     disease: str,
     loc: str,
-    facility_level_nssp_data_dir: Path | str,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
@@ -51,6 +48,8 @@ def main(
     epiweekly: bool = False,
     credentials_path: Path | None = None,
     nhsn_data_path: Path | None = None,
+    run_date: dt.date | None = None,
+    fail_on_stale_data: bool = False,
 ) -> None:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
@@ -62,15 +61,10 @@ def main(
         f"location {loc}, and latest report date."
     )
 
-    credentials_dict = load_credentials(credentials_path, logger)
+    if credentials_path is not None:
+        logger.warning("credentials_path is ignored when using cfa-stf-data")
 
-    available_facility_level_reports = get_available_reports(
-        facility_level_nssp_data_dir
-    )
-
-    report_date = max(available_facility_level_reports)
-    facility_datafile = f"{report_date}.parquet"
-
+    report_date = resolve_nssp_report_date(run_date)
     first_training_date, last_training_date = calculate_training_dates(
         report_date,
         n_training_days,
@@ -78,8 +72,15 @@ def main(
         logger,
     )
 
-    facility_level_nssp_data = pl.scan_parquet(
-        Path(facility_level_nssp_data_dir, facility_datafile)
+    forecast_data = load_forecast_data(
+        disease=disease,
+        loc_abb=loc,
+        report_date=report_date,
+        first_training_date=first_training_date,
+        nhsn_data_path=nhsn_data_path,
+        run_date=run_date,
+        fail_on_stale_data=fail_on_stale_data,
+        logger=logger,
     )
 
     model_batch_dir_name = get_model_batch_dir_name(
@@ -100,15 +101,13 @@ def main(
     process_and_save_loc_data(
         loc_abb=loc,
         disease=disease,
-        facility_level_nssp_data=facility_level_nssp_data,
-        loc_level_nwss_data=None,
+        nssp_data=forecast_data.nssp_data,
+        nhsn_data=forecast_data.nhsn_data,
         report_date=report_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         save_dir=data_dir,
         logger=logger,
-        credentials_dict=credentials_dict,
-        nhsn_data_path=nhsn_data_path,
     )
     if epiweekly:
         logger.info("Generating epiweekly datasets from daily datasets...")
@@ -165,6 +164,11 @@ if __name__ == "__main__":
             "If set, will generate epiweekly datasets and forecasts, and "
             "append 'epiweekly' to the model name."
         ),
+    )
+    parser.add_argument(
+        "--fail-on-stale-data",
+        action="store_true",
+        help="Fail instead of warning when selected input data is stale.",
     )
     args = parser.parse_args()
     main(**vars(args))

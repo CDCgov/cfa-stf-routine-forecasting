@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
+from pipelines.data.data_access import ForecastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -320,6 +321,12 @@ def _write_combined_data(path):
 
 
 def _epiautogp_context(tmp_path, nowcast_source=None):
+    forecast_data = ForecastData(
+        report_date=dt.date(2024, 1, 3),
+        nssp_data=pl.DataFrame(),
+        nhsn_data=pl.DataFrame(),
+        freshness=(),
+    )
     return ForecastPipelineContext(
         forecast_spec=ForecastSpec(
             disease="COVID-19",
@@ -339,7 +346,7 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
         model_batch_dir=tmp_path / "batch",
         model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
         credentials_dict={},
-        facility_level_nssp_data=pl.LazyFrame(),
+        forecast_data=forecast_data,
         logger=logging.getLogger(),
         nowcast_source=nowcast_source,
     )

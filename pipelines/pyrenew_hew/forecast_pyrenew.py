@@ -6,25 +6,23 @@ import shutil
 import tomllib
 from pathlib import Path
 
-import polars as pl
 import tomli_w
 from pyrenew_multisignal.hew.utils import (
     flags_from_hew_letters,
     pyrenew_model_name_from_flags,
 )
 
+from pipelines.data.data_access import load_forecast_data, resolve_nssp_report_date
 from pipelines.data.prep_data import (
     process_and_save_loc_data,
     process_and_save_loc_param,
 )
-from pipelines.data.prep_ww_data import clean_nwss_data, preprocess_ww_data
 from pipelines.pyrenew_hew.fit_pyrenew_model import fit_and_save_model
 from pipelines.pyrenew_hew.generate_predictive import generate_and_save_predictions
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    get_available_reports,
     get_model_batch_dir_name,
     load_credentials,
     make_figures_from_model_fit_dir,
@@ -66,9 +64,6 @@ def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
 def main(
     disease: str,
     loc: str,
-    facility_level_nssp_data_dir: Path,
-    nwss_data_dir: Path,
-    param_data_dir: Path,
     priors_path: Path,
     output_dir: Path,
     n_training_days: int,
@@ -86,9 +81,16 @@ def main(
     forecast_hospital_admissions: bool = False,
     forecast_wastewater: bool = False,
     rng_key: int | None = None,
+    run_date: dt.date | None = None,
+    fail_on_stale_data: bool = False,
 ) -> None:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
+
+    if fit_wastewater or forecast_wastewater:
+        raise ValueError(
+            "Wastewater data loading is no longer supported in this pipeline."
+        )
 
     pyrenew_model_name = pyrenew_model_name_from_flags(
         fit_ed_visits=fit_ed_visits,
@@ -101,7 +103,7 @@ def main(
         f"model {pyrenew_model_name}, location {loc}, "
         f"and latest NSSP report date."
     )
-    signals = ["ed_visits", "hospital_admissions", "wastewater"]
+    signals = ["ed_visits", "hospital_admissions"]
 
     for signal in signals:
         fit = locals().get(f"fit_{signal}", False)
@@ -118,14 +120,10 @@ def main(
             "pyrenew_null (fitting to no signals) is not supported by this pipeline"
         )
 
-    credentials_dict = load_credentials(credentials_path, logger)
+    if credentials_path is not None:
+        load_credentials(credentials_path, logger)
 
-    available_facility_level_reports = get_available_reports(
-        facility_level_nssp_data_dir
-    )
-
-    report_date = max(available_facility_level_reports)
-    facility_datafile = f"{report_date}.parquet"
+    report_date = resolve_nssp_report_date(run_date)
 
     first_training_date, last_training_date = calculate_training_dates(
         report_date,
@@ -134,48 +132,16 @@ def main(
         logger,
     )
 
-    facility_level_nssp_data = pl.scan_parquet(
-        Path(facility_level_nssp_data_dir, facility_datafile)
+    forecast_data = load_forecast_data(
+        disease=disease,
+        loc_abb=loc,
+        report_date=report_date,
+        first_training_date=first_training_date,
+        nhsn_data_path=nhsn_data_path,
+        run_date=run_date,
+        fail_on_stale_data=fail_on_stale_data,
+        logger=logger,
     )
-
-    nwss_data_disease_map = {
-        "COVID-19": "covid",
-        "Influenza": "flu",
-        "RSV": "rsv",
-    }
-
-    def get_available_nwss_reports(
-        data_dir: str | Path,
-        glob_pattern: str = f"NWSS-ETL-{nwss_data_disease_map[disease]}-",
-    ):
-        return [
-            dt.datetime.strptime(f.stem.removeprefix(glob_pattern), "%Y-%m-%d").date()
-            for f in Path(data_dir).glob(f"{glob_pattern}*")
-        ]
-
-    if fit_wastewater:
-        available_nwss_reports = get_available_nwss_reports(nwss_data_dir)
-        if report_date in available_nwss_reports:
-            nwss_data_raw = pl.scan_parquet(
-                Path(
-                    nwss_data_dir,
-                    f"NWSS-ETL-{nwss_data_disease_map[disease]}-{report_date}",
-                    "bronze.parquet",
-                )
-            )
-            nwss_data_cleaned = clean_nwss_data(nwss_data_raw).filter(
-                (pl.col("location") == loc) & (pl.col("date") >= first_training_date)
-            )
-            loc_level_nwss_data = preprocess_ww_data(nwss_data_cleaned.collect())
-        else:
-            raise ValueError(
-                f"NWSS data not available for the requested report date {report_date}"
-            )
-    else:
-        loc_level_nwss_data = None
-
-    param_estimates = pl.scan_parquet(Path(param_data_dir, "prod.parquet"))
-
     model_batch_dir_name = get_model_batch_dir_name(
         disease=disease,
         report_date=report_date,
@@ -197,24 +163,22 @@ def main(
     process_and_save_loc_data(
         loc_abb=loc,
         disease=disease,
-        facility_level_nssp_data=facility_level_nssp_data,
-        loc_level_nwss_data=loc_level_nwss_data,
+        nssp_data=forecast_data.nssp_data,
+        nhsn_data=forecast_data.nhsn_data,
         report_date=report_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         save_dir=data_dir,
         logger=logger,
-        credentials_dict=credentials_dict,
-        nhsn_data_path=nhsn_data_path,
     )
 
     process_and_save_loc_param(
         loc_abb=loc,
         disease=disease,
-        loc_level_nwss_data=loc_level_nwss_data,
-        param_estimates=param_estimates,
+        param_estimates=None,
         fit_ed_visits=fit_ed_visits,
         save_dir=data_dir,
+        as_of=report_date,
     )
     append_prop_data_to_combined_data(Path(data_dir, "combined_data.tsv"))
     logger.info("Data preparation complete.")
@@ -289,13 +253,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--nwss-data-dir",
-        type=Path,
-        default=Path("private_data", "nwss_vintages"),
-        help="Directory in which to look for NWSS data.",
-    )
-
-    parser.add_argument(
         "--priors-path",
         type=Path,
         help=(
@@ -348,10 +305,9 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
-        "--param-data-dir",
-        type=Path,
-        default=Path("private_data", "prod_param_estimates"),
-        help="Directory in which to look for parameter estimates such as delay PMFs.",
+        "--fail-on-stale-data",
+        action="store_true",
+        help="Fail instead of warning when selected input data is stale.",
     )
 
     args = parser.parse_args()

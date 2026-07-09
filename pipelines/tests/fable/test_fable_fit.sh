@@ -15,7 +15,6 @@ for epiweekly_flag in "" "--epiweekly"; do
 	python pipelines/fable/forecast_fable.py \
 		--disease "$disease" \
 		--loc "$location" \
-		--facility-level-nssp-data-dir "$BASE_DIR/private_data/nssp_etl_gold" \
 		--output-dir "$BASE_DIR/2024-12-21_forecasts" \
 		--n-training-days 90 \
 		--n-samples 500 \

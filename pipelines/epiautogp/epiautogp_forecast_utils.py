@@ -12,8 +12,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-import polars as pl
-
+from pipelines.data.data_access import (
+    ForecastData,
+    load_forecast_data,
+    resolve_nssp_report_date,
+)
 from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
 from pipelines.epiautogp.nowcast import NowcastSource
@@ -22,7 +25,6 @@ from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
     generate_epiweekly_data,
-    get_available_reports,
     get_model_batch_dir_name,
     load_credentials,
     make_figures_from_model_fit_dir,
@@ -69,7 +71,7 @@ class ForecastPipelineContext:
     model_batch_dir: Path
     model_run_dir: Path
     credentials_dict: dict[str, Any]
-    facility_level_nssp_data: pl.LazyFrame
+    forecast_data: ForecastData
     logger: logging.Logger
     nowcast_source: NowcastSource | None = None
 
@@ -99,14 +101,13 @@ class ForecastPipelineContext:
         process_and_save_loc_data(
             loc_abb=self.forecast_spec.loc,
             disease=self.forecast_spec.disease,
-            facility_level_nssp_data=self.facility_level_nssp_data,
+            nssp_data=self.forecast_data.nssp_data,
+            nhsn_data=self.forecast_data.nhsn_data,
             report_date=self.forecast_spec.report_date,
             first_training_date=self.first_training_date,
             last_training_date=self.last_training_date,
             save_dir=data_dir,
             logger=self.logger,
-            credentials_dict=self.credentials_dict,
-            nhsn_data_path=self.nhsn_data_path,
         )
 
         # Generate epiweekly datasets
@@ -159,18 +160,11 @@ def _build_reporting_delay_nowcast(
     *,
     forecast_spec: ForecastSpec,
     reporting_delay_pmf: list[float] | None,
-    param_data_dir: Path | str | None,
 ) -> ReportingDelayNowcast:
     """Build a ReportingDelayNowcast, fetching the PMF if not supplied."""
     if reporting_delay_pmf is None:
-        if param_data_dir is None:
-            raise ValueError(
-                "param_data_dir is required when reporting-delay nowcasting "
-                "is requested without a directly supplied reporting_delay_pmf."
-            )
-        param_estimates = pl.scan_parquet(Path(param_data_dir, "prod.parquet"))
         reporting_delay_pmf = get_pmfs(
-            param_estimates=param_estimates,
+            param_estimates=None,
             loc_abb=forecast_spec.loc,
             disease=forecast_spec.disease,
             as_of=forecast_spec.report_date,
@@ -220,7 +214,6 @@ def setup_forecast_pipeline(
     ed_visit_type: str,
     model_name: str,
     nhsn_data_path: Path | None,
-    facility_level_nssp_data_dir: Path | str,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
@@ -228,9 +221,10 @@ def setup_forecast_pipeline(
     exclude_date_ranges: list[tuple[date, date]] | None = None,
     credentials_path: Path | None = None,
     logger: logging.Logger | None = None,
-    param_data_dir: Path | str | None = None,
     nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
+    run_date: date | None = None,
+    fail_on_stale_data: bool = False,
 ) -> ForecastPipelineContext:
     """
     Set up common forecast pipeline infrastructure.
@@ -261,8 +255,6 @@ def setup_forecast_pipeline(
         Name of the model configuration
     nhsn_data_path : Path | None
         Path to NHSN hospital admission data
-    facility_level_nssp_data_dir : Path | str
-        Directory containing facility-level NSSP ED visit data
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -278,15 +270,11 @@ def setup_forecast_pipeline(
         Path to credentials file
     logger : logging.Logger | None, default=None
         Logger instance. If None, creates a new logger
-    param_data_dir : Path | str | None, default=None
-        Directory containing parameter estimates such as reporting-delay PMFs.
-        Required when reporting-delay nowcasting is selected and no PMF is
-        directly supplied.
     nowcast_source_name : {"none", "reporting-delay"}, default="none"
         Nowcast source selection for EpiAutoGP input.
     reporting_delay_pmf : list[float] | None, default=None
-        Directly supplied reporting-delay PMF. Takes precedence over
-        param_data_dir when reporting-delay nowcasting is selected.
+        Directly supplied reporting-delay PMF. If omitted, the PMF is loaded
+        through `cfa-stf-data`.
 
     Returns
     -------
@@ -304,12 +292,7 @@ def setup_forecast_pipeline(
     # Load credentials
     credentials_dict = load_credentials(credentials_path, logger)
 
-    # Get available reports
-    available_facility_level_reports = get_available_reports(
-        facility_level_nssp_data_dir
-    )
-
-    report_date_parsed = max(available_facility_level_reports)
+    report_date_parsed = resolve_nssp_report_date(run_date)
 
     # Gather the forecast specification input parameters into a single cohesive unit
     forecast_spec = ForecastSpec(
@@ -329,10 +312,15 @@ def setup_forecast_pipeline(
         logger,
     )
 
-    # Load NSSP data
-    facility_datafile = f"{report_date_parsed}.parquet"
-    facility_level_nssp_data = pl.scan_parquet(
-        Path(facility_level_nssp_data_dir, facility_datafile)
+    forecast_data = load_forecast_data(
+        disease=disease,
+        loc_abb=loc,
+        report_date=report_date_parsed,
+        first_training_date=first_training_date,
+        nhsn_data_path=nhsn_data_path,
+        run_date=run_date,
+        fail_on_stale_data=fail_on_stale_data,
+        logger=logger,
     )
 
     # Create model batch directory structure
@@ -352,7 +340,6 @@ def setup_forecast_pipeline(
     resolved_nowcast_source = _resolve_nowcast_source(
         forecast_spec=forecast_spec,
         nowcast_source_name=nowcast_source_name,
-        param_data_dir=param_data_dir,
         reporting_delay_pmf=reporting_delay_pmf,
     )
 
@@ -368,7 +355,7 @@ def setup_forecast_pipeline(
         model_batch_dir=model_batch_dir,
         model_run_dir=model_run_dir,
         credentials_dict=credentials_dict,
-        facility_level_nssp_data=facility_level_nssp_data,
+        forecast_data=forecast_data,
         logger=logger,
         nowcast_source=resolved_nowcast_source,
     )

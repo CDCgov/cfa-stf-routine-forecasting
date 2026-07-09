@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
+from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations
@@ -23,12 +23,6 @@ disease_map_lower_ = {
     "rsv": "RSV",
 }
 loc_abbrs_ = LOCATION_LIST
-
-
-def _format_tabular_number(value: float | None) -> str | None:
-    if value is None:
-        return None
-    return f"{value:.15g}"
 
 
 def load_credentials(
@@ -738,22 +732,10 @@ def append_prop_data_to_combined_data(data_path: Path | str) -> None:
 
     if suffix == ".tsv":
         data = pl.read_csv(path, separator="\t", null_values="NA")
-        result = append_prop_data(data).with_columns(
-            pl.col(".value").map_elements(
-                _format_tabular_number,
-                return_dtype=pl.String,
-            )
-        )
-        result.write_csv(path, separator="\t", null_value="NA")
+        append_prop_data(data).write_csv(path, separator="\t", null_value="NA")
     elif suffix == ".csv":
         data = pl.read_csv(path, null_values="NA")
-        result = append_prop_data(data).with_columns(
-            pl.col(".value").map_elements(
-                _format_tabular_number,
-                return_dtype=pl.String,
-            )
-        )
-        result.write_csv(path, null_value="NA")
+        append_prop_data(data).write_csv(path, null_value="NA")
     elif suffix == ".parquet":
         data = pl.read_parquet(path)
         append_prop_data(data).write_parquet(path)

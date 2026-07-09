@@ -19,6 +19,7 @@ from pipelines.data.generate_test_data_lib import (
 DEFAULT_LOCATIONS = ["CA", "DC"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
 REPORT_DATE = dt.date(2024, 12, 21)
+LAST_OBS_DATE = REPORT_DATE - dt.timedelta(days=1)
 OBS_WINDOW_DAYS = 120
 FIRST_OBS_DATE = REPORT_DATE - dt.timedelta(days=OBS_WINDOW_DAYS)
 
@@ -169,7 +170,7 @@ def _make_facility_level_nssp(
     diseases: list[str],
 ) -> pl.DataFrame:
     rows = []
-    observation_dates = _date_range(FIRST_OBS_DATE, REPORT_DATE)
+    observation_dates = _date_range(FIRST_OBS_DATE, LAST_OBS_DATE)
     facility_ids = range(FIRST_FACILITY_ID, N_FACILITIES + 1)
     for location in locations:
         for date in observation_dates:

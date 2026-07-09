@@ -284,15 +284,16 @@ wheels = [
 
 [[package]]
 name = "azure-batch"
-version = "14.2.0"
+version = "15.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "azure-common" },
-    { name = "msrestazure" },
+    { name = "azure-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/35/3e/4611960f8ceb281285d764f32a0e88515fab4e1e32ff5d02bc77e55bbcb6/azure-batch-14.2.0.tar.gz", hash = "sha256:c79267d6c3d3fe14a16a422ab5bbfabcbd68ed0b58b6bbcdfa0c8345c4c78532", size = 243784, upload-time = "2024-03-27T20:05:11.192Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/ec/9c38379dea2a4817a5c5b44282eff56476326cefa09da9e804809b397656/azure_batch-15.1.0.tar.gz", hash = "sha256:2f684d176b457b7213535e145180a914ed6844b2d1066fcc22ac88c3ac9e3fa5", size = 298104, upload-time = "2026-05-01T23:30:12.731Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/15/42aa83f62dc47e00bed0e590d19252c24b94b8c3b740d9bce33ec867e785/azure_batch-14.2.0-py3-none-any.whl", hash = "sha256:115ccff0007852784ccf8fc12f5f3d415ed80513be306da7a8938ca82d948ee7", size = 243322, upload-time = "2024-03-27T20:05:13.803Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/35/358a421ebbb0d6fa929333dd71b94922d34445aa02d9d2fa7c0a277dcf53/azure_batch-15.1.0-py3-none-any.whl", hash = "sha256:6001232ba67a4051f4f1b35d434232757b78baa14e4964ec3bfb91afa1d10ed4", size = 260933, upload-time = "2026-05-01T23:30:14.604Z" },
 ]
 
 [[package]]
@@ -458,18 +459,17 @@ wheels = [
 ]
 
 [[package]]
-name = "azure-mgmt-resource"
-version = "24.0.0"
+name = "azure-mgmt-resource-subscriptions"
+version = "1.0.0b2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "azure-common" },
     { name = "azure-mgmt-core" },
     { name = "isodate" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/50/4c/b27a3dfbedebbcc8e346a956a803528bd94a19fdf14b1de4bd781b03a6cc/azure_mgmt_resource-24.0.0.tar.gz", hash = "sha256:cf6b8995fcdd407ac9ff1dd474087129429a1d90dbb1ac77f97c19b96237b265", size = 3030022, upload-time = "2025-06-17T08:04:01.731Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/d2/1d42399ff4db0b3aa1c86ffde853199e7d34ca8416967a38418a883251dd/azure_mgmt_resource_subscriptions-1.0.0b2.tar.gz", hash = "sha256:9da8a9532469d738f4a24950565994f3627272edf63d0798c9ef523435e0f4a4", size = 57164, upload-time = "2026-05-22T08:33:50.352Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/18/f047cb553dad6fdb65c625c4fe48552e043c4e9a859416a70c5047d07475/azure_mgmt_resource-24.0.0-py3-none-any.whl", hash = "sha256:27b32cd223e2784269f5a0db3c282042886ee4072d79cedc638438ece7cd0df4", size = 3613790, upload-time = "2025-06-17T08:04:04.046Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/c1/a16f83c1fcde7e3c5f4e85768afdd55975e6cfa4d04b83ef9d613a3757c8/azure_mgmt_resource_subscriptions-1.0.0b2-py3-none-any.whl", hash = "sha256:bbd458f54a5f273674a1b0fe746aceee5dd5b582b28e34ddf22acc82f1e5c7a7", size = 64649, upload-time = "2026-05-22T08:33:51.646Z" },
 ]
 
 [[package]]
@@ -680,18 +680,19 @@ dependencies = [
 
 [[package]]
 name = "cfa-cloudops"
-version = "0.6.2"
-source = { git = "https://github.com/CDCgov/cfa-cloudops.git#38c4dd8ca12aba09e8be54fc5ade5c8c2945290a" }
+version = "0.7.2"
+source = { git = "https://github.com/CDCgov/cfa-cloudops.git#070cc3608c1ade5b1016a9c64489ac8d737e522a" }
 dependencies = [
     { name = "anyio" },
     { name = "azure-batch" },
+    { name = "azure-common" },
     { name = "azure-core" },
     { name = "azure-identity" },
     { name = "azure-keyvault" },
     { name = "azure-mgmt-appcontainers" },
     { name = "azure-mgmt-batch" },
     { name = "azure-mgmt-compute" },
-    { name = "azure-mgmt-resource" },
+    { name = "azure-mgmt-resource-subscriptions" },
     { name = "azure-mgmt-web" },
     { name = "azure-storage-blob" },
     { name = "docker" },
@@ -699,6 +700,7 @@ dependencies = [
     { name = "griddler" },
     { name = "humanize" },
     { name = "msrest" },
+    { name = "msrestazure" },
     { name = "networkx" },
     { name = "pandas" },
     { name = "python-dotenv" },
@@ -709,8 +711,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-dagster"
-version = "1.3.2"
-source = { git = "https://github.com/cdcgov/cfa-dagster?rev=v1.3.2#b3c628b618ebff49c2f066e50c5e5ef71564d218" }
+version = "1.4.0"
+source = { git = "https://github.com/cdcgov/cfa-dagster?rev=v1.4.0#95020063baeaa67e2967ffad2a9785f64b61cd66" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },
@@ -725,7 +727,6 @@ dependencies = [
     { name = "dagster-graphql" },
     { name = "dagster-postgres" },
     { name = "dagster-shared" },
-    { name = "msrest" },
     { name = "psycopg2-binary" },
     { name = "pyyaml" },
 ]
@@ -739,8 +740,8 @@ dev = [
 
 [[package]]
 name = "cfa-dataops"
-version = "2026.6.5.0"
-source = { git = "https://github.com/CDCgov/cfa-dataops.git?rev=main#b2b94649c5ea5d0ce0451b22ff40be61e149c3d9" }
+version = "2026.6.30.0"
+source = { git = "https://github.com/CDCgov/cfa-dataops.git?rev=main#e92b3b89e212d1a93396cb12189d2cf6aea1af27" }
 dependencies = [
     { name = "altair" },
     { name = "cfa-cloudops" },
@@ -748,7 +749,6 @@ dependencies = [
     { name = "faker" },
     { name = "fastparquet" },
     { name = "httpx" },
-    { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "itables" },
     { name = "jupyter" },
@@ -783,7 +783,7 @@ dependencies = [
 [[package]]
 name = "cfa-stf-forecasttools"
 version = "0.1.0"
-source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#9f569bb23277925a688df3bb3378e1f379b1b5eb" }
+source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#32e7a058034ddf906d1217613e70c4f93b03e695" }
 dependencies = [
     { name = "numpy" },
     { name = "polars", extra = ["numpy", "pyarrow"] },
@@ -796,8 +796,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "arviz", extra = ["h5netcdf"] },
+    { name = "cfa-cloudops" },
     { name = "cfa-dagster" },
-    { name = "cfa-dataops" },
     { name = "cfa-stf-data" },
     { name = "cfa-stf-forecasttools" },
     { name = "dagster" },
@@ -841,8 +841,8 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "arviz", extras = ["h5netcdf"], git = "https://github.com/arviz-devs/arviz?rev=main" },
-    { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=v1.3.2" },
-    { name = "cfa-dataops", git = "https://github.com/CDCgov/cfa-dataops?rev=main" },
+    { name = "cfa-cloudops", git = "https://github.com/CDCgov/cfa-cloudops?rev=main" },
+    { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=v1.4.0" },
     { name = "cfa-stf-data", git = "https://github.com/CDCgov/cfa-stf-data?rev=main" },
     { name = "cfa-stf-forecasttools", git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main" },
     { name = "dagster" },
@@ -866,7 +866,7 @@ dagster-config-editor = [
     { name = "rich" },
 ]
 dev = [
-    { name = "cfa-dagster", extras = ["dev"], git = "https://github.com/cdcgov/cfa-dagster?rev=v1.3.2" },
+    { name = "cfa-dagster", extras = ["dev"], git = "https://github.com/cdcgov/cfa-dagster?rev=v1.4.0" },
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyter", specifier = ">=1.0.0" },

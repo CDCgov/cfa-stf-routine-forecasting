@@ -7,6 +7,43 @@ import pytest
 from pipelines.data import data_access
 
 
+class FakeLoad:
+    prefix = "public/stf/nssp_gold_v1"
+
+    def __init__(self, versions):
+        self.versions = versions
+
+    def get_versions(self):
+        return self.versions
+
+
+class FakeEndpoint:
+    def __init__(self, versions):
+        self.load = FakeLoad(versions)
+
+
+def test_latest_version_date_uses_public_dataops_versions():
+    endpoint = FakeEndpoint(
+        [
+            "2026-01-09/data.parquet",
+            "2026-01-08T00-00-00/data.parquet",
+            "2026-01-07",
+        ]
+    )
+
+    assert data_access._latest_version_date(endpoint) == dt.date(2026, 1, 9)
+    assert data_access._latest_version_date(
+        endpoint, as_of=dt.date(2026, 1, 8)
+    ) == dt.date(2026, 1, 8)
+
+
+def test_latest_version_date_raises_when_no_versions_match_as_of():
+    endpoint = FakeEndpoint(["2026-01-09/data.parquet"])
+
+    with pytest.raises(ValueError, match="No public/stf/nssp_gold_v1 versions found"):
+        data_access._latest_version_date(endpoint, as_of=dt.date(2026, 1, 8))
+
+
 def test_nssp_freshness_requires_run_date_match():
     fresh = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 7),

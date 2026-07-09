@@ -28,26 +28,22 @@ class ForecastData:
 
 
 def _parse_version_date(version: str) -> dt.date:
-    return dt.datetime.strptime(version[:10], "%Y-%m-%d").date()
-
-
-def _version_spec(as_of: dt.date | None) -> str | None:
-    if as_of is None:
-        return None
-    return f"<={as_of.strftime('%Y-%m-%dT%H-%M-%S')}"
+    version_date = version.split("/", maxsplit=1)[0]
+    return dt.datetime.strptime(version_date[:10], "%Y-%m-%d").date()
 
 
 def _latest_version_date(endpoint, as_of: dt.date | None = None) -> dt.date:
-    version = (
-        endpoint.load._get_version_blobs(  # noqa: SLF001 - dataops has no public resolver
-            version_spec=_version_spec(as_of),
-            selection="newest",
-            print_version=False,
-        )[0]["name"]
-        .removeprefix(f"{endpoint.load.prefix}/")
-        .split("/", maxsplit=1)[0]
+    version_dates = sorted(
+        {_parse_version_date(version) for version in endpoint.load.get_versions()},
+        reverse=True,
     )
-    return _parse_version_date(version)
+    if as_of is not None:
+        version_dates = [
+            version_date for version_date in version_dates if version_date <= as_of
+        ]
+    if not version_dates:
+        raise ValueError(f"No {endpoint.load.prefix} versions found as of {as_of}")
+    return version_dates[0]
 
 
 def resolve_nssp_report_date(

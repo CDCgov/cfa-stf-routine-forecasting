@@ -87,7 +87,7 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
-cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "main" }
+cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.3.2" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "main" }
 cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops", rev = "main"}

@@ -1,10 +1,10 @@
 import datetime as dt
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 import polars as pl
 from cfa.dataops import datacat
+
 from cfa.stf.data import get_nhsn_hrd, get_nssp
 
 
@@ -74,14 +74,6 @@ def _load_dataops_nssp(
         )
         .rename({"reference_date": "date", "value": "ed_visits"})
         .select(["date", "geo_value", "disease", "ed_visits"])
-    )
-
-
-def _load_local_nhsn(nhsn_data_path: Path | str, first_training_date: dt.date):
-    return (
-        pl.read_parquet(nhsn_data_path)
-        .with_columns(weekendingdate=pl.col("weekendingdate").cast(pl.Date))
-        .filter(pl.col("weekendingdate") >= first_training_date)
     )
 
 
@@ -192,7 +184,6 @@ def load_forecast_data(
     loc_abb: str,
     report_date: dt.date,
     first_training_date: dt.date,
-    nhsn_data_path: Path | str | None = None,
     run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
@@ -215,17 +206,12 @@ def load_forecast_data(
         run_date=run_date,
     )
 
-    nhsn_prelim = None
-    if nhsn_data_path is not None:
-        nhsn_data = _load_local_nhsn(nhsn_data_path, first_training_date)
-        nhsn_version_date = report_date
-    else:
-        nhsn_data, nhsn_prelim, nhsn_version_date = _load_dataops_nhsn(
-            disease=disease,
-            loc_abb=loc_abb,
-            first_training_date=first_training_date,
-            run_date=run_date,
-        )
+    nhsn_data, nhsn_prelim, nhsn_version_date = _load_dataops_nhsn(
+        disease=disease,
+        loc_abb=loc_abb,
+        first_training_date=first_training_date,
+        run_date=run_date,
+    )
 
     nhsn_record = nhsn_freshness(
         selected_version_date=nhsn_version_date,

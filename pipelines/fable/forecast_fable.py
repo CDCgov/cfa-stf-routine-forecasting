@@ -47,7 +47,6 @@ def main(
     exclude_last_n_days: int = 0,
     epiweekly: bool = False,
     credentials_path: Path | None = None,
-    nhsn_data_path: Path | None = None,
     run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
 ) -> None:
@@ -77,7 +76,6 @@ def main(
         loc_abb=loc,
         report_date=report_date,
         first_training_date=first_training_date,
-        nhsn_data_path=nhsn_data_path,
         run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,

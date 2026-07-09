@@ -337,7 +337,6 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
             ed_visit_type="observed",
         ),
         model_name="test_model",
-        nhsn_data_path=None,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
         n_forecast_days=28,

@@ -97,7 +97,6 @@ def main(
     ed_visit_type: str = "observed",
     exclude_last_n_days: int = 0,
     credentials_path: Path = None,
-    nhsn_data_path: Path = None,
     exclude_date_ranges: str = None,
     n_particles: int = 24,
     n_mcmc: int = 100,
@@ -145,8 +144,6 @@ def main(
         Number of recent days to exclude from training
     credentials_path : Path | None, default=None
         Path to credentials file for data access
-    nhsn_data_path : Path | None, default=None
-        Path to NHSN hospital admission data
     exclude_date_ranges : str | None, default=None
         Comma-separated list of date ranges to exclude from training data.
         Format: 'YYYY-MM-DD:YYYY-MM-DD,YYYY-MM-DD' for ranges and single dates.
@@ -255,7 +252,6 @@ def main(
         frequency=frequency,
         ed_visit_type=ed_visit_type,
         model_name=model_name,
-        nhsn_data_path=nhsn_data_path,
         output_dir=output_dir,
         n_training_days=n_training_days,
         n_forecast_days=n_forecast_days,

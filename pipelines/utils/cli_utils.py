@@ -64,13 +64,6 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
         help="Path to a TOML file containing credentials such as API keys.",
     )
 
-    parser.add_argument(
-        "--nhsn-data-path",
-        type=Path,
-        default=None,
-        help="Path to local NHSN data (for local testing).",
-    )
-
 
 def run_command(
     executable: str,

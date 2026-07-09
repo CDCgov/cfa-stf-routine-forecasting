@@ -1,6 +1,7 @@
 import datetime as dt
 import logging
 
+import polars as pl
 import pytest
 
 from pipelines.data import data_access
@@ -109,3 +110,57 @@ def test_choose_nhsn_final_when_final_is_newer(monkeypatch):
 
     assert not prelim
     assert selected_version == dt.date(2026, 1, 8)
+
+
+def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
+    calls = {}
+    nssp_data = pl.DataFrame(
+        {
+            "date": [dt.date(2026, 1, 8)],
+            "geo_value": ["CA"],
+            "disease": ["COVID-19"],
+            "ed_visits": [10],
+        }
+    )
+    nhsn_data = pl.DataFrame(
+        {
+            "weekendingdate": [dt.date(2026, 1, 3)],
+            "jurisdiction": ["CA"],
+            "disease": ["COVID-19"],
+            "hospital_admissions": [5],
+        }
+    )
+
+    def fake_load_nssp(**kwargs):
+        calls["nssp"] = kwargs
+        return nssp_data
+
+    def fake_load_nhsn(**kwargs):
+        calls["nhsn"] = kwargs
+        return nhsn_data, True, dt.date(2026, 1, 8)
+
+    monkeypatch.setattr(data_access, "_load_dataops_nssp", fake_load_nssp)
+    monkeypatch.setattr(data_access, "_load_dataops_nhsn", fake_load_nhsn)
+
+    forecast_data = data_access.load_forecast_data(
+        disease="COVID-19",
+        loc_abb="CA",
+        report_date=dt.date(2026, 1, 8),
+        first_training_date=dt.date(2025, 12, 1),
+    )
+
+    assert forecast_data.nssp_data.equals(nssp_data)
+    assert forecast_data.nhsn_data.equals(nhsn_data)
+    assert forecast_data.nhsn_prelim
+    assert calls["nssp"] == {
+        "report_date": dt.date(2026, 1, 8),
+        "loc_abb": "CA",
+        "disease": "COVID-19",
+        "first_training_date": dt.date(2025, 12, 1),
+    }
+    assert calls["nhsn"] == {
+        "disease": "COVID-19",
+        "loc_abb": "CA",
+        "first_training_date": dt.date(2025, 12, 1),
+        "run_date": dt.date(2026, 1, 8),
+    }

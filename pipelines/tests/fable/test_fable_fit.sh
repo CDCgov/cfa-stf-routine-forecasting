@@ -18,8 +18,7 @@ for epiweekly_flag in "" "--epiweekly"; do
 		--output-dir "$BASE_DIR/2024-12-21_forecasts" \
 		--n-training-days 90 \
 		--n-samples 500 \
-		$epiweekly_flag \
-		--nhsn-data-path "$BASE_DIR/private_data/nhsn_test_data/${disease}_${location}.parquet"
+		$epiweekly_flag
 done
 
 if [ "$?" -ne 0 ]; then

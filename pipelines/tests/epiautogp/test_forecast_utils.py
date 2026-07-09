@@ -74,7 +74,6 @@ def base_context(tmp_path):
             ed_visit_type="observed",
         ),
         model_name="test_model",
-        nhsn_data_path=None,
         first_training_date=dt.date(2024, 9, 22),
         last_training_date=dt.date(2024, 12, 20),
         n_forecast_days=28,
@@ -103,7 +102,6 @@ class TestForecastPipelineContext:
                 ed_visit_type="observed",
             ),
             model_name="test_model",
-            nhsn_data_path=None,
             first_training_date=dt.date(2024, 9, 22),
             last_training_date=dt.date(2024, 12, 20),
             n_forecast_days=28,
@@ -167,7 +165,6 @@ class TestSetupForecastPipeline:
             frequency="epiweekly",
             ed_visit_type="observed",
             model_name="test_model",
-            nhsn_data_path=None,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
@@ -204,7 +201,6 @@ class TestSetupForecastPipeline:
             frequency="epiweekly",
             ed_visit_type="observed",
             model_name="test_model",
-            nhsn_data_path=None,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
@@ -247,7 +243,6 @@ class TestSetupForecastPipeline:
             frequency="daily",
             ed_visit_type="observed",
             model_name="test_model",
-            nhsn_data_path=None,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
@@ -287,7 +282,6 @@ class TestSetupForecastPipeline:
             frequency="daily",
             ed_visit_type="other",
             model_name="test_model",
-            nhsn_data_path=None,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
@@ -497,14 +491,11 @@ class TestPrepareModelData:
         tmp_path,
     ):
         """Test prepare_model_data with NHSN target and data."""
-        nhsn_path = tmp_path / "nhsn_hospital_admissions.parquet"
-
         # Override multiple fields for NHSN test
         context = replace(
             base_context,
             forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
             model_name="epiautogp_nhsn_epiweekly",
-            nhsn_data_path=nhsn_path,
             credentials_dict={"key": "value"},
         )
 

@@ -62,7 +62,6 @@ class ForecastPipelineContext:
 
     forecast_spec: ForecastSpec
     model_name: str
-    nhsn_data_path: Path | None
     first_training_date: date
     last_training_date: date
     n_forecast_days: int
@@ -213,7 +212,6 @@ def setup_forecast_pipeline(
     frequency: str,
     ed_visit_type: str,
     model_name: str,
-    nhsn_data_path: Path | None,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
@@ -235,7 +233,7 @@ def setup_forecast_pipeline(
     2. Get available report dates
     3. Parse and validate the report date
     4. Calculate training dates
-    5. Load NSSP data
+    5. Load forecast input data
     6. Create batch directory structure
     7. Resolve nowcasting source based on input parameters and available data
 
@@ -253,8 +251,6 @@ def setup_forecast_pipeline(
         Type of ED visits: "observed" or "other" (NSSP only)
     model_name : str
         Name of the model configuration
-    nhsn_data_path : Path | None
-        Path to NHSN hospital admission data
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -317,7 +313,6 @@ def setup_forecast_pipeline(
         loc_abb=loc,
         report_date=report_date_parsed,
         first_training_date=first_training_date,
-        nhsn_data_path=nhsn_data_path,
         run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
@@ -346,7 +341,6 @@ def setup_forecast_pipeline(
     return ForecastPipelineContext(
         forecast_spec=forecast_spec,
         model_name=model_name,
-        nhsn_data_path=nhsn_data_path,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         n_forecast_days=n_forecast_days,

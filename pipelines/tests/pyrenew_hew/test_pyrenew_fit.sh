@@ -22,8 +22,7 @@ python pipelines/pyrenew_hew/forecast_pyrenew.py \
 	--n-warmup 250 \
 	--rng-key 12345 \
 	--model-letters "$model_letters" \
-	--additional-forecast-letters "$model_letters" \
-	--nhsn-data-path "$BASE_DIR/private_data/nhsn_test_data/${disease}_${location}.parquet"
+	--additional-forecast-letters "$model_letters"
 if [ "$?" -ne 0 ]; then
 	echo "TEST-MODE FAIL: Forecasting/postprocessing pipeline failed"
 	exit 1

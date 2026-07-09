@@ -29,7 +29,6 @@ cmd_args=(
 	--n-training-days 90
 	--target "$target"
 	--frequency "$frequency"
-	--nhsn-data-path "$BASE_DIR/private_data/nhsn_test_data/${disease}_${location}.parquet"
 	--n-forecast-days 28
 	--n-particles 2
 	--n-mcmc 2

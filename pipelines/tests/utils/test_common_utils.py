@@ -164,6 +164,39 @@ class TestDataWranglingUtils:
         )
         plt.assert_frame_equal(result, expected)
 
+    def test_append_prop_data_to_combined_data_allows_variable_names(self, tmp_path):
+        data_path = tmp_path / "combined_data.tsv"
+        pl.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-01"],
+                "location": ["US", "US"],
+                ".variable": ["num_visits", "denom_other_visits"],
+                ".value": [3, 7],
+            }
+        ).write_csv(data_path, separator="\t")
+
+        append_prop_data_to_combined_data(
+            data_path,
+            observed_var="num_visits",
+            other_var="denom_other_visits",
+            prop_var="prop_num_visits",
+        )
+
+        result = pl.read_csv(data_path, separator="\t")
+        expected = pl.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
+                "location": ["US", "US", "US"],
+                ".variable": [
+                    "denom_other_visits",
+                    "num_visits",
+                    "prop_num_visits",
+                ],
+                ".value": [7.0, 3.0, 0.3],
+            }
+        )
+        plt.assert_frame_equal(result, expected)
+
 
 class TestCLIUtils:
     """Tests for CLI argument parsing utilities."""

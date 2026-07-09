@@ -23,6 +23,7 @@ from pipelines.utils.common_utils import (
     create_prop_samples,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
+    parse_model_batch_dir_name,
 )
 from pipelines.utils.postprocess_forecast_batches import main as postprocess_batches
 
@@ -39,6 +40,8 @@ EXPECTED_MODELS = [
     "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other",
     "prop_pyrenew_e_epiautogp_nssp_daily_other",
 ]
+MOCK_DATA_MODE = "mock"
+REAL_DATA_MODE = "real"
 
 
 @contextmanager
@@ -245,10 +248,35 @@ def _patch_dataops(monkeypatch) -> None:
     )
 
 
+def _has_external_dataops_env() -> bool:
+    try:
+        from cfa.cloudops.util import check_ext_env
+    except ImportError:
+        print(
+            "[pipeline-e2e] cfa.cloudops.util.check_ext_env is unavailable; "
+            "using mocked DataOps data.",
+            flush=True,
+        )
+        return False
+
+    return check_ext_env()
+
+
+def _data_mode(request) -> str:
+    requested_mode = request.config.getoption("--e2e-data-mode")
+    if requested_mode == "auto":
+        return REAL_DATA_MODE if _has_external_dataops_env() else MOCK_DATA_MODE
+    return requested_mode
+
+
 @pytest.mark.pipeline_e2e
-def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch):
+def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
     workspace = pipeline_workspace
-    _patch_dataops(monkeypatch)
+    data_mode = _data_mode(request)
+    print(f"[pipeline-e2e] Using {data_mode} DataOps data.", flush=True)
+
+    if data_mode == MOCK_DATA_MODE:
+        _patch_dataops(monkeypatch)
 
     for disease in DEFAULT_DISEASES:
         for location in DEFAULT_LOCATIONS:
@@ -284,8 +312,10 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch):
     for disease in DEFAULT_DISEASES:
         with _status_step(f"Checking postprocessed outputs for {disease}"):
             batch_dir = _model_batch_dir(workspace, disease)
+            batch_info = parse_model_batch_dir_name(batch_dir.name)
             postprocessed_path = (
-                batch_dir / f"2024-12-21-{disease.lower()}-hubverse-table.parquet"
+                batch_dir
+                / f"{batch_info['report_date']}-{disease.lower()}-hubverse-table.parquet"
             )
             assert postprocessed_path.is_file(), (
                 f"Missing postprocessed hubverse table: {postprocessed_path}"

@@ -5,8 +5,8 @@ import datetime as dt
 import logging
 
 import polars as pl
-import polars.testing as plt
 import pytest
+from polars.testing import assert_frame_equal
 
 from pipelines.utils.cli_utils import (
     add_common_forecast_arguments,
@@ -162,7 +162,7 @@ class TestDataWranglingUtils:
                 ".value": [2.0, 8.0, 0.2],
             }
         )
-        plt.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_append_prop_data_to_combined_data_allows_variable_names(self, tmp_path):
         data_path = tmp_path / "combined_data.tsv"
@@ -195,7 +195,7 @@ class TestDataWranglingUtils:
                 ".value": [7.0, 3.0, 0.3],
             }
         )
-        plt.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
 
 class TestCLIUtils:

@@ -28,7 +28,6 @@ FORECAST_DIR_NAME = "2024-12-21_forecasts"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
 EXCLUDE_LAST_N_DAYS = 1
-EXPECTED_OMIT_DAYS = EXCLUDE_LAST_N_DAYS
 EXPECTED_MODELS = [
     "daily_fable_e_other",
     "epiweekly_fable_e_other",
@@ -280,7 +279,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace):
             copied_figures_dir = (
                 workspace
                 / FORECAST_DIR_NAME
-                / f"lookback-{N_TRAINING_DAYS}-omit-{EXPECTED_OMIT_DAYS}"
+                / f"lookback-{N_TRAINING_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}"
                 / disease
             )
             assert copied_figures_dir.is_dir(), (

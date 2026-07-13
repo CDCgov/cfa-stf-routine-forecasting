@@ -12,25 +12,28 @@ authors = [
 ]
 
 dependencies = [
-    "jax<0.10",
     "arviz[h5netcdf]>=1.1.0",
-    "cfa-catalog-public>=2026.3.23.0",
+    "cfa-cloudops",
     "cfa-dagster",
-    "cfa-dataops",
+    "cfa-stf-data",
+    "cfa-stf-forecasttools",
+    "dagster",
+    "jax",
+    "numpy",
+    "numpyro",
     "polarbayes",
     "polars[pyarrow,numpy]>=1.36",
+    "pydantic",
     "pygit2>=1.17.0",
     "pyrenew",
     "pyrenew-multisignal",
     "pypdf>=6.10.1",
+    "scipy",
     "tomli-w>=1.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["pipelines", "cfa"]
-
-[tool.hatch.build.targets.sdist]
-include = ["tests/cfa/stf/forecasttools/test_data/*.nc"]
+packages = ["pipelines"]
 
 [build-system]
 requires = ["hatchling"]
@@ -87,11 +90,13 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
-cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.3.2" }
+cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.4.0" }
+cfa-cloudops = { git = "https://github.com/CDCgov/cfa-cloudops", rev = "main" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "5938ec3"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "main" }
-cfa-dataops = {git = "https://github.com/CDCgov/cfa-dataops", rev = "main"}
-cfa-catalog-public = {git = "https://github.com/cdcgov/cfa-catalog-pub", rev = "main" }
+arviz = { git = "https://github.com/arviz-devs/arviz", rev = "main" }
 arviz-base = { git = "https://github.com/arviz-devs/arviz-base", rev = "main" }
 arviz-plots = { git = "https://github.com/arviz-devs/arviz-plots", rev = "main" }
 arviz-stats = { git = "https://github.com/arviz-devs/arviz-stats", rev = "main" }
+cfa-stf-data = { git = "https://github.com/CDCgov/cfa-stf-data", rev = "main" }
+cfa-stf-forecasttools = { git = "https://github.com/CDCgov/cfa-stf-forecasttools", rev = "main" }

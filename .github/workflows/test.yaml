@@ -64,51 +64,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
-  cfa-stf-test:
-    name: Run cfa/stf ${{ matrix.submodule }} tests and collect coverage
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - submodule: data
-            tests: tests/cfa/stf/data
-            coverage-include: cfa/stf/data/*
-            coverage-file: cfa-stf-data-coverage.xml
-            coverage-flag: cfa-stf-data
-          - submodule: forecasttools
-            tests: tests/cfa/stf/forecasttools
-            coverage-include: cfa/stf/forecasttools/*
-            coverage-file: cfa-stf-forecasttools-coverage.xml
-            coverage-flag: cfa-stf-forecasttools
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up routine forecasting Python
-        uses: ./.github/actions/setup-routine-forecasting-python
-
-      - name: run tests
-        run: |
-          uv run pytest \
-            --cov=cfa/stf \
-            --cov-report= \
-            ${{ matrix.tests }}
-          uv run coverage report --include='${{ matrix.coverage-include }}'
-          uv run coverage xml \
-            --include='${{ matrix.coverage-include }}' \
-            -o ${{ matrix.coverage-file }}
-
-      - name: Upload results to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          env_vars: OS,PYTHON
-          fail_ci_if_error: true
-          flags: ${{ matrix.coverage-flag }}
-          files: ${{ matrix.coverage-file }}
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
-
   stfroutineforecasting-test:
     name: Run stfroutineforecasting tests and collect coverage
     runs-on: ubuntu-latest

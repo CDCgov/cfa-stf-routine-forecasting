@@ -680,8 +680,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-cloudops"
-version = "0.7.2"
-source = { git = "https://github.com/CDCgov/cfa-cloudops.git#070cc3608c1ade5b1016a9c64489ac8d737e522a" }
+version = "0.7.4"
+source = { git = "https://github.com/CDCgov/cfa-cloudops.git#88507fc9f174985148ff786b64b890887ec26e75" }
 dependencies = [
     { name = "anyio" },
     { name = "azure-batch" },
@@ -841,7 +841,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "arviz", extras = ["h5netcdf"], git = "https://github.com/arviz-devs/arviz?rev=main" },
-    { name = "cfa-cloudops", git = "https://github.com/CDCgov/cfa-cloudops?rev=main" },
+    { name = "cfa-cloudops", git = "https://github.com/CDCgov/cfa-cloudops" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=v1.4.0" },
     { name = "cfa-stf-data", git = "https://github.com/CDCgov/cfa-stf-data?rev=main" },
     { name = "cfa-stf-forecasttools", git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main" },

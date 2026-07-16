@@ -783,7 +783,7 @@ dependencies = [
 [[package]]
 name = "cfa-stf-forecasttools"
 version = "0.1.0"
-source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#9f569bb23277925a688df3bb3378e1f379b1b5eb" }
+source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#32e7a058034ddf906d1217613e70c4f93b03e695" }
 dependencies = [
     { name = "numpy" },
     { name = "polars", extra = ["numpy", "pyarrow"] },

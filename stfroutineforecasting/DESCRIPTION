@@ -25,7 +25,7 @@ Imports:
     glue,
     here,
     htmltools,
-    hubUtils,
+    hubUtils (>= 1.2.1),
     jsonlite,
     knitr,
     latex2exp,
@@ -45,8 +45,7 @@ Imports:
 Additional_repositories: https://hubverse-org.r-universe.dev
 Remotes:
     github::cdcgov/forecasttools,
-    github::mjskay/ggdist,
-    hubUtils=github::hubverse-org/hubUtils
+    github::mjskay/ggdist
 Suggests:
     checkmate,
     rcmdcheck,

@@ -17,6 +17,10 @@ These forecasts are submitted to CDC's forecasting hubs:
 
 The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
 
+## Justfile
+
+This repository includes a [Justfile](Justfile) with shortcuts for common development commands. Run `just` to list available recipes.
+
 ## Containers
 
 The project uses GitHub Actions for automatically building container images based on the project's [Dockerfile](Dockerfile). The images are currently hosted on Azure Container Registry and are built and pushed via the [containers.yaml](.github/workflows/containers.yaml) GitHub Actions workflow.
@@ -40,7 +44,7 @@ The following instructions will set up Dagster on your VAP. However, based on th
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
     - Use the `build_image` job in dagster, making sure to push the image.
-2. Run `uv run dagster_defs.py` and open the terminal link (usually http://127.0.0.1:4000/)
+2. Run  `uv run dagster_defs.py` (or `just dagster`) and open the terminal link (usually http://127.0.0.1:4000/)
 
 Dagster is now ready to use locally.
 

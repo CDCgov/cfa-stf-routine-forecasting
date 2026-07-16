@@ -4,13 +4,16 @@ import argparse
 import datetime as dt
 import logging
 
+import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
 from pipelines.utils.cli_utils import (
     add_common_forecast_arguments,
     run_command,
 )
 from pipelines.utils.common_utils import (
+    append_prop_data_to_combined_data,
     calculate_training_dates,
     get_available_reports,
     load_credentials,
@@ -132,6 +135,67 @@ class TestDataWranglingUtils:
         assert dt.date(2024, 12, 1) in result
         assert dt.date(2024, 12, 15) in result
         assert dt.date(2024, 12, 20) in result
+
+    def test_append_prop_data_to_combined_data_updates_tsv(self, tmp_path):
+        data_path = tmp_path / "combined_data.tsv"
+        pl.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-01"],
+                "location": ["US", "US"],
+                ".variable": ["observed_ed_visits", "other_ed_visits"],
+                ".value": [2, 8],
+            }
+        ).write_csv(data_path, separator="\t")
+
+        append_prop_data_to_combined_data(data_path)
+
+        result = pl.read_csv(data_path, separator="\t")
+        expected = pl.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
+                "location": ["US", "US", "US"],
+                ".variable": [
+                    "observed_ed_visits",
+                    "other_ed_visits",
+                    "prop_disease_ed_visits",
+                ],
+                ".value": [2.0, 8.0, 0.2],
+            }
+        )
+        assert_frame_equal(result, expected)
+
+    def test_append_prop_data_to_combined_data_allows_variable_names(self, tmp_path):
+        data_path = tmp_path / "combined_data.tsv"
+        pl.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-01"],
+                "location": ["US", "US"],
+                ".variable": ["num_visits", "denom_other_visits"],
+                ".value": [3, 7],
+            }
+        ).write_csv(data_path, separator="\t")
+
+        append_prop_data_to_combined_data(
+            data_path,
+            observed_var="num_visits",
+            other_var="denom_other_visits",
+            prop_var="prop_num_visits",
+        )
+
+        result = pl.read_csv(data_path, separator="\t")
+        expected = pl.DataFrame(
+            {
+                "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
+                "location": ["US", "US", "US"],
+                ".variable": [
+                    "denom_other_visits",
+                    "num_visits",
+                    "prop_num_visits",
+                ],
+                ".value": [7.0, 3.0, 0.3],
+            }
+        )
+        assert_frame_equal(result, expected)
 
 
 class TestCLIUtils:

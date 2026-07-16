@@ -9,9 +9,6 @@ from zoneinfo import ZoneInfo
 
 # Direct use of dagster
 import dagster as dg
-
-# Helper Libraries
-from cfa.stf.forecasttools import LOCATION_LIST
 from cfa_dagster import (
     ADLS2PickleIOManager,
     ExecutionConfig,
@@ -31,6 +28,9 @@ from cfa_dagster import (
 from pydantic import BaseModel, Field
 from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
+
+# Helper Libraries
+from cfa.stf.forecasttools import LOCATION_LIST
 
 # Model Code
 from pipelines.fable.forecast_fable import main as forecast_fable
@@ -233,11 +233,12 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     )  # type: ignore[reportInvalidTypeForm]
 
     def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
-        """Returns location-specific config if provided via config_overrides"""
         overrides = {}
         for entry in self.config_overrides:
-            if entry["location"] == loc:
-                overrides = {k: v for k, v in entry.items() if k != "location"}
+            if isinstance(entry, dict):
+                entry = ConfigOverride(**entry)
+            if entry.location == loc:
+                overrides = entry.model_dump(exclude={"location"})
                 break
         return self.model_copy(update=overrides)
 

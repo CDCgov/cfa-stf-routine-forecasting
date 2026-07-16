@@ -202,7 +202,9 @@ class _ModelTrainingFields(BaseModel):
 
 
 class ConfigOverride(_ModelTrainingFields, dg.Config):
-    location: Location  # type: ignore[reportInvalidTypeForm]
+    location: Location | None = None  # type: ignore[reportInvalidTypeForm]
+    disease: Disease | None = None  # type: ignore[reportInvalidTypeForm]
+    model: str | None = None
 
     def as_dict(self) -> dict:  # type: ignore[reportInvalidTypeForm]
         return self.model_dump(mode="json", exclude_unset=True)
@@ -222,23 +224,62 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     # Add defaults here, or add in the launchpad with ctrl+space
     config_overrides: list[ConfigOverride] = Field(
         default=[
-            # ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
+            # COVID-19 HE forecasts use a 60-day
+            # lookback; all other (disease, model)
+            # pairs keep the 150-day default.
+            ConfigOverride(
+                disease="COVID-19", model="pyrenew_he", n_training_days=60
+            ).as_dict(),
         ],
         description=(
-            "Provide location-specific overrides as a list of dicts. "
-            "The Launchpad accepts both yaml and json-style lists e.g."
-            "config_overrides: [{ location: GA, exclude_last_n_days: 2 }]"
-            ""
+            "Provide overrides as a list of dictionaries keyed by any combination of "
+            "location, disease, and model; an omitted key matches all values. "
+            "The Launchpad accepts both yaml and json-style lists e.g. "
+            "config_overrides: [{ disease: COVID-19, model: pyrenew_he, n_training_days: 60 }]"
         ),
     )  # type: ignore[reportInvalidTypeForm]
 
-    def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
-        """Returns location-specific config if provided via config_overrides"""
+    def resolve_config(
+        self,
+        disease: str | None = None,
+        location: str | None = None,
+        model: str | None = None,
+    ) -> "ModelBaseConfig":
+        """
+        Return a copy of this config with any matching
+        overrides applied.
+
+        Each override is matched on the selectors it
+        specifies (``location``, ``disease``, ``model``);
+        an omitted selector matches every value. When
+        several entries match, later entries are used.
+
+        Parameters
+        ----------
+        disease : str | None
+            Disease of the current fan-out slice, or
+            None to skip disease matching.
+        location : str | None
+            Location of the current fan-out slice, or
+            None to skip location matching.
+        model : str | None
+            Model identifier of the current slice, or
+            None to skip model matching.
+
+        Returns
+        -------
+        ModelBaseConfig
+            Copy of this config with matching override
+            fields applied.
+        """
+        selectors = {"location": location, "disease": disease, "model": model}
         overrides = {}
         for entry in self.config_overrides:
-            if entry["location"] == loc:
-                overrides = {k: v for k, v in entry.items() if k != "location"}
-                break
+            if all(
+                key not in entry or entry[key] == value
+                for key, value in selectors.items()
+            ):
+                overrides.update({k: v for k, v in entry.items() if k not in selectors})
         return self.model_copy(update=overrides)
 
 
@@ -295,6 +336,8 @@ class PostProcessConfig(dg.Config):
 # MODEL CONSTRUCTOR FUNCTIONS - these are used later, in Asset Definitions
 # ============================================================================
 
+FABLE_FUSION_PARTNER_MODELS = ["pyrenew_e", "pyrenew_he"]
+
 
 def _throw_if_backfill(
     context: dg.OpExecutionContext | dg.AssetExecutionContext,
@@ -326,23 +369,38 @@ def _run_fable_e_other(
         model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
-    loc_config = model_base_config.get_by_location(location)
-    context.log.debug(f"loc_config: '{loc_config}'")
-
     context.log.info(f"fable_e_other_config: '{fable_e_other_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
-    forecast_fable(
-        disease=disease,
-        loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        output_dir=daily_forecast_output_dir,
-        n_training_days=model_base_config.n_training_days,
-        n_forecast_days=28,
-        n_samples=fable_e_other_config.n_samples,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
-        epiweekly=epiweekly,
-        credentials_path=Path("config/creds.toml"),
-    )
+    seen_training_configs: set[tuple[int, int]] = set()
+    for partner in FABLE_FUSION_PARTNER_MODELS:
+        partner_config = model_base_config.resolve_config(
+            disease=disease, location=location, model=partner
+        )
+        training_config = (
+            partner_config.n_training_days,
+            partner_config.exclude_last_n_days,
+        )
+        if training_config in seen_training_configs:
+            continue
+        seen_training_configs.add(training_config)
+
+        context.log.info(
+            f"Running fable for '{partner}' with "
+            f"n_training_days={partner_config.n_training_days}, "
+            f"exclude_last_n_days={partner_config.exclude_last_n_days}"
+        )
+        forecast_fable(
+            disease=disease,
+            loc=location,
+            facility_level_nssp_data_dir=Path("nssp-etl/gold"),
+            output_dir=daily_forecast_output_dir,
+            n_training_days=partner_config.n_training_days,
+            n_forecast_days=28,
+            n_samples=fable_e_other_config.n_samples,
+            exclude_last_n_days=partner_config.exclude_last_n_days,
+            epiweekly=epiweekly,
+            credentials_path=Path("config/creds.toml"),
+        )
 
 
 def _run_pyrenew_model(
@@ -370,7 +428,9 @@ def _run_pyrenew_model(
         f"{model_letters}{pyrenew_config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
-    loc_config = model_base_config.get_by_location(location)
+    loc_config = model_base_config.resolve_config(
+        disease=disease, location=location, model=f"pyrenew_{model_letters}"
+    )
     context.log.debug(f"loc_config: '{loc_config}'")
 
     context.log.info(f"config: '{pyrenew_config}'")
@@ -383,7 +443,7 @@ def _run_pyrenew_model(
         param_data_dir=Path("params"),
         priors_path=Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
         output_dir=daily_forecast_output_dir,
-        n_training_days=model_base_config.n_training_days,
+        n_training_days=loc_config.n_training_days,
         n_forecast_days=28,
         n_chains=pyrenew_config.n_chains,
         n_warmup=pyrenew_config.n_warmup,
@@ -399,17 +459,20 @@ def _run_pyrenew_model(
 def get_model_loc_dir(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
+    model: str,
 ) -> Path:
     disease = model_base_config.diseases.current_value
     location = model_base_config.locations.current_value
 
-    loc_config = model_base_config.get_by_location(location)
+    loc_config = model_base_config.resolve_config(
+        disease=disease, location=location, model=model
+    )
     context.log.debug(f"loc_config: '{loc_config}'")
 
     report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     first_training_date, last_training_date = calculate_training_dates(
         report_date=report_date,
-        n_training_days=model_base_config.n_training_days,
+        n_training_days=loc_config.n_training_days,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         logger=context.log,
     )
@@ -444,7 +507,7 @@ def _run_fusion_model(
     Helper function to run fusion model.
     """
     _throw_if_backfill(context, daily_partitions_def)
-    model_loc_dir = get_model_loc_dir(context, model_base_config)
+    model_loc_dir = get_model_loc_dir(context, model_base_config, model=num_model_name)
     create_prop_samples(
         model_run_dir=model_loc_dir,
         num_model_name=num_model_name,

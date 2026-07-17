@@ -238,7 +238,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
             if isinstance(entry, dict):
                 entry = ConfigOverride(**entry)
             if entry.location == loc:
-                overrides = entry.model_dump(exclude={"location"})
+                overrides = entry.model_dump(exclude={"location"}, exclude_unset=True)
                 break
         return self.model_copy(update=overrides)
 

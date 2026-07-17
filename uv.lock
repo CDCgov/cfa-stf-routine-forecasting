@@ -841,7 +841,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "arviz", extras = ["h5netcdf"], git = "https://github.com/arviz-devs/arviz?rev=main" },
-    { name = "cfa-cloudops", git = "https://github.com/CDCgov/cfa-cloudops" },
+    { name = "cfa-cloudops", git = "https://github.com/CDCgov/cfa-cloudops?rev=main" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=v1.4.0" },
     { name = "cfa-stf-data", git = "https://github.com/CDCgov/cfa-stf-data?rev=main" },
     { name = "cfa-stf-forecasttools", git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main" },
@@ -3291,7 +3291,7 @@ wheels = [
 [[package]]
 name = "polarbayes"
 version = "0.1.0"
-source = { git = "https://github.com/cdcgov/polarbayes?rev=main#33a353198166c07de0d39b4a1f2ae9dce3f52082" }
+source = { git = "https://github.com/cdcgov/polarbayes?rev=main#4ea9857713c013fb34183355794bdd43b9af25f0" }
 dependencies = [
     { name = "arviz-base", extra = ["h5netcdf"] },
     { name = "polars" },

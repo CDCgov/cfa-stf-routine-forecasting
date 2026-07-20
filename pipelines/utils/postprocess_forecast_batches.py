@@ -59,12 +59,13 @@ def process_model_batch_dir(model_batch_dir_path: Path) -> None:
 
 def model_batch_dir_to_target_path(
     model_batch_dir: str,
-    max_last_training_date: dt.date,
     pre_path: Path | str,
 ) -> Path:
     parts = parse_model_batch_dir_name(model_batch_dir)
     lookback = (parts["last_training_date"] - parts["first_training_date"]).days + 1
-    omit = (max_last_training_date - parts["last_training_date"]).days + 1
+    omit = (
+        parts["report_date"] - parts["last_training_date"]
+    ).days - 1  # NSSP data available through report_date - 1
     target_path = Path(
         pre_path,
         f"lookback-{lookback}-omit-{omit}",
@@ -82,13 +83,6 @@ def main(
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     to_process = get_all_forecast_dirs(base_forecast_dir, diseases)
-    # compute max last training date across all model batch dirs and assume this corresponds to omitting 1 day.
-    max_last_training_date = max(
-        [
-            parse_model_batch_dir_name(model_batch_dir)["last_training_date"]
-            for model_batch_dir in to_process
-        ]
-    )
     if skip_existing:
         to_process = [
             batch_dir
@@ -105,9 +99,7 @@ def main(
         logger.info(f"Finished processing {batch_dir}")
         if local_copy_dir:
             source_dir = Path(base_forecast_dir, batch_dir, "figures")
-            target_dir = model_batch_dir_to_target_path(
-                batch_dir, max_last_training_date, local_copy_dir
-            )
+            target_dir = model_batch_dir_to_target_path(batch_dir, local_copy_dir)
             logger.info(
                 f"Copying from {source_dir.relative_to(base_forecast_dir)} to {target_dir.relative_to(local_copy_dir)}..."
             )

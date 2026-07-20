@@ -30,7 +30,7 @@ from pipelines.utils.postprocess_forecast_batches import main as postprocess_bat
 FORECAST_DIR_NAME = "2024-12-21_forecasts"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
-EXPECTED_OMIT_DAYS = 1
+EXCLUDE_LAST_N_DAYS = 1
 EXPECTED_MODELS = [
     "daily_fable_e_other",
     "epiweekly_fable_e_other",
@@ -95,6 +95,7 @@ def _run_fable(
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
         epiweekly=epiweekly,
     )
@@ -108,6 +109,7 @@ def _run_pyrenew(workspace: Path, disease: str, location: str) -> None:
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_chains=1,
         n_samples=40,
         n_warmup=40,
@@ -125,6 +127,7 @@ def _run_epiautogp(workspace: Path, disease: str, location: str) -> None:
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         target="nssp",
         frequency="daily",
         ed_visit_type="other",
@@ -329,7 +332,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             copied_figures_dir = (
                 workspace
                 / FORECAST_DIR_NAME
-                / f"lookback-{N_TRAINING_DAYS}-omit-{EXPECTED_OMIT_DAYS}"
+                / f"lookback-{N_TRAINING_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}"
                 / disease
             )
             assert copied_figures_dir.is_dir(), (

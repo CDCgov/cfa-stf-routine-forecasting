@@ -231,11 +231,12 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     )  # type: ignore[reportInvalidTypeForm]
 
     def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
-        """Returns location-specific config if provided via config_overrides"""
         overrides = {}
         for entry in self.config_overrides:
-            if entry["location"] == loc:
-                overrides = {k: v for k, v in entry.items() if k != "location"}
+            if isinstance(entry, dict):
+                entry = ConfigOverride(**entry)
+            if entry.location == loc:
+                overrides = entry.model_dump(exclude={"location"}, exclude_unset=True)
                 break
         return self.model_copy(update=overrides)
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import polars as pl
 from cfa.dataops import datacat
+
 from cfa.stf.data import get_nhsn_hrd, get_nssp
 
 
@@ -127,9 +128,9 @@ def nhsn_freshness(
     latest_observed_date: dt.date | None,
     run_date: dt.date,
 ) -> DataFreshness:
-    data_pub_day = run_date.weekday() in {2, 4}
+    is_data_pub_day = run_date.weekday() in {2, 4}
 
-    if data_pub_day:
+    if is_data_pub_day:
         is_stale = selected_version_date != run_date
         if is_stale:
             reason = (
@@ -140,7 +141,7 @@ def nhsn_freshness(
             reason = "NHSN version matches run date"
     else:
         age_days = (run_date - selected_version_date).days
-        is_stale = age_days < 0 or age_days >= 7
+        is_stale = age_days >= 7
         if is_stale:
             reason = f"NHSN version {selected_version_date} is not less than a week old"
         else:

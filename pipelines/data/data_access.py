@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import polars as pl
 from cfa.dataops import datacat
+
 from cfa.stf.data import get_nhsn_hrd, get_nssp
 
 
@@ -18,12 +19,31 @@ class DataFreshness:
 
 
 @dataclass(frozen=True)
+class NSSPData:
+    data: pl.DataFrame
+    freshness: DataFreshness
+
+
+@dataclass(frozen=True)
+class NHSNData:
+    data: pl.DataFrame
+    freshness: DataFreshness
+    prelim: bool
+
+
+@dataclass(frozen=True)
 class ForecastData:
     report_date: dt.date
-    nssp_data: pl.DataFrame
-    nhsn_data: pl.DataFrame
-    freshness: tuple[DataFreshness, ...]
-    nhsn_prelim: bool | None = None
+    nssp: NSSPData
+    nhsn: NHSNData
+
+    @property
+    def freshness(self) -> tuple[DataFreshness, ...]:
+        return (self.nssp.freshness, self.nhsn.freshness)
+
+    @property
+    def is_stale(self) -> bool:
+        return any(record.is_stale for record in self.freshness)
 
 
 def _parse_version_date(version: str) -> dt.date:
@@ -222,8 +242,6 @@ def load_forecast_data(
     )
     return ForecastData(
         report_date=report_date,
-        nssp_data=nssp_data,
-        nhsn_data=nhsn_data,
-        freshness=freshness,
-        nhsn_prelim=nhsn_prelim,
+        nssp=NSSPData(data=nssp_data, freshness=nssp_record),
+        nhsn=NHSNData(data=nhsn_data, freshness=nhsn_record, prelim=nhsn_prelim),
     )

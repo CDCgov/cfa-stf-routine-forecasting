@@ -23,7 +23,7 @@ from unittest.mock import patch
 import polars as pl
 import pytest
 
-from pipelines.data.data_access import ForecastData
+from pipelines.data.data_access import DataFreshness, ForecastData, NHSNData, NSSPData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -35,25 +35,47 @@ from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
 def _forecast_data(report_date: dt.date = dt.date(2024, 12, 20)) -> ForecastData:
+    nssp_data = pl.DataFrame(
+        {
+            "date": [dt.date(2024, 12, 20), dt.date(2024, 12, 20)],
+            "geo_value": ["CA", "CA"],
+            "disease": ["COVID-19", "Total"],
+            "ed_visits": [10, 100],
+        }
+    )
+    nhsn_data = pl.DataFrame(
+        {
+            "weekendingdate": [dt.date(2024, 12, 14)],
+            "jurisdiction": ["CA"],
+            "disease": ["COVID-19"],
+            "hospital_admissions": [5],
+        }
+    )
     return ForecastData(
         report_date=report_date,
-        nssp_data=pl.DataFrame(
-            {
-                "date": [dt.date(2024, 12, 20), dt.date(2024, 12, 20)],
-                "geo_value": ["CA", "CA"],
-                "disease": ["COVID-19", "Total"],
-                "ed_visits": [10, 100],
-            }
+        nssp=NSSPData(
+            data=nssp_data,
+            freshness=DataFreshness(
+                source="nssp",
+                selected_version_date=report_date,
+                latest_observed_date=nssp_data.get_column("date").max(),
+                run_date=report_date,
+                is_stale=False,
+                reason="Test NSSP data",
+            ),
         ),
-        nhsn_data=pl.DataFrame(
-            {
-                "weekendingdate": [dt.date(2024, 12, 14)],
-                "jurisdiction": ["CA"],
-                "disease": ["COVID-19"],
-                "hospital_admissions": [5],
-            }
+        nhsn=NHSNData(
+            data=nhsn_data,
+            freshness=DataFreshness(
+                source="nhsn",
+                selected_version_date=report_date,
+                latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
+                run_date=report_date,
+                is_stale=False,
+                reason="Test NHSN data",
+            ),
+            prelim=False,
         ),
-        freshness=(),
     )
 
 
@@ -471,10 +493,10 @@ class TestPrepareModelData:
 
         mock_process_loc.assert_called_once()
         assert mock_process_loc.call_args[1]["nssp_data"].equals(
-            context.forecast_data.nssp_data
+            context.forecast_data.nssp.data
         )
         assert mock_process_loc.call_args[1]["nhsn_data"].equals(
-            context.forecast_data.nhsn_data
+            context.forecast_data.nhsn.data
         )
 
     @patch(

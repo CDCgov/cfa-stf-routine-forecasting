@@ -7,9 +7,9 @@ from pathlib import Path
 
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
-from pipelines.data.data_access import ForecastData
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
+from pipelines.data.data_access import DataFreshness, ForecastData, NHSNData, NSSPData
 from pipelines.data.generate_test_data_lib import (
     FACILITY_LEVEL_NSSP_DATA_COLS,
     LOC_LEVEL_NSSP_DATA_COLS,
@@ -279,11 +279,27 @@ def make_forecast_data(location: str, disease: str) -> ForecastData:
         disease_index=disease_index,
     ).with_columns(pl.lit(disease).alias("disease"))
 
+    nssp_freshness = DataFreshness(
+        source="nssp",
+        selected_version_date=REPORT_DATE,
+        latest_observed_date=nssp_data.get_column("date").max(),
+        run_date=REPORT_DATE,
+        is_stale=False,
+        reason="Synthetic NSSP data",
+    )
+    nhsn_freshness = DataFreshness(
+        source="nhsn",
+        selected_version_date=REPORT_DATE,
+        latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
+        run_date=REPORT_DATE,
+        is_stale=False,
+        reason="Synthetic NHSN data",
+    )
+
     return ForecastData(
         report_date=REPORT_DATE,
-        nssp_data=nssp_data,
-        nhsn_data=nhsn_data,
-        freshness=(),
+        nssp=NSSPData(data=nssp_data, freshness=nssp_freshness),
+        nhsn=NHSNData(data=nhsn_data, freshness=nhsn_freshness, prelim=False),
     )
 
 

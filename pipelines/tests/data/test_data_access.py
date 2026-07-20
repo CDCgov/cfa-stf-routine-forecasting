@@ -186,9 +186,14 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
         first_training_date=dt.date(2025, 12, 1),
     )
 
-    assert forecast_data.nssp_data.equals(nssp_data)
-    assert forecast_data.nhsn_data.equals(nhsn_data)
-    assert forecast_data.nhsn_prelim
+    assert forecast_data.nssp.data.equals(nssp_data)
+    assert forecast_data.nhsn.data.equals(nhsn_data)
+    assert forecast_data.nhsn.prelim
+    assert forecast_data.freshness == (
+        forecast_data.nssp.freshness,
+        forecast_data.nhsn.freshness,
+    )
+    assert not forecast_data.is_stale
     assert calls["nssp"] == {
         "report_date": dt.date(2026, 1, 8),
         "loc_abb": "CA",

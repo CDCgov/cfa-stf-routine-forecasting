@@ -58,12 +58,6 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
 
-    parser.add_argument(
-        "--credentials-path",
-        type=Path,
-        help="Path to a TOML file containing credentials such as API keys.",
-    )
-
 
 def run_command(
     executable: str,

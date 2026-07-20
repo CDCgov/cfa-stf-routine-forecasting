@@ -365,7 +365,6 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
         exclude_date_ranges=None,
         model_batch_dir=tmp_path / "batch",
         model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
-        credentials_dict={},
         forecast_data=forecast_data,
         logger=logging.getLogger(),
         nowcast_source=nowcast_source,

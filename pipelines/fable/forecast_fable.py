@@ -46,7 +46,6 @@ def main(
     n_samples: int,
     exclude_last_n_days: int = 0,
     epiweekly: bool = False,
-    credentials_path: Path | None = None,
     run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
 ) -> None:
@@ -59,9 +58,6 @@ def main(
         "Starting single-location fable E-other forecasting pipeline for "
         f"location {loc}, and latest report date."
     )
-
-    if credentials_path is not None:
-        logger.warning("credentials_path is ignored when using cfa-stf-data")
 
     report_date = resolve_nssp_report_date(run_date)
     first_training_date, last_training_date = calculate_training_dates(

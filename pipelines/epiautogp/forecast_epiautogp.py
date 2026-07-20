@@ -96,7 +96,6 @@ def main(
     frequency: str,
     ed_visit_type: str = "observed",
     exclude_last_n_days: int = 0,
-    credentials_path: Path = None,
     exclude_date_ranges: str = None,
     n_particles: int = 24,
     n_mcmc: int = 100,
@@ -142,8 +141,6 @@ def main(
         Type of ED visits to model: "observed" (disease-related), "other" (non-disease background), or "pct" (percentage of total ED visits). Only applicable for NSSP target
     exclude_last_n_days : int, default=0
         Number of recent days to exclude from training
-    credentials_path : Path | None, default=None
-        Path to credentials file for data access
     exclude_date_ranges : str | None, default=None
         Comma-separated list of date ranges to exclude from training data.
         Format: 'YYYY-MM-DD:YYYY-MM-DD,YYYY-MM-DD' for ranges and single dates.
@@ -257,7 +254,6 @@ def main(
         n_forecast_days=n_forecast_days,
         exclude_last_n_days=exclude_last_n_days,
         exclude_date_ranges=parsed_exclude_date_ranges,
-        credentials_path=credentials_path,
         logger=logger,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,

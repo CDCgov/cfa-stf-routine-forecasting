@@ -26,7 +26,6 @@ from pipelines.utils.common_utils import (
     calculate_training_dates,
     generate_epiweekly_data,
     get_model_batch_dir_name,
-    load_credentials,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
 )
@@ -69,7 +68,6 @@ class ForecastPipelineContext:
     exclude_date_ranges: list[tuple[date, date]] | None
     model_batch_dir: Path
     model_run_dir: Path
-    credentials_dict: dict[str, Any]
     forecast_data: ForecastData
     logger: logging.Logger
     nowcast_source: NowcastSource | None = None
@@ -215,7 +213,6 @@ def setup_forecast_pipeline(
     n_forecast_days: int,
     exclude_last_n_days: int = 0,
     exclude_date_ranges: list[tuple[date, date]] | None = None,
-    credentials_path: Path | None = None,
     logger: logging.Logger | None = None,
     nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
@@ -227,13 +224,12 @@ def setup_forecast_pipeline(
 
     This function performs the initial setup steps that are common across
     all forecast pipelines:
-    1. Load credentials
-    2. Get available report dates
-    3. Parse and validate the report date
-    4. Calculate training dates
-    5. Load forecast input data
-    6. Create batch directory structure
-    7. Resolve nowcasting source based on input parameters and available data
+    1. Get available report dates
+    2. Parse and validate the report date
+    3. Calculate training dates
+    4. Load forecast input data
+    5. Create batch directory structure
+    6. Resolve nowcasting source based on input parameters and available data
 
     Parameters
     ----------
@@ -260,8 +256,6 @@ def setup_forecast_pipeline(
     exclude_date_ranges : list[tuple[date, date]] | None, default=None
         List of date ranges to exclude from training data (inclusive).
         Each tuple contains (start_date, end_date).
-    credentials_path : Path | None, default=None
-        Path to credentials file
     logger : logging.Logger | None, default=None
         Logger instance. If None, creates a new logger
     nowcast_source_name : {"none", "reporting-delay"}, default="none"
@@ -282,9 +276,6 @@ def setup_forecast_pipeline(
         f"Setting up forecast pipeline for {disease}, "
         f"location {loc}, latest report date."
     )
-
-    # Load credentials
-    credentials_dict = load_credentials(credentials_path, logger)
 
     report_date_parsed = resolve_nssp_report_date(run_date)
 
@@ -346,7 +337,6 @@ def setup_forecast_pipeline(
         exclude_date_ranges=exclude_date_ranges,
         model_batch_dir=model_batch_dir,
         model_run_dir=model_run_dir,
-        credentials_dict=credentials_dict,
         forecast_data=forecast_data,
         logger=logger,
         nowcast_source=resolved_nowcast_source,

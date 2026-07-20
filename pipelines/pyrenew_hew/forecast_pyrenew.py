@@ -24,7 +24,6 @@ from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
     get_model_batch_dir_name,
-    load_credentials,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
     run_r_script,
@@ -72,7 +71,6 @@ def main(
     n_warmup: int,
     n_samples: int,
     exclude_last_n_days: int = 0,
-    credentials_path: Path | None = None,
     fit_ed_visits: bool = False,
     fit_hospital_admissions: bool = False,
     fit_wastewater: bool = False,
@@ -118,9 +116,6 @@ def main(
         raise ValueError(
             "pyrenew_null (fitting to no signals) is not supported by this pipeline"
         )
-
-    if credentials_path is not None:
-        load_credentials(credentials_path, logger)
 
     report_date = resolve_nssp_report_date(run_date)
 

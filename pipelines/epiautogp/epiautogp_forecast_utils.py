@@ -96,11 +96,7 @@ class ForecastPipelineContext:
 
         # Process and save location data
         process_and_save_loc_data(
-            loc_abb=self.forecast_spec.loc,
-            disease=self.forecast_spec.disease,
             forecast_data=self.forecast_data,
-            first_training_date=self.first_training_date,
-            last_training_date=self.last_training_date,
             save_dir=data_dir,
             logger=self.logger,
         )
@@ -302,6 +298,7 @@ def setup_forecast_pipeline(
         loc_abb=loc,
         report_date=report_date_parsed,
         first_training_date=first_training_date,
+        last_training_date=last_training_date,
         run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,

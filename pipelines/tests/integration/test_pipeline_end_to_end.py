@@ -213,9 +213,15 @@ def _patch_dataops(monkeypatch) -> None:
         loc_abb,
         report_date,
         first_training_date,
+        last_training_date,
         **kwargs,
     ):
-        return make_forecast_data(location=loc_abb, disease=disease)
+        return make_forecast_data(
+            location=loc_abb,
+            disease=disease,
+            first_training_date=first_training_date,
+            last_training_date=last_training_date,
+        )
 
     def process_and_save_loc_param(
         *,

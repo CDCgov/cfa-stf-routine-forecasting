@@ -153,10 +153,10 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     calls = {}
     nssp_data = pl.DataFrame(
         {
-            "date": [dt.date(2026, 1, 8)],
-            "geo_value": ["CA"],
-            "disease": ["COVID-19"],
-            "ed_visits": [10],
+            "date": [dt.date(2026, 1, 8), dt.date(2026, 1, 8)],
+            "geo_value": ["CA", "CA"],
+            "disease": ["COVID-19", "Total"],
+            "ed_visits": [10, 100],
         }
     )
     nhsn_data = pl.DataFrame(
@@ -178,16 +178,30 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
 
     monkeypatch.setattr(data_access, "_load_dataops_nssp", fake_load_nssp)
     monkeypatch.setattr(data_access, "_load_dataops_nhsn", fake_load_nhsn)
+    monkeypatch.setattr(
+        data_access,
+        "get_us_loc_pop_tbl",
+        lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
+    )
 
     forecast_data = data_access.load_forecast_data(
         disease="COVID-19",
         loc_abb="CA",
         report_date=dt.date(2026, 1, 8),
         first_training_date=dt.date(2025, 12, 1),
+        last_training_date=dt.date(2026, 1, 7),
     )
 
-    assert forecast_data.nssp.data.equals(nssp_data)
-    assert forecast_data.nhsn.data.equals(nhsn_data)
+    assert forecast_data.loc_abb == "CA"
+    assert forecast_data.disease == "COVID-19"
+    assert forecast_data.loc_pop == 39_000_000
+    assert forecast_data.right_truncation_offset == 0
+    assert forecast_data.nssp.data.select(
+        "observed_ed_visits", "other_ed_visits", "data_type", "resolution"
+    ).rows() == [(10, 90, "eval", "daily")]
+    assert forecast_data.nhsn.data.select("data_type", "resolution").rows() == [
+        ("train", "epiweekly")
+    ]
     assert forecast_data.nhsn.prelim
     assert all(
         isinstance(source, data_access.ForecastSourceData)

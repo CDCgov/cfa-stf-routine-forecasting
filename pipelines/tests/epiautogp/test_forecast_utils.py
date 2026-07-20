@@ -23,7 +23,7 @@ from unittest.mock import patch
 import polars as pl
 import pytest
 
-from pipelines.data.data_access import DataFreshness, ForecastData, NHSNData, NSSPData
+from pipelines.data.data_access import DataFreshness, ForecastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -51,31 +51,32 @@ def _forecast_data(report_date: dt.date = dt.date(2024, 12, 20)) -> ForecastData
             "hospital_admissions": [5],
         }
     )
-    return ForecastData(
+    return ForecastData.create(
+        loc_abb="CA",
+        disease="COVID-19",
         report_date=report_date,
-        nssp=NSSPData(
-            data=nssp_data,
-            freshness=DataFreshness(
-                source="nssp",
-                selected_version_date=report_date,
-                latest_observed_date=nssp_data.get_column("date").max(),
-                run_date=report_date,
-                is_stale=False,
-                reason="Test NSSP data",
-            ),
+        first_training_date=dt.date(2024, 9, 22),
+        last_training_date=report_date,
+        nssp_data=nssp_data,
+        nssp_freshness=DataFreshness(
+            source="nssp",
+            selected_version_date=report_date,
+            latest_observed_date=nssp_data.get_column("date").max(),
+            run_date=report_date,
+            is_stale=False,
+            reason="Test NSSP data",
         ),
-        nhsn=NHSNData(
-            data=nhsn_data,
-            freshness=DataFreshness(
-                source="nhsn",
-                selected_version_date=report_date,
-                latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
-                run_date=report_date,
-                is_stale=False,
-                reason="Test NHSN data",
-            ),
-            prelim=False,
+        nhsn_data=nhsn_data,
+        nhsn_freshness=DataFreshness(
+            source="nhsn",
+            selected_version_date=report_date,
+            latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
+            run_date=report_date,
+            is_stale=False,
+            reason="Test NHSN data",
         ),
+        nhsn_prelim=False,
+        loc_pop=1,
     )
 
 

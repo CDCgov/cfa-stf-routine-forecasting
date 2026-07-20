@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import polars as pl
 from cfa.dataops import datacat
 from cfa.stf.data import get_nhsn_hrd, get_nssp
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 
 @dataclass(frozen=True)
@@ -25,19 +26,118 @@ class ForecastSourceData:
 
 @dataclass(frozen=True)
 class NSSPData(ForecastSourceData):
-    pass
+    @classmethod
+    def create(
+        cls,
+        *,
+        data: pl.DataFrame,
+        freshness: DataFreshness,
+        disease: str,
+        last_training_date: dt.date,
+    ) -> "NSSPData":
+        cleaned_data = (
+            data.filter(pl.col("disease").is_in([disease, "Total"]))
+            .pivot(
+                on="disease",
+                values="ed_visits",
+            )
+            .rename({disease: "observed_ed_visits"})
+            .with_columns(
+                other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
+                data_type=pl.when(pl.col("date") <= last_training_date)
+                .then(pl.lit("train"))
+                .otherwise(pl.lit("eval")),
+                resolution=pl.lit("daily"),
+            )
+            .drop("Total")
+            .sort("date")
+        )
+        return cls(data=cleaned_data, freshness=freshness)
 
 
 @dataclass(frozen=True)
 class NHSNData(ForecastSourceData):
     prelim: bool
 
+    @classmethod
+    def create(
+        cls,
+        *,
+        data: pl.DataFrame,
+        freshness: DataFreshness,
+        prelim: bool,
+        first_training_date: dt.date,
+        last_training_date: dt.date,
+    ) -> "NHSNData":
+        cleaned_data = data.filter(
+            pl.col("weekendingdate") >= first_training_date
+        ).with_columns(
+            data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+            .then(pl.lit("train"))
+            .otherwise(pl.lit("eval")),
+            resolution=pl.lit("epiweekly"),
+        )
+        return cls(data=cleaned_data, freshness=freshness, prelim=prelim)
+
 
 @dataclass(frozen=True)
 class ForecastData:
+    loc_abb: str
+    disease: str
     report_date: dt.date
+    loc_pop: int
+    right_truncation_offset: int
     nssp: NSSPData
     nhsn: NHSNData
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        loc_abb: str,
+        disease: str,
+        report_date: dt.date,
+        first_training_date: dt.date,
+        last_training_date: dt.date,
+        nssp_data: pl.DataFrame,
+        nssp_freshness: DataFreshness,
+        nhsn_data: pl.DataFrame,
+        nhsn_freshness: DataFreshness,
+        nhsn_prelim: bool,
+        loc_pop: int | None = None,
+    ) -> "ForecastData":
+        if loc_pop is None:
+            loc_pop = (
+                get_us_loc_pop_tbl()
+                .filter(pl.col("abbr") == loc_abb)
+                .item(0, "population")
+            )
+        # The first entry of a source right-truncation PMF corresponds to reports
+        # for reference_date = report_date - 1 as of report_date.
+        right_truncation_offset = (report_date - last_training_date).days - 1
+        nssp = NSSPData.create(
+            data=nssp_data,
+            freshness=nssp_freshness,
+            disease=disease,
+            last_training_date=last_training_date,
+        )
+        nhsn = NHSNData.create(
+            data=nhsn_data,
+            freshness=nhsn_freshness,
+            prelim=nhsn_prelim,
+            first_training_date=first_training_date,
+            last_training_date=last_training_date,
+        )
+
+        return cls(
+            loc_abb=loc_abb,
+            disease=disease,
+            report_date=report_date,
+            loc_pop=loc_pop,
+            right_truncation_offset=right_truncation_offset,
+            nssp=nssp,
+            nhsn=nhsn,
+        )
 
     @property
     def sources(self) -> tuple[ForecastSourceData, ...]:
@@ -204,6 +304,7 @@ def load_forecast_data(
     loc_abb: str,
     report_date: dt.date,
     first_training_date: dt.date,
+    last_training_date: dt.date,
     run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
@@ -242,8 +343,15 @@ def load_forecast_data(
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )
-    return ForecastData(
+    return ForecastData.create(
+        loc_abb=loc_abb,
+        disease=disease,
         report_date=report_date,
-        nssp=NSSPData(data=nssp_data, freshness=nssp_record),
-        nhsn=NHSNData(data=nhsn_data, freshness=nhsn_record, prelim=nhsn_prelim),
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+        nssp_data=nssp_data,
+        nssp_freshness=nssp_record,
+        nhsn_data=nhsn_data,
+        nhsn_freshness=nhsn_record,
+        nhsn_prelim=nhsn_prelim,
     )

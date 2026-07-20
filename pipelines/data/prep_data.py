@@ -23,88 +23,37 @@ _disease_map = {
 _inverse_disease_map = {v: k for k, v in _disease_map.items()}
 
 
-def clean_nssp_data(
-    data: pl.DataFrame,
-    disease: str,
-    last_training_date: dt.date | None = None,
-) -> pl.DataFrame:
-    """
-    Filter, reformat, and annotate a raw `pl.DataFrame` of NSSP data,
-    yielding a `pl.DataFrame` in the format expected by
-    `combine_surveillance_data`.
-
-    Parameters
-    ----------
-    data
-       Data to clean
-
-    disease
-       Name of the disease for which to prep data.
-
-    last_training_date
-         Last date to include in the training data.
-    """
-
-    if last_training_date is None:
-        last_training_date = data.get_column("date").max()
-
-    return (
-        data.filter(pl.col("disease").is_in([disease, "Total"]))
-        .pivot(
-            on="disease",
-            values="ed_visits",
-        )
-        .rename({disease: "observed_ed_visits"})
-        .with_columns(
-            other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
-            data_type=pl.when(pl.col("date") <= last_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
-            resolution=pl.lit("daily"),
-        )
-        .drop("Total")
-        .sort("date")
-    )
-
-
 def combine_surveillance_data(
+    *,
     disease: str,
-    nssp_data: pl.DataFrame | None = None,
-    nhsn_data: pl.DataFrame | None = None,
-):
-    nssp_data_long = (
-        nssp_data.unpivot(
-            on=["observed_ed_visits", "other_ed_visits"],
-            variable_name=".variable",
-            index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
-            value_name=".value",
-        ).with_columns(pl.lit(None).alias("lab_site_index"))
-        if nssp_data is not None
-        else pl.DataFrame()
-    )
+    nssp_data: pl.DataFrame,
+    nhsn_data: pl.DataFrame,
+) -> pl.DataFrame:
+    nssp_data_long = nssp_data.unpivot(
+        on=["observed_ed_visits", "other_ed_visits"],
+        variable_name=".variable",
+        index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
+        value_name=".value",
+    ).with_columns(pl.lit(None).alias("lab_site_index"))
 
     nhsn_data_long = (
-        (
-            nhsn_data.rename(
-                {
-                    "weekendingdate": "date",
-                    "jurisdiction": "geo_value",
-                    "hospital_admissions": "observed_hospital_admissions",
-                }
-            )
-            .unpivot(
-                on="observed_hospital_admissions",
-                index=cs.exclude("observed_hospital_admissions"),
-                variable_name=".variable",
-                value_name=".value",
-            )
-            .with_columns(pl.lit(None).alias("lab_site_index"))
+        nhsn_data.rename(
+            {
+                "weekendingdate": "date",
+                "jurisdiction": "geo_value",
+                "hospital_admissions": "observed_hospital_admissions",
+            }
         )
-        if nhsn_data is not None
-        else pl.DataFrame()
+        .unpivot(
+            on="observed_hospital_admissions",
+            index=cs.exclude("observed_hospital_admissions"),
+            variable_name=".variable",
+            value_name=".value",
+        )
+        .with_columns(pl.lit(None).alias("lab_site_index"))
     )
 
-    combined_dat = (
+    return (
         pl.concat(
             [nssp_data_long, nhsn_data_long],
             how="diagonal_relaxed",
@@ -124,8 +73,6 @@ def combine_surveillance_data(
             ]
         )
     )
-
-    return combined_dat
 
 
 def aggregate_nssp_to_national(
@@ -406,50 +353,21 @@ def get_pmfs(
 
 
 def process_and_save_loc_data(
-    loc_abb: str,
-    disease: str,
     forecast_data: ForecastData,
-    first_training_date: dt.date,
-    last_training_date: dt.date,
     save_dir: Path,
     logger: logging.Logger | None = None,
 ) -> None:
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+    logger = logger or logging.getLogger(__name__)
 
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-    loc_pop_df = get_us_loc_pop_tbl()
-
-    loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
-
-    right_truncation_offset = (forecast_data.report_date - last_training_date).days - 1
-    # First entry of source right truncation PMFs corresponds to reports
-    # for ref date = report_date - 1 as of report_date
-
-    nssp_full_data = clean_nssp_data(
-        data=forecast_data.nssp.data,
-        disease=disease,
-        last_training_date=last_training_date,
-    )
-
-    nssp_training_data = nssp_full_data.filter(pl.col("data_type") == "train")
-
-    nhsn_full_data = forecast_data.nhsn.data.filter(
-        pl.col("weekendingdate") >= first_training_date
-    ).with_columns(  # in testing mode, this isn't guaranteed'
-        data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
-        .then(pl.lit("train"))
-        .otherwise(pl.lit("eval")),
-        resolution=pl.lit("epiweekly"),
-    )
-    nhsn_training_data = nhsn_full_data.filter(pl.col("data_type") == "train")
-
-    nhsn_step_size = 7
+    nssp_training_data = forecast_data.nssp.data.filter(pl.col("data_type") == "train")
+    nhsn_training_data = forecast_data.nhsn.data.filter(pl.col("data_type") == "train")
 
     data_for_model_fit = {
-        "loc_pop": loc_pop,
-        "right_truncation_offset": right_truncation_offset,
+        "loc_pop": forecast_data.loc_pop,
+        "right_truncation_offset": forecast_data.right_truncation_offset,
         "nwss_training_data": None,
         "nssp_training_data": nssp_training_data.drop("resolution").to_dict(
             as_series=False
@@ -457,7 +375,7 @@ def process_and_save_loc_data(
         "nhsn_training_data": nhsn_training_data.drop("resolution").to_dict(
             as_series=False
         ),
-        "nhsn_step_size": nhsn_step_size,
+        "nhsn_step_size": 7,
         "nssp_step_size": 1,
         "nwss_step_size": 1,
     }
@@ -466,13 +384,12 @@ def process_and_save_loc_data(
         json.dump(data_for_model_fit, json_file, default=str)
 
     combined_data = combine_surveillance_data(
-        nssp_data=nssp_full_data,
-        nhsn_data=nhsn_full_data,
-        disease=disease,
+        disease=forecast_data.disease,
+        nssp_data=forecast_data.nssp.data,
+        nhsn_data=forecast_data.nhsn.data,
     )
 
-    if logger is not None:
-        logger.info(f"Saving {loc_abb} to {save_dir}")
+    logger.info(f"Saving {forecast_data.loc_abb} to {save_dir}")
 
     combined_data.write_csv(Path(save_dir, "combined_data.tsv"), separator="\t")
     return None

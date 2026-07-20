@@ -323,7 +323,11 @@ def _write_combined_data(path):
 def _epiautogp_context(tmp_path, nowcast_source=None):
     report_date = dt.date(2024, 1, 3)
     forecast_data = ForecastData(
+        loc_abb="CA",
+        disease="COVID-19",
         report_date=report_date,
+        loc_pop=1,
+        right_truncation_offset=0,
         nssp=NSSPData(
             data=pl.DataFrame(),
             freshness=DataFreshness(

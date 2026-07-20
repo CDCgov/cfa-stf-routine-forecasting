@@ -9,7 +9,7 @@ import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
-from pipelines.data.data_access import DataFreshness, ForecastData, NHSNData, NSSPData
+from pipelines.data.data_access import DataFreshness, ForecastData
 from pipelines.data.generate_test_data_lib import (
     FACILITY_LEVEL_NSSP_DATA_COLS,
     LOC_LEVEL_NSSP_DATA_COLS,
@@ -255,7 +255,12 @@ def _write_nhsn_data(
             )
 
 
-def make_forecast_data(location: str, disease: str) -> ForecastData:
+def make_forecast_data(
+    location: str,
+    disease: str,
+    first_training_date: dt.date = FIRST_OBS_DATE,
+    last_training_date: dt.date = REPORT_DATE,
+) -> ForecastData:
     locations = sorted(set(DEFAULT_LOCATIONS + [location]))
     diseases = sorted(set(DEFAULT_DISEASES + [disease]))
     location_data = _location_data(locations)
@@ -299,10 +304,18 @@ def make_forecast_data(location: str, disease: str) -> ForecastData:
         reason="Synthetic NHSN data",
     )
 
-    return ForecastData(
+    return ForecastData.create(
+        loc_abb=location,
+        disease=disease,
         report_date=REPORT_DATE,
-        nssp=NSSPData(data=nssp_data, freshness=nssp_freshness),
-        nhsn=NHSNData(data=nhsn_data, freshness=nhsn_freshness, prelim=False),
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+        nssp_data=nssp_data,
+        nssp_freshness=nssp_freshness,
+        nhsn_data=nhsn_data,
+        nhsn_freshness=nhsn_freshness,
+        nhsn_prelim=False,
+        loc_pop=location_by_abbr[location].population,
     )
 
 

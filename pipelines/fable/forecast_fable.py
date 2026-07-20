@@ -72,6 +72,7 @@ def main(
         loc_abb=loc,
         report_date=report_date,
         first_training_date=first_training_date,
+        last_training_date=last_training_date,
         run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
@@ -93,11 +94,7 @@ def main(
     data_dir = Path(ensemble_model_output_dir, "data")
     logger.info(f"Processing {loc}")
     process_and_save_loc_data(
-        loc_abb=loc,
-        disease=disease,
         forecast_data=forecast_data,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
         save_dir=data_dir,
         logger=logger,
     )

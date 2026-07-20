@@ -6,13 +6,15 @@ from pathlib import Path
 import jax.numpy as jnp
 import polars as pl
 import polars.selectors as cs
+from pyrenew_multisignal.hew import approx_lognorm
+
 from cfa.stf.data import (
     get_nnh_delay_pmf,
     get_nnh_generation_interval_pmf,
     get_nnh_right_truncation_pmf,
 )
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
-from pyrenew_multisignal.hew import approx_lognorm
+from pipelines.data.data_access import ForecastData
 
 _disease_map = {
     "COVID-19": "COVID-19/Omicron",
@@ -406,11 +408,9 @@ def get_pmfs(
 def process_and_save_loc_data(
     loc_abb: str,
     disease: str,
-    report_date: dt.date,
+    forecast_data: ForecastData,
     first_training_date: dt.date,
     last_training_date: dt.date,
-    nssp_data: pl.DataFrame,
-    nhsn_data: pl.DataFrame,
     save_dir: Path,
     logger: logging.Logger | None = None,
 ) -> None:
@@ -423,19 +423,19 @@ def process_and_save_loc_data(
 
     loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
 
-    right_truncation_offset = (report_date - last_training_date).days - 1
+    right_truncation_offset = (forecast_data.report_date - last_training_date).days - 1
     # First entry of source right truncation PMFs corresponds to reports
     # for ref date = report_date - 1 as of report_date
 
     nssp_full_data = clean_nssp_data(
-        data=nssp_data,
+        data=forecast_data.nssp.data,
         disease=disease,
         last_training_date=last_training_date,
     )
 
     nssp_training_data = nssp_full_data.filter(pl.col("data_type") == "train")
 
-    nhsn_full_data = nhsn_data.filter(
+    nhsn_full_data = forecast_data.nhsn.data.filter(
         pl.col("weekendingdate") >= first_training_date
     ).with_columns(  # in testing mode, this isn't guaranteed'
         data_type=pl.when(pl.col("weekendingdate") <= last_training_date)

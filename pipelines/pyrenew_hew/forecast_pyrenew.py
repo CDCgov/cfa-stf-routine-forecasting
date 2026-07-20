@@ -161,9 +161,7 @@ def main(
     process_and_save_loc_data(
         loc_abb=loc,
         disease=disease,
-        nssp_data=forecast_data.nssp.data,
-        nhsn_data=forecast_data.nhsn.data,
-        report_date=report_date,
+        forecast_data=forecast_data,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         save_dir=data_dir,

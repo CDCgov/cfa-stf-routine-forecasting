@@ -492,12 +492,7 @@ class TestPrepareModelData:
         _ = context.prepare_model_data()
 
         mock_process_loc.assert_called_once()
-        assert mock_process_loc.call_args[1]["nssp_data"].equals(
-            context.forecast_data.nssp.data
-        )
-        assert mock_process_loc.call_args[1]["nhsn_data"].equals(
-            context.forecast_data.nhsn.data
-        )
+        assert mock_process_loc.call_args[1]["forecast_data"] is context.forecast_data
 
     @patch(
         "pipelines.epiautogp.epiautogp_forecast_utils.append_prop_data_to_combined_data"

@@ -100,9 +100,7 @@ class ForecastPipelineContext:
         process_and_save_loc_data(
             loc_abb=self.forecast_spec.loc,
             disease=self.forecast_spec.disease,
-            nssp_data=self.forecast_data.nssp.data,
-            nhsn_data=self.forecast_data.nhsn.data,
-            report_date=self.forecast_spec.report_date,
+            forecast_data=self.forecast_data,
             first_training_date=self.first_training_date,
             last_training_date=self.last_training_date,
             save_dir=data_dir,

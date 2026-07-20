@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import polars as pl
 from cfa.dataops import datacat
+
 from cfa.stf.data import get_nhsn_hrd, get_nssp
 
 
@@ -18,15 +19,18 @@ class DataFreshness:
 
 
 @dataclass(frozen=True)
-class NSSPData:
+class ForecastSourceData:
     data: pl.DataFrame
     freshness: DataFreshness
 
 
 @dataclass(frozen=True)
-class NHSNData:
-    data: pl.DataFrame
-    freshness: DataFreshness
+class NSSPData(ForecastSourceData):
+    pass
+
+
+@dataclass(frozen=True)
+class NHSNData(ForecastSourceData):
     prelim: bool
 
 
@@ -37,8 +41,12 @@ class ForecastData:
     nhsn: NHSNData
 
     @property
+    def sources(self) -> tuple[ForecastSourceData, ...]:
+        return (self.nssp, self.nhsn)
+
+    @property
     def freshness(self) -> tuple[DataFreshness, ...]:
-        return (self.nssp.freshness, self.nhsn.freshness)
+        return tuple(source.freshness for source in self.sources)
 
     @property
     def is_stale(self) -> bool:

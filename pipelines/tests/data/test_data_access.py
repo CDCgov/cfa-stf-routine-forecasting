@@ -189,6 +189,10 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     assert forecast_data.nssp.data.equals(nssp_data)
     assert forecast_data.nhsn.data.equals(nhsn_data)
     assert forecast_data.nhsn.prelim
+    assert all(
+        isinstance(source, data_access.ForecastSourceData)
+        for source in forecast_data.sources
+    )
     assert forecast_data.freshness == (
         forecast_data.nssp.freshness,
         forecast_data.nhsn.freshness,

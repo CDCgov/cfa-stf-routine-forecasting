@@ -221,9 +221,7 @@ def load_forecast_data(
 
     nssp_record = nssp_freshness(
         selected_version_date=report_date,
-        latest_observed_date=nssp_data.get_column("date").max()
-        if not nssp_data.is_empty()
-        else None,
+        latest_observed_date=nssp_data.get_column("date").max(),
         run_date=run_date,
     )
 
@@ -236,9 +234,7 @@ def load_forecast_data(
 
     nhsn_record = nhsn_freshness(
         selected_version_date=nhsn_version_date,
-        latest_observed_date=nhsn_data.get_column("weekendingdate").max()
-        if not nhsn_data.is_empty()
-        else None,
+        latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
         run_date=run_date,
     )
     freshness = (nssp_record, nhsn_record)

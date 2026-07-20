@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import polars as pl
 from cfa.dataops import datacat
-
 from cfa.stf.data import get_nhsn_hrd, get_nssp
 
 

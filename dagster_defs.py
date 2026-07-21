@@ -277,11 +277,15 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
         for entry in self.config_overrides:
             entry_dict = entry if isinstance(entry, dict) else entry.as_dict()
             if all(
-                key not in entry_dict or entry_dict[key] == value
+                entry_dict.get(key) is None or entry_dict.get(key) == value
                 for key, value in selectors.items()
             ):
                 overrides.update(
-                    {k: v for k, v in entry_dict.items() if k not in selectors}
+                    {
+                        k: v
+                        for k, v in entry_dict.items()
+                        if k not in selectors and v is not None
+                    }
                 )
         return self.model_copy(update=overrides)
 

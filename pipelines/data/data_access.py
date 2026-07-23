@@ -173,23 +173,23 @@ def resolve_nssp_report_date() -> dt.date:
 
 def _load_dataops_nssp(
     *,
-    report_date: dt.date,
     loc_abb: str,
     disease: str,
     first_training_date: dt.date,
-) -> pl.DataFrame:
-    return (
+) -> tuple[pl.DataFrame, dt.date]:
+    version_date = resolve_nssp_report_date()
+    data = (
         get_nssp(
             disease=[disease, "Total"],
             loc_abb=loc_abb,
             dataset="gold",
-            as_of=report_date,
             start_date=first_training_date,
             lazy=False,
         )
         .rename({"reference_date": "date", "value": "ed_visits"})
         .select(["date", "geo_value", "disease", "ed_visits"])
     )
+    return data, version_date
 
 
 def select_latest_nhsn_release() -> tuple[bool, dt.date]:
@@ -311,15 +311,14 @@ def load_forecast_data(
     logger = logger or logging.getLogger(__name__)
     run_date = run_date or report_date
 
-    nssp_data = _load_dataops_nssp(
-        report_date=report_date,
+    nssp_data, nssp_version_date = _load_dataops_nssp(
         loc_abb=loc_abb,
         disease=disease,
         first_training_date=first_training_date,
     )
 
     nssp_record = nssp_freshness(
-        selected_version_date=report_date,
+        selected_version_date=nssp_version_date,
         latest_observed_date=nssp_data.get_column("date").max(),
         run_date=run_date,
     )

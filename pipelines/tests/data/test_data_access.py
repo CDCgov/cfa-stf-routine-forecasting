@@ -113,6 +113,44 @@ def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
     assert selected_version == dt.date(2026, 1, 8)
 
 
+def test_load_dataops_nssp_uses_latest_available_version(monkeypatch):
+    calls = {}
+    raw_data = pl.DataFrame(
+        {
+            "reference_date": [dt.date(2026, 1, 7)],
+            "geo_value": ["CA"],
+            "disease": ["COVID-19"],
+            "value": [10],
+        }
+    )
+    monkeypatch.setattr(
+        data_access,
+        "resolve_nssp_report_date",
+        lambda: dt.date(2026, 1, 8),
+    )
+    monkeypatch.setattr(
+        data_access,
+        "get_nssp",
+        lambda **kwargs: calls.update(kwargs) or raw_data,
+    )
+
+    data, selected_version = data_access._load_dataops_nssp(
+        loc_abb="CA",
+        disease="COVID-19",
+        first_training_date=dt.date(2025, 12, 1),
+    )
+
+    assert selected_version == dt.date(2026, 1, 8)
+    assert data.columns == ["date", "geo_value", "disease", "ed_visits"]
+    assert calls == {
+        "disease": ["COVID-19", "Total"],
+        "loc_abb": "CA",
+        "dataset": "gold",
+        "start_date": dt.date(2025, 12, 1),
+        "lazy": False,
+    }
+
+
 def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     calls = {}
     nssp_data = pl.DataFrame(
@@ -134,7 +172,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
 
     def fake_load_nssp(**kwargs):
         calls["nssp"] = kwargs
-        return nssp_data
+        return nssp_data, dt.date(2026, 1, 8)
 
     def fake_load_nhsn(**kwargs):
         calls["nhsn"] = kwargs
@@ -177,7 +215,6 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     )
     assert not forecast_data.is_stale
     assert calls["nssp"] == {
-        "report_date": dt.date(2026, 1, 8),
         "loc_abb": "CA",
         "disease": "COVID-19",
         "first_training_date": dt.date(2025, 12, 1),

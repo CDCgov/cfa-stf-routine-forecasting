@@ -6,9 +6,7 @@ import os
 import re
 import runpy
 import subprocess
-import tomllib
 from pathlib import Path
-from typing import Any
 
 import polars as pl
 from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
@@ -23,28 +21,6 @@ disease_map_lower_ = {
     "rsv": "RSV",
 }
 loc_abbrs_ = LOCATION_LIST
-
-
-def load_credentials(
-    credentials_path: Path | str | None, logger: logging.Logger
-) -> dict[str, Any] | None:
-    """Load credentials from a TOML file."""
-    if credentials_path is not None:
-        cp = Path(credentials_path)
-        if not cp.suffix.lower() == ".toml":
-            raise ValueError(
-                "Credentials file must have the extension "
-                "'.toml' (not case-sensitive). Got "
-                f"{cp.suffix}"
-            )
-        logger.info(f"Reading in credentials from {cp}...")
-        with open(cp, "rb") as fp:
-            credentials_dict = tomllib.load(fp)
-    else:
-        logger.info("No credentials file given. Will proceed without one.")
-        credentials_dict = None
-
-    return credentials_dict
 
 
 def get_available_reports(

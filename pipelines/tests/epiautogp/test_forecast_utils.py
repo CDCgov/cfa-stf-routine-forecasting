@@ -23,6 +23,7 @@ from unittest.mock import patch
 import polars as pl
 import pytest
 
+from pipelines.data.data_access import DataFreshness, ForecastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -31,6 +32,52 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     setup_forecast_pipeline,
 )
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
+
+
+def _forecast_data(report_date: dt.date = dt.date(2024, 12, 20)) -> ForecastData:
+    nssp_data = pl.DataFrame(
+        {
+            "date": [dt.date(2024, 12, 20), dt.date(2024, 12, 20)],
+            "geo_value": ["CA", "CA"],
+            "disease": ["COVID-19", "Total"],
+            "ed_visits": [10, 100],
+        }
+    )
+    nhsn_data = pl.DataFrame(
+        {
+            "weekendingdate": [dt.date(2024, 12, 14)],
+            "jurisdiction": ["CA"],
+            "disease": ["COVID-19"],
+            "hospital_admissions": [5],
+        }
+    )
+    return ForecastData.from_source_frames(
+        loc_abb="CA",
+        disease="COVID-19",
+        report_date=report_date,
+        first_training_date=dt.date(2024, 9, 22),
+        last_training_date=report_date,
+        nssp_data=nssp_data,
+        nssp_freshness=DataFreshness(
+            source="nssp",
+            selected_version_date=report_date,
+            latest_observed_date=nssp_data.get_column("date").max(),
+            run_date=report_date,
+            is_stale=False,
+            reason="Test NSSP data",
+        ),
+        nhsn_data=nhsn_data,
+        nhsn_freshness=DataFreshness(
+            source="nhsn",
+            selected_version_date=report_date,
+            latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
+            run_date=report_date,
+            is_stale=False,
+            reason="Test NHSN data",
+        ),
+        nhsn_prelim=False,
+        loc_pop=1,
+    )
 
 
 @pytest.fixture
@@ -50,7 +97,6 @@ def base_context(tmp_path):
             ed_visit_type="observed",
         ),
         model_name="test_model",
-        nhsn_data_path=None,
         first_training_date=dt.date(2024, 9, 22),
         last_training_date=dt.date(2024, 12, 20),
         n_forecast_days=28,
@@ -58,8 +104,7 @@ def base_context(tmp_path):
         exclude_date_ranges=None,
         model_batch_dir=tmp_path / "batch",
         model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
-        credentials_dict={},
-        facility_level_nssp_data=pl.LazyFrame(),
+        forecast_data=_forecast_data(),
         logger=logging.getLogger(),
     )
 
@@ -79,7 +124,6 @@ class TestForecastPipelineContext:
                 ed_visit_type="observed",
             ),
             model_name="test_model",
-            nhsn_data_path=None,
             first_training_date=dt.date(2024, 9, 22),
             last_training_date=dt.date(2024, 12, 20),
             n_forecast_days=28,
@@ -87,8 +131,7 @@ class TestForecastPipelineContext:
             exclude_date_ranges=None,
             model_batch_dir=Path("/output/batch"),
             model_run_dir=Path("/output/batch/model_runs/CA"),
-            credentials_dict={"key": "value"},
-            facility_level_nssp_data=pl.LazyFrame(),
+            forecast_data=_forecast_data(),
             logger=logging.getLogger(),
         )
 
@@ -118,23 +161,18 @@ class TestModelPaths:
 class TestSetupForecastPipeline:
     """Tests for the setup_forecast_pipeline function."""
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
     def test_setup_pipeline_returns_context(
         self,
         mock_calc_dates,
-        mock_get_reports,
-        mock_load_creds,
-        mock_scan_parquet,
+        mock_load_data,
         tmp_path,
     ):
         """Test that setup_forecast_pipeline returns a properly configured context."""
         # Setup mocks
-        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_scan_parquet.return_value = pl.LazyFrame()
+        mock_load_data.return_value = _forecast_data()
 
         context = setup_forecast_pipeline(
             disease="COVID-19",
@@ -143,36 +181,31 @@ class TestSetupForecastPipeline:
             frequency="epiweekly",
             ed_visit_type="observed",
             model_name="test_model",
-            nhsn_data_path=None,
-            facility_level_nssp_data_dir=tmp_path,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            run_date=dt.date(2024, 12, 20),
             exclude_last_n_days=0,
-            credentials_path=None,
             logger=None,
             nowcast_source_name="none",
         )
 
         assert isinstance(context, ForecastPipelineContext)
+        assert mock_calc_dates.call_args.args[0] == dt.date(2024, 12, 20)
+        assert mock_load_data.call_args.kwargs["run_date"] == dt.date(2024, 12, 20)
+        assert "report_date" not in mock_load_data.call_args.kwargs
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
     def test_setup_pipeline_creates_directory_structure(
         self,
         mock_calc_dates,
-        mock_get_reports,
-        mock_load_creds,
-        mock_scan_parquet,
+        mock_load_data,
         tmp_path,
     ):
         """Test that setup creates the expected directory structure."""
-        mock_load_creds.return_value = {}
-        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_scan_parquet.return_value = pl.LazyFrame()
+        mock_load_data.return_value = _forecast_data()
 
         context = setup_forecast_pipeline(
             disease="COVID-19",
@@ -181,11 +214,10 @@ class TestSetupForecastPipeline:
             frequency="epiweekly",
             ed_visit_type="observed",
             model_name="test_model",
-            nhsn_data_path=None,
-            facility_level_nssp_data_dir=tmp_path,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            run_date=dt.date(2024, 12, 20),
             nowcast_source_name="none",
         )
 
@@ -198,24 +230,18 @@ class TestSetupForecastPipeline:
         assert context.model_run_dir == expected_run_dir
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
-    def test_reporting_delay_fetches_pmf_from_param_data_dir(
+    def test_reporting_delay_fetches_pmf_from_dataops(
         self,
         mock_calc_dates,
-        mock_get_reports,
-        mock_load_creds,
-        mock_scan_parquet,
+        mock_load_data,
         mock_get_pmfs,
         tmp_path,
     ):
-        """Test reporting-delay nowcasting loads the PMF from param_data_dir."""
-        mock_load_creds.return_value = {}
-        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
+        """Test reporting-delay nowcasting loads the PMF from DataOps."""
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_scan_parquet.return_value = pl.LazyFrame()
+        mock_load_data.return_value = _forecast_data()
         mock_get_pmfs.return_value = {"right_truncation_pmf": [0.25, 0.75]}
 
         context = setup_forecast_pipeline(
@@ -225,12 +251,10 @@ class TestSetupForecastPipeline:
             frequency="daily",
             ed_visit_type="observed",
             model_name="test_model",
-            nhsn_data_path=None,
-            facility_level_nssp_data_dir=tmp_path,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
-            param_data_dir=tmp_path / "prod_param_estimates",
+            run_date=dt.date(2024, 12, 20),
             nowcast_source_name="reporting-delay",
         )
 
@@ -241,24 +265,18 @@ class TestSetupForecastPipeline:
         assert mock_get_pmfs.call_args.kwargs["as_of"] == dt.date(2024, 12, 20)
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.pl.scan_parquet")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_credentials")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_available_reports")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
-    def test_direct_reporting_delay_pmf_wins_over_param_data_dir(
+    def test_direct_reporting_delay_pmf_wins_over_dataops(
         self,
         mock_calc_dates,
-        mock_get_reports,
-        mock_load_creds,
-        mock_scan_parquet,
+        mock_load_data,
         mock_get_pmfs,
         tmp_path,
     ):
         """Test a directly supplied PMF is used without calling get_pmfs."""
-        mock_load_creds.return_value = {}
-        mock_get_reports.return_value = [dt.date(2024, 12, 20)]
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_scan_parquet.return_value = pl.LazyFrame()
+        mock_load_data.return_value = _forecast_data()
 
         context = setup_forecast_pipeline(
             disease="COVID-19",
@@ -267,13 +285,11 @@ class TestSetupForecastPipeline:
             frequency="daily",
             ed_visit_type="other",
             model_name="test_model",
-            nhsn_data_path=None,
-            facility_level_nssp_data_dir=tmp_path,
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
-            param_data_dir=tmp_path / "prod_param_estimates",
             nowcast_source_name="reporting-delay",
+            run_date=dt.date(2024, 12, 20),
             reporting_delay_pmf=[0.4, 0.6],
         )
 
@@ -294,7 +310,6 @@ class TestSetupForecastPipeline:
         with pytest.raises(ValueError, match="not applicable"):
             _resolve_nowcast_source(
                 forecast_spec=spec,
-                param_data_dir=None,
                 nowcast_source_name="reporting-delay",
                 reporting_delay_pmf=[1.0],
             )
@@ -311,7 +326,6 @@ class TestSetupForecastPipeline:
         )
         result = _resolve_nowcast_source(
             forecast_spec=spec,
-            param_data_dir=None,
             nowcast_source_name="reporting-delay",
             reporting_delay_pmf=[0.4, 0.6],
         )
@@ -330,7 +344,6 @@ class TestSetupForecastPipeline:
         )
         result = _resolve_nowcast_source(
             forecast_spec=spec,
-            param_data_dir=None,
             nowcast_source_name="reporting-delay",
             reporting_delay_pmf=[0.4, 0.6],
         )
@@ -351,7 +364,6 @@ class TestSetupForecastPipeline:
         with caplog.at_level(logging.WARNING):
             result = _resolve_nowcast_source(
                 forecast_spec=spec,
-                param_data_dir=None,
                 nowcast_source_name="reporting-delay",
                 reporting_delay_pmf=[1.0],
             )
@@ -371,7 +383,6 @@ class TestSetupForecastPipeline:
         )
         result = _resolve_nowcast_source(
             forecast_spec=spec,
-            param_data_dir=None,
             nowcast_source_name="none",
             reporting_delay_pmf=[0.5, 0.5],
         )
@@ -391,7 +402,6 @@ class TestSetupForecastPipeline:
         with pytest.raises(ValueError, match="nowcast_source_name must be one of"):
             _resolve_nowcast_source(
                 forecast_spec=spec,
-                param_data_dir=None,
                 nowcast_source_name="auto",
                 reporting_delay_pmf=None,
             )
@@ -445,7 +455,7 @@ class TestPrepareModelData:
     )
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.generate_epiweekly_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.process_and_save_loc_data")
-    def test_prepare_model_data_passes_nhsn_data_path(
+    def test_prepare_model_data_passes_loaded_data(
         self,
         mock_process_loc,
         mock_gen_epiweekly,
@@ -453,21 +463,18 @@ class TestPrepareModelData:
         base_context,  # Use fixture
         tmp_path,
     ):
-        """Test that prepare_model_data passes nhsn_data_path to data functions."""
-        nhsn_path = tmp_path / "nhsn_data.parquet"
+        """Test that prepare_model_data passes resolved data to data functions."""
 
         # Override just the fields we need for this test
         context = replace(
             base_context,
             forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
-            nhsn_data_path=nhsn_path,
         )
 
         _ = context.prepare_model_data()
 
-        # Verify nhsn_data_path was passed to process_and_save_loc_data
         mock_process_loc.assert_called_once()
-        assert mock_process_loc.call_args[1]["nhsn_data_path"] == nhsn_path
+        assert mock_process_loc.call_args[1]["forecast_data"] is context.forecast_data
 
     @patch(
         "pipelines.epiautogp.epiautogp_forecast_utils.append_prop_data_to_combined_data"
@@ -483,15 +490,11 @@ class TestPrepareModelData:
         tmp_path,
     ):
         """Test prepare_model_data with NHSN target and data."""
-        nhsn_path = tmp_path / "nhsn_hospital_admissions.parquet"
-
         # Override multiple fields for NHSN test
         context = replace(
             base_context,
             forecast_spec=replace(base_context.forecast_spec, target="nhsn"),
             model_name="epiautogp_nhsn_epiweekly",
-            nhsn_data_path=nhsn_path,
-            credentials_dict={"key": "value"},
         )
 
         paths = context.prepare_model_data()

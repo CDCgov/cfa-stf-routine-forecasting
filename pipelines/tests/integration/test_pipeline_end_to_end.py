@@ -7,24 +7,27 @@ from pathlib import Path
 import polars as pl
 import pytest
 
+from pipelines.data import prep_data
 from pipelines.data.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
+    REPORT_DATE,
+    make_forecast_data,
+    make_param_estimates,
 )
-from pipelines.data.generate_test_data import (
-    main as generate_test_data,
-)
-from pipelines.epiautogp.forecast_epiautogp import main as forecast_epiautogp
-from pipelines.fable.forecast_fable import main as forecast_fable
-from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
+from pipelines.epiautogp import epiautogp_forecast_utils as epiautogp_utils
+from pipelines.epiautogp import forecast_epiautogp as epiautogp_module
+from pipelines.fable import forecast_fable as fable_module
+from pipelines.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from pipelines.utils.common_utils import (
     create_prop_samples,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
+    parse_model_batch_dir_name,
 )
 from pipelines.utils.postprocess_forecast_batches import main as postprocess_batches
 
-FORECAST_DIR_NAME = "2024-12-21_forecasts"
+FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
 EXCLUDE_LAST_N_DAYS = 1
@@ -37,6 +40,8 @@ EXPECTED_MODELS = [
     "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other",
     "prop_pyrenew_e_epiautogp_nssp_daily_other",
 ]
+MOCK_DATA_MODE = "mock"
+REAL_DATA_MODE = "real"
 
 
 @contextmanager
@@ -84,33 +89,24 @@ def pipeline_workspace(request, tmp_path, monkeypatch):
 def _run_fable(
     workspace: Path, disease: str, location: str, *, epiweekly: bool = False
 ) -> None:
-    forecast_fable(
+    fable_module.main(
         disease=disease,
         loc=location,
-        facility_level_nssp_data_dir=workspace / "private_data" / "nssp_etl_gold",
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
+        run_date=REPORT_DATE,
         epiweekly=epiweekly,
-        nhsn_data_path=(
-            workspace
-            / "private_data"
-            / "nhsn_test_data"
-            / f"{disease}_{location}.parquet"
-        ),
     )
 
 
 def _run_pyrenew(workspace: Path, disease: str, location: str) -> None:
-    forecast_pyrenew(
+    pyrenew_module.main(
         disease=disease,
         loc=location,
-        facility_level_nssp_data_dir=workspace / "private_data" / "nssp_etl_gold",
         priors_path=Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
-        param_data_dir=workspace / "private_data" / "prod_param_estimates",
-        nwss_data_dir=workspace / "private_data" / "nwss_vintages",
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
@@ -118,25 +114,18 @@ def _run_pyrenew(workspace: Path, disease: str, location: str) -> None:
         n_chains=1,
         n_samples=40,
         n_warmup=40,
+        run_date=REPORT_DATE,
         rng_key=12345,
         fit_ed_visits=True,
         forecast_ed_visits=True,
-        nhsn_data_path=(
-            workspace
-            / "private_data"
-            / "nhsn_test_data"
-            / f"{disease}_{location}.parquet"
-        ),
     )
 
 
 def _run_epiautogp(workspace: Path, disease: str, location: str) -> None:
-    forecast_epiautogp(
+    epiautogp_module.main(
         disease=disease,
-        report_date="latest",
+        run_date=REPORT_DATE,
         loc=location,
-        facility_level_nssp_data_dir=workspace / "private_data" / "nssp_etl_gold",
-        param_data_dir=workspace / "private_data" / "prod_param_estimates",
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
@@ -144,12 +133,6 @@ def _run_epiautogp(workspace: Path, disease: str, location: str) -> None:
         target="nssp",
         frequency="daily",
         ed_visit_type="other",
-        nhsn_data_path=(
-            workspace
-            / "private_data"
-            / "nhsn_test_data"
-            / f"{disease}_{location}.parquet"
-        ),
         n_particles=2,
         n_mcmc=2,
         n_hmc=2,
@@ -220,15 +203,84 @@ def _assert_model_outputs(model_run_dir: Path) -> None:
         )
 
 
-@pytest.mark.pipeline_e2e
-def test_reduced_pipeline_end_to_end(pipeline_workspace):
-    workspace = pipeline_workspace
-    with _status_step(f"Generating test data in {workspace}"):
-        generate_test_data(
-            workspace,
-            locations=DEFAULT_LOCATIONS,
-            diseases=DEFAULT_DISEASES,
+def _patch_dataops(monkeypatch) -> None:
+    param_estimates = make_param_estimates().lazy()
+
+    def load_forecast_data(
+        *,
+        disease,
+        loc_abb,
+        run_date,
+        first_training_date,
+        last_training_date,
+        **kwargs,
+    ):
+        return make_forecast_data(
+            location=loc_abb,
+            disease=disease,
+            first_training_date=first_training_date,
+            last_training_date=last_training_date,
         )
+
+    def process_and_save_loc_param(
+        *,
+        loc_abb,
+        disease,
+        param_estimates=None,
+        fit_ed_visits,
+        save_dir,
+        as_of=None,
+    ):
+        return prep_data.process_and_save_loc_param(
+            loc_abb=loc_abb,
+            disease=disease,
+            param_estimates=param_estimates,
+            fit_ed_visits=fit_ed_visits,
+            save_dir=save_dir,
+            as_of=as_of,
+        )
+
+    for module in (fable_module, pyrenew_module):
+        monkeypatch.setattr(module, "load_forecast_data", load_forecast_data)
+    monkeypatch.setattr(epiautogp_utils, "load_forecast_data", load_forecast_data)
+    monkeypatch.setattr(
+        pyrenew_module,
+        "process_and_save_loc_param",
+        lambda **kwargs: process_and_save_loc_param(
+            **{**kwargs, "param_estimates": param_estimates}
+        ),
+    )
+
+
+def _has_external_dataops_env() -> bool:
+    try:
+        from cfa.cloudops.util import check_ext_env
+    except ImportError:
+        print(
+            "[pipeline-e2e] cfa.cloudops.util.check_ext_env is unavailable; "
+            "using mocked DataOps data.",
+            flush=True,
+        )
+        return False
+
+    return check_ext_env()
+
+
+def _data_mode(request) -> str:
+    requested_mode = request.config.getoption("--e2e-data-mode")
+    if requested_mode == "auto":
+        return REAL_DATA_MODE if _has_external_dataops_env() else MOCK_DATA_MODE
+    return requested_mode
+
+
+@pytest.mark.pipeline_e2e
+def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
+    workspace = pipeline_workspace
+    data_mode = _data_mode(request)
+    print(f"[pipeline-e2e] Using {data_mode} DataOps data.", flush=True)
+
+    if data_mode == MOCK_DATA_MODE:
+        _patch_dataops(monkeypatch)
 
     for disease in DEFAULT_DISEASES:
         for location in DEFAULT_LOCATIONS:
@@ -264,8 +316,10 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace):
     for disease in DEFAULT_DISEASES:
         with _status_step(f"Checking postprocessed outputs for {disease}"):
             batch_dir = _model_batch_dir(workspace, disease)
+            batch_info = parse_model_batch_dir_name(batch_dir.name)
             postprocessed_path = (
-                batch_dir / f"2024-12-21-{disease.lower()}-hubverse-table.parquet"
+                batch_dir
+                / f"{batch_info['report_date']}-{disease.lower()}-hubverse-table.parquet"
             )
             assert postprocessed_path.is_file(), (
                 f"Missing postprocessed hubverse table: {postprocessed_path}"

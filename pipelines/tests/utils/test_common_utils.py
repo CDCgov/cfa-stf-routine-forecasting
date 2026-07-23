@@ -16,30 +16,12 @@ from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
     get_available_reports,
-    load_credentials,
     parse_exclude_date_ranges,
 )
 
 
 class TestValidationUtils:
     """Tests for validation and configuration utilities."""
-
-    def test_load_credentials_with_none_returns_none(self):
-        """Test that None credentials path returns None."""
-        logger = logging.getLogger(__name__)
-
-        result = load_credentials(None, logger)
-
-        assert result is None
-
-    def test_load_credentials_with_invalid_extension_raises_error(self, tmp_path):
-        """Test that non-TOML file extension raises ValueError."""
-        invalid_file = tmp_path / "credentials.txt"
-        invalid_file.write_text("not a toml file")
-        logger = logging.getLogger(__name__)
-
-        with pytest.raises(ValueError, match="must have the extension '.toml'"):
-            load_credentials(invalid_file, logger)
 
     @pytest.mark.parametrize(
         "n_training_days,exclude_last_n_days,expected_first,expected_last",
@@ -214,6 +196,8 @@ class TestCLIUtils:
                 "COVID-19",
                 "--loc",
                 "CA",
+                "--run-date",
+                "2026-01-08",
             ]
         )
 
@@ -222,6 +206,7 @@ class TestCLIUtils:
         assert args.n_training_days == 180  # default value
         assert args.n_forecast_days == 28  # default value
         assert args.exclude_last_n_days == 0  # default value
+        assert args.run_date == dt.date(2026, 1, 8)
 
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""

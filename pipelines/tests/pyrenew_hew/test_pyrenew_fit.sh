@@ -14,10 +14,8 @@ model_letters="$4"
 python pipelines/pyrenew_hew/forecast_pyrenew.py \
 	--disease "$disease" \
 	--loc "$location" \
-	--facility-level-nssp-data-dir "$BASE_DIR/private_data/nssp_etl_gold" \
+	--run-date 2024-12-21 \
 	--priors-path pipelines/pyrenew_hew/priors/prod_priors.py \
-	--param-data-dir "$BASE_DIR/private_data/prod_param_estimates" \
-	--nwss-data-dir "$BASE_DIR/private_data/nwss_vintages" \
 	--output-dir "$BASE_DIR/2024-12-21_forecasts" \
 	--n-training-days 90 \
 	--n-chains 2 \
@@ -25,8 +23,7 @@ python pipelines/pyrenew_hew/forecast_pyrenew.py \
 	--n-warmup 250 \
 	--rng-key 12345 \
 	--model-letters "$model_letters" \
-	--additional-forecast-letters "$model_letters" \
-	--nhsn-data-path "$BASE_DIR/private_data/nhsn_test_data/${disease}_${location}.parquet"
+	--additional-forecast-letters "$model_letters"
 if [ "$?" -ne 0 ]; then
 	echo "TEST-MODE FAIL: Forecasting/postprocessing pipeline failed"
 	exit 1

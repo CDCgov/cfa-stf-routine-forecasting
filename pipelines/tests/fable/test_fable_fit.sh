@@ -15,12 +15,11 @@ for epiweekly_flag in "" "--epiweekly"; do
 	python pipelines/fable/forecast_fable.py \
 		--disease "$disease" \
 		--loc "$location" \
-		--facility-level-nssp-data-dir "$BASE_DIR/private_data/nssp_etl_gold" \
 		--output-dir "$BASE_DIR/2024-12-21_forecasts" \
+		--run-date 2024-12-21 \
 		--n-training-days 90 \
 		--n-samples 500 \
-		$epiweekly_flag \
-		--nhsn-data-path "$BASE_DIR/private_data/nhsn_test_data/${disease}_${location}.parquet"
+		$epiweekly_flag
 done
 
 if [ "$?" -ne 0 ]; then

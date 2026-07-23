@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
+from pipelines.data.data_access import DataFreshness, ForecastData, NHSNData, NSSPData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -315,11 +316,50 @@ def _write_combined_data(path):
                 ".variable": "observed_ed_visits",
                 ".value": 20.0,
             },
+            {
+                "date": dt.date(2024, 1, 3),
+                "geo_value": "CA",
+                "disease": "COVID-19",
+                "data_type": "eval",
+                ".variable": "observed_ed_visits",
+                ".value": 999.0,
+            },
         ]
     ).write_csv(path, separator="\t")
 
 
 def _epiautogp_context(tmp_path, nowcast_source=None):
+    report_date = dt.date(2024, 1, 3)
+    forecast_data = ForecastData(
+        loc_abb="CA",
+        disease="COVID-19",
+        report_date=report_date,
+        loc_pop=1,
+        right_truncation_offset=0,
+        nssp=NSSPData(
+            data=pl.DataFrame(),
+            freshness=DataFreshness(
+                source="nssp",
+                selected_version_date=report_date,
+                latest_observed_date=None,
+                run_date=report_date,
+                is_stale=False,
+                reason="Test NSSP data",
+            ),
+        ),
+        nhsn=NHSNData(
+            data=pl.DataFrame(),
+            freshness=DataFreshness(
+                source="nhsn",
+                selected_version_date=report_date,
+                latest_observed_date=None,
+                run_date=report_date,
+                is_stale=False,
+                reason="Test NHSN data",
+            ),
+            prelim=False,
+        ),
+    )
     return ForecastPipelineContext(
         forecast_spec=ForecastSpec(
             disease="COVID-19",
@@ -330,7 +370,6 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
             ed_visit_type="observed",
         ),
         model_name="test_model",
-        nhsn_data_path=None,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
         n_forecast_days=28,
@@ -338,8 +377,7 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
         exclude_date_ranges=None,
         model_batch_dir=tmp_path / "batch",
         model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
-        credentials_dict={},
-        facility_level_nssp_data=pl.LazyFrame(),
+        forecast_data=forecast_data,
         logger=logging.getLogger(),
         nowcast_source=nowcast_source,
     )
@@ -348,8 +386,8 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
 class TestConvertToEpiAutoGpJson:
     """Tests for EpiAutoGP JSON serialization."""
 
-    def test_no_nowcast_source_serializes_empty_nowcast_arrays(self, tmp_path):
-        """Test converter writes empty nowcast arrays without a source."""
+    def test_only_training_rows_are_serialized_without_nowcast_source(self, tmp_path):
+        """Test converter excludes evaluation rows from model input."""
         data_path = tmp_path / "combined_data.tsv"
         _write_combined_data(data_path)
         paths = ModelPaths(
@@ -364,6 +402,8 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
+        assert output["dates"] == ["2024-01-01", "2024-01-02"]
+        assert output["reports"] == [10.0, 20.0]
         assert output["nowcast_dates"] == []
         assert output["nowcast_reports"] == []
 

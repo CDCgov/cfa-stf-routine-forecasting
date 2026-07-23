@@ -25,13 +25,11 @@ ed_visit_type="${6:-observed}" # Default to "observed" if not provided
 cmd_args=(
 	--disease "$disease"
 	--loc "$location"
-	--facility-level-nssp-data-dir "$BASE_DIR/private_data/nssp_etl_gold"
-	--param-data-dir "$BASE_DIR/private_data/prod_param_estimates"
 	--output-dir "$BASE_DIR/2024-12-21_forecasts"
 	--n-training-days 90
 	--target "$target"
+	--run-date 2024-12-21
 	--frequency "$frequency"
-	--nhsn-data-path "$BASE_DIR/private_data/nhsn_test_data/${disease}_${location}.parquet"
 	--n-forecast-days 28
 	--n-particles 2
 	--n-mcmc 2

@@ -14,3 +14,13 @@ def pytest_addoption(parser):
         default=False,
         help="Remove an existing --e2e-output-dir before running.",
     )
+    parser.addoption(
+        "--e2e-data-mode",
+        choices=("auto", "real", "mock"),
+        default="auto",
+        help=(
+            "Data source for pipeline end-to-end tests. "
+            "'auto' uses real DataOps data in the external CFA environment "
+            "and mocked data otherwise."
+        ),
+    )

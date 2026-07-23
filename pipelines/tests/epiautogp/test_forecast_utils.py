@@ -192,11 +192,8 @@ class TestSetupForecastPipeline:
 
         assert isinstance(context, ForecastPipelineContext)
         assert mock_calc_dates.call_args.args[0] == dt.date(2024, 12, 20)
-        assert mock_load_data.call_args.kwargs["run_date"] == dt.date(
-            2024, 12, 20
-        )
+        assert mock_load_data.call_args.kwargs["run_date"] == dt.date(2024, 12, 20)
         assert "report_date" not in mock_load_data.call_args.kwargs
-
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")

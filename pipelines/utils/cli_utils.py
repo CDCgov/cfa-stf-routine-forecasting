@@ -51,8 +51,7 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=28,
         help=(
-            "Number of days ahead to forecast relative to the "
-            "run date (default: 28)."
+            "Number of days ahead to forecast relative to the run date (default: 28)."
         ),
     )
 

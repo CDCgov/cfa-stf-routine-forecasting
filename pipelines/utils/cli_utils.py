@@ -1,6 +1,7 @@
 """Shared command-line arguments and utilities for forecast pipelines."""
 
 import argparse
+import datetime as dt
 import subprocess
 from pathlib import Path
 
@@ -25,6 +26,13 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
     parser.add_argument(
+        "--run-date",
+        type=dt.date.fromisoformat,
+        required=True,
+        help="Forecast run date in YYYY-MM-DD format.",
+    )
+
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default="private_data",
@@ -44,7 +52,7 @@ def add_common_forecast_arguments(parser: argparse.ArgumentParser) -> None:
         default=28,
         help=(
             "Number of days ahead to forecast relative to the "
-            "report date (default: 28)."
+            "run date (default: 28)."
         ),
     )
 

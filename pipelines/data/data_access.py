@@ -301,15 +301,13 @@ def load_forecast_data(
     *,
     disease: str,
     loc_abb: str,
-    report_date: dt.date,
+    run_date: dt.date,
     first_training_date: dt.date,
     last_training_date: dt.date,
-    run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
 ) -> ForecastData:
     logger = logger or logging.getLogger(__name__)
-    run_date = run_date or report_date
 
     nssp_data, nssp_version_date = _load_dataops_nssp(
         loc_abb=loc_abb,
@@ -343,7 +341,7 @@ def load_forecast_data(
     return ForecastData.from_source_frames(
         loc_abb=loc_abb,
         disease=disease,
-        report_date=report_date,
+        report_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         nssp_data=nssp_data,

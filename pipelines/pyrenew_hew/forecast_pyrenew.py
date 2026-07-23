@@ -12,7 +12,7 @@ from pyrenew_multisignal.hew.utils import (
     pyrenew_model_name_from_flags,
 )
 
-from pipelines.data.data_access import load_forecast_data, resolve_nssp_report_date
+from pipelines.data.data_access import load_forecast_data
 from pipelines.data.prep_data import (
     process_and_save_loc_data,
     process_and_save_loc_param,
@@ -70,6 +70,7 @@ def main(
     n_chains: int,
     n_warmup: int,
     n_samples: int,
+    run_date: dt.date,
     exclude_last_n_days: int = 0,
     fit_ed_visits: bool = False,
     fit_hospital_admissions: bool = False,
@@ -78,7 +79,6 @@ def main(
     forecast_hospital_admissions: bool = False,
     forecast_wastewater: bool = False,
     rng_key: int | None = None,
-    run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
 ) -> None:
     logging.basicConfig(level=logging.INFO)
@@ -98,7 +98,7 @@ def main(
     logger.info(
         "Starting single-location forecasting pipeline for "
         f"model {pyrenew_model_name}, location {loc}, "
-        f"and latest NSSP report date."
+        f"and run date {run_date}."
     )
     signals = ["ed_visits", "hospital_admissions"]
 
@@ -117,10 +117,8 @@ def main(
             "pyrenew_null (fitting to no signals) is not supported by this pipeline"
         )
 
-    report_date = resolve_nssp_report_date()
-
     first_training_date, last_training_date = calculate_training_dates(
-        report_date,
+        run_date,
         n_training_days,
         exclude_last_n_days,
         logger,
@@ -129,16 +127,15 @@ def main(
     forecast_data = load_forecast_data(
         disease=disease,
         loc_abb=loc,
-        report_date=report_date,
+        run_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
-        run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )
     model_batch_dir_name = get_model_batch_dir_name(
         disease=disease,
-        report_date=report_date,
+        report_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
     )
@@ -166,7 +163,7 @@ def main(
         param_estimates=None,
         fit_ed_visits=fit_ed_visits,
         save_dir=data_dir,
-        as_of=report_date,
+        as_of=run_date,
     )
     append_prop_data_to_combined_data(Path(data_dir, "combined_data.tsv"))
     logger.info("Data preparation complete.")
@@ -216,7 +213,7 @@ def main(
         "Single-location pipeline complete "
         f"for model {pyrenew_model_name}, "
         f"location {loc}, and "
-        f"report date {report_date}."
+        f"run date {run_date}."
     )
     return None
 

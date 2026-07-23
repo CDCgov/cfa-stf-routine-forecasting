@@ -16,6 +16,7 @@ for epiweekly_flag in "" "--epiweekly"; do
 		--disease "$disease" \
 		--loc "$location" \
 		--output-dir "$BASE_DIR/2024-12-21_forecasts" \
+		--run-date 2024-12-21 \
 		--n-training-days 90 \
 		--n-samples 500 \
 		$epiweekly_flag

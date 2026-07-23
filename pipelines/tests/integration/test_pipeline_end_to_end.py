@@ -97,6 +97,7 @@ def _run_fable(
         n_forecast_days=N_FORECAST_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
+        run_date=REPORT_DATE,
         epiweekly=epiweekly,
     )
 
@@ -113,6 +114,7 @@ def _run_pyrenew(workspace: Path, disease: str, location: str) -> None:
         n_chains=1,
         n_samples=40,
         n_warmup=40,
+        run_date=REPORT_DATE,
         rng_key=12345,
         fit_ed_visits=True,
         forecast_ed_visits=True,
@@ -122,7 +124,7 @@ def _run_pyrenew(workspace: Path, disease: str, location: str) -> None:
 def _run_epiautogp(workspace: Path, disease: str, location: str) -> None:
     epiautogp_module.main(
         disease=disease,
-        report_date="latest",
+        run_date=REPORT_DATE,
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
         n_training_days=N_TRAINING_DAYS,
@@ -204,14 +206,11 @@ def _assert_model_outputs(model_run_dir: Path) -> None:
 def _patch_dataops(monkeypatch) -> None:
     param_estimates = make_param_estimates().lazy()
 
-    def resolve_report_date(run_date=None):
-        return REPORT_DATE
-
     def load_forecast_data(
         *,
         disease,
         loc_abb,
-        report_date,
+        run_date,
         first_training_date,
         last_training_date,
         **kwargs,
@@ -242,11 +241,7 @@ def _patch_dataops(monkeypatch) -> None:
         )
 
     for module in (fable_module, pyrenew_module):
-        monkeypatch.setattr(module, "resolve_nssp_report_date", resolve_report_date)
         monkeypatch.setattr(module, "load_forecast_data", load_forecast_data)
-    monkeypatch.setattr(
-        epiautogp_utils, "resolve_nssp_report_date", resolve_report_date
-    )
     monkeypatch.setattr(epiautogp_utils, "load_forecast_data", load_forecast_data)
     monkeypatch.setattr(
         pyrenew_module,

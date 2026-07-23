@@ -189,13 +189,14 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     forecast_data = data_access.load_forecast_data(
         disease="COVID-19",
         loc_abb="CA",
-        report_date=dt.date(2026, 1, 8),
+        run_date=dt.date(2026, 1, 8),
         first_training_date=dt.date(2025, 12, 1),
         last_training_date=dt.date(2026, 1, 7),
     )
 
     assert forecast_data.loc_abb == "CA"
     assert forecast_data.disease == "COVID-19"
+    assert forecast_data.report_date == dt.date(2026, 1, 8)
     assert forecast_data.loc_pop == 39_000_000
     assert forecast_data.right_truncation_offset == 0
     assert forecast_data.nssp.data.select(

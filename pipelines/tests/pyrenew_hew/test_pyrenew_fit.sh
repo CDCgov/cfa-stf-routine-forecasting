@@ -14,6 +14,7 @@ model_letters="$4"
 python pipelines/pyrenew_hew/forecast_pyrenew.py \
 	--disease "$disease" \
 	--loc "$location" \
+	--run-date 2024-12-21 \
 	--priors-path pipelines/pyrenew_hew/priors/prod_priors.py \
 	--output-dir "$BASE_DIR/2024-12-21_forecasts" \
 	--n-training-days 90 \

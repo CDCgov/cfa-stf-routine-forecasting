@@ -162,18 +162,15 @@ class TestSetupForecastPipeline:
     """Tests for the setup_forecast_pipeline function."""
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.resolve_nssp_report_date")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
     def test_setup_pipeline_returns_context(
         self,
         mock_calc_dates,
-        mock_resolve_report,
         mock_load_data,
         tmp_path,
     ):
         """Test that setup_forecast_pipeline returns a properly configured context."""
         # Setup mocks
-        mock_resolve_report.return_value = dt.date(2024, 12, 20)
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
         mock_load_data.return_value = _forecast_data()
 
@@ -187,25 +184,29 @@ class TestSetupForecastPipeline:
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            run_date=dt.date(2024, 12, 20),
             exclude_last_n_days=0,
             logger=None,
             nowcast_source_name="none",
         )
 
         assert isinstance(context, ForecastPipelineContext)
+        assert mock_calc_dates.call_args.args[0] == dt.date(2024, 12, 20)
+        assert mock_load_data.call_args.kwargs["run_date"] == dt.date(
+            2024, 12, 20
+        )
+        assert "report_date" not in mock_load_data.call_args.kwargs
+
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.resolve_nssp_report_date")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
     def test_setup_pipeline_creates_directory_structure(
         self,
         mock_calc_dates,
-        mock_resolve_report,
         mock_load_data,
         tmp_path,
     ):
         """Test that setup creates the expected directory structure."""
-        mock_resolve_report.return_value = dt.date(2024, 12, 20)
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
         mock_load_data.return_value = _forecast_data()
 
@@ -219,6 +220,7 @@ class TestSetupForecastPipeline:
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            run_date=dt.date(2024, 12, 20),
             nowcast_source_name="none",
         )
 
@@ -232,18 +234,15 @@ class TestSetupForecastPipeline:
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.resolve_nssp_report_date")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
     def test_reporting_delay_fetches_pmf_from_dataops(
         self,
         mock_calc_dates,
-        mock_resolve_report,
         mock_load_data,
         mock_get_pmfs,
         tmp_path,
     ):
         """Test reporting-delay nowcasting loads the PMF from DataOps."""
-        mock_resolve_report.return_value = dt.date(2024, 12, 20)
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
         mock_load_data.return_value = _forecast_data()
         mock_get_pmfs.return_value = {"right_truncation_pmf": [0.25, 0.75]}
@@ -258,6 +257,7 @@ class TestSetupForecastPipeline:
             output_dir=tmp_path,
             n_training_days=90,
             n_forecast_days=28,
+            run_date=dt.date(2024, 12, 20),
             nowcast_source_name="reporting-delay",
         )
 
@@ -269,18 +269,15 @@ class TestSetupForecastPipeline:
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.resolve_nssp_report_date")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
     def test_direct_reporting_delay_pmf_wins_over_dataops(
         self,
         mock_calc_dates,
-        mock_resolve_report,
         mock_load_data,
         mock_get_pmfs,
         tmp_path,
     ):
         """Test a directly supplied PMF is used without calling get_pmfs."""
-        mock_resolve_report.return_value = dt.date(2024, 12, 20)
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
         mock_load_data.return_value = _forecast_data()
 
@@ -295,6 +292,7 @@ class TestSetupForecastPipeline:
             n_training_days=90,
             n_forecast_days=28,
             nowcast_source_name="reporting-delay",
+            run_date=dt.date(2024, 12, 20),
             reporting_delay_pmf=[0.4, 0.6],
         )
 

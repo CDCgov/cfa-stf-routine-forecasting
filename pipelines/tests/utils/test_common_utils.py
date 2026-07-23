@@ -196,6 +196,8 @@ class TestCLIUtils:
                 "COVID-19",
                 "--loc",
                 "CA",
+                "--run-date",
+                "2026-01-08",
             ]
         )
 
@@ -204,6 +206,7 @@ class TestCLIUtils:
         assert args.n_training_days == 180  # default value
         assert args.n_forecast_days == 28  # default value
         assert args.exclude_last_n_days == 0  # default value
+        assert args.run_date == dt.date(2026, 1, 8)
 
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""

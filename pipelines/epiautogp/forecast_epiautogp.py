@@ -87,7 +87,7 @@ def run_epiautogp_forecast(
 
 def main(
     disease: str,
-    report_date: str,
+    run_date: dt.date,
     loc: str,
     output_dir: Path | str,
     n_training_days: int,
@@ -122,8 +122,8 @@ def main(
     ----------
     disease : str
         Disease to model (e.g., "COVID-19", "Influenza", "RSV")
-    report_date : str
-        Report date in YYYY-MM-DD format or "latest"
+    run_date : datetime.date
+        Date of the forecast run
     loc : str
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
     output_dir : Path | str
@@ -232,12 +232,7 @@ def main(
 
     logger.info(
         "Starting single-location EpiAutoGP forecasting pipeline for "
-        f"location {loc}, and report date {report_date}"
-    )
-    run_date = (
-        None
-        if report_date == "latest"
-        else dt.datetime.strptime(report_date, "%Y-%m-%d").date()
+        f"location {loc}, and run date {run_date}"
     )
 
     # Step 1: Setup pipeline (loads data, validates dates, creates directories)
@@ -287,7 +282,7 @@ def main(
     logger.info(
         "Single-location EpiAutoGP pipeline complete "
         f"for location {loc}, and "
-        f"report date {report_date}."
+        f"run date {run_date}."
     )
     return None
 
@@ -301,15 +296,6 @@ if __name__ == "__main__":
     add_common_forecast_arguments(parser)
 
     # Add EpiAutoGP-specific arguments
-    parser.add_argument(
-        "--report-date",
-        type=str,
-        default="latest",
-        help=(
-            "Report date in YYYY-MM-DD format or 'latest' to use "
-            "the most recent available data (default: latest)."
-        ),
-    )
 
     parser.add_argument(
         "--target",

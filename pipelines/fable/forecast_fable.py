@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-from pipelines.data.data_access import load_forecast_data, resolve_nssp_report_date
+from pipelines.data.data_access import load_forecast_data
 from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
@@ -44,9 +44,9 @@ def main(
     n_training_days: int,
     n_forecast_days: int,
     n_samples: int,
+    run_date: dt.date,
     exclude_last_n_days: int = 0,
     epiweekly: bool = False,
-    run_date: dt.date | None = None,
     fail_on_stale_data: bool = False,
 ) -> None:
     logging.basicConfig(level=logging.INFO)
@@ -56,12 +56,11 @@ def main(
 
     logger.info(
         "Starting single-location fable E-other forecasting pipeline for "
-        f"location {loc}, and latest report date."
+        f"location {loc}, and run date {run_date}."
     )
 
-    report_date = resolve_nssp_report_date()
     first_training_date, last_training_date = calculate_training_dates(
-        report_date,
+        run_date,
         n_training_days,
         exclude_last_n_days,
         logger,
@@ -70,17 +69,16 @@ def main(
     forecast_data = load_forecast_data(
         disease=disease,
         loc_abb=loc,
-        report_date=report_date,
+        run_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
-        run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )
 
     model_batch_dir_name = get_model_batch_dir_name(
         disease=disease,
-        report_date=report_date,
+        report_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
     )
@@ -127,7 +125,7 @@ def main(
     logger.info(
         "Single-location fable E-other pipeline complete "
         f"for location {loc}, and "
-        f"report date {report_date}."
+        f"run date {run_date}."
     )
     return None
 

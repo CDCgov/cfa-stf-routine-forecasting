@@ -15,7 +15,6 @@ from typing import Any, Literal, get_args
 from pipelines.data.data_access import (
     ForecastData,
     load_forecast_data,
-    resolve_nssp_report_date,
 )
 from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
@@ -207,12 +206,12 @@ def setup_forecast_pipeline(
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
+    run_date: date,
     exclude_last_n_days: int = 0,
     exclude_date_ranges: list[tuple[date, date]] | None = None,
     logger: logging.Logger | None = None,
     nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
-    run_date: date | None = None,
     fail_on_stale_data: bool = False,
 ) -> ForecastPipelineContext:
     """
@@ -220,8 +219,8 @@ def setup_forecast_pipeline(
 
     This function performs the initial setup steps that are common across
     all forecast pipelines:
-    1. Get available report dates
-    2. Parse and validate the report date
+    1. Use the supplied run date
+    2. Validate the run date
     3. Calculate training dates
     4. Load forecast input data
     5. Create batch directory structure
@@ -247,6 +246,8 @@ def setup_forecast_pipeline(
         Number of days of training data
     n_forecast_days : int
         Number of days ahead to forecast
+    run_date : date
+        Date of the forecast run.
     exclude_last_n_days : int, default=0
         Number of recent days to exclude from training
     exclude_date_ranges : list[tuple[date, date]] | None, default=None
@@ -270,16 +271,14 @@ def setup_forecast_pipeline(
 
     logger.info(
         f"Setting up forecast pipeline for {disease}, "
-        f"location {loc}, latest report date."
+        f"location {loc}, run date {run_date}."
     )
-
-    report_date_parsed = resolve_nssp_report_date()
 
     # Gather the forecast specification input parameters into a single cohesive unit
     forecast_spec = ForecastSpec(
         disease=disease,
         loc=loc,
-        report_date=report_date_parsed,
+        report_date=run_date,
         target=target,
         frequency=frequency,
         ed_visit_type=ed_visit_type,
@@ -287,7 +286,7 @@ def setup_forecast_pipeline(
 
     # Calculate training dates
     first_training_date, last_training_date = calculate_training_dates(
-        report_date_parsed,
+        run_date,
         n_training_days,
         exclude_last_n_days,
         logger,
@@ -296,10 +295,9 @@ def setup_forecast_pipeline(
     forecast_data = load_forecast_data(
         disease=disease,
         loc_abb=loc,
-        report_date=report_date_parsed,
+        run_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
-        run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )
@@ -307,7 +305,7 @@ def setup_forecast_pipeline(
     # Create model batch directory structure
     model_batch_dir_name = get_model_batch_dir_name(
         disease=disease,
-        report_date=report_date_parsed,
+        report_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
     )

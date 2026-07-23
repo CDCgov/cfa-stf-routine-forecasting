@@ -28,6 +28,7 @@ cmd_args=(
 	--output-dir "$BASE_DIR/2024-12-21_forecasts"
 	--n-training-days 90
 	--target "$target"
+	--run-date 2024-12-21
 	--frequency "$frequency"
 	--n-forecast-days 28
 	--n-particles 2

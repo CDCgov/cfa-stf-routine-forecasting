@@ -59,7 +59,7 @@ def main(
         f"location {loc}, and latest report date."
     )
 
-    report_date = resolve_nssp_report_date(run_date)
+    report_date = resolve_nssp_report_date()
     first_training_date, last_training_date = calculate_training_dates(
         report_date,
         n_training_days,

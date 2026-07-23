@@ -7,43 +7,6 @@ import pytest
 from pipelines.data import data_access
 
 
-class FakeLoad:
-    prefix = "public/stf/nssp_gold_v1"
-
-    def __init__(self, versions):
-        self.versions = versions
-
-    def get_versions(self):
-        return self.versions
-
-
-class FakeEndpoint:
-    def __init__(self, versions):
-        self.load = FakeLoad(versions)
-
-
-def test_latest_version_date_uses_public_dataops_versions():
-    endpoint = FakeEndpoint(
-        [
-            "2026-01-09/data.parquet",
-            "2026-01-08T00-00-00/data.parquet",
-            "2026-01-07",
-        ]
-    )
-
-    assert data_access._latest_version_date(endpoint) == dt.date(2026, 1, 9)
-    assert data_access._latest_version_date(
-        endpoint, as_of=dt.date(2026, 1, 8)
-    ) == dt.date(2026, 1, 8)
-
-
-def test_latest_version_date_raises_when_no_versions_match_as_of():
-    endpoint = FakeEndpoint(["2026-01-09/data.parquet"])
-
-    with pytest.raises(ValueError, match="No public/stf/nssp_gold_v1 versions found"):
-        data_access._latest_version_date(endpoint, as_of=dt.date(2026, 1, 8))
-
-
 def test_nssp_freshness_requires_run_date_match():
     fresh = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 7),
@@ -118,32 +81,33 @@ def test_enforce_freshness_warns_or_raises(caplog):
 
 
 def test_choose_nhsn_prelim_uses_newer_version(monkeypatch):
-    versions = iter([dt.date(2026, 1, 8), dt.date(2026, 1, 7)])
+    versions = iter([dt.datetime(2026, 1, 8, 8), dt.datetime(2026, 1, 7, 10)])
+    calls = []
     monkeypatch.setattr(
         data_access,
-        "_latest_version_date",
-        lambda endpoint, run_date=None: next(versions),
+        "resolve_nhsn_hrd_version",
+        lambda **kwargs: calls.append(kwargs) or next(versions),
     )
 
-    prelim, selected_version = data_access.choose_nhsn_prelim(
-        run_date=dt.date(2026, 1, 8)
-    )
+    prelim, selected_version = data_access.choose_nhsn_prelim()
 
     assert prelim
     assert selected_version == dt.date(2026, 1, 8)
+    assert calls == [
+        {"prelim": True},
+        {"prelim": False},
+    ]
 
 
 def test_choose_nhsn_final_when_final_is_newer(monkeypatch):
-    versions = iter([dt.date(2026, 1, 7), dt.date(2026, 1, 8)])
+    versions = iter([dt.datetime(2026, 1, 7, 10), dt.datetime(2026, 1, 8, 8)])
     monkeypatch.setattr(
         data_access,
-        "_latest_version_date",
-        lambda endpoint, run_date=None: next(versions),
+        "resolve_nhsn_hrd_version",
+        lambda **kwargs: next(versions),
     )
 
-    prelim, selected_version = data_access.choose_nhsn_prelim(
-        run_date=dt.date(2026, 1, 8)
-    )
+    prelim, selected_version = data_access.choose_nhsn_prelim()
 
     assert not prelim
     assert selected_version == dt.date(2026, 1, 8)
@@ -222,5 +186,4 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
         "disease": "COVID-19",
         "loc_abb": "CA",
         "first_training_date": dt.date(2025, 12, 1),
-        "run_date": dt.date(2026, 1, 8),
     }

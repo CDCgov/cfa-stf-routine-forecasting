@@ -117,7 +117,7 @@ def main(
             "pyrenew_null (fitting to no signals) is not supported by this pipeline"
         )
 
-    report_date = resolve_nssp_report_date(run_date)
+    report_date = resolve_nssp_report_date()
 
     first_training_date, last_training_date = calculate_training_dates(
         report_date,

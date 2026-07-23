@@ -273,7 +273,7 @@ def setup_forecast_pipeline(
         f"location {loc}, latest report date."
     )
 
-    report_date_parsed = resolve_nssp_report_date(run_date)
+    report_date_parsed = resolve_nssp_report_date()
 
     # Gather the forecast specification input parameters into a single cohesive unit
     forecast_spec = ForecastSpec(

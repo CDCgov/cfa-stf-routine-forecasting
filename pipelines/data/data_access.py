@@ -3,8 +3,13 @@ import logging
 from dataclasses import dataclass
 
 import polars as pl
-from cfa.dataops import datacat
-from cfa.stf.data import get_nhsn_hrd, get_nssp
+
+from cfa.stf.data import (
+    get_nhsn_hrd,
+    get_nssp,
+    resolve_nhsn_hrd_version,
+    resolve_nssp_version,
+)
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 
@@ -152,29 +157,19 @@ class ForecastData:
         return any(record.is_stale for record in self.freshness)
 
 
-def _parse_version_date(version: str) -> dt.date:
-    version_date = version.split("/", maxsplit=1)[0]
-    return dt.datetime.strptime(version_date[:10], "%Y-%m-%d").date()
-
-
-def _latest_version_date(endpoint, as_of: dt.date | None = None) -> dt.date:
-    version_dates = sorted(
-        {_parse_version_date(version) for version in endpoint.load.get_versions()},
-        reverse=True,
-    )
-    if as_of is not None:
-        version_dates = [
-            version_date for version_date in version_dates if version_date <= as_of
-        ]
-    if not version_dates:
-        raise ValueError(f"No {endpoint.load.prefix} versions found as of {as_of}")
-    return version_dates[0]
-
-
-def resolve_nssp_report_date(
-    run_date: dt.date | None = None,
+def _resolved_version_date(
+    version: dt.datetime | str | None,
+    *,
+    dataset: str,
 ) -> dt.date:
-    return _latest_version_date(datacat.public.stf.nssp_gold_v1, as_of=run_date)
+    if not isinstance(version, dt.datetime):
+        raise ValueError(f"No dated {dataset} version found")
+    return version.date()
+
+
+def resolve_nssp_report_date() -> dt.date:
+    version = resolve_nssp_version(dataset="gold")
+    return _resolved_version_date(version, dataset="NSSP gold")
 
 
 def _load_dataops_nssp(
@@ -198,9 +193,15 @@ def _load_dataops_nssp(
     )
 
 
-def choose_nhsn_prelim(run_date: dt.date | None = None) -> tuple[bool, dt.date]:
-    prelim_version = _latest_version_date(datacat.public.stf.nhsn_hrd_prelim, run_date)
-    final_version = _latest_version_date(datacat.public.stf.nhsn_hrd, run_date)
+def choose_nhsn_prelim() -> tuple[bool, dt.date]:
+    prelim_version = _resolved_version_date(
+        resolve_nhsn_hrd_version(prelim=True),
+        dataset="NHSN preliminary",
+    )
+    final_version = _resolved_version_date(
+        resolve_nhsn_hrd_version(prelim=False),
+        dataset="NHSN final",
+    )
     if prelim_version >= final_version:
         return True, prelim_version
     return False, final_version
@@ -211,9 +212,8 @@ def _load_dataops_nhsn(
     disease: str,
     loc_abb: str,
     first_training_date: dt.date,
-    run_date: dt.date | None = None,
 ) -> tuple[pl.DataFrame, bool, dt.date]:
-    prelim, version_date = choose_nhsn_prelim(run_date)
+    prelim, version_date = choose_nhsn_prelim()
     data = get_nhsn_hrd(
         disease=disease,
         loc_abb=loc_abb,
@@ -329,7 +329,6 @@ def load_forecast_data(
         disease=disease,
         loc_abb=loc_abb,
         first_training_date=first_training_date,
-        run_date=run_date,
     )
 
     nhsn_record = nhsn_freshness(

@@ -9,9 +9,9 @@ import subprocess
 from pathlib import Path
 
 import polars as pl
+from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
-from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations

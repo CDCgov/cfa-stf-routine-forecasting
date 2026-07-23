@@ -56,7 +56,7 @@ def test_nhsn_freshness_allows_less_than_one_week_on_other_days():
     assert stale.is_stale
 
 
-def test_enforce_freshness_warns_or_raises(caplog):
+def test_apply_freshness_policy_warns_or_raises(caplog):
     stale = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 6),
         latest_observed_date=None,
@@ -65,7 +65,7 @@ def test_enforce_freshness_warns_or_raises(caplog):
     logger = logging.getLogger("test-data-access")
 
     with caplog.at_level(logging.WARNING):
-        data_access.enforce_freshness(
+        data_access.apply_freshness_policy(
             (stale,),
             fail_on_stale_data=False,
             logger=logger,
@@ -73,14 +73,14 @@ def test_enforce_freshness_warns_or_raises(caplog):
     assert "Stale input data" in caplog.text
 
     with pytest.raises(RuntimeError, match="Stale input data"):
-        data_access.enforce_freshness(
+        data_access.apply_freshness_policy(
             (stale,),
             fail_on_stale_data=True,
             logger=logger,
         )
 
 
-def test_choose_nhsn_prelim_uses_newer_version(monkeypatch):
+def test_select_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):
     versions = iter([dt.datetime(2026, 1, 8, 8), dt.datetime(2026, 1, 7, 10)])
     calls = []
     monkeypatch.setattr(
@@ -89,7 +89,7 @@ def test_choose_nhsn_prelim_uses_newer_version(monkeypatch):
         lambda **kwargs: calls.append(kwargs) or next(versions),
     )
 
-    prelim, selected_version = data_access.choose_nhsn_prelim()
+    prelim, selected_version = data_access.select_latest_nhsn_release()
 
     assert prelim
     assert selected_version == dt.date(2026, 1, 8)
@@ -99,7 +99,7 @@ def test_choose_nhsn_prelim_uses_newer_version(monkeypatch):
     ]
 
 
-def test_choose_nhsn_final_when_final_is_newer(monkeypatch):
+def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
     versions = iter([dt.datetime(2026, 1, 7, 10), dt.datetime(2026, 1, 8, 8)])
     monkeypatch.setattr(
         data_access,
@@ -107,7 +107,7 @@ def test_choose_nhsn_final_when_final_is_newer(monkeypatch):
         lambda **kwargs: next(versions),
     )
 
-    prelim, selected_version = data_access.choose_nhsn_prelim()
+    prelim, selected_version = data_access.select_latest_nhsn_release()
 
     assert not prelim
     assert selected_version == dt.date(2026, 1, 8)

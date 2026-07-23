@@ -31,7 +31,7 @@ class ForecastSourceData:
 @dataclass(frozen=True)
 class NSSPData(ForecastSourceData):
     @classmethod
-    def create(
+    def from_source_frame(
         cls,
         *,
         data: pl.DataFrame,
@@ -64,7 +64,7 @@ class NHSNData(ForecastSourceData):
     prelim: bool
 
     @classmethod
-    def create(
+    def from_source_frame(
         cls,
         *,
         data: pl.DataFrame,
@@ -95,7 +95,7 @@ class ForecastData:
     nhsn: NHSNData
 
     @classmethod
-    def create(
+    def from_source_frames(
         cls,
         *,
         loc_abb: str,
@@ -119,13 +119,13 @@ class ForecastData:
         # The first entry of a source right-truncation PMF corresponds to reports
         # for reference_date = report_date - 1 as of report_date.
         right_truncation_offset = (report_date - last_training_date).days - 1
-        nssp = NSSPData.create(
+        nssp = NSSPData.from_source_frame(
             data=nssp_data,
             freshness=nssp_freshness,
             disease=disease,
             last_training_date=last_training_date,
         )
-        nhsn = NHSNData.create(
+        nhsn = NHSNData.from_source_frame(
             data=nhsn_data,
             freshness=nhsn_freshness,
             prelim=nhsn_prelim,
@@ -192,7 +192,7 @@ def _load_dataops_nssp(
     )
 
 
-def choose_nhsn_prelim() -> tuple[bool, dt.date]:
+def select_latest_nhsn_release() -> tuple[bool, dt.date]:
     prelim_version = _resolved_version_date(
         resolve_nhsn_hrd_version(prelim=True),
         dataset="NHSN preliminary",
@@ -212,7 +212,7 @@ def _load_dataops_nhsn(
     loc_abb: str,
     first_training_date: dt.date,
 ) -> tuple[pl.DataFrame, bool, dt.date]:
-    prelim, version_date = choose_nhsn_prelim()
+    prelim, version_date = select_latest_nhsn_release()
     data = get_nhsn_hrd(
         disease=disease,
         loc_abb=loc_abb,
@@ -281,7 +281,7 @@ def nhsn_freshness(
     )
 
 
-def enforce_freshness(
+def apply_freshness_policy(
     freshness: tuple[DataFreshness, ...],
     *,
     fail_on_stale_data: bool,
@@ -336,12 +336,12 @@ def load_forecast_data(
         run_date=run_date,
     )
     freshness = (nssp_record, nhsn_record)
-    enforce_freshness(
+    apply_freshness_policy(
         freshness,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )
-    return ForecastData.create(
+    return ForecastData.from_source_frames(
         loc_abb=loc_abb,
         disease=disease,
         report_date=report_date,

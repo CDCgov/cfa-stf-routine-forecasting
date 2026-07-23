@@ -304,7 +304,7 @@ def make_forecast_data(
         reason="Synthetic NHSN data",
     )
 
-    return ForecastData.create(
+    return ForecastData.from_source_frames(
         loc_abb=location,
         disease=disease,
         report_date=REPORT_DATE,

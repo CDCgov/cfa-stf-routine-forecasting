@@ -51,7 +51,7 @@ def _forecast_data(report_date: dt.date = dt.date(2024, 12, 20)) -> ForecastData
             "hospital_admissions": [5],
         }
     )
-    return ForecastData.create(
+    return ForecastData.from_source_frames(
         loc_abb="CA",
         disease="COVID-19",
         report_date=report_date,

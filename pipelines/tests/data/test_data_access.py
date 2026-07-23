@@ -56,20 +56,33 @@ def test_nhsn_freshness_allows_less_than_one_week_on_other_days():
     assert stale.is_stale
 
 
-def test_apply_freshness_policy_warns_or_raises(caplog):
+def test_apply_freshness_policy_logs_versions_and_warns_or_raises(caplog):
     stale = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 6),
-        latest_observed_date=None,
+        latest_observed_date=dt.date(2026, 1, 5),
+        run_date=dt.date(2026, 1, 7),
+    )
+    fresh = data_access.nhsn_freshness(
+        selected_version_date=dt.date(2026, 1, 7),
+        latest_observed_date=dt.date(2026, 1, 3),
         run_date=dt.date(2026, 1, 7),
     )
     logger = logging.getLogger("test-data-access")
 
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.INFO):
         data_access.apply_freshness_policy(
-            (stale,),
+            (stale, fresh),
             fail_on_stale_data=False,
             logger=logger,
         )
+    assert (
+        "source=nssp version=2026-01-06 latest_observed_date=2026-01-05 "
+        "run_date=2026-01-07 status=stale"
+    ) in caplog.text
+    assert (
+        "source=nhsn version=2026-01-07 latest_observed_date=2026-01-03 "
+        "run_date=2026-01-07 status=fresh"
+    ) in caplog.text
     assert "Stale input data" in caplog.text
 
     with pytest.raises(RuntimeError, match="Stale input data"):

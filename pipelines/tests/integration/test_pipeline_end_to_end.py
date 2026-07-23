@@ -27,7 +27,7 @@ from pipelines.utils.common_utils import (
 )
 from pipelines.utils.postprocess_forecast_batches import main as postprocess_batches
 
-FORECAST_DIR_NAME = "2024-12-21_forecasts"
+FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
 EXCLUDE_LAST_N_DAYS = 1

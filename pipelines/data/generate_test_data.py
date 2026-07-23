@@ -19,7 +19,7 @@ from pipelines.data.generate_test_data_lib import (
 
 DEFAULT_LOCATIONS = ["CA", "DC"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
-REPORT_DATE = dt.date(2024, 12, 21)
+REPORT_DATE = dt.date.today()
 LAST_OBS_DATE = REPORT_DATE - dt.timedelta(
     days=1
 )  # nssp data typically available through report date - 1

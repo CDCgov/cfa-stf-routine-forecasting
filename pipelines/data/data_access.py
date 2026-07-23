@@ -286,6 +286,18 @@ def apply_freshness_policy(
     fail_on_stale_data: bool,
     logger: logging.Logger,
 ) -> None:
+    for record in freshness:
+        logger.info(
+            "Input data freshness: source=%s version=%s latest_observed_date=%s "
+            "run_date=%s status=%s (%s)",
+            record.source,
+            record.selected_version_date,
+            record.latest_observed_date,
+            record.run_date,
+            "stale" if record.is_stale else "fresh",
+            record.reason,
+        )
+
     stale = [record for record in freshness if record.is_stale]
     if not stale:
         return

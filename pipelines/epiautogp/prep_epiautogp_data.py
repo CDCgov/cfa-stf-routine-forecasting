@@ -254,9 +254,9 @@ def _read_tsv_data(
     """
     Read surveillance data from TSV files and extract target variable.
 
-    Reads a TSV file containing surveillance data, filters for the specified
-    disease and location, pivots the data, and extracts the appropriate
-    target variable (NSSP ED visits or NHSN hospital admissions).
+    Reads a TSV file containing surveillance data, filters for training rows
+    from the specified disease and location, pivots the data, and extracts the
+    appropriate target variable (NSSP ED visits or NHSN hospital admissions).
 
     Parameters
     ----------
@@ -308,6 +308,15 @@ def _read_tsv_data(
 
     if df.height == 0:
         raise ValueError(f"No data found for {disease} {location} in {tsv_path}")
+
+    # Evaluation rows are retained in combined_data.tsv for scoring and plotting,
+    # but they must never be passed to the model-fitting input.
+    df = df.filter(pl.col("data_type") == "train")
+
+    if df.height == 0:
+        raise ValueError(
+            f"No training data found for {disease} {location} in {tsv_path}"
+        )
 
     # Pivot the data to get columns for each variable
     df_pivot = df.pivot(

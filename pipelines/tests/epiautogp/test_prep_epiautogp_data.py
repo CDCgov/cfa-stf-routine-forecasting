@@ -316,6 +316,14 @@ def _write_combined_data(path):
                 ".variable": "observed_ed_visits",
                 ".value": 20.0,
             },
+            {
+                "date": dt.date(2024, 1, 3),
+                "geo_value": "CA",
+                "disease": "COVID-19",
+                "data_type": "eval",
+                ".variable": "observed_ed_visits",
+                ".value": 999.0,
+            },
         ]
     ).write_csv(path, separator="\t")
 
@@ -378,8 +386,8 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
 class TestConvertToEpiAutoGpJson:
     """Tests for EpiAutoGP JSON serialization."""
 
-    def test_no_nowcast_source_serializes_empty_nowcast_arrays(self, tmp_path):
-        """Test converter writes empty nowcast arrays without a source."""
+    def test_only_training_rows_are_serialized_without_nowcast_source(self, tmp_path):
+        """Test converter excludes evaluation rows from model input."""
         data_path = tmp_path / "combined_data.tsv"
         _write_combined_data(data_path)
         paths = ModelPaths(
@@ -394,6 +402,8 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
+        assert output["dates"] == ["2024-01-01", "2024-01-02"]
+        assert output["reports"] == [10.0, 20.0]
         assert output["nowcast_dates"] == []
         assert output["nowcast_reports"] == []
 

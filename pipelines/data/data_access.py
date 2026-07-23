@@ -217,7 +217,6 @@ def _load_dataops_nhsn(
         disease=disease,
         loc_abb=loc_abb,
         prelim=prelim,
-        as_of=version_date,
         start_date=first_training_date,
         lazy=False,
     )

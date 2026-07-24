@@ -196,6 +196,13 @@ def _resolve_nowcast_source(
     responsible for validating them. New nowcast approaches plug in by adding
     a new case here and a builder that defines its own required kwargs.
     """
+    reporting_delay_pmf = options.get("reporting_delay_pmf")
+    hubverse_nowcast_dir = options.get("hubverse_nowcast_dir")
+    if reporting_delay_pmf is not None and hubverse_nowcast_dir is not None:
+        raise ValueError(
+            "reporting_delay_pmf and hubverse_nowcast_dir are mutually exclusive."
+        )
+
     match nowcast_source_name:
         case "none":
             return None
@@ -207,7 +214,7 @@ def _resolve_nowcast_source(
                 )
             return _build_reporting_delay_nowcast(
                 forecast_spec=forecast_spec,
-                reporting_delay_pmf=options.get("reporting_delay_pmf"),
+                reporting_delay_pmf=reporting_delay_pmf,
             )
         case "hubverse":
             if not HubverseNowcast.applies_to(forecast_spec=forecast_spec):
@@ -217,7 +224,7 @@ def _resolve_nowcast_source(
                 )
             return _build_hubverse_nowcast(
                 forecast_spec=forecast_spec,
-                hubverse_nowcast_dir=options.get("hubverse_nowcast_dir"),
+                hubverse_nowcast_dir=hubverse_nowcast_dir,
             )
         case _:
             raise ValueError(

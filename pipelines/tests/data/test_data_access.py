@@ -182,6 +182,12 @@ def test_apply_freshness_policy_logs_versions_and_warns_or_raises(caplog):
         )
 
 
+@pytest.mark.parametrize("version", [None, "latest"])
+def test_resolved_version_date_requires_datetime(version):
+    with pytest.raises(ValueError, match="No dated NHSN version found"):
+        data_access._resolved_version_date(version, dataset="NHSN")
+
+
 def test_select_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):
     versions = iter([dt.datetime(2026, 1, 8, 8), dt.datetime(2026, 1, 7, 10)])
     calls = []
@@ -213,6 +219,45 @@ def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
 
     assert not prelim
     assert selected_version == dt.date(2026, 1, 8)
+
+
+def test_load_dataops_nhsn_uses_selected_release(monkeypatch):
+    calls = {}
+    raw_data = pl.DataFrame(
+        {
+            "weekendingdate": [dt.date(2026, 1, 3)],
+            "jurisdiction": ["CA"],
+            "disease": ["COVID-19"],
+            "hospital_admissions": [5],
+        }
+    )
+    monkeypatch.setattr(
+        data_access,
+        "select_latest_nhsn_release",
+        lambda: (True, dt.date(2026, 1, 8)),
+    )
+    monkeypatch.setattr(
+        data_access,
+        "get_nhsn_hrd",
+        lambda **kwargs: calls.update(kwargs) or raw_data,
+    )
+
+    data, prelim, selected_version = data_access._load_dataops_nhsn(
+        disease="COVID-19",
+        loc_abb="CA",
+        first_training_date=dt.date(2025, 12, 1),
+    )
+
+    assert data is raw_data
+    assert prelim
+    assert selected_version == dt.date(2026, 1, 8)
+    assert calls == {
+        "disease": "COVID-19",
+        "loc_abb": "CA",
+        "prelim": True,
+        "start_date": dt.date(2025, 12, 1),
+        "lazy": False,
+    }
 
 
 def test_load_dataops_nssp_uses_latest_available_version(monkeypatch):

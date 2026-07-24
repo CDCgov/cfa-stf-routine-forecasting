@@ -19,10 +19,8 @@ import logging
 from dataclasses import replace
 from unittest.mock import patch
 
-import polars as pl
 import pytest
 
-from pipelines.data.data_access import DataFreshness, ForecastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -31,52 +29,7 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     setup_forecast_pipeline,
 )
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
-
-
-def _forecast_data(report_date: dt.date = dt.date(2024, 12, 20)) -> ForecastData:
-    nssp_data = pl.DataFrame(
-        {
-            "date": [dt.date(2024, 12, 20), dt.date(2024, 12, 20)],
-            "geo_value": ["CA", "CA"],
-            "disease": ["COVID-19", "Total"],
-            "ed_visits": [10, 100],
-        }
-    )
-    nhsn_data = pl.DataFrame(
-        {
-            "weekendingdate": [dt.date(2024, 12, 14)],
-            "jurisdiction": ["CA"],
-            "disease": ["COVID-19"],
-            "hospital_admissions": [5],
-        }
-    )
-    return ForecastData.from_source_frames(
-        loc_abb="CA",
-        disease="COVID-19",
-        report_date=report_date,
-        first_training_date=dt.date(2024, 9, 22),
-        last_training_date=report_date,
-        nssp_data=nssp_data,
-        nssp_freshness=DataFreshness(
-            source="nssp",
-            selected_version_date=report_date,
-            latest_observed_date=nssp_data.get_column("date").max(),
-            run_date=report_date,
-            is_stale=False,
-            reason="Test NSSP data",
-        ),
-        nhsn_data=nhsn_data,
-        nhsn_freshness=DataFreshness(
-            source="nhsn",
-            selected_version_date=report_date,
-            latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
-            run_date=report_date,
-            is_stale=False,
-            reason="Test NHSN data",
-        ),
-        nhsn_prelim=False,
-        loc_pop=1,
-    )
+from pipelines.tests.factories import make_test_forecast_data
 
 
 @pytest.fixture
@@ -103,7 +56,7 @@ def base_context(tmp_path):
         exclude_date_ranges=None,
         model_batch_dir=tmp_path / "batch",
         model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
-        forecast_data=_forecast_data(),
+        forecast_data=make_test_forecast_data(),
         logger=logging.getLogger(),
     )
 
@@ -122,7 +75,7 @@ class TestSetupForecastPipeline:
         """Test that setup_forecast_pipeline returns a properly configured context."""
         # Setup mocks
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_load_data.return_value = _forecast_data()
+        mock_load_data.return_value = make_test_forecast_data()
 
         context = setup_forecast_pipeline(
             disease="COVID-19",
@@ -157,7 +110,7 @@ class TestSetupForecastPipeline:
     ):
         """Test that setup creates the expected directory structure."""
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_load_data.return_value = _forecast_data()
+        mock_load_data.return_value = make_test_forecast_data()
 
         context = setup_forecast_pipeline(
             disease="COVID-19",
@@ -193,7 +146,7 @@ class TestSetupForecastPipeline:
     ):
         """Test reporting-delay nowcasting loads the PMF from DataOps."""
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_load_data.return_value = _forecast_data()
+        mock_load_data.return_value = make_test_forecast_data()
         mock_get_pmfs.return_value = {"right_truncation_pmf": [0.25, 0.75]}
 
         context = setup_forecast_pipeline(
@@ -228,7 +181,7 @@ class TestSetupForecastPipeline:
     ):
         """Test a directly supplied PMF is used without calling get_pmfs."""
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
-        mock_load_data.return_value = _forecast_data()
+        mock_load_data.return_value = make_test_forecast_data()
 
         context = setup_forecast_pipeline(
             disease="COVID-19",

@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
-from pipelines.data.data_access import DataFreshness, ForecastData, NHSNData, NSSPData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -25,6 +24,7 @@ from pipelines.epiautogp.prep_epiautogp_data import (
     _apply_date_exclusions,
     convert_to_epiautogp_json,
 )
+from pipelines.tests.factories import make_test_forecast_data
 
 N_DAYS = 10
 
@@ -330,35 +330,10 @@ def _write_combined_data(path):
 
 def _epiautogp_context(tmp_path, nowcast_source=None):
     report_date = dt.date(2024, 1, 3)
-    forecast_data = ForecastData(
-        loc_abb="CA",
-        disease="COVID-19",
+    forecast_data = make_test_forecast_data(
         report_date=report_date,
-        loc_pop=1,
-        right_truncation_offset=0,
-        nssp=NSSPData(
-            data=pl.DataFrame(),
-            freshness=DataFreshness(
-                source="nssp",
-                selected_version_date=report_date,
-                latest_observed_date=None,
-                run_date=report_date,
-                is_stale=False,
-                reason="Test NSSP data",
-            ),
-        ),
-        nhsn=NHSNData(
-            data=pl.DataFrame(),
-            freshness=DataFreshness(
-                source="nhsn",
-                selected_version_date=report_date,
-                latest_observed_date=None,
-                run_date=report_date,
-                is_stale=False,
-                reason="Test NHSN data",
-            ),
-            prelim=False,
-        ),
+        first_training_date=dt.date(2024, 1, 1),
+        last_training_date=dt.date(2024, 1, 2),
     )
     return ForecastPipelineContext(
         forecast_spec=ForecastSpec(

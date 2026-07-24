@@ -7,6 +7,95 @@ import pytest
 from pipelines.data import data_access
 
 
+def _freshness(source: str) -> data_access.DataFreshness:
+    report_date = dt.date(2026, 1, 7)
+    return data_access.DataFreshness(
+        source=source,
+        selected_version_date=report_date,
+        latest_observed_date=report_date,
+        run_date=report_date,
+        is_stale=False,
+        reason="Test data",
+    )
+
+
+def test_nssp_data_normalizes_source_frame():
+    source_data = pl.DataFrame(
+        {
+            "date": [
+                dt.date(2026, 1, 8),
+                dt.date(2026, 1, 8),
+                dt.date(2026, 1, 7),
+                dt.date(2026, 1, 7),
+                dt.date(2026, 1, 7),
+            ],
+            "geo_value": ["CA"] * 5,
+            "disease": [
+                "COVID-19",
+                "Total",
+                "Total",
+                "Influenza",
+                "COVID-19",
+            ],
+            "ed_visits": [12, 120, 100, 8, 10],
+        }
+    )
+
+    result = data_access.NSSPData.from_source_frame(
+        data=source_data,
+        freshness=_freshness("nssp"),
+        disease="COVID-19",
+        last_training_date=dt.date(2026, 1, 7),
+    )
+
+    assert result.data.select(
+        "date",
+        "observed_ed_visits",
+        "other_ed_visits",
+        "data_type",
+        "resolution",
+    ).rows() == [
+        (dt.date(2026, 1, 7), 10, 90, "train", "daily"),
+        (dt.date(2026, 1, 8), 12, 108, "eval", "daily"),
+    ]
+
+
+def test_nhsn_data_filters_and_classifies_source_frame():
+    source_data = pl.DataFrame(
+        {
+            "weekendingdate": [
+                dt.date(2025, 12, 27),
+                dt.date(2026, 1, 10),
+                dt.date(2026, 1, 1),
+                dt.date(2026, 1, 7),
+            ],
+            "jurisdiction": ["CA"] * 4,
+            "disease": ["COVID-19"] * 4,
+            "hospital_admissions": [3, 6, 4, 5],
+        }
+    )
+
+    result = data_access.NHSNData.from_source_frame(
+        data=source_data,
+        freshness=_freshness("nhsn"),
+        prelim=True,
+        first_training_date=dt.date(2026, 1, 1),
+        last_training_date=dt.date(2026, 1, 7),
+    )
+
+    assert result.prelim
+    assert result.data.select(
+        "weekendingdate",
+        "hospital_admissions",
+        "data_type",
+        "resolution",
+    ).rows() == [
+        (dt.date(2026, 1, 10), 6, "eval", "epiweekly"),
+        (dt.date(2026, 1, 1), 4, "train", "epiweekly"),
+        (dt.date(2026, 1, 7), 5, "train", "epiweekly"),
+    ]
+
+
 def test_nssp_freshness_requires_run_date_match():
     fresh = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 7),

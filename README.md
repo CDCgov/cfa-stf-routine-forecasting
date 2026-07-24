@@ -1,7 +1,7 @@
 # CFA STF Routine Forecasting
-| stfroutineforecasting                                                                                                                                                                                    | pipelines                                                                                                                                                         | cfa/stf/data                                                                                                                                                           | cfa/stf/forecasttools                                                                                                                                                           |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![stfroutineforecasting](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/branch/main/graph/badge.svg?flag=stfroutineforecasting)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![pipelines](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=pipelines)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![cfa/stf/data](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=cfa-stf-data)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![cfa/stf/forecasttools](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=cfa-stf-forecasttools)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) |
+| stfroutineforecasting | pipelines |
+| --- | --- |
+| [![stfroutineforecasting](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/branch/main/graph/badge.svg?flag=stfroutineforecasting)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) | [![pipelines](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting/graph/badge.svg?flag=pipelines)](https://codecov.io/gh/CDCgov/cfa-stf-routine-forecasting) |
 
 The STF Routine Forecasting project contains code for producing short-term forecasts of respiratory disease burden using several models:
 - [EpiAutoGp](pipelines/epiautogp)
@@ -16,6 +16,10 @@ These forecasts are submitted to CDC's forecasting hubs:
 - [COVID-19 Forecast Hub](https://github.com/CDCgov/covid19-forecast-hub)
 
 The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
+
+## Justfile
+
+This repository includes a [Justfile](Justfile) with shortcuts for common development commands. Run `just` to list available recipes.
 
 ## Containers
 
@@ -40,7 +44,7 @@ The following instructions will set up Dagster on your VAP. However, based on th
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
     - Use the `build_image` job in dagster, making sure to push the image.
-2. Run `uv run dagster_defs.py` and open the terminal link (usually http://127.0.0.1:4000/)
+2. Run  `uv run dagster_defs.py` (or `just dagster`) and open the terminal link (usually http://127.0.0.1:4000/)
 
 Dagster is now ready to use locally.
 

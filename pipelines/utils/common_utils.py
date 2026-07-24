@@ -10,9 +10,10 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+import polars as pl
+from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
-from cfa.stf.forecasttools import LOCATION_LIST, ensure_list
 from pipelines.utils.cli_utils import run_command
 
 # Disease mapping and location abbreviations
@@ -579,6 +580,8 @@ def get_all_forecast_dirs(
     ValueError
         Given an invalid ``report_date``.
     """
+    from cfa.stf.data import ensure_list
+
     diseases = ensure_list(diseases)
 
     if report_date is None:
@@ -722,14 +725,39 @@ def create_prop_samples(
     )
 
 
-def append_prop_data_to_combined_data(data_path: Path | str) -> None:
-    args = [str(data_path)]
+def append_prop_data_to_combined_data(
+    data_path: Path | str,
+    observed_var: str = "observed_ed_visits",
+    other_var: str = "other_ed_visits",
+    prop_var: str = "prop_disease_ed_visits",
+) -> None:
+    """Append disease ED visit proportion rows to a combined data file in place."""
+    path = Path(data_path)
+    suffix = path.suffix.lower()
 
-    run_r_script(
-        "pipelines/utils/append_prop_data.R",
-        args,
-        function_name="append_prop_data_to_combined_data",
+    if suffix == ".tsv":
+        data = pl.read_csv(path, separator="\t", null_values="NA")
+    elif suffix == ".csv":
+        data = pl.read_csv(path, null_values="NA")
+    elif suffix == ".parquet":
+        data = pl.read_parquet(path)
+    else:
+        raise ValueError(
+            "data_path must have a supported tabular extension: .tsv, .csv, or .parquet"
+        )
+
+    data = append_prop_data(
+        data,
+        observed_var=observed_var,
+        other_var=other_var,
+        prop_var=prop_var,
     )
+    if suffix == ".tsv":
+        data.write_csv(path, separator="\t", null_value="NA")
+    elif suffix == ".csv":
+        data.write_csv(path, null_value="NA")
+    elif suffix == ".parquet":
+        data.write_parquet(path)
 
 
 def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> None:

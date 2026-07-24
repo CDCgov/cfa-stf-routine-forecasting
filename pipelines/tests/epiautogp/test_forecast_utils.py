@@ -341,6 +341,7 @@ class TestPrepareModelData:
         mock_process_loc.assert_called_once()
         assert mock_process_loc.call_args[1]["forecast_data"] is context.forecast_data
 
+
 class TestPostprocessForecast:
     """Tests for the postprocess_forecast function."""
 

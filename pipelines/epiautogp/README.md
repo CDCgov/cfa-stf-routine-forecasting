@@ -16,7 +16,8 @@ The forecasting pipeline consists of five main steps:
 
 1. **Setup**: Load data, validate dates, create directory structure
 2. **Data Preparation**: Process location data, evaluation data, and generate epiweekly datasets
-3. **Data nowcasting**: Either simple right-truncation correction or no nowcasting (further methods coming)
+3. **Data nowcasting**: Use no nowcast, reporting-delay correction, or
+   probabilistic NHSN trajectories from a materialized Hubverse asset
 4. **Data Conversion**: Transform data into EpiAutoGP's JSON input format
 5. **Model Execution**: Run the Julia-based EpiAutoGP model
 6. **Post-processing**: Process outputs, create hubverse tables, and generate plots
@@ -63,6 +64,16 @@ Pluggable nowcasting sources for nowcasting recent observations.
 - **`NowcastSource`** (Protocol): Declares `applies_to(*, forecast_spec) -> bool` (the predicate the resolver queries before constructing) and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
 - **`FixedNowcast`**: Trivial source wrapping a precomputed `NowcastData`.
 - **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF. Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.
+- **`HubverseNowcast`**: Reads a pathogen-partitioned directory materialized by
+  the Dagster ADLS filesystem IO manager. The directory must contain exactly
+  one Parquet under `model-output/CFA-nowcastNHSN/`. It applies to epiweekly
+  NHSN observed counts.
+
+For Hubverse sample output, `target_end_date` supplies the sorted
+`nowcast_dates`. Rows sharing an `output_type_id` form one complete trajectory,
+with `value` ordered by `target_end_date`, so the JSON contains one inner
+`nowcast_reports` vector per sample ID. `origin_date` identifies the artifact
+vintage and must equal the EpiAutoGP run's report date.
 
 ### `prep_epiautogp_data.py`
 

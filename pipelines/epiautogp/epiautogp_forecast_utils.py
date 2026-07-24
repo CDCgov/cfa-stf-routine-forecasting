@@ -20,6 +20,7 @@ from pipelines.data.data_access import (
 )
 from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
+from pipelines.epiautogp.hubverse_nowcast import HubverseNowcast
 from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.utils.common_utils import (
@@ -31,7 +32,7 @@ from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
 )
 
-NowcastSourceName = Literal["none", "reporting-delay"]
+NowcastSourceName = Literal["none", "reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
@@ -165,6 +166,22 @@ def _build_reporting_delay_nowcast(
     return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
 
 
+def _build_hubverse_nowcast(
+    *,
+    forecast_spec: ForecastSpec,
+    hubverse_nowcast_dir: Path | str | None,
+) -> HubverseNowcast:
+    """Build a HubverseNowcast from a materialized Dagster asset directory."""
+    if hubverse_nowcast_dir is None:
+        raise ValueError(
+            "hubverse_nowcast_dir is required when Hubverse nowcasting is requested."
+        )
+    return HubverseNowcast(
+        containing_dir=Path(hubverse_nowcast_dir),
+        forecast_spec=forecast_spec,
+    )
+
+
 def _resolve_nowcast_source(
     *,
     forecast_spec: ForecastSpec,
@@ -189,7 +206,18 @@ def _resolve_nowcast_source(
                     f"target={forecast_spec.target!r}, ed_visit_type={forecast_spec.ed_visit_type!r}."
                 )
             return _build_reporting_delay_nowcast(
-                forecast_spec=forecast_spec, **options
+                forecast_spec=forecast_spec,
+                reporting_delay_pmf=options.get("reporting_delay_pmf"),
+            )
+        case "hubverse":
+            if not HubverseNowcast.applies_to(forecast_spec=forecast_spec):
+                raise ValueError(
+                    "hubverse nowcasting is only applicable to NHSN "
+                    "epiweekly observed counts."
+                )
+            return _build_hubverse_nowcast(
+                forecast_spec=forecast_spec,
+                hubverse_nowcast_dir=options.get("hubverse_nowcast_dir"),
             )
         case _:
             raise ValueError(
@@ -214,6 +242,7 @@ def setup_forecast_pipeline(
     logger: logging.Logger | None = None,
     nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_dir: Path | str | None = None,
     fail_on_stale_data: bool = False,
 ) -> ForecastPipelineContext:
     """
@@ -257,11 +286,14 @@ def setup_forecast_pipeline(
         Each tuple contains (start_date, end_date).
     logger : logging.Logger | None, default=None
         Logger instance. If None, creates a new logger
-    nowcast_source_name : {"none", "reporting-delay"}, default="none"
+    nowcast_source_name : {"none", "reporting-delay", "hubverse"}, default="none"
         Nowcast source selection for EpiAutoGP input.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. If omitted, the PMF is loaded
         through `cfa-stf-data`.
+    hubverse_nowcast_dir : Path | str | None, default=None
+        Local directory containing the materialized Hubverse model output.
+        Required when Hubverse nowcasting is selected.
 
     Returns
     -------
@@ -322,6 +354,7 @@ def setup_forecast_pipeline(
         forecast_spec=forecast_spec,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        hubverse_nowcast_dir=hubverse_nowcast_dir,
     )
 
     return ForecastPipelineContext(

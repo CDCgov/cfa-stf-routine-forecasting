@@ -842,21 +842,24 @@ def deploy_image_to_prod_server_op(
     )
 
 
+deploy_image_to_prod_server_config = dg.RunConfig(
+    ops={
+        "deploy_image_to_prod_server_op": {
+            "inputs": {
+                "image_to_deploy": prod_server_image,
+            }
+        }
+    },
+    # configure this job to run on your computer
+    execution=basic_execution_config.to_run_config(),
+)
+
+
 @dg.job(
     description=(
         "Simply deploy the latest image to the prod_server (you can override the tag if necessary)"
     ),
-    config=dg.RunConfig(
-        ops={
-            "deploy_image_to_prod_server_op": {
-                "inputs": {
-                    "image_to_deploy": prod_server_image,
-                }
-            }
-        },
-        # configure this job to run on your computer
-        execution=basic_execution_config.to_run_config(),
-    ),
+    config=deploy_image_to_prod_server_config,
     executor_def=dynamic_executor(),
 )
 def deploy_image_to_prod_server():
@@ -869,7 +872,7 @@ def deploy_image_to_prod_server():
     job_name="deploy_image_to_prod_server",
 )
 def deploy_image_to_prod_server_schedule():
-    return dg.RunRequest()
+    return dg.RunRequest(run_config=deploy_image_to_prod_server_config)
 
 
 # These are only used in dev - they should not appear on the production webserver

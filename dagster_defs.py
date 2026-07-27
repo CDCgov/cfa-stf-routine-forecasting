@@ -815,6 +815,63 @@ def postprocess_forecasts(
 # These can create images.
 # ============================================================================
 
+update_script_url = (
+    # repo
+    "https://raw.githubusercontent.com/CDCgov/cfa-dagster/"
+    # ref
+    "refs/heads/main/"
+    # file
+    "scripts/update_code_location.py"
+)
+
+prod_server_image = f"{registry}/{local_workdir.name}:latest"
+
+
+# Used both in the schedule and in the build_image_op
+@dg.op
+def deploy_image_to_prod_server_op(
+    context: dg.OpExecutionContext, image_to_deploy: str
+):
+    """
+    Reloads the latest image for prod
+    """
+    context.log.info(f"Deploying {image_to_deploy} to the dagster prod server.")
+    subprocess.run(
+        ["uv", "run", update_script_url, "--registry_image", image_to_deploy],
+        check=True,
+    )
+
+
+@dg.job(
+    description=(
+        "Simply deploy the latest image to the prod_server (you can override the tag if necessary)"
+    ),
+    config=dg.RunConfig(
+        ops={
+            "deploy_image_to_prod_server_op": {
+                "inputs": {
+                    "image_to_deploy": prod_server_image,
+                }
+            }
+        },
+        # configure this job to run on your computer
+        execution=basic_execution_config.to_run_config(),
+    ),
+    executor_def=dynamic_executor(),
+)
+def deploy_image_to_prod_server():
+    deploy_image_to_prod_server_op()
+
+
+@dg.schedule(
+    cron_schedule="00 23 * * TUE",
+    execution_timezone=tz,
+    job_name="deploy_image_to_prod_server",
+)
+def deploy_image_to_prod_server_schedule():
+    return dg.RunRequest()
+
+
 # These are only used in dev - they should not appear on the production webserver
 if not is_production:
     # Build and Push Image ---------------------------
@@ -860,20 +917,8 @@ if not is_production:
         context.log.info(f"Running {' '.join(build_command)}")
         subprocess.run(build_command, check=True)
 
-        update_script_url = (
-            # repo
-            "https://raw.githubusercontent.com/CDCgov/cfa-dagster/"
-            # ref
-            "refs/heads/main/"
-            # file
-            "scripts/update_code_location.py"
-        )
-
         if should_deploy_to_prod:
-            context.log.info(f"Deploying {image} to the dagster prod server.")
-            subprocess.run(
-                ["uv", "run", update_script_url, "--registry_image", image], check=True
-            )
+            deploy_image_to_prod_server_op(image_to_deploy=image)
 
     @dg.job(
         description=(

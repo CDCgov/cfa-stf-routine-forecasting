@@ -833,7 +833,7 @@ def deploy_image_to_prod_server_op(
     context: dg.OpExecutionContext, image_to_deploy: str
 ):
     """
-    Reloads the latest image for prod
+    Deploys the dagster image to the prod server. Can deploy a working branch's image or the latest image.
     """
     context.log.info(f"Deploying {image_to_deploy} to the dagster prod server.")
     subprocess.run(
@@ -857,7 +857,9 @@ deploy_image_to_prod_server_config = dg.RunConfig(
 
 @dg.job(
     description=(
-        "Simply deploy the latest image to the prod_server (you can override the tag if necessary)"
+        "Simply deploys the latest image to the prod_server (you can override the tag if necessary)"
+        "This uses the the deploy_image_to_prod_server_op with 'latest' as the selected tag."
+        "Elsewhere (such as in the build_image job) we pass the git branch name or a user supplied tag."
     ),
     config=deploy_image_to_prod_server_config,
     executor_def=dynamic_executor(),
@@ -871,7 +873,7 @@ def deploy_image_to_prod_server():
     execution_timezone=tz,
     job_name="deploy_image_to_prod_server",
 )
-def deploy_image_to_prod_server_schedule():
+def reset_prod_server_image_for_wednesday():
     return dg.RunRequest(run_config=deploy_image_to_prod_server_config)
 
 
@@ -921,7 +923,9 @@ if not is_production:
         subprocess.run(build_command, check=True)
 
         if should_deploy_to_prod:
-            deploy_image_to_prod_server_op(image_to_deploy=image)
+            deploy_image_to_prod_server_op(
+                context=dg.OpExecutionContext, image_to_deploy=image
+            )
 
     @dg.job(
         description=(

@@ -23,16 +23,6 @@ disease_map_lower_ = {
 loc_abbrs_ = LOCATION_LIST
 
 
-def get_available_reports(
-    data_dir: str | Path, glob_pattern: str = "*.parquet"
-) -> list[dt.date]:
-    """Get available report dates from glob pattern matching files in a directory. Default pattern matches parquet files."""
-    return [
-        dt.datetime.strptime(f.stem, "%Y-%m-%d").date()
-        for f in Path(data_dir).glob(glob_pattern)
-    ]
-
-
 def _parse_single_date(date_str: str) -> tuple[dt.date, dt.date]:
     """
     Parse a single date string into a date range tuple.

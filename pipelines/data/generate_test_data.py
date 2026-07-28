@@ -17,7 +17,7 @@ from pipelines.data.generate_test_data_lib import (
     create_default_param_estimates,
 )
 
-DEFAULT_LOCATIONS = ["CA", "DC"]
+DEFAULT_LOCATIONS = ["CA", "US"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
 REPORT_DATE = dt.date.today()
 LAST_OBS_DATE = REPORT_DATE - dt.timedelta(

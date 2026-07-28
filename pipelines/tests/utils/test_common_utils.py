@@ -15,7 +15,6 @@ from pipelines.utils.cli_utils import (
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    get_available_reports,
     parse_exclude_date_ranges,
 )
 
@@ -104,19 +103,6 @@ class TestValidationUtils:
 
 class TestDataWranglingUtils:
     """Tests for data loading and processing utilities."""
-
-    def test_get_available_reports_with_parquet_files(self, tmp_path):
-        """Test discovering available report dates from parquet files."""
-        (tmp_path / "2024-12-01.parquet").touch()
-        (tmp_path / "2024-12-15.parquet").touch()
-        (tmp_path / "2024-12-20.parquet").touch()
-
-        result = get_available_reports(tmp_path)
-
-        assert len(result) == 3
-        assert dt.date(2024, 12, 1) in result
-        assert dt.date(2024, 12, 15) in result
-        assert dt.date(2024, 12, 20) in result
 
     def test_append_prop_data_to_combined_data_updates_tsv(self, tmp_path):
         data_path = tmp_path / "combined_data.tsv"

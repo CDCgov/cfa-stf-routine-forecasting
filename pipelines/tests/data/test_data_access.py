@@ -1,3 +1,4 @@
+import calendar
 import datetime as dt
 import logging
 
@@ -127,16 +128,36 @@ def test_nssp_freshness_requires_run_date_match():
     assert "does not match run date" in stale.reason
 
 
-def test_nhsn_freshness_is_strict_on_wednesday_and_friday():
+@pytest.mark.parametrize(
+    ("run_date", "expected_weekday"),
+    [
+        pytest.param(
+            dt.date(2026, 1, 7),
+            calendar.WEDNESDAY,
+            id="wednesday",
+        ),
+        pytest.param(
+            dt.date(2026, 1, 9),
+            calendar.FRIDAY,
+            id="friday",
+        ),
+    ],
+)
+def test_nhsn_freshness_is_strict_on_wednesday_and_friday(
+    run_date,
+    expected_weekday,
+):
+    assert run_date.weekday() == expected_weekday
+
     stale = data_access.nhsn_freshness(
-        selected_version_date=dt.date(2026, 1, 6),
+        selected_version_date=run_date - dt.timedelta(days=1),
         latest_observed_date=dt.date(2026, 1, 3),
-        run_date=dt.date(2026, 1, 7),
+        run_date=run_date,
     )
     fresh = data_access.nhsn_freshness(
-        selected_version_date=dt.date(2026, 1, 9),
+        selected_version_date=run_date,
         latest_observed_date=dt.date(2026, 1, 3),
-        run_date=dt.date(2026, 1, 9),
+        run_date=run_date,
     )
 
     assert stale.is_stale

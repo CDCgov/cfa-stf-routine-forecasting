@@ -8,9 +8,9 @@ from pathlib import Path
 import jax.numpy as jnp
 import polars as pl
 import polars.selectors as cs
+from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pyrenew_multisignal.hew import approx_lognorm
 
-from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pipelines.utils.common_utils import py_scalar_to_r_scalar, run_r_code
 
 _disease_map = {

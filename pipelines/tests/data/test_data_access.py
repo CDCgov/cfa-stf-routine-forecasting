@@ -3,6 +3,7 @@ import logging
 
 import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
 from pipelines.data import data_access
 
@@ -48,16 +49,25 @@ def test_nssp_data_normalizes_source_frame():
         last_training_date=dt.date(2026, 1, 7),
     )
 
-    assert result.data.select(
-        "date",
-        "observed_ed_visits",
-        "other_ed_visits",
-        "data_type",
-        "resolution",
-    ).rows() == [
-        (dt.date(2026, 1, 7), 10, 90, "train", "daily"),
-        (dt.date(2026, 1, 8), 12, 108, "eval", "daily"),
-    ]
+    expected = pl.DataFrame(
+        {
+            "date": [dt.date(2026, 1, 7), dt.date(2026, 1, 8)],
+            "observed_ed_visits": [10, 12],
+            "other_ed_visits": [90, 108],
+            "data_type": ["train", "eval"],
+            "resolution": ["daily", "daily"],
+        }
+    )
+    assert_frame_equal(
+        result.data.select(
+            "date",
+            "observed_ed_visits",
+            "other_ed_visits",
+            "data_type",
+            "resolution",
+        ),
+        expected,
+    )
 
 
 def test_nhsn_data_filters_and_classifies_source_frame():
@@ -84,23 +94,20 @@ def test_nhsn_data_filters_and_classifies_source_frame():
     )
 
     assert result.prelim
-    assert result.data.columns == [
-        "weekendingdate",
-        "jurisdiction",
-        "hospital_admissions",
-        "data_type",
-        "resolution",
-    ]
-    assert result.data.select(
-        "weekendingdate",
-        "hospital_admissions",
-        "data_type",
-        "resolution",
-    ).rows() == [
-        (dt.date(2026, 1, 10), 6, "eval", "epiweekly"),
-        (dt.date(2026, 1, 1), 4, "train", "epiweekly"),
-        (dt.date(2026, 1, 7), 5, "train", "epiweekly"),
-    ]
+    expected = pl.DataFrame(
+        {
+            "weekendingdate": [
+                dt.date(2026, 1, 10),
+                dt.date(2026, 1, 1),
+                dt.date(2026, 1, 7),
+            ],
+            "jurisdiction": ["CA"] * 3,
+            "hospital_admissions": [6, 4, 5],
+            "data_type": ["eval", "train", "train"],
+            "resolution": ["epiweekly"] * 3,
+        }
+    )
+    assert_frame_equal(result.data, expected)
 
 
 def test_nssp_freshness_requires_run_date_match():
@@ -255,7 +262,7 @@ def test_load_dataops_nhsn_uses_selected_release(monkeypatch):
         first_training_date=dt.date(2025, 12, 1),
     )
 
-    assert data is raw_data
+    assert_frame_equal(data, raw_data)
     assert prelim
     assert selected_version == dt.date(2026, 1, 8)
     assert calls == {
@@ -295,7 +302,15 @@ def test_load_dataops_nssp_uses_latest_available_version(monkeypatch):
     )
 
     assert selected_version == dt.date(2026, 1, 8)
-    assert data.columns == ["date", "geo_value", "disease", "ed_visits"]
+    expected = pl.DataFrame(
+        {
+            "date": [dt.date(2026, 1, 7)],
+            "geo_value": ["CA"],
+            "disease": ["COVID-19"],
+            "ed_visits": [10],
+        }
+    )
+    assert_frame_equal(data, expected)
     assert calls == {
         "disease": ["COVID-19", "Total"],
         "loc_abb": "CA",
@@ -353,12 +368,33 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     assert forecast_data.report_date == dt.date(2026, 1, 8)
     assert forecast_data.loc_pop == 39_000_000
     assert forecast_data.right_truncation_offset == 0
-    assert forecast_data.nssp.data.select(
-        "observed_ed_visits", "other_ed_visits", "data_type", "resolution"
-    ).rows() == [(10, 90, "eval", "daily")]
-    assert forecast_data.nhsn.data.select("data_type", "resolution").rows() == [
-        ("train", "epiweekly")
-    ]
+    expected_nssp = pl.DataFrame(
+        {
+            "observed_ed_visits": [10],
+            "other_ed_visits": [90],
+            "data_type": ["eval"],
+            "resolution": ["daily"],
+        }
+    )
+    assert_frame_equal(
+        forecast_data.nssp.data.select(
+            "observed_ed_visits",
+            "other_ed_visits",
+            "data_type",
+            "resolution",
+        ),
+        expected_nssp,
+    )
+    expected_nhsn = pl.DataFrame(
+        {
+            "data_type": ["train"],
+            "resolution": ["epiweekly"],
+        }
+    )
+    assert_frame_equal(
+        forecast_data.nhsn.data.select("data_type", "resolution"),
+        expected_nhsn,
+    )
     assert forecast_data.nhsn.prelim
     assert all(
         isinstance(source, data_access.ForecastSourceData)

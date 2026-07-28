@@ -2,12 +2,19 @@
 
 import datetime as dt
 from dataclasses import dataclass
+from pathlib import Path
 
+import numpy as np
 import polars as pl
 import polars.selectors as cs
+
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 from pipelines.data.data_access import DataFreshness, ForecastData
+from pipelines.epiautogp.hubverse_nowcast import (
+    HUBVERSE_MODEL_OUTPUT_SUBDIR,
+    HUBVERSE_TARGETS,
+)
 
 DEFAULT_LOCATIONS = ["CA", "US"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
@@ -38,6 +45,14 @@ NHSN_SEASONAL_INCREMENT_PERCENT = 0.0001
 NHSN_SEASONAL_PERIOD_WEEKS = 4
 WEEK_ENDING_WEEKDAY = 5
 DAYS_PER_WEEK = 7
+
+REPORTING_FRACTIONS = np.array([0.6, 0.8, 0.9, 0.99, 1.0])
+REPORTING_DELAY_PMF = np.diff(np.insert(REPORTING_FRACTIONS, 0, 0.0))
+
+HUBVERSE_NOWCAST_DIR_NAME = "hubverse_nowcasts"
+HUBVERSE_N_SAMPLES = 40
+HUBVERSE_LOGNORMAL_SIGMA = 0.05
+HUBVERSE_RANDOM_SEED = 12345
 
 _NSSP_DISEASE_NAMES = {"COVID-19": "COVID-19/Omicron"}
 _FACILITY_LEVEL_NSSP_DATA_COLS = [
@@ -299,3 +314,91 @@ def make_forecast_data(
         nhsn_prelim=False,
         loc_pop=location_by_abbr[location].population,
     )
+
+
+def write_hubverse_nowcasts(
+    base_dir: Path,
+    locations: list[str] | None = None,
+    diseases: list[str] | None = None,
+) -> None:
+    """
+    Write noisy sample nowcasts in the production Hubverse schema.
+    This reuses `_make_nhsn` to generate the underlying "true" counts for the
+    most recent weeks, then adds noise to simulate the nowcast process. The
+    noise is lognormal, with a fixed sigma.
+    """
+    locations = locations or DEFAULT_LOCATIONS
+    diseases = diseases or DEFAULT_DISEASES
+    location_data = _location_data(locations)
+    private_data_dir = base_dir / "private_data"
+    n_nowcast_dates = len(REPORTING_FRACTIONS) - 1
+    for disease_index, disease in enumerate(diseases):
+        if disease not in HUBVERSE_TARGETS:
+            raise ValueError(f"No Hubverse target mapping for {disease!r}")
+
+        rng = np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index)
+        rows = []
+        disease_id = disease.lower().replace("-", "").replace(" ", "_")
+        for location in location_data:
+            recent_reports = (
+                _make_nhsn(
+                    location=location,
+                    disease_index=disease_index,
+                )
+                .filter(pl.col("weekendingdate") < REPORT_DATE)
+                .tail(n_nowcast_dates)
+            )
+            if recent_reports.height != n_nowcast_dates:
+                raise ValueError(
+                    f"Expected {n_nowcast_dates} NHSN reports for "
+                    f"{disease}, {location.abbr}; found {recent_reports.height}"
+                )
+
+            dates = recent_reports.get_column("weekendingdate").to_list()
+            reports = recent_reports.get_column("hospital_admissions").to_numpy()
+            horizons = [
+                (target_end_date - REPORT_DATE).days // DAYS_PER_WEEK
+                for target_end_date in dates
+            ]
+            fractions = np.array(
+                [REPORTING_FRACTIONS[-horizon - 1] for horizon in horizons]
+            )
+            expected_final_counts = reports / fractions
+            log_means = np.log(expected_final_counts) - HUBVERSE_LOGNORMAL_SIGMA**2 / 2
+            samples = rng.lognormal(
+                mean=log_means,
+                sigma=HUBVERSE_LOGNORMAL_SIGMA,
+                size=(HUBVERSE_N_SAMPLES, n_nowcast_dates),
+            )
+
+            for sample_index, trajectory in enumerate(samples, start=1):
+                for target_end_date, horizon, value in zip(dates, horizons, trajectory):
+                    rows.append(
+                        {
+                            "origin_date": REPORT_DATE,
+                            "target_end_date": target_end_date,
+                            "horizon": horizon,
+                            "target": HUBVERSE_TARGETS[disease],
+                            "location": location.abbr.lower(),
+                            "output_type": "sample",
+                            "output_type_id": (
+                                f"{disease_id}_{location.abbr.lower()}_{sample_index}"
+                            ),
+                            "value": value,
+                        }
+                    )
+
+        hubverse = pl.DataFrame(rows).with_columns(
+            pl.col("horizon").cast(pl.Int32),
+            pl.col("value").cast(pl.Float64),
+        )
+        output_dir = (
+            private_data_dir
+            / HUBVERSE_NOWCAST_DIR_NAME
+            / disease.lower()
+            / HUBVERSE_MODEL_OUTPUT_SUBDIR
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        hubverse.write_parquet(
+            output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet"
+        )

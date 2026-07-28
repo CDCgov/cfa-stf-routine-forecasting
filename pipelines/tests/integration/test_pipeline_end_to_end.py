@@ -12,8 +12,12 @@ from pipelines.data import prep_data
 from pipelines.data.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
+    HUBVERSE_N_SAMPLES,
+    HUBVERSE_NOWCAST_DIR_NAME,
     REPORT_DATE,
+    REPORTING_DELAY_PMF,
     make_forecast_data,
+    write_hubverse_nowcasts,
 )
 from pipelines.epiautogp import epiautogp_forecast_utils as epiautogp_utils
 from pipelines.epiautogp import forecast_epiautogp as epiautogp_module
@@ -31,6 +35,8 @@ FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
 N_FORECAST_DAYS = 14
 EXCLUDE_LAST_N_DAYS = 1
+HUBVERSE_DISEASE = "COVID-19"
+HUBVERSE_LOCATION = "CA"
 EXPECTED_MODELS = [
     "daily_fable_e_other",
     "epiweekly_fable_e_other",
@@ -53,7 +59,7 @@ def _normalize_pmf(weights: list[float]) -> list[float]:
 
 GENERATION_INTERVAL_PMF = _normalize_pmf([64, 23, 9, 3, 1])
 DELAY_PMF = _normalize_pmf([0, 2, 17, 24, 20, 14, 9, 6, 4, 2, 1, 1])
-RIGHT_TRUNCATION_PMF = _normalize_pmf([1, 0, 0, 0])
+RIGHT_TRUNCATION_PMF = _normalize_pmf(REPORTING_DELAY_PMF.tolist())
 
 
 @contextmanager
@@ -133,7 +139,18 @@ def _run_pyrenew(workspace: Path, disease: str, location: str) -> None:
     )
 
 
-def _run_epiautogp(workspace: Path, disease: str, location: str) -> None:
+def _run_epiautogp(
+    workspace: Path,
+    disease: str,
+    location: str,
+    *,
+    target: str,
+    frequency: str,
+    nowcast_source_name: str,
+    ed_visit_type: str = "observed",
+    hubverse_nowcast_dir: Path | None = None,
+    n_forecast_draws: int = 40,
+) -> None:
     epiautogp_module.main(
         disease=disease,
         run_date=REPORT_DATE,
@@ -142,15 +159,17 @@ def _run_epiautogp(workspace: Path, disease: str, location: str) -> None:
         n_training_days=N_TRAINING_DAYS,
         n_forecast_days=N_FORECAST_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
-        target="nssp",
-        frequency="daily",
-        ed_visit_type="other",
+        target=target,
+        frequency=frequency,
+        ed_visit_type=ed_visit_type,
         n_particles=2,
         n_mcmc=2,
         n_hmc=2,
-        n_forecast_draws=40,
+        n_forecast_draws=n_forecast_draws,
         smc_data_proportion=0.1,
         n_threads=2,
+        nowcast_source_name=nowcast_source_name,
+        hubverse_nowcast_dir=hubverse_nowcast_dir,
     )
 
 
@@ -203,8 +222,12 @@ def _run_fusions(model_run_dir: Path) -> None:
         model_fit_dir_to_hub_tbl(fusion_model_dir)
 
 
-def _assert_model_outputs(model_run_dir: Path) -> None:
-    for model_name in EXPECTED_MODELS:
+def _assert_model_outputs(model_run_dir: Path, *, expect_hubverse: bool) -> None:
+    expected_models = EXPECTED_MODELS.copy()
+    if expect_hubverse:
+        expected_models.append("epiautogp_nhsn_epiweekly")
+
+    for model_name in expected_models:
         model_dir = model_run_dir / model_name
         assert model_dir.is_dir(), f"Missing model directory: {model_dir}"
         assert (model_dir / "samples.parquet").is_file(), (
@@ -281,6 +304,13 @@ def _data_mode(request) -> str:
 @pytest.mark.pipeline_e2e
 def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
     workspace = pipeline_workspace
+    with _status_step(f"Generating Hubverse test data in {workspace}"):
+        write_hubverse_nowcasts(
+            workspace,
+            locations=DEFAULT_LOCATIONS,
+            diseases=DEFAULT_DISEASES,
+        )
+
     data_mode = _data_mode(request)
     print(f"[pipeline-e2e] Using {data_mode} DataOps data.", flush=True)
 
@@ -289,6 +319,10 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
 
     for disease in DEFAULT_DISEASES:
         for location in DEFAULT_LOCATIONS:
+            # One generated combination is enough to exercise Hubverse.
+            expect_hubverse = (
+                disease == HUBVERSE_DISEASE and location == HUBVERSE_LOCATION
+            )
             with _status_step(f"Running Fable for {disease}, {location}"):
                 _run_fable(workspace, disease, location)
 
@@ -298,8 +332,40 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             with _status_step(f"Running PyRenew for {disease}, {location}"):
                 _run_pyrenew(workspace, disease, location)
 
-            with _status_step(f"Running EpiAutoGP for {disease}, {location}"):
-                _run_epiautogp(workspace, disease, location)
+            with _status_step(
+                f"Running reporting-delay EpiAutoGP for {disease}, {location}"
+            ):
+                _run_epiautogp(
+                    workspace,
+                    disease,
+                    location,
+                    target="nssp",
+                    frequency="daily",
+                    ed_visit_type="other",
+                    nowcast_source_name="reporting-delay",
+                )
+
+            if expect_hubverse:
+                # In this situation we also check the NHSN ("H") signal
+                # and that the EpiAutoGP model is run with the Hubverse nowcast source.
+                with _status_step(
+                    f"Running Hubverse EpiAutoGP for {disease}, {location}"
+                ):
+                    _run_epiautogp(
+                        workspace,
+                        disease,
+                        location,
+                        target="nhsn",
+                        frequency="epiweekly",
+                        nowcast_source_name="hubverse",
+                        hubverse_nowcast_dir=(
+                            workspace
+                            / "private_data"
+                            / HUBVERSE_NOWCAST_DIR_NAME
+                            / disease.lower()
+                        ),
+                        n_forecast_draws=HUBVERSE_N_SAMPLES,
+                    )
 
             model_run_dir = (
                 _model_batch_dir(workspace, disease) / "model_runs" / location
@@ -308,7 +374,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
                 _run_fusions(model_run_dir)
 
             with _status_step(f"Checking model outputs for {disease}, {location}"):
-                _assert_model_outputs(model_run_dir)
+                _assert_model_outputs(model_run_dir, expect_hubverse=expect_hubverse)
 
     with _status_step("Postprocessing forecast batches"):
         postprocess_batches(

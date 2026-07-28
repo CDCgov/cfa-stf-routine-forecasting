@@ -73,19 +73,21 @@ class NHSNData(ForecastSourceData):
         first_training_date: dt.date,
         last_training_date: dt.date,
     ) -> "NHSNData":
-        cleaned_data = data.filter(
-            pl.col("weekendingdate") >= first_training_date
-        ).with_columns(
-            data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
-            resolution=pl.lit("epiweekly"),
-        ).select(
-            "weekendingdate",
-            "jurisdiction",
-            "hospital_admissions",
-            "data_type",
-            "resolution",
+        cleaned_data = (
+            data.filter(pl.col("weekendingdate") >= first_training_date)
+            .with_columns(
+                data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+                .then(pl.lit("train"))
+                .otherwise(pl.lit("eval")),
+                resolution=pl.lit("epiweekly"),
+            )
+            .select(
+                "weekendingdate",
+                "jurisdiction",
+                "hospital_admissions",
+                "data_type",
+                "resolution",
+            )
         )
         return cls(data=cleaned_data, freshness=freshness, prelim=prelim)
 

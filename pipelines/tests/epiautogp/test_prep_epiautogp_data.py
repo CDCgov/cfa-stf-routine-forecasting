@@ -424,9 +424,7 @@ class TestConvertToEpiAutoGpJson:
         ).write_csv(data_path, separator="\t")
 
         hubverse_dir = tmp_path / "hubverse"
-        model_output_dir = (
-            hubverse_dir / "model-output" / "CFA-nowcastNHSN"
-        )
+        model_output_dir = hubverse_dir / "model-output" / "CFA-nowcastNHSN"
         model_output_dir.mkdir(parents=True)
         pl.DataFrame(
             [

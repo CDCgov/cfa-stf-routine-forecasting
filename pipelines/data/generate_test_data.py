@@ -9,7 +9,6 @@ import polars as pl
 import polars.selectors as cs
 
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
-
 from pipelines.data.data_access import DataFreshness, ForecastData
 from pipelines.epiautogp.hubverse_nowcast import (
     HUBVERSE_MODEL_OUTPUT_SUBDIR,
@@ -399,6 +398,4 @@ def write_hubverse_nowcasts(
             / HUBVERSE_MODEL_OUTPUT_SUBDIR
         )
         output_dir.mkdir(parents=True, exist_ok=True)
-        hubverse.write_parquet(
-            output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet"
-        )
+        hubverse.write_parquet(output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet")

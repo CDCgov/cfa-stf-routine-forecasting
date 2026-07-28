@@ -155,13 +155,9 @@ class HubverseNowcast:
             ((~pl.col("value").is_finite()) | (pl.col("value") < 0)).any()
         ).item()
         if invalid_values:
-            raise ValueError(
-                "Hubverse sample values must be finite and non-negative."
-            )
+            raise ValueError("Hubverse sample values must be finite and non-negative.")
 
-        nowcast_dates = (
-            samples.get_column("target_end_date").unique().sort().to_list()
-        )
+        nowcast_dates = samples.get_column("target_end_date").unique().sort().to_list()
         missing_observation_dates = sorted(set(nowcast_dates) - set(dates))
         if missing_observation_dates:
             raise ValueError(

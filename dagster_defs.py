@@ -827,24 +827,28 @@ update_script_url = (
 prod_server_image = f"{registry}/{local_workdir.name}:latest"
 
 
-# Used both in the schedule and in the build_image_op
-@dg.op
-def deploy_image_to_prod_server_op(
-    context: dg.OpExecutionContext, image_to_deploy: str
-):
-    """
-    Deploys the dagster image to the prod server. Can deploy a working branch's image or the latest image.
-    """
-    context.log.info(f"Deploying {image_to_deploy} to the dagster prod server.")
+# Plain helper so the deploy logic can be reused directly (e.g. from build_image_op)
+# without invoking the op imperatively, which Dagster does not support.
+def _refresh_prod_server_image(logger, image_to_deploy: str):
+    logger.info(f"Deploying {image_to_deploy} to the dagster prod server.")
     subprocess.run(
         ["uv", "run", update_script_url, "--registry_image", image_to_deploy],
         check=True,
     )
 
 
-deploy_image_to_prod_server_config = dg.RunConfig(
+# Used both in the schedule and in the build_image_op
+@dg.op
+def refresh_prod_server_image_op(context: dg.OpExecutionContext, image_to_deploy: str):
+    """
+    Deploys the dagster image to the prod server. Can deploy a working branch's image or the latest image.
+    """
+    _refresh_prod_server_image(context.log, image_to_deploy)
+
+
+refresh_prod_server_image_config = dg.RunConfig(
     ops={
-        "deploy_image_to_prod_server_op": {
+        "refresh_prod_server_image_op": {
             "inputs": {
                 "image_to_deploy": prod_server_image,
             }
@@ -857,24 +861,23 @@ deploy_image_to_prod_server_config = dg.RunConfig(
 
 @dg.job(
     description=(
-        "Simply deploys the latest image to the prod_server (you can override the tag if necessary)"
-        "This uses the the deploy_image_to_prod_server_op with 'latest' as the selected tag."
-        "Elsewhere (such as in the build_image job) we pass the git branch name or a user supplied tag."
+        "Standalone job that simply (re)deploys the latest image to the prod server (you can override the tag if necessary). "
+        "Note - the build_image job that is available in dev can be passed a flag that executes this when complete. "
     ),
-    config=deploy_image_to_prod_server_config,
+    config=refresh_prod_server_image_config,
     executor_def=dynamic_executor(),
 )
-def deploy_image_to_prod_server():
-    deploy_image_to_prod_server_op()
+def refresh_prod_server_image():
+    refresh_prod_server_image_op()
 
 
 @dg.schedule(
     cron_schedule="00 23 * * TUE",
     execution_timezone=tz,
-    job_name="deploy_image_to_prod_server",
+    job_name="refresh_prod_server_image",
 )
 def reset_prod_server_image_for_wednesday():
-    return dg.RunRequest(run_config=deploy_image_to_prod_server_config)
+    return dg.RunRequest(run_config=refresh_prod_server_image_config)
 
 
 # These are only used in dev - they should not appear on the production webserver
@@ -923,9 +926,7 @@ if not is_production:
         subprocess.run(build_command, check=True)
 
         if should_deploy_to_prod:
-            deploy_image_to_prod_server_op(
-                context=dg.OpExecutionContext, image_to_deploy=image
-            )
+            _refresh_prod_server_image(context.log, image_to_deploy=image)
 
     @dg.job(
         description=(

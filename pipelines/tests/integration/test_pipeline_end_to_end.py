@@ -2,6 +2,7 @@ import os
 import shutil
 import time
 from contextlib import contextmanager
+from math import isclose
 from pathlib import Path
 
 import polars as pl
@@ -13,7 +14,6 @@ from pipelines.data.generate_test_data import (
     DEFAULT_LOCATIONS,
     REPORT_DATE,
     make_forecast_data,
-    make_param_estimates,
 )
 from pipelines.epiautogp import epiautogp_forecast_utils as epiautogp_utils
 from pipelines.epiautogp import forecast_epiautogp as epiautogp_module
@@ -42,6 +42,18 @@ EXPECTED_MODELS = [
 ]
 MOCK_DATA_MODE = "mock"
 REAL_DATA_MODE = "real"
+
+
+def _normalize_pmf(weights: list[float]) -> list[float]:
+    total = sum(weights)
+    pmf = [weight / total for weight in weights]
+    assert isclose(sum(pmf), 1.0)
+    return pmf
+
+
+GENERATION_INTERVAL_PMF = _normalize_pmf([64, 23, 9, 3, 1])
+DELAY_PMF = _normalize_pmf([0, 2, 17, 24, 20, 14, 9, 6, 4, 2, 1, 1])
+RIGHT_TRUNCATION_PMF = _normalize_pmf([1, 0, 0, 0])
 
 
 @contextmanager
@@ -204,14 +216,6 @@ def _assert_model_outputs(model_run_dir: Path) -> None:
 
 
 def _patch_dataops(monkeypatch) -> None:
-    param_estimates = make_param_estimates()
-
-    def get_pmf(parameter: str, loc_abb: str | None = None) -> list[float]:
-        filtered = param_estimates.filter(pl.col("parameter") == parameter)
-        if loc_abb is not None:
-            filtered = filtered.filter(pl.col("geo_value") == loc_abb)
-        return filtered.item(0, "value").to_list()
-
     def load_forecast_data(
         *,
         disease,
@@ -234,22 +238,22 @@ def _patch_dataops(monkeypatch) -> None:
     monkeypatch.setattr(
         prep_data,
         "get_nnh_generation_interval_pmf",
-        lambda **kwargs: get_pmf("generation_interval"),
+        lambda **kwargs: GENERATION_INTERVAL_PMF.copy(),
     )
     monkeypatch.setattr(
         prep_data,
         "get_nnh_delay_pmf",
-        lambda **kwargs: get_pmf("delay"),
+        lambda **kwargs: DELAY_PMF.copy(),
     )
     monkeypatch.setattr(
         prep_data,
         "get_nnh_right_truncation_pmf",
-        lambda loc_abb, **kwargs: get_pmf("right_truncation", loc_abb),
+        lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )
     monkeypatch.setattr(
         epiautogp_utils,
         "get_nnh_right_truncation_pmf",
-        lambda loc_abb, **kwargs: get_pmf("right_truncation", loc_abb),
+        lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )
 
 

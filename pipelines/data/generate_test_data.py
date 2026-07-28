@@ -1,21 +1,13 @@
 """Generate deterministic synthetic data for pipeline integration tests."""
 
-import argparse
 import datetime as dt
 from dataclasses import dataclass
-from pathlib import Path
 
 import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 from pipelines.data.data_access import DataFreshness, ForecastData
-from pipelines.data.generate_test_data_lib import (
-    FACILITY_LEVEL_NSSP_DATA_COLS,
-    LOC_LEVEL_NSSP_DATA_COLS,
-    NHSN_COLS,
-    create_default_param_estimates,
-)
 
 DEFAULT_LOCATIONS = ["CA", "US"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
@@ -48,6 +40,29 @@ WEEK_ENDING_WEEKDAY = 5
 DAYS_PER_WEEK = 7
 
 _NSSP_DISEASE_NAMES = {"COVID-19": "COVID-19/Omicron"}
+_FACILITY_LEVEL_NSSP_DATA_COLS = [
+    "reference_date",
+    "report_date",
+    "geo_type",
+    "geo_value",
+    "asof",
+    "metric",
+    "run_id",
+    "facility",
+    "disease",
+    "value",
+]
+_LOC_LEVEL_NSSP_DATA_COLS = [
+    "reference_date",
+    "report_date",
+    "geo_type",
+    "geo_value",
+    "metric",
+    "disease",
+    "value",
+    "any_update_this_day",
+]
+_NHSN_COLS = ["jurisdiction", "weekendingdate", "hospital_admissions"]
 
 
 @dataclass(frozen=True)
@@ -144,25 +159,6 @@ def _weekending_dates() -> list[dt.date]:
     return _date_range(first_week, REPORT_DATE, step_days=DAYS_PER_WEEK)
 
 
-def _write_parquet(data: pl.DataFrame, directory: Path, file_name: str) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
-    data.write_parquet(directory / file_name)
-
-
-def make_param_estimates(
-    locations: list[str] | None = None,
-    diseases: list[str] | None = None,
-) -> pl.DataFrame:
-    locations = locations or DEFAULT_LOCATIONS
-    diseases = diseases or DEFAULT_DISEASES
-    return create_default_param_estimates(
-        states_to_simulate=locations,
-        diseases_to_simulate=diseases,
-        max_train_date_str=REPORT_DATE.isoformat(),
-        max_train_date=REPORT_DATE,
-    )
-
-
 def _make_facility_level_nssp(
     *,
     locations: list[LocationData],
@@ -205,7 +201,7 @@ def _make_facility_level_nssp(
                     )
                 )
 
-    return pl.DataFrame(rows).select(cs.by_name(FACILITY_LEVEL_NSSP_DATA_COLS))
+    return pl.DataFrame(rows).select(cs.by_name(_FACILITY_LEVEL_NSSP_DATA_COLS))
 
 
 def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
@@ -214,7 +210,7 @@ def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
         .agg(pl.col("value").sum())
         .with_columns(pl.lit(True).alias("any_update_this_day"))
         .sort(["reference_date", "geo_value", "disease"])
-        .select(cs.by_name(LOC_LEVEL_NSSP_DATA_COLS))
+        .select(cs.by_name(_LOC_LEVEL_NSSP_DATA_COLS))
     )
 
 
@@ -238,21 +234,7 @@ def _make_nhsn(
             }
         )
 
-    return pl.DataFrame(rows).select(cs.by_name(NHSN_COLS))
-
-
-def _write_nhsn_data(
-    private_data_dir: Path,
-    locations: list[LocationData],
-    diseases: list[str],
-) -> None:
-    for location in locations:
-        for disease_index, disease in enumerate(diseases):
-            _write_parquet(
-                _make_nhsn(location=location, disease_index=disease_index),
-                private_data_dir / "nhsn_test_data",
-                f"{disease}_{location.abbr}.parquet",
-            )
+    return pl.DataFrame(rows).select(cs.by_name(_NHSN_COLS))
 
 
 def make_forecast_data(
@@ -317,43 +299,3 @@ def make_forecast_data(
         nhsn_prelim=False,
         loc_pop=location_by_abbr[location].population,
     )
-
-
-def main(
-    base_dir: Path,
-    locations: list[str] | None = None,
-    diseases: list[str] | None = None,
-) -> None:
-    locations = locations or DEFAULT_LOCATIONS
-    diseases = diseases or DEFAULT_DISEASES
-    location_data = _location_data(locations)
-
-    private_data_dir = base_dir / "private_data"
-    private_data_dir.mkdir(parents=True, exist_ok=True)
-
-    _write_nhsn_data(private_data_dir, location_data, diseases)
-
-    print(f"Successfully generated test data in {private_data_dir}")
-
-
-def _split_values(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create pipeline integration data.")
-    parser.add_argument("base_dir", type=Path, help="Base directory for output data.")
-    parser.add_argument(
-        "--locations",
-        type=_split_values,
-        default=DEFAULT_LOCATIONS,
-        help="Comma-separated location abbreviations to generate.",
-    )
-    parser.add_argument(
-        "--diseases",
-        type=_split_values,
-        default=DEFAULT_DISEASES,
-        help="Comma-separated diseases to generate.",
-    )
-    args = parser.parse_args()
-    main(args.base_dir, locations=args.locations, diseases=args.diseases)

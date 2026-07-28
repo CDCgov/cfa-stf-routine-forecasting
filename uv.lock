@@ -811,7 +811,6 @@ dependencies = [
     { name = "pypdf" },
     { name = "pyrenew" },
     { name = "pyrenew-multisignal" },
-    { name = "scipy" },
     { name = "tomli-w" },
 ]
 
@@ -856,7 +855,6 @@ requires-dist = [
     { name = "pypdf", specifier = ">=6.10.1" },
     { name = "pyrenew" },
     { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=5938ec3" },
-    { name = "scipy" },
     { name = "tomli-w", specifier = ">=1.1.0" },
 ]
 

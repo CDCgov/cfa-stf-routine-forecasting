@@ -28,7 +28,6 @@ dependencies = [
     "pyrenew",
     "pyrenew-multisignal",
     "pypdf>=6.10.1",
-    "scipy",
     "tomli-w>=1.1.0",
 ]
 

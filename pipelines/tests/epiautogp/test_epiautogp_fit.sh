@@ -43,7 +43,7 @@ if [ "$ed_visit_type" != "observed" ]; then
 	cmd_args+=(--ed-visit-type "$ed_visit_type")
 fi
 
-# NSSP counts use the test-data reporting-delay PMF; NHSN and NSSP
+# NSSP counts load their reporting-delay PMF through cfa-stf-data; NHSN and NSSP
 # percentages have no nowcast (the reporting-delay estimator only applies
 # to count series).
 if [ "$target" = "nssp" ] && [ "$ed_visit_type" != "pct" ]; then

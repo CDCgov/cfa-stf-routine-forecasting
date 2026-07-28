@@ -84,6 +84,13 @@ def test_nhsn_data_filters_and_classifies_source_frame():
     )
 
     assert result.prelim
+    assert result.data.columns == [
+        "weekendingdate",
+        "jurisdiction",
+        "hospital_admissions",
+        "data_type",
+        "resolution",
+    ]
     assert result.data.select(
         "weekendingdate",
         "hospital_admissions",

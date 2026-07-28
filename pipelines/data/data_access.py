@@ -80,6 +80,12 @@ class NHSNData(ForecastSourceData):
             .then(pl.lit("train"))
             .otherwise(pl.lit("eval")),
             resolution=pl.lit("epiweekly"),
+        ).select(
+            "weekendingdate",
+            "jurisdiction",
+            "hospital_admissions",
+            "data_type",
+            "resolution",
         )
         return cls(data=cleaned_data, freshness=freshness, prelim=prelim)
 

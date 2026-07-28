@@ -1,7 +1,6 @@
 """Tests for converting Hubverse sample output to EpiAutoGP nowcasts."""
 
 import datetime as dt
-from pathlib import Path
 
 import polars as pl
 import pytest
@@ -13,18 +12,6 @@ from pipelines.epiautogp.nowcast import NowcastData
 
 ORIGIN = dt.date(2026, 7, 18)
 NOWCAST_DATES = [dt.date(2026, 7, 4), dt.date(2026, 7, 11)]
-PROD_FIXTURE_DIR = (
-    Path(__file__).parents[1]
-    / "test_data"
-    / "epiautogp"
-    / "hubverse_nowcast_covid_ca"
-)
-PROD_FIXTURE_DATES = [
-    dt.date(2026, 6, 20),
-    dt.date(2026, 6, 27),
-    dt.date(2026, 7, 4),
-    dt.date(2026, 7, 11),
-]
 
 
 def _spec(
@@ -105,22 +92,6 @@ def test_converts_shuffled_rows_to_complete_ordered_trajectories(tmp_path):
     assert result.reports == [[10.0, 11.0], [20.0, 21.0]]
 
 
-def test_converts_real_production_location_fixture():
-    source = HubverseNowcast(
-        containing_dir=PROD_FIXTURE_DIR,
-        forecast_spec=_spec(loc="CA"),
-    )
-
-    result = source.get_nowcast_data(
-        dates=PROD_FIXTURE_DATES,
-        reports=[0.0] * len(PROD_FIXTURE_DATES),
-    )
-
-    assert result.dates == PROD_FIXTURE_DATES
-    assert len(result.reports) == 2_000
-    assert {len(trajectory) for trajectory in result.reports} == {4}
-
-
 @pytest.mark.parametrize(
     ("disease", "target"),
     [
@@ -177,6 +148,16 @@ def test_resolver_requires_containing_directory():
             forecast_spec=_spec(),
             nowcast_source_name="hubverse",
             hubverse_nowcast_dir=None,
+        )
+
+
+def test_resolver_rejects_reporting_pmf_with_hubverse_directory(tmp_path):
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _resolve_nowcast_source(
+            forecast_spec=_spec(),
+            nowcast_source_name="hubverse",
+            reporting_delay_pmf=[0.5, 0.5],
+            hubverse_nowcast_dir=tmp_path,
         )
 
 

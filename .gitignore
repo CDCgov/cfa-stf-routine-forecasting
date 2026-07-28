@@ -40,10 +40,6 @@
 *.rar
 *.zip
 
-# Allowlist
-!pipelines/tests/test_data/*/**/*.parquet
-
-
 #####
 # Python
 # https://github.com/github/gitignore/blob/main/Python.gitignore

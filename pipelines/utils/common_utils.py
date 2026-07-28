@@ -546,9 +546,8 @@ def get_all_forecast_dirs(
     ValueError
         Given an invalid ``report_date``.
     """
-    from cfa.stf.data import ensure_list
-
-    diseases = ensure_list(diseases)
+    if isinstance(diseases, str):
+        diseases = [diseases]
 
     if report_date is None:
         report_date_str = ""

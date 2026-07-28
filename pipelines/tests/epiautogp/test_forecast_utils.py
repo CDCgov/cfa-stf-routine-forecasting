@@ -134,20 +134,20 @@ class TestSetupForecastPipeline:
         assert context.model_batch_dir == expected_batch_dir
         assert context.model_run_dir == expected_run_dir
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_nnh_right_truncation_pmf")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
-    def test_reporting_delay_fetches_pmf_from_dataops(
+    def test_reporting_delay_fetches_pmf_from_cfa_stf_data(
         self,
         mock_calc_dates,
         mock_load_data,
-        mock_get_pmfs,
+        mock_get_right_truncation_pmf,
         tmp_path,
     ):
-        """Test reporting-delay nowcasting loads the PMF from DataOps."""
+        """Test reporting-delay nowcasting loads its PMF through cfa-stf-data."""
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
         mock_load_data.return_value = make_test_forecast_data()
-        mock_get_pmfs.return_value = {"right_truncation_pmf": [0.25, 0.75]}
+        mock_get_right_truncation_pmf.return_value = [0.25, 0.75]
 
         context = setup_forecast_pipeline(
             disease="COVID-19",
@@ -165,21 +165,24 @@ class TestSetupForecastPipeline:
 
         assert isinstance(context.nowcast_source, ReportingDelayNowcast)
         assert context.nowcast_source.reporting_delay_pmf == [0.25, 0.75]
-        assert mock_get_pmfs.call_args.kwargs["loc_abb"] == "CA"
-        assert mock_get_pmfs.call_args.kwargs["disease"] == "COVID-19"
-        assert mock_get_pmfs.call_args.kwargs["as_of"] == dt.date(2024, 12, 20)
+        mock_get_right_truncation_pmf.assert_called_once_with(
+            loc_abb="CA",
+            disease="COVID-19",
+            as_of=dt.date(2024, 12, 20),
+            reference_date=dt.date(2024, 12, 20),
+        )
 
-    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_pmfs")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.get_nnh_right_truncation_pmf")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
-    def test_direct_reporting_delay_pmf_wins_over_dataops(
+    def test_direct_reporting_delay_pmf_wins_over_cfa_stf_data(
         self,
         mock_calc_dates,
         mock_load_data,
-        mock_get_pmfs,
+        mock_get_right_truncation_pmf,
         tmp_path,
     ):
-        """Test a directly supplied PMF is used without calling get_pmfs."""
+        """Test a directly supplied PMF skips cfa-stf-data."""
         mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
         mock_load_data.return_value = make_test_forecast_data()
 
@@ -200,7 +203,7 @@ class TestSetupForecastPipeline:
 
         assert isinstance(context.nowcast_source, ReportingDelayNowcast)
         assert context.nowcast_source.reporting_delay_pmf == [0.4, 0.6]
-        mock_get_pmfs.assert_not_called()
+        mock_get_right_truncation_pmf.assert_not_called()
 
     def test_reporting_delay_errors_for_percentage_targets(self):
         """Test reporting-delay fails for percentage data (numerator/denominator)."""

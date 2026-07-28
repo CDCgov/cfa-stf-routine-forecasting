@@ -208,150 +208,6 @@ def aggregate_facility_level_nssp_to_loc(
     )
 
 
-def _validate_and_extract(
-    df_lazy: pl.LazyFrame,
-    parameter_name: str,
-) -> list:
-    df = df_lazy.filter(pl.col("parameter") == parameter_name).collect()
-    if df.height != 1:
-        error_msg = f"Expected exactly one {parameter_name} parameter row, but found {df.height}"
-        logging.error(error_msg)
-        if df.height > 0:
-            logging.error(f"Found rows: {df}")
-        raise ValueError(error_msg)
-    return df.item(0, "value").to_list()
-
-
-def get_pmfs(
-    param_estimates: pl.LazyFrame | None,
-    loc_abb: str,
-    disease: str,
-    as_of: dt.date | None = None,
-    right_truncation_required: bool = True,
-) -> dict[str, list]:
-    """
-    Filter and extract probability mass functions (PMFs) from
-    parameter estimates LazyFrame based on location, disease
-    and date filters.
-
-    This function queries a LazyFrame containing epidemiological
-    parameters and returns a dictionary of three PMFs:
-    delay, generation interval, and right truncation.
-
-    Parameters
-    ----------
-    param_estimates: pl.LazyFrame
-        A LazyFrame containing parameter data with columns
-        including 'disease', 'parameter', 'value', 'geo_value',
-        'start_date', 'end_date', and 'reference_date'.
-
-    loc_abb : str
-        Location abbreviation (geo_value) to filter
-        right truncation parameters.
-
-    disease : str
-        Name of the disease.
-
-    as_of : datetime.date, optional
-        Date for which parameters must be valid
-        (start_date <= as_of < end_date). Defaults
-        to the most recent estimates.
-
-    right_truncation_required : bool, optional
-        If False, allows extraction of other pmfs if
-        right_truncation estimate is missing
-
-    Returns
-    -------
-    dict[str, list]
-        A dictionary containing three PMF arrays:
-        - 'generation_interval_pmf': Generation interval distribution
-        - 'delay_pmf': Delay distribution
-        - 'right_truncation_pmf': Right truncation distribution
-
-    Raises
-    ------
-    ValueError
-        If exactly one row is not found for any of the required parameters.
-
-    Notes
-    -----
-    The function applies specific filtering logic for each parameter type:
-    - For delay and generation_interval: filters by disease,
-      parameter name, and validity date range.
-    - For right_truncation: additionally filters by location.
-    """
-    if param_estimates is None:
-        delay_pmf = get_nnh_delay_pmf(disease=disease, as_of=as_of)
-        delay_pmf[0] = 0.0
-        delay_pmf = jnp.array(delay_pmf)
-        delay_pmf = delay_pmf / delay_pmf.sum()
-        result = {
-            "generation_interval_pmf": get_nnh_generation_interval_pmf(
-                disease=disease, as_of=as_of
-            ),
-            "delay_pmf": delay_pmf.tolist(),
-        }
-        try:
-            result["right_truncation_pmf"] = get_nnh_right_truncation_pmf(
-                loc_abb=loc_abb,
-                disease=disease,
-                as_of=as_of,
-                reference_date=as_of,
-            )
-        except ValueError:
-            if right_truncation_required:
-                raise
-            result["right_truncation_pmf"] = [1]
-        return result
-
-    as_of = as_of or dt.date.max - dt.timedelta(days=1)
-    if loc_abb == "GA" and as_of > dt.date(2025, 10, 14):
-        as_of = dt.date(2025, 10, 14)
-
-    filtered_estimates = (
-        param_estimates.with_columns(
-            pl.col("start_date").fill_null(dt.date.min),
-            pl.col("end_date").fill_null(dt.date.max),
-        )
-        .filter(pl.col("disease") == disease)
-        .filter(
-            as_of >= pl.col("start_date"),
-            as_of < pl.col("end_date"),
-        )
-    )
-
-    generation_interval_pmf = _validate_and_extract(
-        filtered_estimates, "generation_interval"
-    )
-
-    delay_pmf = _validate_and_extract(filtered_estimates, "delay")
-
-    # ensure 0 first entry; we do not model the possibility
-    # of a zero infection-to-recorded-admission delay in Pyrenew-HEW
-    delay_pmf[0] = 0.0
-    delay_pmf = jnp.array(delay_pmf)
-    delay_pmf = delay_pmf / delay_pmf.sum()
-    delay_pmf = delay_pmf.tolist()
-
-    right_truncation_df = filtered_estimates.filter(
-        pl.col("geo_value") == loc_abb
-    ).filter(pl.col("reference_date") == pl.col("reference_date").max())
-
-    if right_truncation_df.collect().height == 0 and not right_truncation_required:
-        right_truncation_pmf = [1]
-    else:
-        right_truncation_pmf = _validate_and_extract(
-            right_truncation_df, "right_truncation"
-        )
-
-    return {
-        "generation_interval_pmf": generation_interval_pmf,
-        "delay_pmf": delay_pmf,
-        "right_truncation_pmf": right_truncation_pmf,
-    }
-
-
 def process_and_save_loc_data(
     forecast_data: ForecastData,
     save_dir: Path,
@@ -398,7 +254,6 @@ def process_and_save_loc_data(
 def process_and_save_loc_param(
     loc_abb,
     disease,
-    param_estimates,
     fit_ed_visits,
     save_dir,
     as_of: dt.date | None = None,
@@ -407,16 +262,30 @@ def process_and_save_loc_param(
     loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
     pop_fraction = jnp.array([1])
 
-    pmfs = get_pmfs(
-        param_estimates=param_estimates,
-        loc_abb=loc_abb,
+    generation_interval_pmf = get_nnh_generation_interval_pmf(
         disease=disease,
-        right_truncation_required=fit_ed_visits,
         as_of=as_of,
     )
+    delay_pmf = get_nnh_delay_pmf(disease=disease, as_of=as_of)
+    # We do not model a zero infection-to-recorded-admission delay.
+    delay_pmf[0] = 0.0
+    delay_pmf = jnp.array(delay_pmf)
+    delay_pmf = (delay_pmf / delay_pmf.sum()).tolist()
+
+    try:
+        right_truncation_pmf = get_nnh_right_truncation_pmf(
+            loc_abb=loc_abb,
+            disease=disease,
+            as_of=as_of,
+            reference_date=as_of,
+        )
+    except ValueError:
+        if fit_ed_visits:
+            raise
+        right_truncation_pmf = [1]
 
     inf_to_hosp_admit_lognormal_loc, inf_to_hosp_admit_lognormal_scale = approx_lognorm(
-        jnp.array(pmfs["delay_pmf"])[1:],  # only fit the non-zero delays
+        jnp.array(delay_pmf)[1:],  # only fit the non-zero delays
         loc_guess=0,
         scale_guess=0.5,
     )
@@ -424,11 +293,11 @@ def process_and_save_loc_param(
     model_params = {
         "population_size": loc_pop,
         "pop_fraction": pop_fraction.tolist(),
-        "generation_interval_pmf": pmfs["generation_interval_pmf"],
-        "right_truncation_pmf": pmfs["right_truncation_pmf"],
+        "generation_interval_pmf": generation_interval_pmf,
+        "right_truncation_pmf": right_truncation_pmf,
         "inf_to_hosp_admit_lognormal_loc": inf_to_hosp_admit_lognormal_loc,
         "inf_to_hosp_admit_lognormal_scale": inf_to_hosp_admit_lognormal_scale,
-        "inf_to_hosp_admit_pmf": pmfs["delay_pmf"],
+        "inf_to_hosp_admit_pmf": delay_pmf,
     }
     with open(Path(save_dir, "model_params.json"), "w") as json_file:
         json.dump(model_params, json_file, default=str)

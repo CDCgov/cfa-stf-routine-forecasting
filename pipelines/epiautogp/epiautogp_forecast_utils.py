@@ -12,11 +12,13 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Literal, get_args
 
+from cfa.stf.data import get_nnh_right_truncation_pmf
+
 from pipelines.data.data_access import (
     ForecastData,
     load_forecast_data,
 )
-from pipelines.data.prep_data import get_pmfs, process_and_save_loc_data
+from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
 from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
@@ -153,12 +155,12 @@ def _build_reporting_delay_nowcast(
 ) -> ReportingDelayNowcast:
     """Build a ReportingDelayNowcast, fetching the PMF if not supplied."""
     if reporting_delay_pmf is None:
-        reporting_delay_pmf = get_pmfs(
-            param_estimates=None,
+        reporting_delay_pmf = get_nnh_right_truncation_pmf(
             loc_abb=forecast_spec.loc,
             disease=forecast_spec.disease,
             as_of=forecast_spec.report_date,
-        )["right_truncation_pmf"]
+            reference_date=forecast_spec.report_date,
+        )
 
     return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
 

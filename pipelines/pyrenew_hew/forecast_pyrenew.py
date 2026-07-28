@@ -160,7 +160,6 @@ def main(
     process_and_save_loc_param(
         loc_abb=loc,
         disease=disease,
-        param_estimates=None,
         fit_ed_visits=fit_ed_visits,
         save_dir=data_dir,
         as_of=run_date,

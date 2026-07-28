@@ -204,7 +204,13 @@ def _assert_model_outputs(model_run_dir: Path) -> None:
 
 
 def _patch_dataops(monkeypatch) -> None:
-    param_estimates = make_param_estimates().lazy()
+    param_estimates = make_param_estimates()
+
+    def get_pmf(parameter: str, loc_abb: str | None = None) -> list[float]:
+        filtered = param_estimates.filter(pl.col("parameter") == parameter)
+        if loc_abb is not None:
+            filtered = filtered.filter(pl.col("geo_value") == loc_abb)
+        return filtered.item(0, "value").to_list()
 
     def load_forecast_data(
         *,
@@ -222,33 +228,28 @@ def _patch_dataops(monkeypatch) -> None:
             last_training_date=last_training_date,
         )
 
-    def process_and_save_loc_param(
-        *,
-        loc_abb,
-        disease,
-        param_estimates=None,
-        fit_ed_visits,
-        save_dir,
-        as_of=None,
-    ):
-        return prep_data.process_and_save_loc_param(
-            loc_abb=loc_abb,
-            disease=disease,
-            param_estimates=param_estimates,
-            fit_ed_visits=fit_ed_visits,
-            save_dir=save_dir,
-            as_of=as_of,
-        )
-
     for module in (fable_module, pyrenew_module):
         monkeypatch.setattr(module, "load_forecast_data", load_forecast_data)
     monkeypatch.setattr(epiautogp_utils, "load_forecast_data", load_forecast_data)
     monkeypatch.setattr(
-        pyrenew_module,
-        "process_and_save_loc_param",
-        lambda **kwargs: process_and_save_loc_param(
-            **{**kwargs, "param_estimates": param_estimates}
-        ),
+        prep_data,
+        "get_nnh_generation_interval_pmf",
+        lambda **kwargs: get_pmf("generation_interval"),
+    )
+    monkeypatch.setattr(
+        prep_data,
+        "get_nnh_delay_pmf",
+        lambda **kwargs: get_pmf("delay"),
+    )
+    monkeypatch.setattr(
+        prep_data,
+        "get_nnh_right_truncation_pmf",
+        lambda loc_abb, **kwargs: get_pmf("right_truncation", loc_abb),
+    )
+    monkeypatch.setattr(
+        epiautogp_utils,
+        "get_nnh_right_truncation_pmf",
+        lambda loc_abb, **kwargs: get_pmf("right_truncation", loc_abb),
     )
 
 

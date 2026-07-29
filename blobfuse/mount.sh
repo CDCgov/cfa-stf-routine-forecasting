@@ -15,10 +15,6 @@ mkdir -p .cache
 
 echo "Mounting containers specified in mounts.txt using blobfuse2..."
 TO_MOUNT=(
-	"nssp-etl"
-	"nssp-archival-vintages"
-	"nwss-vintages"
-	"prod-param-estimates"
 	"stf-routine-forecasting-prod-output"
 	"stf-routine-forecasting-test-output"
 	"stf-routine-forecasting-config"

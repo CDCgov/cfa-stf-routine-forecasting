@@ -92,10 +92,6 @@ image = f"{registry}/{local_workdir.name}:{tag}"
 
 # Used in the cloud, and combined with the local mounting dir, used locally
 blob_mounts = [
-    f"nssp-archival-vintages:{container_workdir}/nssp-archival-vintages",
-    f"nssp-etl:{container_workdir}/nssp-etl",
-    f"nwss-vintages:{container_workdir}/nwss-vintages",
-    f"prod-param-estimates:{container_workdir}/params",
     f"stf-routine-forecasting-config:{container_workdir}/config",
     f"stf-routine-forecasting-prod-output:{container_workdir}/output",
     f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
@@ -199,6 +195,7 @@ class _ModelTrainingFields(BaseModel):
     output_basedir: str = Field(default_factory=lambda: "")
     n_training_days: int = Field(default_factory=lambda: 0)
     exclude_last_n_days: int = Field(default_factory=lambda: 0)
+    fail_on_stale_data: bool = Field(default_factory=lambda: is_production)
 
 
 class ConfigOverride(_ModelTrainingFields, dg.Config):
@@ -217,6 +214,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     output_basedir: str = "output" if is_production else "test-output"
     n_training_days: int = 150
     exclude_last_n_days: int = 1
+    fail_on_stale_data: bool = is_production
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
     locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
     # Add defaults here, or add in the launchpad with ctrl+space
@@ -320,6 +318,7 @@ def _run_fable_e_other(
 
     disease = model_base_config.diseases.current_value
     location = model_base_config.locations.current_value
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
@@ -335,14 +334,14 @@ def _run_fable_e_other(
     forecast_fable(
         disease=disease,
         loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
         output_dir=daily_forecast_output_dir,
         n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
         n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         epiweekly=epiweekly,
-        credentials_path=Path("config/creds.toml"),
+        run_date=run_date,
+        fail_on_stale_data=model_base_config.fail_on_stale_data,
     )
 
 
@@ -359,6 +358,7 @@ def _run_pyrenew_model(
 
     disease = model_base_config.diseases.current_value
     location = model_base_config.locations.current_value
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
     # we let the user potentially override the basedir,
     # but subdir is locked to the partition date
@@ -379,9 +379,6 @@ def _run_pyrenew_model(
     forecast_pyrenew(
         disease=disease,
         loc=location,
-        facility_level_nssp_data_dir=Path("nssp-etl/gold"),
-        nwss_data_dir=Path("nwss-vintages"),
-        param_data_dir=Path("params"),
         priors_path=Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
         output_dir=daily_forecast_output_dir,
         n_training_days=model_base_config.n_training_days,
@@ -390,8 +387,9 @@ def _run_pyrenew_model(
         n_warmup=pyrenew_config.n_warmup,
         n_samples=pyrenew_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
-        credentials_path=Path("config/creds.toml"),
         rng_key=pyrenew_config.rng_key,
+        run_date=run_date,
+        fail_on_stale_data=model_base_config.fail_on_stale_data,
         **fit_flags,
         **forecast_flags,
     )
@@ -407,9 +405,9 @@ def get_model_loc_dir(
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
 
-    report_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     first_training_date, last_training_date = calculate_training_dates(
-        report_date=report_date,
+        report_date=run_date,
         n_training_days=model_base_config.n_training_days,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         logger=context.log,
@@ -417,7 +415,7 @@ def get_model_loc_dir(
 
     model_batch_dir_name = get_model_batch_dir_name(
         disease=disease,
-        report_date=report_date,
+        report_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
     )

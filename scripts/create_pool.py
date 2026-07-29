@@ -6,10 +6,6 @@ client.create_pool(
     pool_name="stf-routine-forecasting-pool",
     vm_size="small",
     mounts=[
-        "nssp-archival-vintages",
-        "nssp-etl",
-        "nwss-vintages",
-        "prod-param-estimates",
         "stf-routine-forecasting-config",
         "stf-routine-forecasting-prod-output",
         "stf-routine-forecasting-test-output",

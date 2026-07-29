@@ -1,66 +1,48 @@
-from contextlib import nullcontext
-from datetime import date
+import datetime as dt
+from unittest.mock import patch
 
 import polars as pl
-import pytest
 
-from pipelines.data import prep_data
-
-valid_diseases = ["COVID-19", "Influenza", "RSV"]
+from pipelines.data.prep_data import process_and_save_loc_param
 
 
-@pytest.mark.parametrize(
-    "pivoted_raw_data",
-    [
-        pl.DataFrame(
-            {
-                "COVID-19": [10, 15, 20],
-                "Influenza": [12, 16, 22],
-                "RSV": [0, 2, 0],
-                "Total": [497, 502, 499],
-                "date": [date(2024, 12, 29), date(2025, 1, 1), date(2025, 1, 3)],
-            }
-        )
-    ],
-)
-@pytest.mark.parametrize("disease", valid_diseases + ["Iffluenza", "COVID_19"])
-@pytest.mark.parametrize(
-    "last_data_date",
-    [date(2025, 12, 12), date(2024, 12, 1), date(2025, 1, 2), date(2024, 12, 29)],
-)
-def test_clean_nssp_data(pivoted_raw_data, disease, last_data_date):
-    """
-    Confirm that clean_nssp_data works as expected.
-    """
-    raw_data = pivoted_raw_data.unpivot(
-        index="date", variable_name="disease", value_name="ed_visits"
+@patch("pipelines.data.prep_data.approx_lognorm", return_value=(1.2, 0.3))
+@patch("pipelines.data.prep_data.get_us_loc_pop_tbl")
+@patch("pipelines.data.prep_data.get_nnh_right_truncation_pmf")
+@patch("pipelines.data.prep_data.get_nnh_delay_pmf")
+@patch("pipelines.data.prep_data.get_nnh_generation_interval_pmf")
+def test_process_and_save_loc_param_loads_pmfs_from_cfa_stf_data(
+    mock_generation_interval,
+    mock_delay,
+    mock_right_truncation,
+    mock_loc_pop,
+    _mock_approx_lognorm,
+    tmp_path,
+):
+    as_of = dt.date(2026, 7, 28)
+    mock_generation_interval.return_value = [0.4, 0.6]
+    mock_delay.return_value = [0.2, 0.3, 0.5]
+    mock_right_truncation.return_value = [0.25, 0.75]
+    mock_loc_pop.return_value = pl.DataFrame(
+        {"abbr": ["CA"], "population": [39_000_000]}
     )
-    invalid_disease = disease not in valid_diseases
 
-    expect_empty_df = invalid_disease
+    process_and_save_loc_param(
+        loc_abb="CA",
+        disease="COVID-19",
+        fit_ed_visits=True,
+        save_dir=tmp_path,
+        as_of=as_of,
+    )
 
-    if expect_empty_df:
-        context = pytest.raises(pl.exceptions.ColumnNotFoundError, match=disease)
-    else:
-        context = nullcontext()
-    with context:
-        result = prep_data.clean_nssp_data(raw_data, disease, last_data_date)
-    if not expect_empty_df:
-        expected = (
-            pivoted_raw_data.select(
-                pl.col("date"),
-                pl.col(disease).alias("observed_ed_visits"),
-                pl.col("Total"),
-            )
-            .with_columns(
-                other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
-                data_type=pl.when(pl.col("date") <= last_data_date)
-                .then(pl.lit("train"))
-                .otherwise(pl.lit("eval")),
-            )
-            .drop("Total")
-            .sort("date")
-        )
-        assert result.select(
-            ["date", "observed_ed_visits", "other_ed_visits", "data_type"]
-        ).equals(expected)
+    mock_generation_interval.assert_called_once_with(
+        disease="COVID-19",
+        as_of=as_of,
+    )
+    mock_delay.assert_called_once_with(disease="COVID-19", as_of=as_of)
+    mock_right_truncation.assert_called_once_with(
+        loc_abb="CA",
+        disease="COVID-19",
+        as_of=as_of,
+        reference_date=as_of,
+    )

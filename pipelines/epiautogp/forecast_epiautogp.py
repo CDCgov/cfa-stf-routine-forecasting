@@ -1,4 +1,5 @@
 import argparse
+import datetime as dt
 import logging
 from pathlib import Path
 
@@ -86,9 +87,8 @@ def run_epiautogp_forecast(
 
 def main(
     disease: str,
-    report_date: str,
+    run_date: dt.date,
     loc: str,
-    facility_level_nssp_data_dir: Path | str,
     output_dir: Path | str,
     n_training_days: int,
     n_forecast_days: int,
@@ -96,8 +96,6 @@ def main(
     frequency: str,
     ed_visit_type: str = "observed",
     exclude_last_n_days: int = 0,
-    credentials_path: Path = None,
-    nhsn_data_path: Path = None,
     exclude_date_ranges: str = None,
     n_particles: int = 24,
     n_mcmc: int = 100,
@@ -105,9 +103,9 @@ def main(
     n_forecast_draws: int = 2000,
     smc_data_proportion: float = 0.1,
     n_threads: int | str = "auto",
-    param_data_dir: Path | str = Path("private_data", "prod_param_estimates"),
     nowcast_source_name: str = "none",
     reporting_delay_pmf: list[float] | None = None,
+    fail_on_stale_data: bool = False,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -124,14 +122,10 @@ def main(
     ----------
     disease : str
         Disease to model (e.g., "COVID-19", "Influenza", "RSV")
-    report_date : str
-        Report date in YYYY-MM-DD format or "latest"
+    run_date : datetime.date
+        Date of the forecast run
     loc : str
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
-    facility_level_nssp_data_dir : Path | str
-        Directory containing facility-level NSSP ED visit data
-    param_data_dir : Path | str
-        Directory containing parameter estimates such as reporting-delay PMFs
     output_dir : Path | str
         Root directory for output
     n_training_days : int
@@ -147,10 +141,6 @@ def main(
         Type of ED visits to model: "observed" (disease-related), "other" (non-disease background), or "pct" (percentage of total ED visits). Only applicable for NSSP target
     exclude_last_n_days : int, default=0
         Number of recent days to exclude from training
-    credentials_path : Path | None, default=None
-        Path to credentials file for data access
-    nhsn_data_path : Path | None, default=None
-        Path to NHSN hospital admission data
     exclude_date_ranges : str | None, default=None
         Comma-separated list of date ranges to exclude from training data.
         Format: 'YYYY-MM-DD:YYYY-MM-DD,YYYY-MM-DD' for ranges and single dates.
@@ -242,7 +232,7 @@ def main(
 
     logger.info(
         "Starting single-location EpiAutoGP forecasting pipeline for "
-        f"location {loc}, and report date {report_date}"
+        f"location {loc}, and run date {run_date}"
     )
 
     # Step 1: Setup pipeline (loads data, validates dates, creates directories)
@@ -254,18 +244,16 @@ def main(
         frequency=frequency,
         ed_visit_type=ed_visit_type,
         model_name=model_name,
-        nhsn_data_path=nhsn_data_path,
-        facility_level_nssp_data_dir=facility_level_nssp_data_dir,
         output_dir=output_dir,
         n_training_days=n_training_days,
         n_forecast_days=n_forecast_days,
         exclude_last_n_days=exclude_last_n_days,
         exclude_date_ranges=parsed_exclude_date_ranges,
-        credentials_path=credentials_path,
         logger=logger,
-        param_data_dir=param_data_dir,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        run_date=run_date,
+        fail_on_stale_data=fail_on_stale_data,
     )
 
     # Step 2: Prepare data for modelling (process location data, epiweekly data)
@@ -294,7 +282,7 @@ def main(
     logger.info(
         "Single-location EpiAutoGP pipeline complete "
         f"for location {loc}, and "
-        f"report date {report_date}."
+        f"run date {run_date}."
     )
     return None
 
@@ -308,15 +296,6 @@ if __name__ == "__main__":
     add_common_forecast_arguments(parser)
 
     # Add EpiAutoGP-specific arguments
-    parser.add_argument(
-        "--report-date",
-        type=str,
-        default="latest",
-        help=(
-            "Report date in YYYY-MM-DD format or 'latest' to use "
-            "the most recent available data (default: latest)."
-        ),
-    )
 
     parser.add_argument(
         "--target",
@@ -350,13 +329,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--param-data-dir",
-        type=Path,
-        default=Path("private_data", "prod_param_estimates"),
-        help="Directory containing parameter estimates such as reporting-delay PMFs.",
-    )
-
-    parser.add_argument(
         "--nowcast-source",
         dest="nowcast_source_name",
         type=str,
@@ -367,6 +339,11 @@ if __name__ == "__main__":
             "'reporting-delay' inflates recent counts using a reporting-delay "
             "PMF (default: none)."
         ),
+    )
+    parser.add_argument(
+        "--fail-on-stale-data",
+        action="store_true",
+        help="Fail instead of warning when selected input data is stale.",
     )
 
     parser.add_argument(

@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import polars.selectors as cs
-
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
+
 from pipelines.data.data_access import DataFreshness, ForecastData
 from pipelines.epiautogp.hubverse_nowcast import (
     HUBVERSE_MODEL_OUTPUT_SUBDIR,

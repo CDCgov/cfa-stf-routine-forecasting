@@ -875,6 +875,7 @@ def refresh_prod_server_image():
     cron_schedule="00 23 * * TUE",
     execution_timezone=tz,
     job_name="refresh_prod_server_image",
+    default_status=dg.DefaultScheduleStatus.RUNNING,
 )
 def reset_prod_server_image_for_wednesday():
     return dg.RunRequest(run_config=refresh_prod_server_image_config)

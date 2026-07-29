@@ -38,23 +38,9 @@ if [ -d "$BASE_DIR" ]; then
 	fi
 fi
 
-# Step 1: Generate test data
+# Step 1: Run EpiAutoGP forecasting pipeline for all locations and targets
 echo "========================================="
-echo "Step 1: Generating test data"
-echo "========================================="
-uv run python pipelines/data/generate_test_data.py "$BASE_DIR"
-
-if [ "$?" -ne 0 ]; then
-	echo "TEST-MODE FAIL: Generating test data failed"
-	exit 1
-else
-	echo "✓ Test data generated"
-	echo ""
-fi
-
-# Step 2: Run EpiAutoGP forecasting pipeline for all locations and targets
-echo "========================================="
-echo "Step 2: Running EpiAutoGP forecasts"
+echo "Step 1: Running EpiAutoGP forecasts"
 echo "========================================="
 
 for location in "${LOCATIONS[@]}"; do
@@ -133,7 +119,7 @@ done
 
 echo ""
 echo "========================================="
-echo "Step 3: Verifying outputs"
+echo "Step 2: Verifying outputs"
 echo "========================================="
 
 # Count expected outputs (4 targets × number of locations × number of diseases)

@@ -2,7 +2,7 @@ import datetime as dt
 import logging
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
 import polars as pl
 from cfa.stf.data import (
@@ -14,7 +14,7 @@ from cfa.stf.data import (
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 ForecastSourceName = Literal["nssp", "nhsn"]
-_FORECAST_SOURCE_NAMES = frozenset({"nssp", "nhsn"})
+_FORECAST_SOURCE_NAMES = frozenset(get_args(ForecastSourceName))
 
 
 @dataclass(frozen=True)

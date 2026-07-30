@@ -223,11 +223,13 @@ def _patch_dataops(monkeypatch) -> None:
         run_date,
         first_training_date,
         last_training_date,
+        sources,
         **kwargs,
     ):
         return make_forecast_data(
             location=loc_abb,
             disease=disease,
+            sources=sources,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
         )

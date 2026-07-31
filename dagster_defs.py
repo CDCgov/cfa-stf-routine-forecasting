@@ -245,18 +245,17 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     ) -> "ModelBaseConfig":
         """
         Return a copy of this config with any matching
-        overrides applied.
-
-        Each override is matched on the selectors it
-        specifies (``location``, ``disease``, ``model``);
-        an omitted selector matches every value. When
-        several entries match, later entries are used.
+        overrides applied. Each override is matched on
+        the selectors it specifies (``location``,
+        ``disease``, ``model``); an omitted selector
+        matches every value. When several entries match,
+        later entries are used.
 
         Parameters
         ----------
         disease : str | None
-            Disease of the current fan-out slice, or
-            None to skip disease matching.
+            Disease of the current slice, or None to
+            skip disease matching.
         location : str | None
             Location of the current fan-out slice, or
             None to skip location matching.

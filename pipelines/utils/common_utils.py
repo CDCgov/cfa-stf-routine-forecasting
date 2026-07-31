@@ -6,9 +6,7 @@ import os
 import re
 import runpy
 import subprocess
-import tomllib
 from pathlib import Path
-from typing import Any
 
 import polars as pl
 from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
@@ -23,38 +21,6 @@ disease_map_lower_ = {
     "rsv": "RSV",
 }
 loc_abbrs_ = LOCATION_LIST
-
-
-def load_credentials(
-    credentials_path: Path | str | None, logger: logging.Logger
-) -> dict[str, Any] | None:
-    """Load credentials from a TOML file."""
-    if credentials_path is not None:
-        cp = Path(credentials_path)
-        if not cp.suffix.lower() == ".toml":
-            raise ValueError(
-                "Credentials file must have the extension "
-                "'.toml' (not case-sensitive). Got "
-                f"{cp.suffix}"
-            )
-        logger.info(f"Reading in credentials from {cp}...")
-        with open(cp, "rb") as fp:
-            credentials_dict = tomllib.load(fp)
-    else:
-        logger.info("No credentials file given. Will proceed without one.")
-        credentials_dict = None
-
-    return credentials_dict
-
-
-def get_available_reports(
-    data_dir: str | Path, glob_pattern: str = "*.parquet"
-) -> list[dt.date]:
-    """Get available report dates from glob pattern matching files in a directory. Default pattern matches parquet files."""
-    return [
-        dt.datetime.strptime(f.stem, "%Y-%m-%d").date()
-        for f in Path(data_dir).glob(glob_pattern)
-    ]
 
 
 def _parse_single_date(date_str: str) -> tuple[dt.date, dt.date]:
@@ -731,7 +697,7 @@ def append_prop_data_to_combined_data(
     other_var: str = "other_ed_visits",
     prop_var: str = "prop_disease_ed_visits",
 ) -> None:
-    """Append disease ED visit proportion rows to a combined data file in place."""
+    """Append disease ED visit proportion rows when both inputs are available."""
     path = Path(data_path)
     suffix = path.suffix.lower()
 
@@ -744,6 +710,18 @@ def append_prop_data_to_combined_data(
     else:
         raise ValueError(
             "data_path must have a supported tabular extension: .tsv, .csv, or .parquet"
+        )
+
+    required_vars = {observed_var, other_var}
+    available_vars = set(data.get_column(".variable").unique().to_list())
+    present_required_vars = required_vars & available_vars
+    if not present_required_vars:
+        return
+    if present_required_vars != required_vars:
+        missing_vars = ", ".join(sorted(required_vars - available_vars))
+        raise ValueError(
+            "Cannot append ED visit proportions from incomplete NSSP data; "
+            f"missing variable(s): {missing_vars}"
         )
 
     data = append_prop_data(

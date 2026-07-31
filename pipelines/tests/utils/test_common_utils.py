@@ -15,31 +15,12 @@ from pipelines.utils.cli_utils import (
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
-    get_available_reports,
-    load_credentials,
     parse_exclude_date_ranges,
 )
 
 
 class TestValidationUtils:
     """Tests for validation and configuration utilities."""
-
-    def test_load_credentials_with_none_returns_none(self):
-        """Test that None credentials path returns None."""
-        logger = logging.getLogger(__name__)
-
-        result = load_credentials(None, logger)
-
-        assert result is None
-
-    def test_load_credentials_with_invalid_extension_raises_error(self, tmp_path):
-        """Test that non-TOML file extension raises ValueError."""
-        invalid_file = tmp_path / "credentials.txt"
-        invalid_file.write_text("not a toml file")
-        logger = logging.getLogger(__name__)
-
-        with pytest.raises(ValueError, match="must have the extension '.toml'"):
-            load_credentials(invalid_file, logger)
 
     @pytest.mark.parametrize(
         "n_training_days,exclude_last_n_days,expected_first,expected_last",
@@ -123,18 +104,44 @@ class TestValidationUtils:
 class TestDataWranglingUtils:
     """Tests for data loading and processing utilities."""
 
-    def test_get_available_reports_with_parquet_files(self, tmp_path):
-        """Test discovering available report dates from parquet files."""
-        (tmp_path / "2024-12-01.parquet").touch()
-        (tmp_path / "2024-12-15.parquet").touch()
-        (tmp_path / "2024-12-20.parquet").touch()
+    def test_append_prop_data_to_combined_data_skips_non_nssp_data(self, tmp_path):
+        data_path = tmp_path / "combined_data.tsv"
+        original = pl.DataFrame(
+            {
+                "date": ["2024-01-01"],
+                "location": ["US"],
+                ".variable": ["observed_hospital_admissions"],
+                ".value": [5],
+            }
+        )
+        original.write_csv(data_path, separator="\t")
 
-        result = get_available_reports(tmp_path)
+        append_prop_data_to_combined_data(data_path)
 
-        assert len(result) == 3
-        assert dt.date(2024, 12, 1) in result
-        assert dt.date(2024, 12, 15) in result
-        assert dt.date(2024, 12, 20) in result
+        result = pl.read_csv(data_path, separator="\t")
+        assert_frame_equal(result, original)
+
+    @pytest.mark.parametrize(
+        "present_var",
+        ["observed_ed_visits", "other_ed_visits"],
+    )
+    def test_append_prop_data_to_combined_data_rejects_incomplete_nssp(
+        self,
+        tmp_path,
+        present_var,
+    ):
+        data_path = tmp_path / "combined_data.tsv"
+        pl.DataFrame(
+            {
+                "date": ["2024-01-01"],
+                "location": ["US"],
+                ".variable": [present_var],
+                ".value": [5],
+            }
+        ).write_csv(data_path, separator="\t")
+
+        with pytest.raises(ValueError, match="incomplete NSSP data"):
+            append_prop_data_to_combined_data(data_path)
 
     def test_append_prop_data_to_combined_data_updates_tsv(self, tmp_path):
         data_path = tmp_path / "combined_data.tsv"
@@ -214,6 +221,8 @@ class TestCLIUtils:
                 "COVID-19",
                 "--loc",
                 "CA",
+                "--run-date",
+                "2026-01-08",
             ]
         )
 
@@ -222,6 +231,7 @@ class TestCLIUtils:
         assert args.n_training_days == 180  # default value
         assert args.n_forecast_days == 28  # default value
         assert args.exclude_last_n_days == 0  # default value
+        assert args.run_date == dt.date(2026, 1, 8)
 
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""

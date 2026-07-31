@@ -1,13 +1,20 @@
 """Generate deterministic synthetic data for pipeline integration tests."""
 
 import datetime as dt
+from collections.abc import Collection
 from dataclasses import dataclass
 
 import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
-from pipelines.data.data_access import DataFreshness, ForecastData
+from pipelines.data.data_access import (
+    DataFreshness,
+    ForecastData,
+    ForecastSourceName,
+    NHSNData,
+    NSSPData,
+)
 
 DEFAULT_LOCATIONS = ["CA", "US"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
@@ -240,9 +247,11 @@ def _make_nhsn(
 def make_forecast_data(
     location: str,
     disease: str,
+    sources: Collection[ForecastSourceName],
     first_training_date: dt.date = FIRST_OBS_DATE,
     last_training_date: dt.date = REPORT_DATE,
 ) -> ForecastData:
+    requested_sources = frozenset(sources)
     locations = sorted(set(DEFAULT_LOCATIONS + [location]))
     diseases = sorted(set(DEFAULT_DISEASES + [disease]))
     location_data = _location_data(locations)
@@ -286,16 +295,59 @@ def make_forecast_data(
         reason="Synthetic NHSN data",
     )
 
-    return ForecastData.from_source_frames(
+    nssp = (
+        NSSPData(
+            data=(
+                nssp_data.pivot(
+                    on="disease",
+                    values="ed_visits",
+                )
+                .rename({disease: "observed_ed_visits"})
+                .with_columns(
+                    other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
+                    data_type=pl.when(pl.col("date") <= last_training_date)
+                    .then(pl.lit("train"))
+                    .otherwise(pl.lit("eval")),
+                    resolution=pl.lit("daily"),
+                )
+                .drop("Total")
+                .sort("date")
+            ),
+            freshness=nssp_freshness,
+        )
+        if "nssp" in requested_sources
+        else None
+    )
+    nhsn = (
+        NHSNData(
+            data=(
+                nhsn_data.filter(pl.col("weekendingdate") >= first_training_date)
+                .with_columns(
+                    data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+                    .then(pl.lit("train"))
+                    .otherwise(pl.lit("eval")),
+                    resolution=pl.lit("epiweekly"),
+                )
+                .select(
+                    "weekendingdate",
+                    "jurisdiction",
+                    "hospital_admissions",
+                    "data_type",
+                    "resolution",
+                )
+            ),
+            freshness=nhsn_freshness,
+            prelim=False,
+        )
+        if "nhsn" in requested_sources
+        else None
+    )
+    return ForecastData(
         loc_abb=location,
         disease=disease,
         report_date=REPORT_DATE,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-        nssp_data=nssp_data,
-        nssp_freshness=nssp_freshness,
-        nhsn_data=nhsn_data,
-        nhsn_freshness=nhsn_freshness,
-        nhsn_prelim=False,
         loc_pop=location_by_abbr[location].population,
+        right_truncation_offset=(REPORT_DATE - last_training_date).days - 1,
+        nssp=nssp,
+        nhsn=nhsn,
     )

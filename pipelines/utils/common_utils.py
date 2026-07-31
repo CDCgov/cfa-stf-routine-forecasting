@@ -697,7 +697,7 @@ def append_prop_data_to_combined_data(
     other_var: str = "other_ed_visits",
     prop_var: str = "prop_disease_ed_visits",
 ) -> None:
-    """Append disease ED visit proportion rows to a combined data file in place."""
+    """Append disease ED visit proportion rows when both inputs are available."""
     path = Path(data_path)
     suffix = path.suffix.lower()
 
@@ -710,6 +710,18 @@ def append_prop_data_to_combined_data(
     else:
         raise ValueError(
             "data_path must have a supported tabular extension: .tsv, .csv, or .parquet"
+        )
+
+    required_vars = {observed_var, other_var}
+    available_vars = set(data.get_column(".variable").unique().to_list())
+    present_required_vars = required_vars & available_vars
+    if not present_required_vars:
+        return
+    if present_required_vars != required_vars:
+        missing_vars = ", ".join(sorted(required_vars - available_vars))
+        raise ValueError(
+            "Cannot append ED visit proportions from incomplete NSSP data; "
+            f"missing variable(s): {missing_vars}"
         )
 
     data = append_prop_data(

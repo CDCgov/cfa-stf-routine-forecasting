@@ -1,9 +1,67 @@
 import datetime as dt
+import json
 from unittest.mock import patch
 
 import polars as pl
+import pytest
 
-from pipelines.data.prep_data import process_and_save_loc_param
+from pipelines.data.prep_data import (
+    process_and_save_loc_data,
+    process_and_save_loc_param,
+)
+from pipelines.tests.factories import make_test_forecast_data
+from pipelines.utils.common_utils import append_prop_data_to_combined_data
+
+
+@pytest.mark.parametrize(
+    ("sources", "expected_variables"),
+    [
+        pytest.param(
+            ("nssp",),
+            {
+                "observed_ed_visits",
+                "other_ed_visits",
+                "prop_disease_ed_visits",
+            },
+            id="nssp-only",
+        ),
+        pytest.param(
+            ("nhsn",),
+            {"observed_hospital_admissions"},
+            id="nhsn-only",
+        ),
+        pytest.param(
+            ("nssp", "nhsn"),
+            {
+                "observed_ed_visits",
+                "other_ed_visits",
+                "observed_hospital_admissions",
+                "prop_disease_ed_visits",
+            },
+            id="both",
+        ),
+    ],
+)
+def test_process_and_save_loc_data_handles_present_sources(
+    tmp_path,
+    sources,
+    expected_variables,
+):
+    forecast_data = make_test_forecast_data(sources=sources)
+
+    process_and_save_loc_data(
+        forecast_data=forecast_data,
+        save_dir=tmp_path,
+    )
+    append_prop_data_to_combined_data(tmp_path / "combined_data.tsv")
+
+    with open(tmp_path / "data_for_model_fit.json") as file:
+        model_data = json.load(file)
+    assert (model_data["nssp_training_data"] is not None) == ("nssp" in sources)
+    assert (model_data["nhsn_training_data"] is not None) == ("nhsn" in sources)
+
+    combined_data = pl.read_csv(tmp_path / "combined_data.tsv", separator="\t")
+    assert set(combined_data.get_column(".variable")) == expected_variables
 
 
 @patch("pipelines.data.prep_data.approx_lognorm", return_value=(1.2, 0.3))

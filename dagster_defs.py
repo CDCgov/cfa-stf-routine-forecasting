@@ -274,7 +274,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
         overrides = {}
         for entry in self.config_overrides:
             # launchpad-supplied entries arrive as plain dicts;
-            # sending through ConfigOverride validates keys and 
+            # sending through ConfigOverride validates keys and
             # provides appropriate types
             if isinstance(entry, dict):
                 entry = ConfigOverride(**entry)

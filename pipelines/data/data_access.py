@@ -259,14 +259,15 @@ def apply_freshness_policy(
             record.reason,
         )
 
-    stale = [record for record in freshness if record.is_stale]
-    if not stale:
+    stale_records = [record for record in freshness if record.is_stale]
+    if not stale_records:
         return
 
-    message = "; ".join(record.reason for record in stale)
+    reasons = "; ".join(record.reason for record in stale_records)
+    message = f"Stale input data: {reasons}"
     if fail_on_stale_data:
-        raise RuntimeError(f"Stale input data: {message}")
-    logger.warning("Stale input data: %s", message)
+        raise RuntimeError(message)
+    logger.warning(message)
 
 
 def load_forecast_data(

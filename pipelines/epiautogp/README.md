@@ -5,6 +5,7 @@ This module provides a forecasting pipeline interface for the `EpiAutoGP` model.
 ## Overview
 
 The EpiAutoGP pipeline supports forecasting of:
+
 - **NSSP ED visits**: Emergency department visits from the National Syndromic Surveillance Program
 - **NHSN hospital admissions**: Hospital admission counts from the National Healthcare Safety Network
 
@@ -28,10 +29,12 @@ The forecasting pipeline consists of five main steps:
 Main entry point for the forecasting pipeline.
 
 **Key Functions:**
+
 - **`main()`**: Orchestrates the complete pipeline from setup to post-processing
 - **`run_epiautogp_forecast()`**: Executes the Julia EpiAutoGP model with specified parameters
 
 **EpiAutoGP-Specific Parameters:**
+
 - `--target`: Data type (`nssp` or `nhsn`)
 - `--frequency`: Temporal frequency (`daily` or `epiweekly`)
 - `--n-particles`: Number of particles for Sequential Monte Carlo (default: 24)
@@ -42,19 +45,25 @@ Main entry point for the forecasting pipeline.
 
 ### `forecast_spec.py`
 
-Defines the `ForecastSpec` value object — a frozen dataclass bundling the six fields that identify a single forecast run: `disease`, `loc`, `report_date`, `target`, `frequency`, `ed_visit_type`. These fields travel together through the pipeline and have inter-field validity constraints (see `_validate_epiautogp_parameters`), so they're treated as one cohesive unit. Lives in its own module to avoid an import cycle between `nowcast.py` and `epiautogp_forecast_utils.py`.
+Defines the `ForecastSpec` value object — a frozen dataclass bundling the six fields that identify a single forecast run: `disease`, `loc`, `report_date`, `target`, `frequency`, `ed_visit_type`.
+These fields travel together through the pipeline and have inter-field validity constraints (see `_validate_epiautogp_parameters`), so they're treated as one cohesive unit.
+Lives in its own module to avoid an import cycle between `nowcast.py` and `epiautogp_forecast_utils.py`.
 
 ### `epiautogp_forecast_utils.py`
 
 Shared utilities for the forecast pipeline, containing modular functions for each pipeline stage.
 
 **Data Classes:**
-- **`ForecastPipelineContext`**: Container for shared pipeline state. Embeds a `ForecastSpec` plus workflow-only fields (training dates, output directories, data sources, logger, nowcast source).
+
+- **`ForecastPipelineContext`**: Container for shared pipeline state.
+  Embeds a `ForecastSpec` plus workflow-only fields (training dates, output directories, data sources, logger, nowcast source).
 - **`ModelPaths`**: Container for output directory structure and file paths
 
 **Key Functions:**
+
 - **`setup_forecast_pipeline()`**: Builds the `ForecastSpec`, resolves the nowcast source, and assembles a `ForecastPipelineContext` for downstream stages.
-- **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`. Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
+- **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`.
+  Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
 
 ### `nowcast.py` & `reporting_delay_nowcast.py`
 
@@ -62,13 +71,15 @@ Pluggable nowcasting sources for nowcasting recent observations.
 
 - **`NowcastSource`** (Protocol): Declares `applies_to(*, forecast_spec) -> bool` (the predicate the resolver queries before constructing) and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
 - **`FixedNowcast`**: Trivial source wrapping a precomputed `NowcastData`.
-- **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF. Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.
+- **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF.
+  Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.
 
 ### `prep_epiautogp_data.py`
 
 Data conversion utilities for EpiAutoGP JSON format.
 
 **Key Function:**
+
 - **`convert_to_epiautogp_json()`**: Converts surveillance data to EpiAutoGP JSON format
   - Supports both NSSP (ED visits) and NHSN (hospital admission counts)
   - Handles daily and epiweekly data frequencies
@@ -76,6 +87,7 @@ Data conversion utilities for EpiAutoGP JSON format.
   - Validates input parameters and data availability
 
 **Input Data Sources:**
+
 1. **Legacy JSON Format**: `data_for_model_fit.json` with `nssp_training_data` and `nhsn_training_data`
 2. **TSV Files (Recommended)**:
    - Daily: `combined_data.tsv`
@@ -83,6 +95,7 @@ Data conversion utilities for EpiAutoGP JSON format.
    - Contains: `observed_ed_visits`, `other_ed_visits`, `observed_hospital_admissions`
 
 **Output Format:**
+
 ```json
 {
   "dates": ["2024-09-22", "2024-09-23", ...],
@@ -103,6 +116,7 @@ Data conversion utilities for EpiAutoGP JSON format.
 Post-processing utilities for EpiAutoGP outputs.
 
 **Key Function:**
+
 - **`calculate_credible_intervals()`**: Computes median and credible intervals from posterior samples
   - Default intervals: 50%, 80%, 95%
 - **`process_epiautogp_forecast()`**: Converts Julia outputs to R plotting format
@@ -137,6 +151,7 @@ output_dir/
 ## Integration with cfa-stf-routine-forecasting
 
 This module follows the same design patterns as other forecasting models in the cfa-stf-routine-forecasting pipeline:
+
 - Shared pipeline utilities (`setup_forecast_pipeline`, `prepare_model_data`)
 - Common data formats (TSV training data, hubverse tables)
 - Consistent directory structure

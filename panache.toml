@@ -1,0 +1,10 @@
+extend-exclude = [".github/"]
+flavor = "gfm"
+[format]
+wrap = "sentence"
+[formatters]
+python = "ruff"
+r = "air"
+[linters]
+python = "ruff"
+r = "jarl"

@@ -1,24 +1,20 @@
 """Generate deterministic synthetic data for pipeline integration tests."""
 
-import argparse
 import datetime as dt
 from dataclasses import dataclass
-from pathlib import Path
 
 import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
-from pipelines.data.generate_test_data_lib import (
-    FACILITY_LEVEL_NSSP_DATA_COLS,
-    LOC_LEVEL_NSSP_DATA_COLS,
-    NHSN_COLS,
-    create_default_param_estimates,
-)
+from pipelines.data.data_access import DataFreshness, ForecastData
 
-DEFAULT_LOCATIONS = ["CA", "DC"]
+DEFAULT_LOCATIONS = ["CA", "US"]
 DEFAULT_DISEASES = ["COVID-19", "Influenza"]
-REPORT_DATE = dt.date(2024, 12, 21)
+REPORT_DATE = dt.date.today()
+LAST_OBS_DATE = REPORT_DATE - dt.timedelta(
+    days=1
+)  # nssp data typically available through report date - 1
 OBS_WINDOW_DAYS = 120
 FIRST_OBS_DATE = REPORT_DATE - dt.timedelta(days=OBS_WINDOW_DAYS)
 
@@ -44,6 +40,29 @@ WEEK_ENDING_WEEKDAY = 5
 DAYS_PER_WEEK = 7
 
 _NSSP_DISEASE_NAMES = {"COVID-19": "COVID-19/Omicron"}
+_FACILITY_LEVEL_NSSP_DATA_COLS = [
+    "reference_date",
+    "report_date",
+    "geo_type",
+    "geo_value",
+    "asof",
+    "metric",
+    "run_id",
+    "facility",
+    "disease",
+    "value",
+]
+_LOC_LEVEL_NSSP_DATA_COLS = [
+    "reference_date",
+    "report_date",
+    "geo_type",
+    "geo_value",
+    "metric",
+    "disease",
+    "value",
+    "any_update_this_day",
+]
+_NHSN_COLS = ["jurisdiction", "weekendingdate", "hospital_admissions"]
 
 
 @dataclass(frozen=True)
@@ -140,36 +159,13 @@ def _weekending_dates() -> list[dt.date]:
     return _date_range(first_week, REPORT_DATE, step_days=DAYS_PER_WEEK)
 
 
-def _write_parquet(data: pl.DataFrame, directory: Path, file_name: str) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
-    data.write_parquet(directory / file_name)
-
-
-def _write_param_estimates(
-    private_data_dir: Path,
-    locations: list[str],
-    diseases: list[str],
-) -> None:
-    param_estimates = create_default_param_estimates(
-        states_to_simulate=locations,
-        diseases_to_simulate=diseases,
-        max_train_date_str=REPORT_DATE.isoformat(),
-        max_train_date=REPORT_DATE,
-    )
-    _write_parquet(
-        param_estimates,
-        private_data_dir / "prod_param_estimates",
-        "prod.parquet",
-    )
-
-
 def _make_facility_level_nssp(
     *,
     locations: list[LocationData],
     diseases: list[str],
 ) -> pl.DataFrame:
     rows = []
-    observation_dates = _date_range(FIRST_OBS_DATE, REPORT_DATE)
+    observation_dates = _date_range(FIRST_OBS_DATE, LAST_OBS_DATE)
     facility_ids = range(FIRST_FACILITY_ID, N_FACILITIES + 1)
     for location in locations:
         for date in observation_dates:
@@ -205,7 +201,7 @@ def _make_facility_level_nssp(
                     )
                 )
 
-    return pl.DataFrame(rows).select(cs.by_name(FACILITY_LEVEL_NSSP_DATA_COLS))
+    return pl.DataFrame(rows).select(cs.by_name(_FACILITY_LEVEL_NSSP_DATA_COLS))
 
 
 def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
@@ -214,7 +210,7 @@ def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
         .agg(pl.col("value").sum())
         .with_columns(pl.lit(True).alias("any_update_this_day"))
         .sort(["reference_date", "geo_value", "disease"])
-        .select(cs.by_name(LOC_LEVEL_NSSP_DATA_COLS))
+        .select(cs.by_name(_LOC_LEVEL_NSSP_DATA_COLS))
     )
 
 
@@ -238,87 +234,68 @@ def _make_nhsn(
             }
         )
 
-    return pl.DataFrame(rows).select(cs.by_name(NHSN_COLS))
+    return pl.DataFrame(rows).select(cs.by_name(_NHSN_COLS))
 
 
-def _write_nssp_data(private_data_dir: Path, facility_level_nssp: pl.DataFrame) -> None:
-    _write_parquet(
-        facility_level_nssp,
-        private_data_dir / "nssp_etl_gold",
-        f"{REPORT_DATE}.parquet",
-    )
-
-    state_level_nssp = _make_state_level_nssp(facility_level_nssp)
-    _write_parquet(
-        state_level_nssp,
-        private_data_dir / "nssp_state_level_gold",
-        f"{REPORT_DATE}.parquet",
-    )
-    _write_parquet(
-        state_level_nssp.select(cs.exclude("any_update_this_day")),
-        private_data_dir / "nssp-etl",
-        "latest_comprehensive.parquet",
-    )
-
-
-def _write_nhsn_data(
-    private_data_dir: Path,
-    locations: list[LocationData],
-    diseases: list[str],
-) -> None:
-    for location in locations:
-        for disease_index, disease in enumerate(diseases):
-            _write_parquet(
-                _make_nhsn(location=location, disease_index=disease_index),
-                private_data_dir / "nhsn_test_data",
-                f"{disease}_{location.abbr}.parquet",
-            )
-
-
-def main(
-    base_dir: Path,
-    locations: list[str] | None = None,
-    diseases: list[str] | None = None,
-) -> None:
-    locations = locations or DEFAULT_LOCATIONS
-    diseases = diseases or DEFAULT_DISEASES
+def make_forecast_data(
+    location: str,
+    disease: str,
+    first_training_date: dt.date = FIRST_OBS_DATE,
+    last_training_date: dt.date = REPORT_DATE,
+) -> ForecastData:
+    locations = sorted(set(DEFAULT_LOCATIONS + [location]))
+    diseases = sorted(set(DEFAULT_DISEASES + [disease]))
     location_data = _location_data(locations)
-
-    private_data_dir = base_dir / "private_data"
-    private_data_dir.mkdir(parents=True, exist_ok=True)
-
-    _write_param_estimates(private_data_dir, locations, diseases)
+    location_by_abbr = {item.abbr: item for item in location_data}
+    disease_index = diseases.index(disease)
+    nssp_disease = _NSSP_DISEASE_NAMES.get(disease, disease)
 
     facility_level_nssp = _make_facility_level_nssp(
         locations=location_data,
         diseases=diseases,
     )
-    _write_nssp_data(private_data_dir, facility_level_nssp)
-    _write_nhsn_data(private_data_dir, location_data, diseases)
-
-    # PyRenew accepts an NWSS directory even when wastewater is not fit.
-    (private_data_dir / "nwss_vintages").mkdir(exist_ok=True)
-    print(f"Successfully generated test data in {private_data_dir}")
-
-
-def _split_values(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create pipeline integration data.")
-    parser.add_argument("base_dir", type=Path, help="Base directory for output data.")
-    parser.add_argument(
-        "--locations",
-        type=_split_values,
-        default=DEFAULT_LOCATIONS,
-        help="Comma-separated location abbreviations to generate.",
+    nssp_data = (
+        _make_state_level_nssp(facility_level_nssp)
+        .filter(
+            pl.col("geo_value") == location,
+            pl.col("disease").is_in([nssp_disease, "Total"]),
+        )
+        .with_columns(disease=pl.col("disease").replace({nssp_disease: disease}))
+        .rename({"reference_date": "date", "value": "ed_visits"})
+        .select(["date", "geo_value", "disease", "ed_visits"])
     )
-    parser.add_argument(
-        "--diseases",
-        type=_split_values,
-        default=DEFAULT_DISEASES,
-        help="Comma-separated diseases to generate.",
+    nhsn_data = _make_nhsn(
+        location=location_by_abbr[location],
+        disease_index=disease_index,
+    ).with_columns(pl.lit(disease).alias("disease"))
+
+    nssp_freshness = DataFreshness(
+        source="nssp",
+        selected_version_date=REPORT_DATE,
+        latest_observed_date=nssp_data.get_column("date").max(),
+        run_date=REPORT_DATE,
+        is_stale=False,
+        reason="Synthetic NSSP data",
     )
-    args = parser.parse_args()
-    main(args.base_dir, locations=args.locations, diseases=args.diseases)
+    nhsn_freshness = DataFreshness(
+        source="nhsn",
+        selected_version_date=REPORT_DATE,
+        latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
+        run_date=REPORT_DATE,
+        is_stale=False,
+        reason="Synthetic NHSN data",
+    )
+
+    return ForecastData.from_source_frames(
+        loc_abb=location,
+        disease=disease,
+        report_date=REPORT_DATE,
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+        nssp_data=nssp_data,
+        nssp_freshness=nssp_freshness,
+        nhsn_data=nhsn_data,
+        nhsn_freshness=nhsn_freshness,
+        nhsn_prelim=False,
+        loc_pop=location_by_abbr[location].population,
+    )

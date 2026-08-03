@@ -5,8 +5,9 @@ import math
 
 import pytest
 
+from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.forecast_spec import ForecastSpec
-from pipelines.epiautogp.nowcast import FixedNowcast, NowcastData
+from pipelines.epiautogp.nowcast import FixedNowcast
 from pipelines.epiautogp.reporting_delay import (
     inflate_report,
     reporting_inflation_factors,

@@ -14,8 +14,8 @@ import datetime as dt
 import logging
 from dataclasses import dataclass
 
+from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.forecast_spec import ForecastSpec
-from pipelines.epiautogp.nowcast import NowcastData
 from pipelines.epiautogp.reporting_delay import (
     inflate_report,
     reporting_inflation_factors,

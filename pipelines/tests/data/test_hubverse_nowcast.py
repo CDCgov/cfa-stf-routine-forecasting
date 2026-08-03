@@ -6,9 +6,9 @@ import polars as pl
 import pytest
 
 from pipelines.data.hubverse_nowcast import HubverseNowcast
+from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.epiautogp_forecast_utils import _resolve_nowcast_source
 from pipelines.epiautogp.forecast_spec import ForecastSpec
-from pipelines.epiautogp.nowcast import NowcastData
 
 ORIGIN = dt.date(2026, 7, 18)
 NOWCAST_DATES = [dt.date(2026, 7, 4), dt.date(2026, 7, 11)]

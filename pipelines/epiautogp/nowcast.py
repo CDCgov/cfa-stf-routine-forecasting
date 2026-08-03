@@ -3,20 +3,11 @@ Generic nowcast objects for EpiAutoGP.
 """
 
 import datetime as dt
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
+from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.forecast_spec import ForecastSpec
-
-
-@dataclass(frozen=True)
-class NowcastData:
-    """
-    Dates and report series for nowcasting.
-    """
-
-    dates: list[dt.date] = field(default_factory=list)
-    reports: list[list[float]] = field(default_factory=list)
 
 
 class NowcastSource(Protocol):

@@ -21,7 +21,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pipeline-e2e:
+  fable:
+    name: Fable model test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
+
+      - name: Run Fable model test
+        run: >-
+          uv run pytest -s
+          pipelines/tests/integration/test_fable_forecast.py
+          --e2e-data-mode mock
+          --model-test-location CA
+          --model-test-disease COVID-19
+
+  pyrenew:
+    name: PyRenew H/E/HE model test
     runs-on: ubuntu-latest
     env:
       XLA_FLAGS: --xla_force_host_platform_device_count=2
@@ -34,8 +55,33 @@ jobs:
       - name: Set up routine forecasting R
         uses: ./.github/actions/setup-routine-forecasting-r
 
+      - name: Run PyRenew model test
+        run: >-
+          uv run pytest -s
+          pipelines/tests/integration/test_pyrenew_forecast.py
+          --e2e-data-mode mock
+          --model-test-location CA
+          --model-test-disease COVID-19
+
+  epiautogp:
+    name: EpiAutoGP model test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
+
       - name: Set up routine forecasting Julia
         uses: ./.github/actions/setup-routine-forecasting-julia
 
-      - name: Run pipeline integration test
-        run: uv run pytest -s -m pipeline_e2e pipelines/tests/integration
+      - name: Run EpiAutoGP model test
+        run: >-
+          uv run pytest -s
+          pipelines/tests/integration/test_epiautogp_forecast.py
+          --e2e-data-mode mock
+          --model-test-location CA
+          --model-test-disease COVID-19

@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - ".github/workflows/pipeline-run-check.yaml"
       - "pipelines/**"
       - "cfa/**"
       - "stfroutineforecasting/**"
@@ -11,6 +12,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/pipeline-run-check.yaml"
       - "pipelines/**"
       - "cfa/**"
       - "stfroutineforecasting/**"
@@ -21,6 +23,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pipeline-e2e:
+    name: Reduced pipeline end-to-end test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up routine forecasting Python
+        uses: ./.github/actions/setup-routine-forecasting-python
+
+      - name: Set up routine forecasting R
+        uses: ./.github/actions/setup-routine-forecasting-r
+
+      - name: Set up routine forecasting Julia
+        uses: ./.github/actions/setup-routine-forecasting-julia
+
+      - name: Run reduced pipeline end-to-end test
+        run: >-
+          uv run pytest -s
+          -m pipeline_e2e
+          pipelines/tests/integration/test_pipeline_end_to_end.py
+          --e2e-data-mode mock
+
   fable:
     name: Fable model test
     runs-on: ubuntu-latest
@@ -44,8 +68,6 @@ jobs:
   pyrenew:
     name: PyRenew H/E/HE model test
     runs-on: ubuntu-latest
-    env:
-      XLA_FLAGS: --xla_force_host_platform_device_count=2
     steps:
       - uses: actions/checkout@v7
 

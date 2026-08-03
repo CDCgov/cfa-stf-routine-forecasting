@@ -65,7 +65,7 @@ Shared utilities for the forecast pipeline, containing modular functions for eac
 - **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`.
   Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
 
-### `nowcast.py` & `reporting_delay_nowcast.py`
+### `nowcast.py`, `reporting_delay_nowcast.py`, and `../data/hubverse_nowcast.py`
 
 Pluggable nowcasting sources for nowcasting recent observations.
 

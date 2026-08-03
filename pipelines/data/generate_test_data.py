@@ -17,7 +17,7 @@ from pipelines.data.data_access import (
     NHSNData,
     NSSPData,
 )
-from pipelines.epiautogp.hubverse_nowcast import (
+from pipelines.data.hubverse_nowcast import (
     HUBVERSE_MODEL_OUTPUT_SUBDIR,
     HUBVERSE_TARGETS,
 )

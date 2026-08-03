@@ -12,11 +12,11 @@ from pathlib import Path
 
 import polars as pl
 
+from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ModelPaths,
 )
-from pipelines.epiautogp.nowcast import NowcastData
 
 
 def _validate_epiautogp_parameters(

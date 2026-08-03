@@ -1,5 +1,5 @@
 """
-Reporting-delay nowcasting for EpiAutoGP.
+Reporting-delay nowcasting for surveillance data.
 
 The estimator inflates the most-recent observations of a daily count series by
 the inverse of the reporting CDF. It is only meaningful for *count* targets:
@@ -10,13 +10,15 @@ would require distinct PMFs for the numerator and denominator series (see
 #1058).
 """
 
+from __future__ import annotations
+
 import datetime as dt
 import logging
 from dataclasses import dataclass
 
-from pipelines.epiautogp.forecast_spec import ForecastSpec
-from pipelines.epiautogp.nowcast import NowcastData
-from pipelines.epiautogp.reporting_delay import (
+from pipelines.data.forecast_spec import ForecastSpec
+from pipelines.data.nowcast import NowcastData
+from pipelines.data.reporting_delay import (
     inflate_report,
     reporting_inflation_factors,
 )

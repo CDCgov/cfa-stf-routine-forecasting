@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
+from pipelines.data.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
@@ -28,7 +29,6 @@ from pipelines.epiautogp.epiautogp_forecast_utils import (
     _resolve_nowcast_source,
     setup_forecast_pipeline,
 )
-from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.tests.factories import make_test_forecast_data
 
 

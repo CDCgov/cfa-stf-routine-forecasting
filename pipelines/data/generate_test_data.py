@@ -380,13 +380,15 @@ def write_hubverse_nowcasts(
     """
     locations = locations or DEFAULT_LOCATIONS
     diseases = diseases or DEFAULT_DISEASES
+    all_diseases = sorted(set(DEFAULT_DISEASES + diseases))
     location_data = _location_data(locations)
     private_data_dir = base_dir / "private_data"
     n_nowcast_dates = len(REPORTING_FRACTIONS) - 1
-    for disease_index, disease in enumerate(diseases):
+    for disease in diseases:
         if disease not in HUBVERSE_TARGETS:
             raise ValueError(f"No Hubverse target mapping for {disease!r}")
 
+        disease_index = all_diseases.index(disease)
         rng = np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index)
         rows = []
         disease_id = disease.lower().replace("-", "").replace(" ", "_")

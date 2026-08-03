@@ -4,7 +4,11 @@ from pathlib import Path
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from pipelines.data import prep_data
-from pipelines.data.generate_test_data import REPORT_DATE, make_forecast_data
+from pipelines.data.generate_test_data import (
+    REPORT_DATE,
+    REPORTING_DELAY_PMF,
+    make_forecast_data,
+)
 from pipelines.epiautogp import epiautogp_forecast_utils as epiautogp_utils
 from pipelines.epiautogp import forecast_epiautogp as epiautogp_module
 from pipelines.fable import forecast_fable as fable_module
@@ -27,7 +31,7 @@ def _normalize_pmf(weights: list[float]) -> list[float]:
 
 GENERATION_INTERVAL_PMF = _normalize_pmf([64, 23, 9, 3, 1])
 DELAY_PMF = _normalize_pmf([0, 2, 17, 24, 20, 14, 9, 6, 4, 2, 1, 1])
-RIGHT_TRUNCATION_PMF = _normalize_pmf([1, 0, 0, 0])
+RIGHT_TRUNCATION_PMF = _normalize_pmf(REPORTING_DELAY_PMF.tolist())
 
 
 def resolve_data_mode(request) -> str:
@@ -150,6 +154,9 @@ def run_epiautogp(
     target: str = "nssp",
     frequency: str = "daily",
     ed_visit_type: str = "other",
+    nowcast_source_name: str = "none",
+    hubverse_nowcast_dir: Path | None = None,
+    n_forecast_draws: int = 40,
 ) -> None:
     epiautogp_module.main(
         disease=disease,
@@ -165,9 +172,11 @@ def run_epiautogp(
         n_particles=2,
         n_mcmc=2,
         n_hmc=2,
-        n_forecast_draws=40,
+        n_forecast_draws=n_forecast_draws,
         smc_data_proportion=0.1,
         n_threads=2,
+        nowcast_source_name=nowcast_source_name,
+        hubverse_nowcast_dir=hubverse_nowcast_dir,
     )
 
 

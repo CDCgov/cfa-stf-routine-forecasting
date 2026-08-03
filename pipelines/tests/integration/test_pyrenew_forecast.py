@@ -7,7 +7,6 @@ from pipelines.tests.integration.model_test_utils import (
 )
 
 
-@pytest.mark.pipeline_e2e
 @pytest.mark.model_integration
 def test_pyrenew_forecast(pipeline_workspace, monkeypatch, request):
     disease = request.config.getoption("--model-test-disease")

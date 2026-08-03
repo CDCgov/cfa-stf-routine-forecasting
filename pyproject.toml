@@ -79,6 +79,7 @@ select = ["I", "E4", "E7", "E9", "F", "UP"]
 [tool.pytest.ini_options]
 markers = [
     "pipeline_e2e: end-to-end pipeline integration test",
+    "model_integration: single-model pipeline integration test",
 ]
 
 [tool.uv]

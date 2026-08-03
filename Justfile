@@ -9,18 +9,6 @@ default:
 dagster:
     uv run dagster_defs.py
 
-# Run the reduced pipeline end-to-end test in auto data mode.
-e2e-auto:
-    @just e2e auto
-
-# Run the reduced pipeline end-to-end test with real DataOps data.
-e2e-real:
-    @just e2e real
-
-# Run the reduced pipeline end-to-end test with mocked DataOps data.
-e2e-mock:
-    @just e2e mock
-
 # Run the reduced pipeline end-to-end test and retain its output in the repo.
 e2e data_mode="auto":
     #!/usr/bin/env bash
@@ -32,3 +20,27 @@ e2e data_mode="auto":
       --e2e-output-dir "{{e2e_output_dir}}" \
       --e2e-force \
       --e2e-data-mode "{{data_mode}}"
+
+# Test Fable for one disease and location with mock or real DataOps data.
+test-fable data_mode="auto" location="CA" disease="COVID-19":
+    uv run pytest -s \
+      pipelines/tests/integration/test_fable_forecast.py \
+      --e2e-data-mode "{{data_mode}}" \
+      --model-test-location "{{location}}" \
+      --model-test-disease "{{disease}}"
+
+# Test PyRenew for one disease and location with mock or real DataOps data.
+test-pyrenew data_mode="auto" location="CA" disease="COVID-19":
+    uv run pytest -s \
+      pipelines/tests/integration/test_pyrenew_forecast.py \
+      --e2e-data-mode "{{data_mode}}" \
+      --model-test-location "{{location}}" \
+      --model-test-disease "{{disease}}"
+
+# Test EpiAutoGP for one disease and location with mock or real DataOps data.
+test-epiautogp data_mode="auto" location="CA" disease="COVID-19":
+    uv run pytest -s \
+      pipelines/tests/integration/test_epiautogp_forecast.py \
+      --e2e-data-mode "{{data_mode}}" \
+      --model-test-location "{{location}}" \
+      --model-test-disease "{{disease}}"

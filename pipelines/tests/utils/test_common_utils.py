@@ -104,6 +104,45 @@ class TestValidationUtils:
 class TestDataWranglingUtils:
     """Tests for data loading and processing utilities."""
 
+    def test_append_prop_data_to_combined_data_skips_non_nssp_data(self, tmp_path):
+        data_path = tmp_path / "combined_data.tsv"
+        original = pl.DataFrame(
+            {
+                "date": ["2024-01-01"],
+                "location": ["US"],
+                ".variable": ["observed_hospital_admissions"],
+                ".value": [5],
+            }
+        )
+        original.write_csv(data_path, separator="\t")
+
+        append_prop_data_to_combined_data(data_path)
+
+        result = pl.read_csv(data_path, separator="\t")
+        assert_frame_equal(result, original)
+
+    @pytest.mark.parametrize(
+        "present_var",
+        ["observed_ed_visits", "other_ed_visits"],
+    )
+    def test_append_prop_data_to_combined_data_rejects_incomplete_nssp(
+        self,
+        tmp_path,
+        present_var,
+    ):
+        data_path = tmp_path / "combined_data.tsv"
+        pl.DataFrame(
+            {
+                "date": ["2024-01-01"],
+                "location": ["US"],
+                ".variable": [present_var],
+                ".value": [5],
+            }
+        ).write_csv(data_path, separator="\t")
+
+        with pytest.raises(ValueError, match="incomplete NSSP data"):
+            append_prop_data_to_combined_data(data_path)
+
     def test_append_prop_data_to_combined_data_updates_tsv(self, tmp_path):
         data_path = tmp_path / "combined_data.tsv"
         pl.DataFrame(

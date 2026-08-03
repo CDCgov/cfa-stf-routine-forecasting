@@ -72,6 +72,7 @@ def main(
         run_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
+        sources={"nssp"},
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )

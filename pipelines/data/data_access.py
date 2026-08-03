@@ -1,6 +1,8 @@
 import datetime as dt
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
+from typing import Literal, get_args
 
 import polars as pl
 from cfa.stf.data import (
@@ -10,6 +12,9 @@ from cfa.stf.data import (
     resolve_nssp_version,
 )
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
+
+ForecastSourceName = Literal["nssp", "nhsn"]
+_FORECAST_SOURCE_NAMES = frozenset(get_args(ForecastSourceName))
 
 
 @dataclass(frozen=True)
@@ -30,66 +35,12 @@ class ForecastSourceData:
 
 @dataclass(frozen=True)
 class NSSPData(ForecastSourceData):
-    @classmethod
-    def from_source_frame(
-        cls,
-        *,
-        data: pl.DataFrame,
-        freshness: DataFreshness,
-        disease: str,
-        last_training_date: dt.date,
-    ) -> "NSSPData":
-        cleaned_data = (
-            data.filter(pl.col("disease").is_in([disease, "Total"]))
-            .pivot(
-                on="disease",
-                values="ed_visits",
-            )
-            .rename({disease: "observed_ed_visits"})
-            .with_columns(
-                other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
-                data_type=pl.when(pl.col("date") <= last_training_date)
-                .then(pl.lit("train"))
-                .otherwise(pl.lit("eval")),
-                resolution=pl.lit("daily"),
-            )
-            .drop("Total")
-            .sort("date")
-        )
-        return cls(data=cleaned_data, freshness=freshness)
+    pass
 
 
 @dataclass(frozen=True)
 class NHSNData(ForecastSourceData):
     prelim: bool
-
-    @classmethod
-    def from_source_frame(
-        cls,
-        *,
-        data: pl.DataFrame,
-        freshness: DataFreshness,
-        prelim: bool,
-        first_training_date: dt.date,
-        last_training_date: dt.date,
-    ) -> "NHSNData":
-        cleaned_data = (
-            data.filter(pl.col("weekendingdate") >= first_training_date)
-            .with_columns(
-                data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
-                .then(pl.lit("train"))
-                .otherwise(pl.lit("eval")),
-                resolution=pl.lit("epiweekly"),
-            )
-            .select(
-                "weekendingdate",
-                "jurisdiction",
-                "hospital_admissions",
-                "data_type",
-                "resolution",
-            )
-        )
-        return cls(data=cleaned_data, freshness=freshness, prelim=prelim)
 
 
 @dataclass(frozen=True)
@@ -99,61 +50,16 @@ class ForecastData:
     report_date: dt.date
     loc_pop: int
     right_truncation_offset: int
-    nssp: NSSPData
-    nhsn: NHSNData
+    nssp: NSSPData | None = None
+    nhsn: NHSNData | None = None
 
-    @classmethod
-    def from_source_frames(
-        cls,
-        *,
-        loc_abb: str,
-        disease: str,
-        report_date: dt.date,
-        first_training_date: dt.date,
-        last_training_date: dt.date,
-        nssp_data: pl.DataFrame,
-        nssp_freshness: DataFreshness,
-        nhsn_data: pl.DataFrame,
-        nhsn_freshness: DataFreshness,
-        nhsn_prelim: bool,
-        loc_pop: int | None = None,
-    ) -> "ForecastData":
-        if loc_pop is None:
-            loc_pop = (
-                get_us_loc_pop_tbl()
-                .filter(pl.col("abbr") == loc_abb)
-                .item(0, "population")
-            )
-        # The first entry of a source right-truncation PMF corresponds to reports
-        # for reference_date = report_date - 1 as of report_date.
-        right_truncation_offset = (report_date - last_training_date).days - 1
-        nssp = NSSPData.from_source_frame(
-            data=nssp_data,
-            freshness=nssp_freshness,
-            disease=disease,
-            last_training_date=last_training_date,
-        )
-        nhsn = NHSNData.from_source_frame(
-            data=nhsn_data,
-            freshness=nhsn_freshness,
-            prelim=nhsn_prelim,
-            first_training_date=first_training_date,
-            last_training_date=last_training_date,
-        )
-
-        return cls(
-            loc_abb=loc_abb,
-            disease=disease,
-            report_date=report_date,
-            loc_pop=loc_pop,
-            right_truncation_offset=right_truncation_offset,
-            nssp=nssp,
-            nhsn=nhsn,
-        )
+    def __post_init__(self) -> None:
+        if self.nssp is None and self.nhsn is None:
+            raise ValueError("ForecastData requires at least one data source")
 
     @property
     def sources(self) -> tuple[ForecastSourceData, ...]:
-        return (self.nssp, self.nhsn)
+        return tuple(source for source in (self.nssp, self.nhsn) if source is not None)
 
     @property
     def freshness(self) -> tuple[DataFreshness, ...]:
@@ -184,9 +90,11 @@ def _load_dataops_nssp(
     loc_abb: str,
     disease: str,
     first_training_date: dt.date,
-) -> tuple[pl.DataFrame, dt.date]:
+    last_training_date: dt.date,
+    run_date: dt.date,
+) -> NSSPData:
     version_date = resolve_nssp_report_date()
-    data = (
+    source_data = (
         get_nssp(
             disease=[disease, "Total"],
             loc_abb=loc_abb,
@@ -197,7 +105,29 @@ def _load_dataops_nssp(
         .rename({"reference_date": "date", "value": "ed_visits"})
         .select(["date", "geo_value", "disease", "ed_visits"])
     )
-    return data, version_date
+    freshness = nssp_freshness(
+        selected_version_date=version_date,
+        latest_observed_date=source_data.get_column("date").max(),
+        run_date=run_date,
+    )
+    data = (
+        source_data.filter(pl.col("disease").is_in([disease, "Total"]))
+        .pivot(
+            on="disease",
+            values="ed_visits",
+        )
+        .rename({disease: "observed_ed_visits"})
+        .with_columns(
+            other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
+            data_type=pl.when(pl.col("date") <= last_training_date)
+            .then(pl.lit("train"))
+            .otherwise(pl.lit("eval")),
+            resolution=pl.lit("daily"),
+        )
+        .drop("Total")
+        .sort("date")
+    )
+    return NSSPData(data=data, freshness=freshness)
 
 
 def select_latest_nhsn_release() -> tuple[bool, dt.date]:
@@ -219,16 +149,39 @@ def _load_dataops_nhsn(
     disease: str,
     loc_abb: str,
     first_training_date: dt.date,
-) -> tuple[pl.DataFrame, bool, dt.date]:
+    last_training_date: dt.date,
+    run_date: dt.date,
+) -> NHSNData:
     prelim, version_date = select_latest_nhsn_release()
-    data = get_nhsn_hrd(
+    source_data = get_nhsn_hrd(
         disease=disease,
         loc_abb=loc_abb,
         prelim=prelim,
         start_date=first_training_date,
         lazy=False,
     )
-    return data, prelim, version_date
+    freshness = nhsn_freshness(
+        selected_version_date=version_date,
+        latest_observed_date=source_data.get_column("weekendingdate").max(),
+        run_date=run_date,
+    )
+    data = (
+        source_data.filter(pl.col("weekendingdate") >= first_training_date)
+        .with_columns(
+            data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+            .then(pl.lit("train"))
+            .otherwise(pl.lit("eval")),
+            resolution=pl.lit("epiweekly"),
+        )
+        .select(
+            "weekendingdate",
+            "jurisdiction",
+            "hospital_admissions",
+            "data_type",
+            "resolution",
+        )
+    )
+    return NHSNData(data=data, freshness=freshness, prelim=prelim)
 
 
 def nssp_freshness(
@@ -306,14 +259,15 @@ def apply_freshness_policy(
             record.reason,
         )
 
-    stale = [record for record in freshness if record.is_stale]
-    if not stale:
+    stale_records = [record for record in freshness if record.is_stale]
+    if not stale_records:
         return
 
-    message = "; ".join(record.reason for record in stale)
+    reasons = "; ".join(record.reason for record in stale_records)
+    message = f"Stale input data: {reasons}"
     if fail_on_stale_data:
-        raise RuntimeError(f"Stale input data: {message}")
-    logger.warning("Stale input data: %s", message)
+        raise RuntimeError(message)
+    logger.warning(message)
 
 
 def load_forecast_data(
@@ -323,49 +277,59 @@ def load_forecast_data(
     run_date: dt.date,
     first_training_date: dt.date,
     last_training_date: dt.date,
+    sources: Collection[ForecastSourceName],
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
 ) -> ForecastData:
     logger = logger or logging.getLogger(__name__)
+    requested_sources = frozenset(sources)
+    if not requested_sources:
+        raise ValueError("At least one forecast data source is required")
+    if invalid_sources := requested_sources - _FORECAST_SOURCE_NAMES:
+        invalid = ", ".join(sorted(invalid_sources))
+        raise ValueError(f"Unknown forecast data source(s): {invalid}")
 
-    nssp_data, nssp_version_date = _load_dataops_nssp(
-        loc_abb=loc_abb,
-        disease=disease,
-        first_training_date=first_training_date,
-    )
+    nssp = None
+    nhsn = None
+    freshness = []
+    if "nssp" in requested_sources:
+        nssp = _load_dataops_nssp(
+            loc_abb=loc_abb,
+            disease=disease,
+            first_training_date=first_training_date,
+            last_training_date=last_training_date,
+            run_date=run_date,
+        )
+        freshness.append(nssp.freshness)
 
-    nssp_record = nssp_freshness(
-        selected_version_date=nssp_version_date,
-        latest_observed_date=nssp_data.get_column("date").max(),
-        run_date=run_date,
-    )
+    if "nhsn" in requested_sources:
+        nhsn = _load_dataops_nhsn(
+            disease=disease,
+            loc_abb=loc_abb,
+            first_training_date=first_training_date,
+            last_training_date=last_training_date,
+            run_date=run_date,
+        )
+        freshness.append(nhsn.freshness)
 
-    nhsn_data, nhsn_prelim, nhsn_version_date = _load_dataops_nhsn(
-        disease=disease,
-        loc_abb=loc_abb,
-        first_training_date=first_training_date,
-    )
-
-    nhsn_record = nhsn_freshness(
-        selected_version_date=nhsn_version_date,
-        latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
-        run_date=run_date,
-    )
-    freshness = (nssp_record, nhsn_record)
     apply_freshness_policy(
-        freshness,
+        tuple(freshness),
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )
-    return ForecastData.from_source_frames(
+
+    loc_pop = (
+        get_us_loc_pop_tbl().filter(pl.col("abbr") == loc_abb).item(0, "population")
+    )
+    # The first entry of a source right-truncation PMF corresponds to reports
+    # for reference_date = report_date - 1 as of report_date.
+    right_truncation_offset = (run_date - last_training_date).days - 1
+    return ForecastData(
         loc_abb=loc_abb,
         disease=disease,
         report_date=run_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-        nssp_data=nssp_data,
-        nssp_freshness=nssp_record,
-        nhsn_data=nhsn_data,
-        nhsn_freshness=nhsn_record,
-        nhsn_prelim=nhsn_prelim,
+        loc_pop=loc_pop,
+        right_truncation_offset=right_truncation_offset,
+        nssp=nssp,
+        nhsn=nhsn,
     )

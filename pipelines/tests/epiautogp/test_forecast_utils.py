@@ -98,7 +98,36 @@ class TestSetupForecastPipeline:
         assert mock_calc_dates.call_args.args[0] == dt.date(2024, 12, 20)
         assert mock_load_data.call_args.kwargs["run_date"] == dt.date(2024, 12, 20)
         assert mock_load_data.call_args.kwargs["fail_on_stale_data"] is True
+        assert mock_load_data.call_args.kwargs["sources"] == {"nssp"}
         assert "report_date" not in mock_load_data.call_args.kwargs
+
+    @pytest.mark.parametrize("target", ["nssp", "nhsn"])
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
+    @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")
+    def test_setup_pipeline_requests_target_source(
+        self,
+        mock_calc_dates,
+        mock_load_data,
+        tmp_path,
+        target,
+    ):
+        mock_calc_dates.return_value = (dt.date(2024, 9, 22), dt.date(2024, 12, 20))
+        mock_load_data.return_value = make_test_forecast_data(sources={target})
+
+        setup_forecast_pipeline(
+            disease="COVID-19",
+            loc="CA",
+            target=target,
+            frequency="epiweekly",
+            ed_visit_type="observed",
+            model_name="test_model",
+            output_dir=tmp_path,
+            n_training_days=90,
+            n_forecast_days=28,
+            run_date=dt.date(2024, 12, 20),
+        )
+
+        assert mock_load_data.call_args.kwargs["sources"] == {target}
 
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.load_forecast_data")
     @patch("pipelines.epiautogp.epiautogp_forecast_utils.calculate_training_dates")

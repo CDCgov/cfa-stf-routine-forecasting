@@ -20,36 +20,44 @@ from pipelines.data.data_access import ForecastData
 def combine_surveillance_data(
     *,
     disease: str,
-    nssp_data: pl.DataFrame,
-    nhsn_data: pl.DataFrame,
+    nssp_data: pl.DataFrame | None,
+    nhsn_data: pl.DataFrame | None,
 ) -> pl.DataFrame:
-    nssp_data_long = nssp_data.unpivot(
-        on=["observed_ed_visits", "other_ed_visits"],
-        variable_name=".variable",
-        index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
-        value_name=".value",
-    ).with_columns(pl.lit(None).alias("lab_site_index"))
+    source_frames = []
+    if nssp_data is not None:
+        source_frames.append(
+            nssp_data.unpivot(
+                on=["observed_ed_visits", "other_ed_visits"],
+                variable_name=".variable",
+                index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
+                value_name=".value",
+            ).with_columns(pl.lit(None).alias("lab_site_index"))
+        )
 
-    nhsn_data_long = (
-        nhsn_data.rename(
-            {
-                "weekendingdate": "date",
-                "jurisdiction": "geo_value",
-                "hospital_admissions": "observed_hospital_admissions",
-            }
+    if nhsn_data is not None:
+        source_frames.append(
+            nhsn_data.rename(
+                {
+                    "weekendingdate": "date",
+                    "jurisdiction": "geo_value",
+                    "hospital_admissions": "observed_hospital_admissions",
+                }
+            )
+            .unpivot(
+                on="observed_hospital_admissions",
+                index=cs.exclude("observed_hospital_admissions"),
+                variable_name=".variable",
+                value_name=".value",
+            )
+            .with_columns(pl.lit(None).alias("lab_site_index"))
         )
-        .unpivot(
-            on="observed_hospital_admissions",
-            index=cs.exclude("observed_hospital_admissions"),
-            variable_name=".variable",
-            value_name=".value",
-        )
-        .with_columns(pl.lit(None).alias("lab_site_index"))
-    )
+
+    if not source_frames:
+        raise ValueError("At least one surveillance data source is required")
 
     return (
         pl.concat(
-            [nssp_data_long, nhsn_data_long],
+            source_frames,
             how="diagonal_relaxed",
         )
         .with_columns(pl.lit(disease).alias("disease"))
@@ -79,18 +87,30 @@ def process_and_save_loc_data(
 
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-    nssp_training_data = forecast_data.nssp.data.filter(pl.col("data_type") == "train")
-    nhsn_training_data = forecast_data.nhsn.data.filter(pl.col("data_type") == "train")
+    nssp_training_data = (
+        forecast_data.nssp.data.filter(pl.col("data_type") == "train")
+        if forecast_data.nssp is not None
+        else None
+    )
+    nhsn_training_data = (
+        forecast_data.nhsn.data.filter(pl.col("data_type") == "train")
+        if forecast_data.nhsn is not None
+        else None
+    )
 
     data_for_model_fit = {
         "loc_pop": forecast_data.loc_pop,
         "right_truncation_offset": forecast_data.right_truncation_offset,
         "nwss_training_data": None,
-        "nssp_training_data": nssp_training_data.drop("resolution").to_dict(
-            as_series=False
+        "nssp_training_data": (
+            nssp_training_data.drop("resolution").to_dict(as_series=False)
+            if nssp_training_data is not None
+            else None
         ),
-        "nhsn_training_data": nhsn_training_data.drop("resolution").to_dict(
-            as_series=False
+        "nhsn_training_data": (
+            nhsn_training_data.drop("resolution").to_dict(as_series=False)
+            if nhsn_training_data is not None
+            else None
         ),
         "nhsn_step_size": 7,
         "nssp_step_size": 1,
@@ -102,8 +122,8 @@ def process_and_save_loc_data(
 
     combined_data = combine_surveillance_data(
         disease=forecast_data.disease,
-        nssp_data=forecast_data.nssp.data,
-        nhsn_data=forecast_data.nhsn.data,
+        nssp_data=forecast_data.nssp.data if forecast_data.nssp is not None else None,
+        nhsn_data=forecast_data.nhsn.data if forecast_data.nhsn is not None else None,
     )
 
     logger.info(f"Saving {forecast_data.loc_abb} to {save_dir}")

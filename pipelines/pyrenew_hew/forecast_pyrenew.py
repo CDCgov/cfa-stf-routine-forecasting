@@ -124,12 +124,19 @@ def main(
         logger,
     )
 
+    sources = set()
+    if fit_ed_visits:
+        sources.add("nssp")
+    if fit_hospital_admissions:
+        sources.add("nhsn")
+
     forecast_data = load_forecast_data(
         disease=disease,
         loc_abb=loc,
         run_date=run_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
+        sources=sources,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
     )

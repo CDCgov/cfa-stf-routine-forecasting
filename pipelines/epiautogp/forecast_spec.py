@@ -1,8 +1,9 @@
 """
 Forecast specification value object.
 
-Lives in the data layer alongside the nowcast protocols and implementations so
-pipeline orchestration can consume the same value object without import cycles.
+Lives in its own module so that both `nowcast.py` (which the protocol and its
+implementations live in) and `epiautogp_forecast_utils.py` (which builds and
+consumes specs) can import it.
 """
 
 from dataclasses import dataclass

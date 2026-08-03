@@ -5,11 +5,13 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 
-from pipelines.data.forecast_spec import ForecastSpec
-from pipelines.data.nowcast import NowcastData
+if TYPE_CHECKING:
+    from pipelines.epiautogp.forecast_spec import ForecastSpec
+    from pipelines.epiautogp.nowcast import NowcastData
 
 HUBVERSE_MODEL_OUTPUT_SUBDIR = Path("model-output", "CFA-nowcastNHSN")
 HUBVERSE_TARGETS = {
@@ -184,5 +186,7 @@ class HubverseNowcast:
                 "output_type_id", maintain_order=True
             )
         ]
+
+        from pipelines.epiautogp.nowcast import NowcastData
 
         return NowcastData(dates=nowcast_dates, reports=nowcast_reports)

@@ -1,5 +1,5 @@
 """
-Data-layer reporting-delay helpers shared across nowcast sources.
+Reporting-delay helpers shared across nowcast sources.
 """
 
 from itertools import accumulate

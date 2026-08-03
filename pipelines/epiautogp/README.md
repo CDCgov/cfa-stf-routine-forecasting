@@ -43,11 +43,11 @@ Main entry point for the forecasting pipeline.
 - `--n-forecast-draws`: Number of forecast draws (default: 2000)
 - `--smc-data-proportion`: Data proportion per SMC step (default: 0.1)
 
-### `../data/forecast_spec.py`
+### `forecast_spec.py`
 
 Defines the `ForecastSpec` value object — a frozen dataclass bundling the six fields that identify a single forecast run: `disease`, `loc`, `report_date`, `target`, `frequency`, `ed_visit_type`.
 These fields travel together through the pipeline and have inter-field validity constraints (see `_validate_epiautogp_parameters`), so they're treated as one cohesive unit.
-Lives in the data layer alongside the shared nowcast abstractions to avoid import cycles with `epiautogp_forecast_utils.py`.
+Lives in its own module to avoid an import cycle between `nowcast.py` and `epiautogp_forecast_utils.py`.
 
 ### `epiautogp_forecast_utils.py`
 
@@ -65,7 +65,7 @@ Shared utilities for the forecast pipeline, containing modular functions for eac
 - **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`.
   Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
 
-### `../data/nowcast.py`, `../data/reporting_delay_nowcast.py`, and `../data/hubverse_nowcast.py`
+### `nowcast.py`, `reporting_delay_nowcast.py`, and `../data/hubverse_nowcast.py`
 
 Pluggable nowcasting sources for nowcasting recent observations.
 

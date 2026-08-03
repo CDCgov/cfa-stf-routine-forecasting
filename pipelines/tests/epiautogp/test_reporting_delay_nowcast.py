@@ -5,13 +5,13 @@ import math
 
 import pytest
 
-from pipelines.data.forecast_spec import ForecastSpec
-from pipelines.data.nowcast import FixedNowcast, NowcastData
-from pipelines.data.reporting_delay import (
+from pipelines.epiautogp.forecast_spec import ForecastSpec
+from pipelines.epiautogp.nowcast import FixedNowcast, NowcastData
+from pipelines.epiautogp.reporting_delay import (
     inflate_report,
     reporting_inflation_factors,
 )
-from pipelines.data.reporting_delay_nowcast import ReportingDelayNowcast
+from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
 def _spec(

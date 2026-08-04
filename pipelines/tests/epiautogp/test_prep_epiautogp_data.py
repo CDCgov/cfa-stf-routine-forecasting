@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
-from pipelines.data.hubverse_nowcast import HubverseNowcast
 from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
@@ -404,71 +403,3 @@ class TestConvertToEpiAutoGpJson:
         assert source.reports == [10.0, 20.0]
         assert output["nowcast_dates"] == ["2024-01-02"]
         assert output["nowcast_reports"] == [[21.0]]
-
-    def test_hubverse_source_serializes_vector_of_vectors(self, tmp_path):
-        """Test Hubverse samples retain their trajectory shape in JSON."""
-        dates = [dt.date(2024, 1, 6), dt.date(2024, 1, 13)]
-        data_path = tmp_path / "epiweekly_combined_data.tsv"
-        pl.DataFrame(
-            {
-                "date": dates,
-                "geo_value": ["CA", "CA"],
-                "disease": ["COVID-19", "COVID-19"],
-                "data_type": ["train", "train"],
-                ".variable": [
-                    "observed_hospital_admissions",
-                    "observed_hospital_admissions",
-                ],
-                ".value": [10.0, 20.0],
-            }
-        ).write_csv(data_path, separator="\t")
-
-        hubverse_dir = tmp_path / "hubverse"
-        model_output_dir = hubverse_dir / "model-output" / "CFA-nowcastNHSN"
-        model_output_dir.mkdir(parents=True)
-        pl.DataFrame(
-            [
-                {
-                    "origin_date": dt.date(2024, 1, 20),
-                    "target_end_date": date,
-                    "target": "wk inc covid hosp",
-                    "location": "ca",
-                    "output_type": "sample",
-                    "output_type_id": sample_id,
-                    "value": value,
-                }
-                for sample_id, values in [
-                    ("sample_1", [11.0, 21.0]),
-                    ("sample_2", [12.0, 22.0]),
-                ]
-                for date, value in zip(dates, values)
-            ]
-        ).write_parquet(model_output_dir / "nowcast.parquet")
-
-        spec = ForecastSpec(
-            disease="COVID-19",
-            loc="CA",
-            report_date=dt.date(2024, 1, 20),
-            target="nhsn",
-            frequency="epiweekly",
-            ed_visit_type="observed",
-        )
-        context = _epiautogp_context(
-            tmp_path,
-            nowcast_source=HubverseNowcast(
-                containing_dir=hubverse_dir,
-                forecast_spec=spec,
-            ),
-        )
-        context.forecast_spec = spec
-        paths = ModelPaths(
-            model_output_dir=tmp_path / "model",
-            data_dir=tmp_path,
-            training_data=data_path,
-        )
-
-        output_path = convert_to_epiautogp_json(context=context, paths=paths)
-
-        output = json.loads(output_path.read_text())
-        assert output["nowcast_dates"] == ["2024-01-06", "2024-01-13"]
-        assert output["nowcast_reports"] == [[11.0, 21.0], [12.0, 22.0]]

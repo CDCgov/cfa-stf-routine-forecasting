@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Literal, get_args
 
 from cfa.stf.data import get_nnh_right_truncation_pmf
 
@@ -18,9 +18,10 @@ from pipelines.data.data_access import (
     ForecastData,
     load_forecast_data,
 )
+from pipelines.data.hubverse_nowcast import HubverseNowcast
+from pipelines.data.nowcast import NowcastSource
 from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
-from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
@@ -31,7 +32,7 @@ from pipelines.utils.common_utils import (
     model_fit_dir_to_hub_tbl,
 )
 
-NowcastSourceName = Literal["none", "reporting-delay"]
+NowcastSourceName = Literal["none", "reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
@@ -169,16 +170,15 @@ def _resolve_nowcast_source(
     *,
     forecast_spec: ForecastSpec,
     nowcast_source_name: NowcastSourceName,
-    **options: Any,
+    reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_dir: Path | str | None = None,
 ) -> NowcastSource | None:
-    """
-    Resolve the requested nowcast source for one EpiAutoGP run.
+    """Resolve the requested nowcast source for one EpiAutoGP run."""
+    if reporting_delay_pmf is not None and hubverse_nowcast_dir is not None:
+        raise ValueError(
+            "reporting_delay_pmf and hubverse_nowcast_dir are mutually exclusive."
+        )
 
-    `forecast_spec` and `nowcast_source_name` are universal; remaining keyword
-    arguments are forwarded as-is to the chosen source's builder, which is
-    responsible for validating them. New nowcast approaches plug in by adding
-    a new case here and a builder that defines its own required kwargs.
-    """
     match nowcast_source_name:
         case "none":
             return None
@@ -189,7 +189,23 @@ def _resolve_nowcast_source(
                     f"target={forecast_spec.target!r}, ed_visit_type={forecast_spec.ed_visit_type!r}."
                 )
             return _build_reporting_delay_nowcast(
-                forecast_spec=forecast_spec, **options
+                forecast_spec=forecast_spec,
+                reporting_delay_pmf=reporting_delay_pmf,
+            )
+        case "hubverse":
+            if not HubverseNowcast.applies_to(forecast_spec=forecast_spec):
+                raise ValueError(
+                    "hubverse nowcasting is only applicable to NHSN "
+                    "epiweekly observed counts."
+                )
+            if hubverse_nowcast_dir is None:
+                raise ValueError(
+                    "hubverse_nowcast_dir is required when Hubverse nowcasting is "
+                    "requested."
+                )
+            return HubverseNowcast(
+                containing_dir=Path(hubverse_nowcast_dir),
+                forecast_spec=forecast_spec,
             )
         case _:
             raise ValueError(
@@ -214,6 +230,7 @@ def setup_forecast_pipeline(
     logger: logging.Logger | None = None,
     nowcast_source_name: NowcastSourceName = "none",
     reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_dir: Path | str | None = None,
     fail_on_stale_data: bool = False,
 ) -> ForecastPipelineContext:
     """
@@ -257,11 +274,14 @@ def setup_forecast_pipeline(
         Each tuple contains (start_date, end_date).
     logger : logging.Logger | None, default=None
         Logger instance. If None, creates a new logger
-    nowcast_source_name : {"none", "reporting-delay"}, default="none"
+    nowcast_source_name : {"none", "reporting-delay", "hubverse"}, default="none"
         Nowcast source selection for EpiAutoGP input.
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. If omitted, the PMF is loaded
         through `cfa-stf-data`.
+    hubverse_nowcast_dir : Path | str | None, default=None
+        Local directory containing the materialized Hubverse model output.
+        Required when Hubverse nowcasting is selected.
 
     Returns
     -------
@@ -323,6 +343,7 @@ def setup_forecast_pipeline(
         forecast_spec=forecast_spec,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        hubverse_nowcast_dir=hubverse_nowcast_dir,
     )
 
     return ForecastPipelineContext(

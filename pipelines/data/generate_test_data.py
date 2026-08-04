@@ -3,7 +3,9 @@
 import datetime as dt
 from collections.abc import Collection
 from dataclasses import dataclass
+from pathlib import Path
 
+import numpy as np
 import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
@@ -14,6 +16,10 @@ from pipelines.data.data_access import (
     ForecastSourceName,
     NHSNData,
     NSSPData,
+)
+from pipelines.data.hubverse_nowcast import (
+    HUBVERSE_MODEL_OUTPUT_SUBDIR,
+    HUBVERSE_TARGETS,
 )
 
 DEFAULT_LOCATIONS = ["CA", "US"]
@@ -45,6 +51,14 @@ NHSN_SEASONAL_INCREMENT_PERCENT = 0.0001
 NHSN_SEASONAL_PERIOD_WEEKS = 4
 WEEK_ENDING_WEEKDAY = 5
 DAYS_PER_WEEK = 7
+
+REPORTING_FRACTIONS = np.array([0.6, 0.8, 0.9, 0.99, 1.0])
+REPORTING_DELAY_PMF = np.diff(np.insert(REPORTING_FRACTIONS, 0, 0.0))
+
+HUBVERSE_NOWCAST_DIR_NAME = "hubverse_nowcasts"
+HUBVERSE_N_SAMPLES = 40
+HUBVERSE_LOGNORMAL_SIGMA = 0.05
+HUBVERSE_RANDOM_SEED = 12345
 
 _NSSP_DISEASE_NAMES = {"COVID-19": "COVID-19/Omicron"}
 _FACILITY_LEVEL_NSSP_DATA_COLS = [
@@ -351,3 +365,134 @@ def make_forecast_data(
         nssp=nssp,
         nhsn=nhsn,
     )
+
+
+def _make_location_hubverse_nowcasts(
+    *,
+    location: LocationData,
+    disease: str,
+    disease_index: int,
+    rng: np.random.Generator,
+) -> list[dict]:
+    """Make noisy Hubverse sample nowcasts for one disease and location."""
+    n_nowcast_dates = len(REPORTING_FRACTIONS) - 1
+    recent_reports = (
+        _make_nhsn(
+            location=location,
+            disease_index=disease_index,
+        )
+        .filter(pl.col("weekendingdate") < REPORT_DATE)
+        .tail(n_nowcast_dates)
+    )
+    if recent_reports.height != n_nowcast_dates:
+        raise ValueError(
+            f"Expected {n_nowcast_dates} NHSN reports for "
+            f"{disease}, {location.abbr}; found {recent_reports.height}"
+        )
+
+    dates = recent_reports.get_column("weekendingdate").to_list()
+    reports = recent_reports.get_column("hospital_admissions").to_numpy()
+    horizons = [
+        (target_end_date - REPORT_DATE).days // DAYS_PER_WEEK
+        for target_end_date in dates
+    ]
+    fractions = np.array([REPORTING_FRACTIONS[-horizon - 1] for horizon in horizons])
+    expected_final_counts = reports / fractions
+    log_means = np.log(expected_final_counts) - HUBVERSE_LOGNORMAL_SIGMA**2 / 2
+    samples = rng.lognormal(
+        mean=log_means,
+        sigma=HUBVERSE_LOGNORMAL_SIGMA,
+        size=(HUBVERSE_N_SAMPLES, n_nowcast_dates),
+    )
+    disease_id = disease.lower().replace("-", "").replace(" ", "_")
+
+    return [
+        {
+            "origin_date": REPORT_DATE,
+            "target_end_date": target_end_date,
+            "horizon": horizon,
+            "target": HUBVERSE_TARGETS[disease],
+            "location": location.abbr.lower(),
+            "output_type": "sample",
+            "output_type_id": (f"{disease_id}_{location.abbr.lower()}_{sample_index}"),
+            "value": value,
+        }
+        for sample_index, trajectory in enumerate(samples, start=1)
+        for target_end_date, horizon, value in zip(dates, horizons, trajectory)
+    ]
+
+
+def _make_disease_hubverse_nowcasts(
+    *,
+    locations: list[LocationData],
+    disease: str,
+    disease_index: int,
+) -> pl.DataFrame:
+    """Make noisy Hubverse sample nowcasts for one disease."""
+    rng = np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index)
+    rows = []
+    for location in locations:
+        rows.extend(
+            _make_location_hubverse_nowcasts(
+                location=location,
+                disease=disease,
+                disease_index=disease_index,
+                rng=rng,
+            )
+        )
+
+    return pl.DataFrame(rows).with_columns(
+        pl.col("horizon").cast(pl.Int32),
+        pl.col("value").cast(pl.Float64),
+    )
+
+
+def _write_disease_hubverse_nowcasts(
+    *,
+    base_dir: Path,
+    disease: str,
+    nowcasts: pl.DataFrame,
+) -> None:
+    """Write one disease's Hubverse nowcasts to its production-style path."""
+    output_dir = (
+        base_dir
+        / "private_data"
+        / HUBVERSE_NOWCAST_DIR_NAME
+        / disease.lower()
+        / HUBVERSE_MODEL_OUTPUT_SUBDIR
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    nowcasts.write_parquet(output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet")
+
+
+def write_hubverse_nowcasts(
+    base_dir: Path,
+    locations: list[str] | None = None,
+    diseases: list[str] | None = None,
+) -> None:
+    """
+    Write noisy sample nowcasts in the production Hubverse schema.
+
+    This reuses `_make_nhsn` to generate the underlying "true" counts for the
+    most recent weeks, then adds fixed-sigma lognormal noise to simulate the
+    nowcast process.
+    """
+    locations = locations or DEFAULT_LOCATIONS
+    diseases = diseases or DEFAULT_DISEASES
+    all_diseases = sorted(set(DEFAULT_DISEASES + diseases))
+    location_data = _location_data(locations)
+
+    for disease in diseases:
+        if disease not in HUBVERSE_TARGETS:
+            raise ValueError(f"No Hubverse target mapping for {disease!r}")
+        disease_index = all_diseases.index(disease)
+        nowcasts = _make_disease_hubverse_nowcasts(
+            locations=location_data,
+            disease=disease,
+            disease_index=disease_index,
+        )
+        _write_disease_hubverse_nowcasts(
+            base_dir=base_dir,
+            disease=disease,
+            nowcasts=nowcasts,
+        )

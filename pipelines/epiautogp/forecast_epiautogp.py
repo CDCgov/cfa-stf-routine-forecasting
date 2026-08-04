@@ -105,6 +105,7 @@ def main(
     n_threads: int | str = "auto",
     nowcast_source_name: str = "none",
     reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_dir: Path | str | None = None,
     fail_on_stale_data: bool = False,
 ) -> None:
     """
@@ -158,9 +159,12 @@ def main(
     n_threads : int | str, default="auto"
         Number of threads for Julia execution (integer or "auto")
     nowcast_source_name : str, default="none"
-        Nowcast source to use: "none" or "reporting-delay"
+        Nowcast source to use: "none", "reporting-delay", or "hubverse"
     reporting_delay_pmf : list[float] | None, default=None
         Directly supplied reporting-delay PMF. Python API only.
+    hubverse_nowcast_dir : Path | str | None, default=None
+        Local directory containing a materialized Hubverse model-output asset.
+        Required when nowcast_source_name="hubverse".
 
     Returns
     -------
@@ -252,6 +256,7 @@ def main(
         logger=logger,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
+        hubverse_nowcast_dir=hubverse_nowcast_dir,
         run_date=run_date,
         fail_on_stale_data=fail_on_stale_data,
     )
@@ -337,7 +342,18 @@ if __name__ == "__main__":
         help=(
             "Nowcast source to use: 'none' disables nowcasting; "
             "'reporting-delay' inflates recent counts using a reporting-delay "
-            "PMF (default: none)."
+            "PMF; 'hubverse' reads sample trajectories from a materialized "
+            "Hubverse asset (default: none)."
+        ),
+    )
+
+    parser.add_argument(
+        "--hubverse-nowcast-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Local directory containing model-output/CFA-nowcastNHSN. "
+            "Required with --nowcast-source hubverse."
         ),
     )
     parser.add_argument(

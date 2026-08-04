@@ -14,12 +14,12 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
+from pipelines.data.nowcast import NowcastData
 from pipelines.epiautogp.epiautogp_forecast_utils import (
     ForecastPipelineContext,
     ForecastSpec,
     ModelPaths,
 )
-from pipelines.epiautogp.nowcast import NowcastData
 from pipelines.epiautogp.prep_epiautogp_data import (
     _apply_date_exclusions,
     convert_to_epiautogp_json,

@@ -19,9 +19,9 @@ from pipelines.data.data_access import (
     load_forecast_data,
 )
 from pipelines.data.hubverse_nowcast import HubverseNowcast
+from pipelines.data.nowcast import NowcastSource
 from pipelines.data.prep_data import process_and_save_loc_data
 from pipelines.epiautogp.forecast_spec import ForecastSpec
-from pipelines.epiautogp.nowcast import NowcastSource
 from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,

@@ -12,6 +12,16 @@ from pipelines.epiautogp.forecast_spec import ForecastSpec
 
 ORIGIN = dt.date(2026, 7, 18)
 NOWCAST_DATES = [dt.date(2026, 7, 4), dt.date(2026, 7, 11)]
+HUBVERSE_SCHEMA = {
+    "origin_date": pl.Date,
+    "target_end_date": pl.Date,
+    "horizon": pl.Int32,
+    "target": pl.String,
+    "location": pl.String,
+    "output_type": pl.String,
+    "output_type_id": pl.String,
+    "value": pl.Float64,
+}
 
 
 def _spec(
@@ -33,43 +43,43 @@ def _spec(
     )
 
 
-def _sample_rows(
+def _sample_frame(
     *,
     target: str = "wk inc covid hosp",
     origin_date: dt.date = ORIGIN,
-) -> list[dict]:
-    rows = [
-        {
-            "origin_date": origin_date,
-            "target_end_date": date,
-            "horizon": -2 + date_index,
-            "target": target,
-            "location": location,
-            "output_type": "sample",
-            "output_type_id": sample_id,
-            "value": value,
-        }
-        for location, sample_id, values in [
-            ("ca", "sample_2", [20.0, 21.0]),
-            ("ca", "sample_1", [10.0, 11.0]),
-            ("ny", "sample_1", [100.0, 101.0]),
-        ]
-        for date_index, (date, value) in enumerate(zip(NOWCAST_DATES, values))
-    ]
-    return list(reversed(rows))
+) -> pl.DataFrame:
+    return pl.DataFrame(
+        [
+            {
+                "origin_date": origin_date,
+                "target_end_date": date,
+                "horizon": -2 + date_index,
+                "target": target,
+                "location": location,
+                "output_type": "sample",
+                "output_type_id": sample_id,
+                "value": value,
+            }
+            for location, sample_id, values in [
+                ("ca", "sample_2", [20.0, 21.0]),
+                ("ca", "sample_1", [10.0, 11.0]),
+                ("ny", "sample_1", [100.0, 101.0]),
+            ]
+            for date_index, (date, value) in enumerate(zip(NOWCAST_DATES, values))
+        ],
+        schema=HUBVERSE_SCHEMA,
+    ).reverse()
 
 
 def _write_artifact(
     tmp_path,
-    rows: list[dict] | None = None,
+    frame: pl.DataFrame | None = None,
     *,
     filename: str = "2026-07-18-CFA-nowcastNHSN.parquet",
 ):
     output_dir = tmp_path / "model-output" / "CFA-nowcastNHSN"
     output_dir.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame(_sample_rows() if rows is None else rows).write_parquet(
-        output_dir / filename
-    )
+    (_sample_frame() if frame is None else frame).write_parquet(output_dir / filename)
     return tmp_path
 
 
@@ -106,7 +116,7 @@ def test_maps_supported_diseases_and_location_case_insensitively(
     source = HubverseNowcast(
         containing_dir=_write_artifact(
             tmp_path,
-            _sample_rows(target=target),
+            _sample_frame(target=target),
         ),
         forecast_spec=_spec(disease=disease, loc="cA"),
     )
@@ -173,11 +183,10 @@ def test_requires_exactly_one_parquet(tmp_path, artifact_count):
 
 
 def test_rejects_missing_required_column(tmp_path):
-    rows = _sample_rows()
-    for row in rows:
-        del row["output_type_id"]
     source = HubverseNowcast(
-        containing_dir=_write_artifact(tmp_path, rows),
+        containing_dir=_write_artifact(
+            tmp_path, _sample_frame().drop("output_type_id")
+        ),
         forecast_spec=_spec(),
     )
 
@@ -186,29 +195,27 @@ def test_rejects_missing_required_column(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("rows", "message"),
+    ("frame", "message"),
     [
-        (_sample_rows(origin_date=dt.date(2026, 7, 12)), "run vintage"),
-        (_sample_rows(target="wk inc flu hosp"), "no rows for target"),
+        (_sample_frame(origin_date=dt.date(2026, 7, 12)), "run vintage"),
+        (_sample_frame(target="wk inc flu hosp"), "no rows for target"),
         (
-            [
-                {**row, "location": "ny"}
-                for row in _sample_rows()
-                if row["location"] == "ca"
-            ],
+            _sample_frame()
+            .filter(pl.col("location") == "ca")
+            .with_columns(location=pl.lit("ny")),
             "no rows for location",
         ),
         (
-            [{**row, "output_type": "quantile"} for row in _sample_rows()],
+            _sample_frame().with_columns(output_type=pl.lit("quantile")),
             "no sample rows",
         ),
     ],
 )
 def test_rejects_unmatched_vintage_target_location_or_output_type(
-    tmp_path, rows, message
+    tmp_path, frame, message
 ):
     source = HubverseNowcast(
-        containing_dir=_write_artifact(tmp_path, rows),
+        containing_dir=_write_artifact(tmp_path, frame),
         forecast_spec=_spec(),
     )
 
@@ -217,10 +224,10 @@ def test_rejects_unmatched_vintage_target_location_or_output_type(
 
 
 def test_rejects_duplicate_sample_date(tmp_path):
-    rows = _sample_rows()
-    rows.append(next(row.copy() for row in rows if row["location"] == "ca"))
+    frame = _sample_frame()
+    frame = pl.concat([frame, frame.filter(pl.col("location") == "ca").head(1)])
     source = HubverseNowcast(
-        containing_dir=_write_artifact(tmp_path, rows),
+        containing_dir=_write_artifact(tmp_path, frame),
         forecast_spec=_spec(),
     )
 
@@ -229,17 +236,15 @@ def test_rejects_duplicate_sample_date(tmp_path):
 
 
 def test_rejects_incomplete_trajectory(tmp_path):
-    rows = [
-        row
-        for row in _sample_rows()
-        if not (
-            row["location"] == "ca"
-            and row["output_type_id"] == "sample_2"
-            and row["target_end_date"] == NOWCAST_DATES[1]
+    frame = _sample_frame().filter(
+        ~(
+            (pl.col("location") == "ca")
+            & (pl.col("output_type_id") == "sample_2")
+            & (pl.col("target_end_date") == NOWCAST_DATES[1])
         )
-    ]
+    )
     source = HubverseNowcast(
-        containing_dir=_write_artifact(tmp_path, rows),
+        containing_dir=_write_artifact(tmp_path, frame),
         forecast_spec=_spec(),
     )
 
@@ -249,10 +254,13 @@ def test_rejects_incomplete_trajectory(tmp_path):
 
 @pytest.mark.parametrize("invalid_value", [-1.0, float("inf"), float("nan")])
 def test_rejects_invalid_sample_values(tmp_path, invalid_value):
-    rows = _sample_rows()
-    next(row for row in rows if row["location"] == "ca")["value"] = invalid_value
+    frame = _sample_frame().with_columns(
+        value=pl.when(pl.col("location") == "ca")
+        .then(pl.lit(invalid_value))
+        .otherwise(pl.col("value"))
+    )
     source = HubverseNowcast(
-        containing_dir=_write_artifact(tmp_path, rows),
+        containing_dir=_write_artifact(tmp_path, frame),
         forecast_spec=_spec(),
     )
 

@@ -1,8 +1,15 @@
 import datetime as dt
+from collections.abc import Collection
 
 import polars as pl
 
-from pipelines.data.data_access import DataFreshness, ForecastData
+from pipelines.data.data_access import (
+    DataFreshness,
+    ForecastData,
+    ForecastSourceName,
+    NHSNData,
+    NSSPData,
+)
 
 DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 
@@ -16,24 +23,28 @@ def make_test_forecast_data(
     last_training_date: dt.date | None = None,
     loc_pop: int = 1,
     nhsn_prelim: bool = False,
+    sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
 ) -> ForecastData:
-    first_training_date = first_training_date or report_date - dt.timedelta(days=89)
     last_training_date = last_training_date or report_date
+    requested_sources = frozenset(sources)
 
     nssp_data = pl.DataFrame(
         {
-            "date": [last_training_date, last_training_date],
-            "geo_value": [loc_abb, loc_abb],
-            "disease": [disease, "Total"],
-            "ed_visits": [10, 100],
+            "date": [last_training_date],
+            "geo_value": [loc_abb],
+            "observed_ed_visits": [10],
+            "other_ed_visits": [90],
+            "data_type": ["train"],
+            "resolution": ["daily"],
         }
     )
     nhsn_data = pl.DataFrame(
         {
             "weekendingdate": [last_training_date],
             "jurisdiction": [loc_abb],
-            "disease": [disease],
             "hospital_admissions": [5],
+            "data_type": ["train"],
+            "resolution": ["epiweekly"],
         }
     )
 
@@ -47,16 +58,29 @@ def make_test_forecast_data(
             reason=f"Test {source.upper()} data",
         )
 
-    return ForecastData.from_source_frames(
+    nssp = (
+        NSSPData(
+            data=nssp_data,
+            freshness=freshness("nssp"),
+        )
+        if "nssp" in requested_sources
+        else None
+    )
+    nhsn = (
+        NHSNData(
+            data=nhsn_data,
+            freshness=freshness("nhsn"),
+            prelim=nhsn_prelim,
+        )
+        if "nhsn" in requested_sources
+        else None
+    )
+    return ForecastData(
         loc_abb=loc_abb,
         disease=disease,
         report_date=report_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-        nssp_data=nssp_data,
-        nssp_freshness=freshness("nssp"),
-        nhsn_data=nhsn_data,
-        nhsn_freshness=freshness("nhsn"),
-        nhsn_prelim=nhsn_prelim,
         loc_pop=loc_pop,
+        right_truncation_offset=(report_date - last_training_date).days - 1,
+        nssp=nssp,
+        nhsn=nhsn,
     )

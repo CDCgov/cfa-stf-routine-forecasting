@@ -86,3 +86,50 @@ def test_entrypoint_forwards_fail_on_stale_data(
         module.main(**main_kwargs)
 
     assert dependency_kwargs["fail_on_stale_data"] is True
+    if module is forecast_fable:
+        assert dependency_kwargs["sources"] == {"nssp"}
+    if module is forecast_pyrenew:
+        assert dependency_kwargs["sources"] == {"nssp"}
+
+
+@pytest.mark.parametrize(
+    ("fit_ed_visits", "fit_hospital_admissions", "expected_sources"),
+    [
+        pytest.param(True, False, {"nssp"}, id="pyrenew-e"),
+        pytest.param(False, True, {"nhsn"}, id="pyrenew-h"),
+        pytest.param(True, True, {"nssp", "nhsn"}, id="pyrenew-he"),
+    ],
+)
+def test_pyrenew_requests_sources_for_fitted_signals(
+    monkeypatch,
+    fit_ed_visits,
+    fit_hospital_admissions,
+    expected_sources,
+):
+    dependency_kwargs = {}
+
+    def stop_at_data_boundary(**kwargs):
+        dependency_kwargs.update(kwargs)
+        raise _StopAfterDataBoundary
+
+    monkeypatch.setattr(forecast_pyrenew, "load_forecast_data", stop_at_data_boundary)
+
+    with pytest.raises(_StopAfterDataBoundary):
+        forecast_pyrenew.main(
+            disease="COVID-19",
+            loc="CA",
+            priors_path=Path("unused"),
+            output_dir=Path("unused"),
+            n_training_days=90,
+            n_forecast_days=28,
+            n_chains=1,
+            n_warmup=1,
+            n_samples=1,
+            run_date=dt.date(2026, 1, 7),
+            fit_ed_visits=fit_ed_visits,
+            fit_hospital_admissions=fit_hospital_admissions,
+            forecast_ed_visits=fit_ed_visits,
+            forecast_hospital_admissions=fit_hospital_admissions,
+        )
+
+    assert dependency_kwargs["sources"] == expected_sources

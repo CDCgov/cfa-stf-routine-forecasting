@@ -21,10 +21,11 @@ def _freshness(source: str) -> data_access.DataFreshness:
     )
 
 
-def test_nssp_data_normalizes_source_frame():
+def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
+    calls = {}
     source_data = pl.DataFrame(
         {
-            "date": [
+            "reference_date": [
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 7),
@@ -39,15 +40,26 @@ def test_nssp_data_normalizes_source_frame():
                 "Influenza",
                 "COVID-19",
             ],
-            "ed_visits": [12, 120, 100, 8, 10],
+            "value": [12, 120, 100, 8, 10],
         }
     )
+    monkeypatch.setattr(
+        data_access,
+        "resolve_nssp_report_date",
+        lambda: dt.date(2026, 1, 8),
+    )
+    monkeypatch.setattr(
+        data_access,
+        "get_nssp",
+        lambda **kwargs: calls.update(kwargs) or source_data,
+    )
 
-    result = data_access.NSSPData.from_source_frame(
-        data=source_data,
-        freshness=_freshness("nssp"),
+    result = data_access._load_dataops_nssp(
+        loc_abb="CA",
         disease="COVID-19",
+        first_training_date=dt.date(2025, 12, 1),
         last_training_date=dt.date(2026, 1, 7),
+        run_date=dt.date(2026, 1, 8),
     )
 
     expected = pl.DataFrame(
@@ -69,9 +81,20 @@ def test_nssp_data_normalizes_source_frame():
         ),
         expected,
     )
+    assert result.freshness.selected_version_date == dt.date(2026, 1, 8)
+    assert result.freshness.latest_observed_date == dt.date(2026, 1, 8)
+    assert not result.freshness.is_stale
+    assert calls == {
+        "disease": ["COVID-19", "Total"],
+        "loc_abb": "CA",
+        "dataset": "gold",
+        "start_date": dt.date(2025, 12, 1),
+        "lazy": False,
+    }
 
 
-def test_nhsn_data_filters_and_classifies_source_frame():
+def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
+    calls = {}
     source_data = pl.DataFrame(
         {
             "weekendingdate": [
@@ -85,13 +108,23 @@ def test_nhsn_data_filters_and_classifies_source_frame():
             "hospital_admissions": [3, 6, 4, 5],
         }
     )
+    monkeypatch.setattr(
+        data_access,
+        "select_latest_nhsn_release",
+        lambda: (True, dt.date(2026, 1, 8)),
+    )
+    monkeypatch.setattr(
+        data_access,
+        "get_nhsn_hrd",
+        lambda **kwargs: calls.update(kwargs) or source_data,
+    )
 
-    result = data_access.NHSNData.from_source_frame(
-        data=source_data,
-        freshness=_freshness("nhsn"),
-        prelim=True,
+    result = data_access._load_dataops_nhsn(
+        disease="COVID-19",
+        loc_abb="CA",
         first_training_date=dt.date(2026, 1, 1),
         last_training_date=dt.date(2026, 1, 7),
+        run_date=dt.date(2026, 1, 8),
     )
 
     assert result.prelim
@@ -109,6 +142,56 @@ def test_nhsn_data_filters_and_classifies_source_frame():
         }
     )
     assert_frame_equal(result.data, expected)
+    assert result.freshness.selected_version_date == dt.date(2026, 1, 8)
+    assert result.freshness.latest_observed_date == dt.date(2026, 1, 10)
+    assert not result.freshness.is_stale
+    assert calls == {
+        "disease": "COVID-19",
+        "loc_abb": "CA",
+        "prelim": True,
+        "start_date": dt.date(2026, 1, 1),
+        "lazy": False,
+    }
+
+
+@pytest.mark.parametrize("source_name", ["nssp", "nhsn"])
+def test_forecast_data_allows_one_source(source_name):
+    source = (
+        data_access.NSSPData(
+            data=pl.DataFrame(),
+            freshness=_freshness("nssp"),
+        )
+        if source_name == "nssp"
+        else data_access.NHSNData(
+            data=pl.DataFrame(),
+            freshness=_freshness("nhsn"),
+            prelim=False,
+        )
+    )
+    forecast_data = data_access.ForecastData(
+        loc_abb="CA",
+        disease="COVID-19",
+        report_date=dt.date(2026, 1, 7),
+        loc_pop=39_000_000,
+        right_truncation_offset=0,
+        nssp=source if source_name == "nssp" else None,
+        nhsn=source if source_name == "nhsn" else None,
+    )
+
+    assert forecast_data.sources == (source,)
+    assert forecast_data.freshness == (source.freshness,)
+    assert not forecast_data.is_stale
+
+
+def test_forecast_data_requires_at_least_one_source():
+    with pytest.raises(ValueError, match="at least one data source"):
+        data_access.ForecastData(
+            loc_abb="CA",
+            disease="COVID-19",
+            report_date=dt.date(2026, 1, 7),
+            loc_pop=39_000_000,
+            right_truncation_offset=0,
+        )
 
 
 def test_nssp_freshness_requires_run_date_match():
@@ -256,117 +339,54 @@ def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
     assert selected_version == dt.date(2026, 1, 8)
 
 
-def test_load_dataops_nhsn_uses_selected_release(monkeypatch):
-    calls = {}
-    raw_data = pl.DataFrame(
-        {
-            "weekendingdate": [dt.date(2026, 1, 3)],
-            "jurisdiction": ["CA"],
-            "disease": ["COVID-19"],
-            "hospital_admissions": [5],
-        }
-    )
-    monkeypatch.setattr(
-        data_access,
-        "select_latest_nhsn_release",
-        lambda: (True, dt.date(2026, 1, 8)),
-    )
-    monkeypatch.setattr(
-        data_access,
-        "get_nhsn_hrd",
-        lambda **kwargs: calls.update(kwargs) or raw_data,
-    )
-
-    data, prelim, selected_version = data_access._load_dataops_nhsn(
-        disease="COVID-19",
-        loc_abb="CA",
-        first_training_date=dt.date(2025, 12, 1),
-    )
-
-    assert_frame_equal(data, raw_data)
-    assert prelim
-    assert selected_version == dt.date(2026, 1, 8)
-    assert calls == {
-        "disease": "COVID-19",
-        "loc_abb": "CA",
-        "prelim": True,
-        "start_date": dt.date(2025, 12, 1),
-        "lazy": False,
-    }
-
-
-def test_load_dataops_nssp_uses_latest_available_version(monkeypatch):
-    calls = {}
-    raw_data = pl.DataFrame(
-        {
-            "reference_date": [dt.date(2026, 1, 7)],
-            "geo_value": ["CA"],
-            "disease": ["COVID-19"],
-            "value": [10],
-        }
-    )
-    monkeypatch.setattr(
-        data_access,
-        "resolve_nssp_report_date",
-        lambda: dt.date(2026, 1, 8),
-    )
-    monkeypatch.setattr(
-        data_access,
-        "get_nssp",
-        lambda **kwargs: calls.update(kwargs) or raw_data,
-    )
-
-    data, selected_version = data_access._load_dataops_nssp(
-        loc_abb="CA",
-        disease="COVID-19",
-        first_training_date=dt.date(2025, 12, 1),
-    )
-
-    assert selected_version == dt.date(2026, 1, 8)
-    expected = pl.DataFrame(
-        {
-            "date": [dt.date(2026, 1, 7)],
-            "geo_value": ["CA"],
-            "disease": ["COVID-19"],
-            "ed_visits": [10],
-        }
-    )
-    assert_frame_equal(data, expected)
-    assert calls == {
-        "disease": ["COVID-19", "Total"],
-        "loc_abb": "CA",
-        "dataset": "gold",
-        "start_date": dt.date(2025, 12, 1),
-        "lazy": False,
-    }
-
-
 def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     calls = {}
-    nssp_data = pl.DataFrame(
-        {
-            "date": [dt.date(2026, 1, 8), dt.date(2026, 1, 8)],
-            "geo_value": ["CA", "CA"],
-            "disease": ["COVID-19", "Total"],
-            "ed_visits": [10, 100],
-        }
+    report_date = dt.date(2026, 1, 8)
+
+    def freshness(source, latest_observed_date):
+        return data_access.DataFreshness(
+            source=source,
+            selected_version_date=report_date,
+            latest_observed_date=latest_observed_date,
+            run_date=report_date,
+            is_stale=False,
+            reason="Test data",
+        )
+
+    nssp = data_access.NSSPData(
+        data=pl.DataFrame(
+            {
+                "date": [dt.date(2026, 1, 8)],
+                "geo_value": ["CA"],
+                "observed_ed_visits": [10],
+                "other_ed_visits": [90],
+                "data_type": ["eval"],
+                "resolution": ["daily"],
+            }
+        ),
+        freshness=freshness("nssp", dt.date(2026, 1, 8)),
     )
-    nhsn_data = pl.DataFrame(
-        {
-            "weekendingdate": [dt.date(2026, 1, 3)],
-            "jurisdiction": ["CA"],
-            "disease": ["COVID-19"],
-            "hospital_admissions": [5],
-        }
+    nhsn = data_access.NHSNData(
+        data=pl.DataFrame(
+            {
+                "weekendingdate": [dt.date(2026, 1, 3)],
+                "jurisdiction": ["CA"],
+                "hospital_admissions": [5],
+                "data_type": ["train"],
+                "resolution": ["epiweekly"],
+            }
+        ),
+        freshness=freshness("nhsn", dt.date(2026, 1, 3)),
+        prelim=True,
     )
 
     def fake_load_nssp(**kwargs):
         calls["nssp"] = kwargs
-        return nssp_data, dt.date(2026, 1, 8)
+        return nssp
 
     def fake_load_nhsn(**kwargs):
         calls["nhsn"] = kwargs
-        return nhsn_data, True, dt.date(2026, 1, 8)
+        return nhsn
 
     monkeypatch.setattr(data_access, "_load_dataops_nssp", fake_load_nssp)
     monkeypatch.setattr(data_access, "_load_dataops_nhsn", fake_load_nhsn)
@@ -379,14 +399,15 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     forecast_data = data_access.load_forecast_data(
         disease="COVID-19",
         loc_abb="CA",
-        run_date=dt.date(2026, 1, 8),
+        run_date=report_date,
         first_training_date=dt.date(2025, 12, 1),
         last_training_date=dt.date(2026, 1, 7),
+        sources={"nssp", "nhsn"},
     )
 
     assert forecast_data.loc_abb == "CA"
     assert forecast_data.disease == "COVID-19"
-    assert forecast_data.report_date == dt.date(2026, 1, 8)
+    assert forecast_data.report_date == report_date
     assert forecast_data.loc_pop == 39_000_000
     assert forecast_data.right_truncation_offset == 0
     expected_nssp = pl.DataFrame(
@@ -430,9 +451,104 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
         "loc_abb": "CA",
         "disease": "COVID-19",
         "first_training_date": dt.date(2025, 12, 1),
+        "last_training_date": dt.date(2026, 1, 7),
+        "run_date": report_date,
     }
     assert calls["nhsn"] == {
         "disease": "COVID-19",
         "loc_abb": "CA",
         "first_training_date": dt.date(2025, 12, 1),
+        "last_training_date": dt.date(2026, 1, 7),
+        "run_date": report_date,
     }
+
+
+@pytest.mark.parametrize("requested_source", ["nssp", "nhsn"])
+def test_load_forecast_data_only_loads_requested_source(
+    monkeypatch,
+    requested_source,
+):
+    nssp = data_access.NSSPData(
+        data=pl.DataFrame(
+            {
+                "date": [dt.date(2026, 1, 8)],
+                "geo_value": ["CA"],
+                "observed_ed_visits": [10],
+                "other_ed_visits": [90],
+                "data_type": ["eval"],
+                "resolution": ["daily"],
+            }
+        ),
+        freshness=_freshness("nssp"),
+    )
+    nhsn = data_access.NHSNData(
+        data=pl.DataFrame(
+            {
+                "weekendingdate": [dt.date(2026, 1, 3)],
+                "jurisdiction": ["CA"],
+                "hospital_admissions": [5],
+                "data_type": ["train"],
+                "resolution": ["epiweekly"],
+            }
+        ),
+        freshness=_freshness("nhsn"),
+        prelim=True,
+    )
+
+    def fail_if_called(**kwargs):
+        raise AssertionError(f"Excluded source loader called with {kwargs}")
+
+    if requested_source == "nssp":
+        monkeypatch.setattr(
+            data_access,
+            "_load_dataops_nssp",
+            lambda **kwargs: nssp,
+        )
+        monkeypatch.setattr(data_access, "_load_dataops_nhsn", fail_if_called)
+    else:
+        monkeypatch.setattr(data_access, "_load_dataops_nssp", fail_if_called)
+        monkeypatch.setattr(
+            data_access,
+            "_load_dataops_nhsn",
+            lambda **kwargs: nhsn,
+        )
+    monkeypatch.setattr(
+        data_access,
+        "get_us_loc_pop_tbl",
+        lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
+    )
+
+    forecast_data = data_access.load_forecast_data(
+        disease="COVID-19",
+        loc_abb="CA",
+        run_date=dt.date(2026, 1, 8),
+        first_training_date=dt.date(2025, 12, 1),
+        last_training_date=dt.date(2026, 1, 7),
+        sources={requested_source},
+        fail_on_stale_data=True,
+    )
+
+    assert (forecast_data.nssp is not None) == (requested_source == "nssp")
+    assert (forecast_data.nhsn is not None) == (requested_source == "nhsn")
+    assert tuple(record.source for record in forecast_data.freshness) == (
+        requested_source,
+    )
+
+
+@pytest.mark.parametrize(
+    ("sources", "message"),
+    [
+        pytest.param(set(), "At least one", id="empty"),
+        pytest.param({"nwss"}, "Unknown forecast data source", id="unknown"),
+    ],
+)
+def test_load_forecast_data_rejects_invalid_sources(sources, message):
+    with pytest.raises(ValueError, match=message):
+        data_access.load_forecast_data(
+            disease="COVID-19",
+            loc_abb="CA",
+            run_date=dt.date(2026, 1, 8),
+            first_training_date=dt.date(2025, 12, 1),
+            last_training_date=dt.date(2026, 1, 7),
+            sources=sources,
+        )

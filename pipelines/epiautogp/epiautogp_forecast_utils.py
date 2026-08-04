@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Literal, get_args
 
 from cfa.stf.data import get_nnh_right_truncation_pmf
 
@@ -166,38 +166,14 @@ def _build_reporting_delay_nowcast(
     return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
 
 
-def _build_hubverse_nowcast(
-    *,
-    forecast_spec: ForecastSpec,
-    hubverse_nowcast_dir: Path | str | None,
-) -> HubverseNowcast:
-    """Build a HubverseNowcast from a materialized Dagster asset directory."""
-    if hubverse_nowcast_dir is None:
-        raise ValueError(
-            "hubverse_nowcast_dir is required when Hubverse nowcasting is requested."
-        )
-    return HubverseNowcast(
-        containing_dir=Path(hubverse_nowcast_dir),
-        forecast_spec=forecast_spec,
-    )
-
-
 def _resolve_nowcast_source(
     *,
     forecast_spec: ForecastSpec,
     nowcast_source_name: NowcastSourceName,
-    **options: Any,
+    reporting_delay_pmf: list[float] | None = None,
+    hubverse_nowcast_dir: Path | str | None = None,
 ) -> NowcastSource | None:
-    """
-    Resolve the requested nowcast source for one EpiAutoGP run.
-
-    `forecast_spec` and `nowcast_source_name` are universal; remaining keyword
-    arguments are forwarded as-is to the chosen source's builder, which is
-    responsible for validating them. New nowcast approaches plug in by adding
-    a new case here and a builder that defines its own required kwargs.
-    """
-    reporting_delay_pmf = options.get("reporting_delay_pmf")
-    hubverse_nowcast_dir = options.get("hubverse_nowcast_dir")
+    """Resolve the requested nowcast source for one EpiAutoGP run."""
     if reporting_delay_pmf is not None and hubverse_nowcast_dir is not None:
         raise ValueError(
             "reporting_delay_pmf and hubverse_nowcast_dir are mutually exclusive."
@@ -222,9 +198,14 @@ def _resolve_nowcast_source(
                     "hubverse nowcasting is only applicable to NHSN "
                     "epiweekly observed counts."
                 )
-            return _build_hubverse_nowcast(
+            if hubverse_nowcast_dir is None:
+                raise ValueError(
+                    "hubverse_nowcast_dir is required when Hubverse nowcasting is "
+                    "requested."
+                )
+            return HubverseNowcast(
+                containing_dir=Path(hubverse_nowcast_dir),
                 forecast_spec=forecast_spec,
-                hubverse_nowcast_dir=hubverse_nowcast_dir,
             )
         case _:
             raise ValueError(

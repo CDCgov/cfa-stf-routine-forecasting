@@ -63,7 +63,7 @@ Shared utilities for the forecast pipeline, containing modular functions for eac
 
 - **`setup_forecast_pipeline()`**: Builds the `ForecastSpec`, resolves the nowcast source, and assembles a `ForecastPipelineContext` for downstream stages.
 - **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`.
-  Universal args (`forecast_spec`, `nowcast_source_name`) are explicit; source-specific options are forwarded via `**kwargs` to the chosen builder, which validates them.
+  Its explicit source-specific arguments are validated against the selected source.
 
 ### `nowcast.py`, `reporting_delay_nowcast.py`, and `../data/hubverse_nowcast.py`
 

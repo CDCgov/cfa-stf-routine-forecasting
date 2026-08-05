@@ -30,8 +30,7 @@ Imports:
     tibble,
     tidybayes,
     tidyr,
-    tidyselect,
-    urca
+    tidyselect
 Additional_repositories: https://hubverse-org.r-universe.dev
 Remotes:
     github::cdcgov/forecasttools,

@@ -10,7 +10,8 @@ script_packages <- c(
   "argparser",
   "rlang",
   "stfroutineforecasting",
-  "forecasttools"
+  "forecasttools",
+  "urca"
 )
 
 ## load in packages without messages

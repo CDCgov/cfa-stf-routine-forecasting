@@ -75,6 +75,8 @@ jobs:
 
       - name: Set up routine forecasting R
         uses: ./.github/actions/setup-routine-forecasting-r
+        with:
+          dependencies: '"all"'
 
       - name: Test coverage
         run: |

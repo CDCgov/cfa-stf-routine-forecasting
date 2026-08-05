@@ -556,6 +556,7 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
 
 weekly_forecast_base_asset_args = {
     "partitions_def": daily_partitions_def,
+    "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
 }
 
 weekly_forecast_initial_asset_args = {
@@ -783,6 +784,7 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
+    retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     group_name="WeeklyForecastFusion",
 )
 def postprocess_forecasts(

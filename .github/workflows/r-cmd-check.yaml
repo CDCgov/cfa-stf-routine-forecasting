@@ -31,6 +31,8 @@ jobs:
 
     - name: Set up routine forecasting R
       uses: ./.github/actions/setup-routine-forecasting-r
+      with:
+        dependencies: '"all"'
 
     - name: "Check stfroutineforecasting package"
       uses: r-lib/actions/check-r-package@v2

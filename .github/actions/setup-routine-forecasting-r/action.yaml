@@ -1,6 +1,10 @@
 name: "Set up routine forecasting R"
 description: "Set up R and install the stfroutineforecasting package."
-inputs: {}
+inputs:
+  dependencies:
+    description: "R dependency types to install, expressed as an R value."
+    required: false
+    default: "NA"
 runs:
   using: "composite"
   steps:
@@ -17,6 +21,7 @@ runs:
         working-directory: stfroutineforecasting
         needs: check, coverage
         extra-packages: any::covr, any::xml2
+        dependencies: ${{ inputs.dependencies }}
 
     - name: Install stfroutineforecasting
       run: pak::local_install("stfroutineforecasting", ask = FALSE, upgrade = FALSE)

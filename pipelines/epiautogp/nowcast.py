@@ -18,11 +18,11 @@ class FixedNowcast:
     data: NowcastData
 
     @staticmethod
-    def applies_to(
+    def ensure_applicable(
         *,
         forecast_spec: ForecastSpec,
-    ) -> bool:
-        return True
+    ) -> None:
+        pass
 
     def get_nowcast_data(
         self,

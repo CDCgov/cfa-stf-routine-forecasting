@@ -36,10 +36,10 @@ class ReportingDelayNowcast:
     reporting_delay_pmf: list[float]
 
     @staticmethod
-    def applies_to(
+    def ensure_applicable(
         *,
         forecast_spec: ForecastSpec,
-    ) -> bool:
+    ) -> None:
         # The estimator multiplies recent observations by 1/reporting_fraction.
         # For a percentage (numerator / denominator) the same factor applies to
         # both terms and cancels, so reject ed_visit_type="pct". Target and
@@ -52,7 +52,13 @@ class ReportingDelayNowcast:
                 forecast_spec.frequency,
             )
 
-        return forecast_spec.ed_visit_type != "pct"
+        if forecast_spec.ed_visit_type == "pct":
+            raise ValueError(
+                "Reporting-delay nowcasting is not applicable when "
+                "ed_visit_type='pct': applying the same reporting-delay "
+                "inflation factor to the numerator and denominator would "
+                "cancel out."
+            )
 
     def get_nowcast_data(
         self,

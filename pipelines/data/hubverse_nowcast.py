@@ -42,13 +42,20 @@ class HubverseNowcast:
         object.__setattr__(self, "containing_dir", Path(self.containing_dir))
 
     @staticmethod
-    def applies_to(*, forecast_spec: ForecastSpec) -> bool:
+    def ensure_applicable(*, forecast_spec: ForecastSpec) -> None:
         """Whether Hubverse NHSN sample output matches the requested model."""
-        return (
-            forecast_spec.target == "nhsn"
-            and forecast_spec.frequency == "epiweekly"
-            and forecast_spec.ed_visit_type == "observed"
-        )
+        if (
+            forecast_spec.target != "nhsn"
+            or forecast_spec.frequency != "epiweekly"
+            or forecast_spec.ed_visit_type != "observed"
+        ):
+            raise ValueError(
+                "Hubverse nowcasting is only applicable when target='nhsn', "
+                "frequency='epiweekly', and ed_visit_type='observed'; got "
+                f"target={forecast_spec.target!r}, "
+                f"frequency={forecast_spec.frequency!r}, and "
+                f"ed_visit_type={forecast_spec.ed_visit_type!r}."
+            )
 
     def _artifact_path(self) -> Path:
         model_output_dir = self.containing_dir / HUBVERSE_MODEL_OUTPUT_SUBDIR

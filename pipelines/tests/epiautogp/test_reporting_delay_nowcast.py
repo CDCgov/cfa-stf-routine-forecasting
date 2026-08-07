@@ -18,7 +18,7 @@ from pipelines.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 def _spec(
     *, target: str = "nssp", ed_visit_type: str = "observed", frequency: str = "daily"
 ) -> ForecastSpec:
-    """Build a ForecastSpec varying only the fields applies_to cares about."""
+    """Build a ForecastSpec varying only the applicability fields."""
     return ForecastSpec(
         disease="COVID-19",
         loc="CA",
@@ -61,24 +61,32 @@ class TestInflateReport:
             inflate_report(1.0, -0.1)
 
 
-class TestReportingDelayNowcastAppliesTo:
+class TestReportingDelayNowcastEnsureApplicable:
     @pytest.mark.parametrize(
-        ("target", "ed_visit_type", "expected"),
+        ("target", "ed_visit_type"),
         [
-            ("nssp", "observed", True),
-            ("nssp", "other", True),
-            ("nssp", "pct", False),
+            ("nssp", "observed"),
+            ("nssp", "other"),
             # NHSN has no ed_visit_type concept; the parameter defaults to
             # "observed" upstream and the source happily applies to its counts.
-            ("nhsn", "observed", True),
+            ("nhsn", "observed"),
         ],
     )
-    def test_applies_to(self, target, ed_visit_type, expected):
+    def test_accepts_count_targets(self, target, ed_visit_type):
         # Only ed_visit_type is gating; target and frequency are carried in the
         # spec for protocol compatibility but ignored here. The resolver
         # enforces daily cadence via a soft warning.
         spec = _spec(target=target, ed_visit_type=ed_visit_type, frequency="daily")
-        assert ReportingDelayNowcast.applies_to(forecast_spec=spec) is expected
+        assert ReportingDelayNowcast.ensure_applicable(forecast_spec=spec) is None
+
+    def test_percentage_target_raises_with_explanation(self):
+        spec = _spec(ed_visit_type="pct")
+
+        with pytest.raises(
+            ValueError,
+            match="same reporting-delay inflation factor.*would cancel out",
+        ):
+            ReportingDelayNowcast.ensure_applicable(forecast_spec=spec)
 
 
 class TestReportingDelayNowcastGetNowcastData:
@@ -149,8 +157,8 @@ class TestReportingDelayNowcastGetNowcastData:
 
 
 class TestFixedNowcast:
-    def test_applies_to_always_true(self):
-        assert FixedNowcast.applies_to(forecast_spec=_spec()) is True
+    def test_ensure_applicable_accepts_any_spec(self):
+        assert FixedNowcast.ensure_applicable(forecast_spec=_spec()) is None
 
     def test_returns_stored_data(self):
         data = NowcastData(dates=[dt.date(2024, 1, 1)], reports=[[1.0]])

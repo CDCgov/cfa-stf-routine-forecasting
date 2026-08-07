@@ -1,4 +1,3 @@
-import argparse
 import datetime as dt
 import logging
 import os
@@ -6,7 +5,6 @@ from pathlib import Path
 
 from pipelines.data.data_access import load_forecast_data
 from pipelines.data.prep_data import process_and_save_loc_data
-from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
@@ -129,34 +127,3 @@ def main(
         f"run date {run_date}."
     )
     return None
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create fable E-other forecasts.")
-
-    # Add common arguments
-    add_common_forecast_arguments(parser)
-
-    # Add fable-specific arguments
-    parser.add_argument(
-        "--n-samples",
-        type=int,
-        default=1000,
-        help=("Number of samples to draw (default: 1000)."),
-    )
-    parser.add_argument(
-        "--epiweekly",
-        action="store_true",
-        help=(
-            "Whether to generate epiweekly fable E-other forecasts. "
-            "If set, will generate epiweekly datasets and forecasts, and "
-            "append 'epiweekly' to the model name."
-        ),
-    )
-    parser.add_argument(
-        "--fail-on-stale-data",
-        action="store_true",
-        help="Fail instead of warning when selected input data is stale.",
-    )
-    args = parser.parse_args()
-    main(**vars(args))

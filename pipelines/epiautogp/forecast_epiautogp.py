@@ -1,4 +1,3 @@
-import argparse
 import datetime as dt
 import logging
 from pathlib import Path
@@ -7,10 +6,6 @@ from pipelines.epiautogp import (
     convert_to_epiautogp_json,
     setup_forecast_pipeline,
 )
-from pipelines.epiautogp.epiautogp_forecast_utils import (
-    VALID_NOWCAST_SOURCE_NAMES,
-)
-from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     parse_exclude_date_ranges,
     run_julia_script,
@@ -290,131 +285,3 @@ def main(
         f"run date {run_date}."
     )
     return None
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run EpiAutoGP forecasting pipeline for disease modeling."
-    )
-
-    # Add common arguments
-    add_common_forecast_arguments(parser)
-
-    # Add EpiAutoGP-specific arguments
-
-    parser.add_argument(
-        "--target",
-        type=str,
-        required=True,
-        choices=["nssp", "nhsn"],
-        help=(
-            "Target data type: 'nssp' for ED visit data or "
-            "'nhsn' for hospital admission counts."
-        ),
-    )
-
-    parser.add_argument(
-        "--frequency",
-        type=str,
-        default="epiweekly",
-        choices=["daily", "epiweekly"],
-        help="Data frequency: 'daily' or 'epiweekly' (default: epiweekly).",
-    )
-
-    parser.add_argument(
-        "--ed-visit-type",
-        type=str,
-        default="observed",
-        choices=["observed", "other", "pct"],
-        help=(
-            "Type of ED visits to model: 'observed' (disease-related), "
-            "'other' (non-disease background), or 'pct' (percentage of total ED visits). "
-            "Only applicable for NSSP target (default: observed)."
-        ),
-    )
-
-    parser.add_argument(
-        "--nowcast-source",
-        dest="nowcast_source_name",
-        type=str,
-        default="none",
-        choices=list(VALID_NOWCAST_SOURCE_NAMES),
-        help=(
-            "Nowcast source to use: 'none' disables nowcasting; "
-            "'reporting-delay' inflates recent counts using a reporting-delay "
-            "PMF; 'hubverse' reads sample trajectories from a materialized "
-            "Hubverse asset (default: none)."
-        ),
-    )
-
-    parser.add_argument(
-        "--hubverse-nowcast-dir",
-        type=Path,
-        default=None,
-        help=(
-            "Local directory containing model-output/CFA-nowcastNHSN. "
-            "Required with --nowcast-source hubverse."
-        ),
-    )
-    parser.add_argument(
-        "--fail-on-stale-data",
-        action="store_true",
-        help="Fail instead of warning when selected input data is stale.",
-    )
-
-    parser.add_argument(
-        "--n-particles",
-        type=int,
-        default=24,
-        help="Number of particles for SMC (default: 24).",
-    )
-
-    parser.add_argument(
-        "--n-mcmc",
-        type=int,
-        default=100,
-        help="Number of MCMC steps for GP kernel structure (default: 100).",
-    )
-
-    parser.add_argument(
-        "--n-hmc",
-        type=int,
-        default=50,
-        help="Number of HMC steps for GP kernel hyperparameters (default: 50).",
-    )
-
-    parser.add_argument(
-        "--n-forecast-draws",
-        type=int,
-        default=2000,
-        help="Number of forecast draws (default: 2000).",
-    )
-
-    parser.add_argument(
-        "--smc-data-proportion",
-        type=float,
-        default=0.1,
-        help="Proportion of data used in each SMC step (default: 0.1).",
-    )
-
-    parser.add_argument(
-        "--n-threads",
-        type=lambda v: int(v) if v.isdigit() else v,
-        default="auto",
-        help="Number of threads to use for EpiAutoGP computations (integer or 'auto'; default: auto).",
-    )
-
-    parser.add_argument(
-        "--exclude-date-ranges",
-        type=str,
-        default=None,
-        help=(
-            "Comma-separated list of date ranges to exclude from training data "
-            "due to known reporting problems. "
-            "Format: 'YYYY-MM-DD:YYYY-MM-DD' for ranges or 'YYYY-MM-DD' for single dates. "
-            "Example: '2024-01-15:2024-01-20,2024-03-01' excludes Jan 15-20 and Mar 1."
-        ),
-    )
-
-    args = parser.parse_args()
-    main(**vars(args))

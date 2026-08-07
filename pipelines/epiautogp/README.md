@@ -33,15 +33,15 @@ Main entry point for the forecasting pipeline.
 - **`main()`**: Orchestrates the complete pipeline from setup to post-processing
 - **`run_epiautogp_forecast()`**: Executes the Julia EpiAutoGP model with specified parameters
 
-**EpiAutoGP-Specific Parameters:**
+**EpiAutoGP-Specific `main()` Parameters:**
 
-- `--target`: Data type (`nssp` or `nhsn`)
-- `--frequency`: Temporal frequency (`daily` or `epiweekly`)
-- `--n-particles`: Number of particles for Sequential Monte Carlo (default: 24)
-- `--n-mcmc`: MCMC steps for GP kernel structure (default: 100)
-- `--n-hmc`: HMC steps for GP kernel hyperparameters (default: 50)
-- `--n-forecast-draws`: Number of forecast draws (default: 2000)
-- `--smc-data-proportion`: Data proportion per SMC step (default: 0.1)
+- `target`: Data type (`nssp` or `nhsn`)
+- `frequency`: Temporal frequency (`daily` or `epiweekly`)
+- `n_particles`: Number of particles for Sequential Monte Carlo (default: 24)
+- `n_mcmc`: MCMC steps for GP kernel structure (default: 100)
+- `n_hmc`: HMC steps for GP kernel hyperparameters (default: 50)
+- `n_forecast_draws`: Number of forecast draws (default: 2000)
+- `smc_data_proportion`: Data proportion per SMC step (default: 0.1)
 
 ### `forecast_spec.py`
 

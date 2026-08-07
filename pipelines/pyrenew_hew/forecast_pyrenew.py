@@ -1,4 +1,3 @@
-import argparse
 import datetime as dt
 import logging
 import os
@@ -7,10 +6,7 @@ import tomllib
 from pathlib import Path
 
 import tomli_w
-from pyrenew_multisignal.hew.utils import (
-    flags_from_hew_letters,
-    pyrenew_model_name_from_flags,
-)
+from pyrenew_multisignal.hew.utils import pyrenew_model_name_from_flags
 
 from pipelines.data.data_access import load_forecast_data
 from pipelines.data.prep_data import (
@@ -19,7 +15,6 @@ from pipelines.data.prep_data import (
 )
 from pipelines.pyrenew_hew.fit_pyrenew_model import fit_and_save_model
 from pipelines.pyrenew_hew.generate_predictive import generate_and_save_predictions
-from pipelines.utils.cli_utils import add_common_forecast_arguments
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
@@ -222,91 +217,3 @@ def main(
         f"run date {run_date}."
     )
     return None
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Create fit data for disease modeling."
-    )
-
-    # Add common arguments
-    add_common_forecast_arguments(parser)
-
-    # Add pyrenew-specific arguments
-    parser.add_argument(
-        "--model-letters",
-        type=str,
-        help=(
-            "Fit the model corresponding to the provided model letters "
-            "(e.g. 'he', 'e', 'hew')."
-        ),
-        required=True,
-    )
-
-    parser.add_argument(
-        "--priors-path",
-        type=Path,
-        help=(
-            "Path to an executable python file defining random variables "
-            "that require priors as pyrenew RandomVariable objects."
-        ),
-        required=True,
-    )
-
-    parser.add_argument(
-        "--n-warmup",
-        type=int,
-        default=1000,
-        help="Number of warmup iterations per chain for NUTS (default: 1000).",
-    )
-
-    parser.add_argument(
-        "--n-samples",
-        type=int,
-        default=1000,
-        help=(
-            "Number of posterior samples to draw per chain using NUTS (default: 1000)."
-        ),
-    )
-
-    parser.add_argument(
-        "--n-chains",
-        type=int,
-        default=4,
-        help="Number of MCMC chains to run (default: 4).",
-    )
-
-    parser.add_argument(
-        "--additional-forecast-letters",
-        type=str,
-        help=(
-            "Forecast the following signals even if they were not fit. "
-            "Fit signals are always forecast."
-        ),
-        default=None,
-    )
-
-    parser.add_argument(
-        "--rng-key",
-        type=int,
-        help=(
-            "Integer seed for a JAX random number generator. "
-            "If not provided, a random integer will be chosen."
-        ),
-        default=None,
-    )
-    parser.add_argument(
-        "--fail-on-stale-data",
-        action="store_true",
-        help="Fail instead of warning when selected input data is stale.",
-    )
-
-    args = parser.parse_args()
-    fit_flags = flags_from_hew_letters(args.model_letters)
-    forecast_flags = flags_from_hew_letters(
-        args.model_letters + (args.additional_forecast_letters or ""),
-        flag_prefix="forecast",
-    )
-    delattr(args, "additional_forecast_letters")
-    delattr(args, "model_letters")
-    main(**vars(args), **fit_flags, **forecast_flags)

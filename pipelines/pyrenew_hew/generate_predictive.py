@@ -1,4 +1,3 @@
-import argparse
 import datetime as dt
 import pickle
 from pathlib import Path
@@ -140,60 +139,3 @@ def generate_and_save_predictions(
     )
 
     return None
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description=("Do posterior prediction from a pyrenew-hew fit.")
-    )
-    parser.add_argument(
-        "model_run_dir",
-        type=Path,
-        help=(
-            "Path to a directory containing the model fitting data "
-            "and the posterior chains. "
-            "The completed predictive samples will be saved here."
-        ),
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        required=True,
-        help="Name of the model to use for generating predictions.",
-    )
-    parser.add_argument(
-        "--n-forecast-points",
-        type=int,
-        default=0,
-        help="Number of time points to forecast (Default: 0).",
-    )
-    parser.add_argument(
-        "--predict-ed-visits",
-        type=bool,
-        action=argparse.BooleanOptionalAction,
-        help="If provided, generate posterior predictions for ED visits.",
-    )
-    parser.add_argument(
-        "--predict-hospital-admissions",
-        type=bool,
-        action=argparse.BooleanOptionalAction,
-        help=("If provided, generate posterior predictions for hospital admissions."),
-    )
-    parser.add_argument(
-        "--predict-wastewater",
-        type=bool,
-        action=argparse.BooleanOptionalAction,
-        help="If provided, generate posterior predictions for wastewater.",
-    )
-    parser.add_argument(
-        "--rng-key",
-        type=int,
-        help=(
-            "Integer seed for a JAX random number generator. "
-            "If not provided, a random integer will be chosen."
-        ),
-        default=None,
-    )
-    args = parser.parse_args()
-
-    generate_and_save_predictions(**vars(args))

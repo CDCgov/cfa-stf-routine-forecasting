@@ -1,6 +1,5 @@
-"""Unit tests for common utility and command-line argument functions"""
+"""Unit tests for common utility functions."""
 
-import argparse
 import datetime as dt
 import logging
 
@@ -8,10 +7,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from pipelines.utils.cli_utils import (
-    add_common_forecast_arguments,
-    run_command,
-)
+from pipelines.utils.cli_utils import run_command
 from pipelines.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
@@ -206,32 +202,7 @@ class TestDataWranglingUtils:
 
 
 class TestCLIUtils:
-    """Tests for CLI argument parsing utilities."""
-
-    def test_add_common_forecast_arguments_smoke_test(self):
-        """Smoke test that common arguments are added without errors."""
-        parser = argparse.ArgumentParser()
-
-        add_common_forecast_arguments(parser)
-
-        # Parse with minimal required arguments to verify they exist
-        args = parser.parse_args(
-            [
-                "--disease",
-                "COVID-19",
-                "--loc",
-                "CA",
-                "--run-date",
-                "2026-01-08",
-            ]
-        )
-
-        assert args.disease == "COVID-19"
-        assert args.loc == "CA"
-        assert args.n_training_days == 180  # default value
-        assert args.n_forecast_days == 28  # default value
-        assert args.exclude_last_n_days == 0  # default value
-        assert args.run_date == dt.date(2026, 1, 8)
+    """Tests for command-line utilities."""
 
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""

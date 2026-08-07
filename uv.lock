@@ -855,7 +855,7 @@ requires-dist = [
     { name = "pygit2", specifier = ">=1.17.0" },
     { name = "pypdf", specifier = ">=6.10.1" },
     { name = "pyrenew" },
-    { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=5938ec3" },
+    { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=1c9fa48" },
     { name = "tomli-w", specifier = ">=1.1.0" },
 ]
 
@@ -3694,7 +3694,7 @@ wheels = [
 [[package]]
 name = "pyrenew"
 version = "0.1.7"
-source = { git = "https://github.com/CDCgov/PyRenew?rev=v0.1.7#ef83fbb7f65d1131fd1f37935ce655a1268c8edf" }
+source = { git = "https://github.com/CDCgov/PyRenew?rev=69b92d6#69b92d6b3ba70387e9cbf1c40aea42a835994a9f" }
 dependencies = [
     { name = "jax" },
     { name = "numpy" },
@@ -3705,7 +3705,7 @@ dependencies = [
 [[package]]
 name = "pyrenew-multisignal"
 version = "0.1.0"
-source = { git = "https://github.com/CDCgov/pyrenew-multisignal?rev=5938ec3#5938ec3260cec14050fa787d6b192726d7ace7d8" }
+source = { git = "https://github.com/CDCgov/pyrenew-multisignal?rev=1c9fa48#1c9fa48d2435a0fbcf45716cc5713d77c52c9f91" }
 dependencies = [
     { name = "jax" },
     { name = "numpy" },

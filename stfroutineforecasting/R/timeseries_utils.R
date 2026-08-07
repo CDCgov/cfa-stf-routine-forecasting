@@ -37,7 +37,7 @@ load_training_data <- function(
     )
   ) |>
     dplyr::filter(.data$data_type == "train") |>
-    dplyr::select(-"lab_site_index") |>
+    dplyr::select(-"lab_site_index", -"data_type") |>
     dplyr::filter(stringr::str_ends(.data$.variable, "ed_visits")) |>
     tidyr::pivot_wider(names_from = ".variable", values_from = ".value")
 

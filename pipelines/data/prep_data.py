@@ -103,12 +103,12 @@ def process_and_save_loc_data(
         "right_truncation_offset": forecast_data.right_truncation_offset,
         "nwss_training_data": None,
         "nssp_training_data": (
-            nssp_training_data.drop("resolution").to_dict(as_series=False)
+            nssp_training_data.drop("resolution", "data_type").to_dict(as_series=False)
             if nssp_training_data is not None
             else None
         ),
         "nhsn_training_data": (
-            nhsn_training_data.drop("resolution").to_dict(as_series=False)
+            nhsn_training_data.drop("resolution", "data_type").to_dict(as_series=False)
             if nhsn_training_data is not None
             else None
         ),

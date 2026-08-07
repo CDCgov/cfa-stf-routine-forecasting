@@ -27,8 +27,7 @@ purrr::walk(script_packages, \(pkg) {
 #' This function fits a combination ensemble model to the training data and
 #' generates forecast samples for a specified number of days.
 #'
-#' @param data A data frame containing the time series data. It should have a
-#' column named `data_type` to distinguish between training and other data.
+#' @param data A data frame containing only the training time series data.
 #' @param n_forecast_days An integer specifying the number of days to forecast.
 #' Default is 28.
 #' @param n_samples An integer specifying the number of forecast samples to
@@ -54,7 +53,6 @@ fit_and_forecast_ensemble <- function(
 
   fit <- data |>
     as_tsibble(index = date) |>
-    filter(data_type == "train") |>
     model(
       comb_model = combination_ensemble(
         ETS(

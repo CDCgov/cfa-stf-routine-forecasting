@@ -117,10 +117,12 @@ def generate_and_save_predictions(
         ft.arviz.assign_coords_from_start_step(idata, **row, inplace=True)
 
     # Save one netcdf for reloading
-    idata.to_netcdf(str(mcmc_output_dir / "original_inference_data.nc"))
+    idata.to_netcdf(
+        str(mcmc_output_dir / "original_inference_data.nc"), engine="h5netcdf"
+    )
     ft.arviz.prune_chains_by_rel_diff(idata, rel_diff_thresh=0.9, inplace=True)
 
-    idata.to_netcdf(str(mcmc_output_dir / "inference_data.nc"))
+    idata.to_netcdf(str(mcmc_output_dir / "inference_data.nc"), engine="h5netcdf")
 
     tidy_posterior_predictive = (
         pb.gather_draws(

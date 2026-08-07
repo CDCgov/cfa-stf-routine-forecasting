@@ -326,7 +326,7 @@ def _read_tsv_data(
     )
 
     # Ensure date column is properly typed
-    df_pivot = df_pivot.with_columns(pl.col("date").cast(pl.Date))
+    df_pivot = df_pivot.with_columns(pl.col("date").str.to_date())
     df_pivot = df_pivot.sort("date")
 
     # Apply date exclusions if provided (before extracting to lists)

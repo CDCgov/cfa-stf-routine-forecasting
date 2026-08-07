@@ -183,21 +183,13 @@ def _resolve_nowcast_source(
         case "none":
             return None
         case "reporting-delay":
-            if not ReportingDelayNowcast.applies_to(forecast_spec=forecast_spec):
-                raise ValueError(
-                    f"reporting-delay nowcasting is not applicable to "
-                    f"target={forecast_spec.target!r}, ed_visit_type={forecast_spec.ed_visit_type!r}."
-                )
+            ReportingDelayNowcast.ensure_applicable(forecast_spec=forecast_spec)
             return _build_reporting_delay_nowcast(
                 forecast_spec=forecast_spec,
                 reporting_delay_pmf=reporting_delay_pmf,
             )
         case "hubverse":
-            if not HubverseNowcast.applies_to(forecast_spec=forecast_spec):
-                raise ValueError(
-                    "hubverse nowcasting is only applicable to NHSN "
-                    "epiweekly observed counts."
-                )
+            HubverseNowcast.ensure_applicable(forecast_spec=forecast_spec)
             if hubverse_nowcast_dir is None:
                 raise ValueError(
                     "hubverse_nowcast_dir is required when Hubverse nowcasting is "

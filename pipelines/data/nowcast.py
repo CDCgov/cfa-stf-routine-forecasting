@@ -21,12 +21,12 @@ class NowcastData:
 class NowcastSource(Protocol):
     """Interface for producing nowcast data for a forecast configuration."""
 
-    def applies_to(
+    def ensure_applicable(
         self,
         *,
         forecast_spec: ForecastSpec,
-    ) -> bool:
-        """Whether this source applies to a forecast configuration."""
+    ) -> None:
+        """Ensure this source applies to a forecast configuration."""
         ...
 
     def get_nowcast_data(

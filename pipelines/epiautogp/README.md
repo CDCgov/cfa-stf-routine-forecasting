@@ -70,7 +70,7 @@ Shared utilities for the forecast pipeline, containing modular functions for eac
 Pluggable nowcasting sources for nowcasting recent observations.
 
 - **`NowcastData`** (`../data/nowcast.py`): Stores nowcast dates and report trajectories.
-- **`NowcastSource`** (`../data/nowcast.py`): Protocol declaring `applies_to(*, forecast_spec) -> bool` (the predicate the resolver queries before constructing) and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
+- **`NowcastSource`** (`../data/nowcast.py`): Protocol declaring `ensure_applicable(*, forecast_spec) -> None` and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
 - **`FixedNowcast`**: Trivial source wrapping a precomputed `NowcastData`.
 - **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF.
   Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.

@@ -136,6 +136,19 @@ def test_resolver_builds_source_for_materialized_directory(tmp_path):
 
 
 @pytest.mark.parametrize(
+    ("spec", "invalid_setting"),
+    [
+        (_spec(target="nssp"), "target='nssp'"),
+        (_spec(frequency="daily"), "frequency='daily'"),
+        (_spec(ed_visit_type="pct"), "ed_visit_type='pct'"),
+    ],
+)
+def test_validation_explains_inapplicable_model_configuration(spec, invalid_setting):
+    with pytest.raises(ValueError, match=invalid_setting):
+        HubverseNowcast.ensure_applicable(forecast_spec=spec)
+
+
+@pytest.mark.parametrize(
     "spec",
     [
         _spec(target="nssp"),
@@ -143,7 +156,7 @@ def test_resolver_builds_source_for_materialized_directory(tmp_path):
         _spec(ed_visit_type="pct"),
     ],
 )
-def test_resolver_rejects_inapplicable_model_configuration(tmp_path, spec):
+def test_resolver_propagates_applicability_error(tmp_path, spec):
     with pytest.raises(ValueError, match="only applicable"):
         _resolve_nowcast_source(
             forecast_spec=spec,

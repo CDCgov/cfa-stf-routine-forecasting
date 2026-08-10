@@ -5,16 +5,18 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/pipeline-run-check.yaml"
-      - "pipelines/**"
-      - "cfa/**"
+      - "pyproject.toml"
+      - "src/cfa/stf/routine/**"
+      - "tests/**"
       - "stfroutineforecasting/**"
       - "uv.lock"
   push:
     branches: [main]
     paths:
       - ".github/workflows/pipeline-run-check.yaml"
-      - "pipelines/**"
-      - "cfa/**"
+      - "pyproject.toml"
+      - "src/cfa/stf/routine/**"
+      - "tests/**"
       - "stfroutineforecasting/**"
       - "uv.lock"
 
@@ -42,7 +44,7 @@ jobs:
         run: >-
           uv run pytest -s
           -m pipeline_e2e
-          pipelines/tests/integration/test_pipeline_end_to_end.py
+          tests/integration/test_pipeline_end_to_end.py
           --e2e-data-mode mock
 
   fable:
@@ -60,7 +62,7 @@ jobs:
       - name: Run Fable model test
         run: >-
           uv run pytest -s
-          pipelines/tests/integration/test_fable_forecast.py
+          tests/integration/test_fable_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
           --model-test-disease COVID-19
@@ -80,7 +82,7 @@ jobs:
       - name: Run PyRenew model test
         run: >-
           uv run pytest -s
-          pipelines/tests/integration/test_pyrenew_forecast.py
+          tests/integration/test_pyrenew_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
           --model-test-disease COVID-19
@@ -103,7 +105,7 @@ jobs:
       - name: Run EpiAutoGP model test
         run: >-
           uv run pytest -s
-          pipelines/tests/integration/test_epiautogp_forecast.py
+          tests/integration/test_epiautogp_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
           --model-test-disease COVID-19

@@ -31,8 +31,21 @@ dependencies = [
     "tomli-w>=1.1.0",
 ]
 
+[project.scripts]
+cfa-stf-routine-create-pool = "cfa.stf.routine.create_pool:main"
+
 [tool.hatch.build.targets.wheel]
-packages = ["pipelines"]
+packages = ["src/cfa"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"dagster_defs.py" = "dagster_defs.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.uv-cache",
+    "/.venv",
+    "/work",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -45,8 +58,8 @@ allow-direct-references = true
 directory_type = "project"
 
 [tool.dg.project]
-root_module = "dagster_defs"
-defs_module = "dagster_defs"
+root_module = "cfa.stf.routine"
+defs_module = "cfa.stf.routine"
 code_location_target_module = "dagster_defs"
 
 [dependency-groups]
@@ -72,15 +85,32 @@ test = [
 
 [tool.ruff]
 fix = true
+src = ["src"]
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["I", "E4", "E7", "E9", "F", "UP"]
 
 [tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+    "--strict-config",
+    "--strict-markers",
+]
 markers = [
     "pipeline_e2e: end-to-end pipeline integration test",
     "model_integration: single-model pipeline integration test",
 ]
+testpaths = ["tests"]
+xfail_strict = true
+
+[tool.coverage.run]
+branch = true
+source = ["cfa.stf.routine"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
 
 [tool.uv]
 override-dependencies = [

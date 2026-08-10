@@ -33,16 +33,17 @@ from pygit2.repository import Repository
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 # Model Code
-from pipelines.fable.forecast_fable import main as forecast_fable
-from pipelines.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from pipelines.utils.common_utils import (
+from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
+from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
+from cfa.stf.routine.utils.common_utils import (
     calculate_training_dates,
     create_prop_samples,
     get_model_batch_dir_name,
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
 )
-from pipelines.utils.postprocess_forecast_batches import main as postprocess
+from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
 # ============================================================================
 # DAGSTER INITIALIZATION
@@ -66,7 +67,7 @@ is_production = is_prod()
 
 # Instead of hardcoding the repo name, this will always find the containing directory of this defs file
 # As of 6/2026, cfa-stf-routine-forecasting
-local_workdir = Path(__file__).parent.resolve()  # absolute path to the workdir
+local_workdir = Path(__file__).parent.resolve()
 container_workdir = Path(
     f"/{local_workdir.name}"
 )  # in the container, workdir is mounted at /
@@ -379,7 +380,7 @@ def _run_pyrenew_model(
     forecast_pyrenew(
         disease=disease,
         loc=location,
-        priors_path=Path("pipelines/pyrenew_hew/priors/prod_priors.py"),
+        priors_path=PRODUCTION_PRIORS,
         output_dir=daily_forecast_output_dir,
         n_training_days=model_base_config.n_training_days,
         n_forecast_days=28,
@@ -931,8 +932,8 @@ if not is_production:
 
     @dg.job(
         description=(
-            "Build the container image used by dagster to run this project's asset pipelines."
-            "Run after making any change and before running the pipelines."
+            "Build the container image used by dagster to run this project's asset cfa.stf.routine."
+            "Run after making any change and before running the cfa.stf.routine."
         ),
         config=dg.RunConfig(
             ops={

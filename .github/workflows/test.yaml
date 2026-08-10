@@ -27,7 +27,6 @@ jobs:
       - name: Check Dagster definitions
         env:
           DAGSTER_USER: test
-          PYTHONPATH: ${{ github.workspace }}
         run: uv run dg check defs
 
   pipelines-test:

@@ -18,7 +18,8 @@ These forecasts are submitted to CDC's forecasting hubs:
 - [FluSight Forecast Hub](https://github.com/cdcepi/FluSight-forecast-hub)
 - [COVID-19 Forecast Hub](https://github.com/CDCgov/covid19-forecast-hub)
 
-The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
+The modeling pipeline is orchestrated with [Dagster](src/cfa/stf/routine/dagster_defs.py).
+The root-level `dagster_defs.py` is a compatibility entrypoint for upstream tooling.
 
 ## Justfile
 
@@ -82,7 +83,7 @@ When using the Docker executor, Dagster bind-mounts the repository's local `test
 
 From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), you can run and schedule model runs and see other projects' pipelines at CFA.
 
-- Pushes to `main` that include changes to `dagster_defs.py` will automatically update this server via a GitHub Actions workflow.
+- Pushes to `main` that include changes to either Dagster definitions entrypoint will automatically update this server via a GitHub Actions workflow.
   (See next section.)
 - Before pushing to `main`, make sure you have thoroughly tested your own branch and gotten a PR review.
 - It is good practice to periodically re-sync (`uv sync`) and even re-create your virtual environment if your branch has been open a while to make sure dependencies are up to date.
@@ -94,7 +95,7 @@ From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), yo
 1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch.
    Use this for testing in pre-prod with a non-`main` branch.
    - Let people know when you do this so they don't override your test with their own.
-   - Pushes to main that do not include changes to `dagster_defs.py` will NOT automatically update the server.
+   - Pushes to main that do not include changes to either Dagster definitions entrypoint will NOT automatically update the server.
 2. As mentioned, pushes to `main` that include a change to the Dagster definitions module since the previous commit (or PR) will push to the server.
 3. Powerusers: `build_image` in dagster's Jobs will build and push your own local branch to the server if you set `should_push` to `True`.
    - Communicate that you are running this job to the STF team before doing so.

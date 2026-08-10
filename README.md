@@ -41,8 +41,8 @@ You can choose whether to push the image (generally you should) or to even push 
 > [!NOTE]
 > Azure Batch Forecasting Pipelines can only be run by CDC internal users on the CFA Virtual Analyst Platform.
 
-To execute dagster workflows fully locally with this project, you'll need to have blobs mounted.
-However, you can also launch jobs locally and have them submit to Azure Batch.
+Dagster jobs can run locally with the in-process or Docker executor, or submit to Azure Batch.
+Local runs write forecast outputs to `test-output/` in the repository.
 
 ### Local Development and Testing
 
@@ -52,7 +52,7 @@ However, you can also launch jobs locally and have them submit to Azure Batch.
 
 The following instructions will set up Dagster on your VAP.
 However, based on the current configuration, actual execution will still run in the cloud via Azure Batch.
-You can change the `executor` option in `dagster_defs.py` or in the dagster launchpad to test using the local Docker Executor - this will require you to have setup Blobfuse.
+You can change the `executor` option in `dagster_defs.py` or in the Dagster launchpad to test using the local Docker executor.
 See [Using the local docker executor](#using-the-local-docker-executor).
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:
@@ -76,12 +76,7 @@ If you'd like to test a few "tasks" locally, you can have dagster execute on you
 Dagster can leverage your VM's own docker daemon to emulate Azure Batch.
 When doing this, take care not to run more than two or three state x disease combinations at a time or you will quickly put your VM into a coma.
 
-When using the `Docker Executor`, Dagster assumes mounts at `./blobfuse/mounts/` in the working directory.
-
-- `sudo bash "./blobfuse/cleanup.sh"`: gracefully unmounts the relevant blobs.
-  It is often worth running this first to make sure you're mounting to a clean setup.
-- `sudo bash "./blobfuse/mount.sh"`: mounts the relevant blobs using blobfuse.
-  Use this before launching locally-executed dagster jobs.
+When using the Docker executor, Dagster bind-mounts the repository's local `test-output/` directory into the container.
 
 #### Production Scheduling
 

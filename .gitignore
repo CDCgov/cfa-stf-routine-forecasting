@@ -401,6 +401,5 @@ pipelines/tests/epiautogp_end_to_end_test_output/*
 azureconfig.env
 azureconfig.sh
 
-# blobfuse
-config.yaml
-blobfuse/mounts/
+# Local Dagster output
+/test-output/

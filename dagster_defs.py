@@ -88,17 +88,18 @@ tag = (
 )
 image = f"{registry}/{local_workdir.name}:{tag}"
 
-# ----------- Azure blob storage mount strings ---------------
+# ----------- Output volume mount strings ---------------
 
-# Used in the cloud, and combined with the local mounting dir, used locally
-blob_mounts = [
-    f"stf-routine-forecasting-config:{container_workdir}/config",
+# Azure Batch writes outputs directly to blob storage.
+azure_blob_mounts = [
     f"stf-routine-forecasting-prod-output:{container_workdir}/output",
     f"stf-routine-forecasting-test-output:{container_workdir}/test-output",
 ]
 
-# Used when mounting with docker
-local_mounting_dir = f"{local_workdir}/blobfuse/mounts/"
+# Local runs are non-production, so they use one output directory.
+local_output_mount = (
+    f"{local_workdir / 'test-output'}:{container_workdir / 'test-output'}"
+)
 
 # ---------- Execution Configuration ----------
 
@@ -123,10 +124,10 @@ docker_execution_config = ExecutionConfig(
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
                     f"{__file__}:{container_workdir}/{os.path.basename(__file__)}",
-                    # blob container mounts for cfa-stf-routine-forecasting
-                    # with the docker executor we need the local mounting dir as well
+                    # Store outputs on the host so they persist after the
+                    # container exits.
                 ]
-                + [local_mounting_dir + mount for mount in blob_mounts]
+                + [local_output_mount]
             },
         },
     ),
@@ -149,10 +150,9 @@ azure_batch_execution_config = ExecutionConfig(
                     # f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    # blob container mounts for cfa-stf-routine-forecasting
-                    # we do not need the local mounting dir for azure batch
+                    # Azure blob output mounts
                 ]
-                + blob_mounts,
+                + azure_blob_mounts,
                 "working_dir": f"{container_workdir}",
             },
         },
@@ -969,11 +969,7 @@ if not is_production:
         )
         explore_cmd = (
             ["docker", "run", "-it"]
-            + [
-                item
-                for mount in blob_mounts
-                for item in ("-v", local_mounting_dir + mount)
-            ]
+            + ["-v", local_output_mount]
             + ["--rm", image, "bash"]
         )
         subprocess.run(explore_cmd, check=True)

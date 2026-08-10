@@ -395,8 +395,7 @@ private_data/*
 .vscode/settings.json
 
 # Ignore end to end test output
-pipelines/tests/end_to_end_test_output/*
-pipelines/tests/epiautogp_end_to_end_test_output/*
+/tests/end_to_end_test_output/
 
 # Azure configuration files
 azureconfig.env

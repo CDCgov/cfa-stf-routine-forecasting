@@ -18,16 +18,7 @@ These forecasts are submitted to CDC's forecasting hubs:
 - [FluSight Forecast Hub](https://github.com/cdcepi/FluSight-forecast-hub)
 - [COVID-19 Forecast Hub](https://github.com/CDCgov/covid19-forecast-hub)
 
-The Python project uses a `src/` layout.
-Import application code from the `cfa.stf.routine` namespace; tests live separately in [`tests/`](tests).
-The modeling pipeline is orchestrated with [Dagster](dagster_defs.py), whose definitions module intentionally remains at the repository root.
-
-Install the project and its development dependencies, then run the fast test suite with:
-
-```bash
-uv sync --all-groups
-uv run pytest -m "not pipeline_e2e and not model_integration"
-```
+The modeling pipeline is orchestrated with [Dagster](dagster_defs.py).
 
 ## Justfile
 

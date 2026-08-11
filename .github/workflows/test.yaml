@@ -51,8 +51,8 @@ jobs:
         run: |
           uv run pytest \
             -m "not pipeline_e2e and not model_integration" \
-            --cov=pipelines --cov-report=term --cov-report=xml:pipelines-coverage.xml \
-            pipelines/tests
+            --cov=cfa.stf.routine --cov-report=term --cov-report=xml:pipelines-coverage.xml \
+            tests
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v7

@@ -33,7 +33,7 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: ^(package\.lock\.json|pipelines/epiautogp/Manifest\.toml)$
+        exclude: ^(package\.lock\.json|src/cfa/stf/routine/epiautogp/Manifest\.toml)$
   # R
   - repo: https://github.com/posit-dev/air-pre-commit
     rev: 0.11.0
@@ -55,7 +55,7 @@ repos:
     hooks:
       - id: typos
         args: ["--force-exclude"]
-        exclude: ^pipelines/epiautogp/Manifest\.toml$
+        exclude: ^src/cfa/stf/routine/epiautogp/Manifest\.toml$
   # Quarto / Markdown
   - repo: https://github.com/jolars/panache-pre-commit
     rev: v3.3.0

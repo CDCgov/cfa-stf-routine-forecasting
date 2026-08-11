@@ -171,7 +171,7 @@ jobs:
 
             HEAD="${{ github.sha }}"
 
-            if git diff --name-only "$BASE" "$HEAD" | grep -q 'dagster_defs\.py'; then
+            if git diff --name-only "$BASE" "$HEAD" | grep -Eq '^(dagster_defs\.py|src/cfa/stf/routine/dagster_defs\.py)$'; then
               echo "changed=true" >> $GITHUB_OUTPUT
               echo "Dagster defs changed: true"
             else

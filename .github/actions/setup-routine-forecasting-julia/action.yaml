@@ -13,5 +13,5 @@ runs:
       uses: julia-actions/cache@v3
 
     - name: Install Julia dependencies
-      run: julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate()'
+      run: julia --project=src/cfa/stf/routine/epiautogp -e 'using Pkg; Pkg.instantiate()'
       shell: bash

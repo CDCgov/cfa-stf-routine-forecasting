@@ -35,21 +35,21 @@ COPY ./stfroutineforecasting /cfa-stf-routine-forecasting/stfroutineforecasting
 
 # Julia environment for direct NowcastAutoGP runner
 # Copy only Julia environment metadata first so dependency installation is cached
-# independently of changes to pipeline source files. The full pipelines tree is
+# independently of changes to pipeline source files. The full source tree is
 # copied later.
-COPY ./pipelines/epiautogp/Project.toml \
-     ./pipelines/epiautogp/Manifest.toml \
-     /cfa-stf-routine-forecasting/pipelines/epiautogp/
+COPY ./src/cfa/stf/routine/epiautogp/Project.toml \
+     ./src/cfa/stf/routine/epiautogp/Manifest.toml \
+     /cfa-stf-routine-forecasting/src/cfa/stf/routine/epiautogp/
 
 # Set working directory
 WORKDIR /cfa-stf-routine-forecasting
 
 # Instantiate Julia dependencies into the image so the runtime container can run
 # the EpiAutoGP subprocess without downloading packages. This is a script
-# environment under pipelines/epiautogp, so we commit its Manifest.toml for a
+# environment under the EpiAutoGP package, so we commit its Manifest.toml for a
 # reproducible EpiAutoGP dependency set.
 RUN mkdir -p "${JULIA_DEPOT_DIR}" \
-    && julia --project=pipelines/epiautogp -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
+    && julia --project=src/cfa/stf/routine/epiautogp -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
     && chmod -R a+rwX "${JULIA_DEPOT_DIR}"
 
 # Install stfroutineforecasting
@@ -81,16 +81,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-install-project --no-dev
 
 #
-# Copy in python pipeline and orchestration files that frequently change
+# Copy in Python pipeline and orchestration files that frequently change
 #
 
 # Project files
-COPY pipelines ./pipelines
+COPY src ./src
 COPY README.md ./README.md
+COPY dagster_defs.py ./dagster_defs.py
 
-# Install the local project now that pipelines / sources are present
+# Install the local project now that its sources are present
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
-
-# Dagster
-COPY dagster_defs.py ./dagster_defs.py

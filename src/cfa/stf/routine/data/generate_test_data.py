@@ -61,28 +61,21 @@ HUBVERSE_LOGNORMAL_SIGMA = 0.05
 HUBVERSE_RANDOM_SEED = 12345
 
 _FACILITY_LEVEL_NSSP_DATA_COLS = [
-    "reference_date",
-    "report_date",
-    "geo_type",
-    "geo_value",
-    "asof",
-    "metric",
-    "run_id",
+    "date",
+    "state_abb",
     "facility",
     "disease",
+    "target_type",
     "value",
 ]
 _LOC_LEVEL_NSSP_DATA_COLS = [
-    "reference_date",
-    "report_date",
-    "geo_type",
-    "geo_value",
-    "metric",
+    "date",
+    "state_abb",
     "disease",
+    "target_type",
     "value",
-    "any_update_this_day",
 ]
-_NHSN_COLS = ["jurisdiction", "weekendingdate", "hospital_admissions"]
+_NHSN_COLS = ["date", "state_abb", "disease", "target_type", "value"]
 
 
 @dataclass(frozen=True)
@@ -161,15 +154,11 @@ def _nssp_row(
     value: int,
 ) -> dict:
     return {
-        "reference_date": date,
-        "report_date": REPORT_DATE,
-        "geo_type": "state",
-        "geo_value": location,
-        "asof": REPORT_DATE,
-        "metric": "count_ed_visits",
-        "run_id": 0,
+        "date": date,
+        "state_abb": location,
         "facility": facility,
         "disease": disease,
+        "target_type": "inc ed visits",
         "value": value,
     }
 
@@ -228,8 +217,7 @@ def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
     return (
         facility_level_nssp.group_by(cs.exclude("facility", "value"))
         .agg(pl.col("value").sum())
-        .with_columns(pl.lit(True).alias("any_update_this_day"))
-        .sort(["reference_date", "geo_value", "disease"])
+        .sort(["date", "state_abb", "disease"])
         .select(cs.by_name(_LOC_LEVEL_NSSP_DATA_COLS))
     )
 
@@ -237,15 +225,18 @@ def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
 def _make_nhsn(
     *,
     location: LocationData,
+    disease: str,
     disease_index: int,
 ) -> pl.DataFrame:
     rows = []
-    for week_index, weekendingdate in enumerate(_weekending_dates()):
+    for week_index, date in enumerate(_weekending_dates()):
         rows.append(
             {
-                "jurisdiction": location.abbr,
-                "weekendingdate": weekendingdate,
-                "hospital_admissions": (
+                "date": date,
+                "state_abb": location.abbr,
+                "disease": disease,
+                "target_type": "wk inc hosp",
+                "value": (
                     _count_from_population_percent(
                         location.population,
                         _nhsn_percent(week_index, disease_index),
@@ -274,19 +265,15 @@ def make_forecast_data(
         locations=location_data,
         diseases=diseases,
     )
-    nssp_data = (
-        _make_state_level_nssp(facility_level_nssp)
-        .filter(
-            pl.col("geo_value") == location,
-            pl.col("disease").is_in([disease, "total"]),
-        )
-        .rename({"reference_date": "date", "geo_value": "state_abb"})
-        .select(["date", "state_abb", "disease", "value"])
+    nssp_data = _make_state_level_nssp(facility_level_nssp).filter(
+        pl.col("state_abb") == location,
+        pl.col("disease").is_in([disease, "total"]),
     )
     nhsn_data = _make_nhsn(
         location=location_by_abbr[location],
+        disease=disease,
         disease_index=disease_index,
-    ).with_columns(pl.lit(disease).alias("disease"))
+    )
 
     nssp_freshness = DataFreshness(
         source="nssp",
@@ -299,7 +286,7 @@ def make_forecast_data(
     nhsn_freshness = DataFreshness(
         source="nhsn",
         selected_version_date=REPORT_DATE,
-        latest_observed_date=nhsn_data.get_column("weekendingdate").max(),
+        latest_observed_date=nhsn_data.get_column("date").max(),
         run_date=REPORT_DATE,
         is_stale=False,
         reason="Synthetic NHSN data",
@@ -320,7 +307,7 @@ def make_forecast_data(
                     .otherwise(pl.lit("eval")),
                     resolution=pl.lit("daily"),
                 )
-                .drop("total")
+                .drop("total", "target_type")
                 .sort("date")
             ),
             freshness=nssp_freshness,
@@ -331,14 +318,7 @@ def make_forecast_data(
     nhsn = (
         NHSNData(
             data=(
-                nhsn_data.rename(
-                    {
-                        "weekendingdate": "date",
-                        "jurisdiction": "state_abb",
-                        "hospital_admissions": "value",
-                    }
-                )
-                .filter(pl.col("date") >= first_training_date)
+                nhsn_data.filter(pl.col("date") >= first_training_date)
                 .with_columns(
                     data_type=pl.when(pl.col("date") <= last_training_date)
                     .then(pl.lit("train"))
@@ -382,9 +362,10 @@ def _make_location_hubverse_nowcasts(
     recent_reports = (
         _make_nhsn(
             location=location,
+            disease=disease,
             disease_index=disease_index,
         )
-        .filter(pl.col("weekendingdate") < REPORT_DATE)
+        .filter(pl.col("date") < REPORT_DATE)
         .tail(n_nowcast_dates)
     )
     if recent_reports.height != n_nowcast_dates:
@@ -393,8 +374,8 @@ def _make_location_hubverse_nowcasts(
             f"{disease}, {location.abbr}; found {recent_reports.height}"
         )
 
-    dates = recent_reports.get_column("weekendingdate").to_list()
-    reports = recent_reports.get_column("hospital_admissions").to_numpy()
+    dates = recent_reports.get_column("date").to_list()
+    reports = recent_reports.get_column("value").to_numpy()
     horizons = [
         (target_end_date - REPORT_DATE).days // DAYS_PER_WEEK
         for target_end_date in dates

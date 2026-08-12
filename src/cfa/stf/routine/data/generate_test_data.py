@@ -31,18 +31,13 @@ LAST_OBS_DATE = REPORT_DATE - dt.timedelta(
 OBS_WINDOW_DAYS = 120
 FIRST_OBS_DATE = REPORT_DATE - dt.timedelta(days=OBS_WINDOW_DAYS)
 
-N_FACILITIES = 3
-FIRST_FACILITY_ID = 1
-
 ED_BASELINE_PERCENT = 0.0012
 ED_DISEASE_INCREMENT_PERCENT = 0.0003
-ED_FACILITY_INCREMENT_PERCENT = 0.0001
 ED_TREND_INCREMENT_PERCENT = 0.0001
 ED_SEASONAL_INCREMENT_PERCENT = 0.0001
 ED_TREND_PERIOD_DAYS = 21
 ED_SEASONAL_PERIOD_DAYS = 7
-TOTAL_ED_BASELINE_OFFSET_PERCENT = 0.025
-TOTAL_ED_FACILITY_INCREMENT_PERCENT = 0.001
+TOTAL_ED_OFFSET_PERCENT = 0.025
 
 NHSN_BASELINE_PERCENT = 0.002
 NHSN_DISEASE_INCREMENT_PERCENT = 0.0005
@@ -60,22 +55,13 @@ HUBVERSE_N_SAMPLES = 40
 HUBVERSE_LOGNORMAL_SIGMA = 0.05
 HUBVERSE_RANDOM_SEED = 12345
 
-_FACILITY_LEVEL_NSSP_DATA_COLS = [
-    "date",
-    "state_abb",
-    "facility",
-    "disease",
-    "target_type",
-    "value",
-]
-_LOC_LEVEL_NSSP_DATA_COLS = [
+_SOURCE_DATA_COLS = [
     "date",
     "state_abb",
     "disease",
     "target_type",
     "value",
 ]
-_NHSN_COLS = ["date", "state_abb", "disease", "target_type", "value"]
 
 
 @dataclass(frozen=True)
@@ -115,23 +101,15 @@ def _count_from_population_percent(population: int, percent: float) -> int:
     return max(1, round(population * percent / 100))
 
 
-def _ed_percent(date: dt.date, disease_index: int, facility: int) -> float:
+def _ed_percent(date: dt.date, disease_index: int) -> float:
     day_index = (date - FIRST_OBS_DATE).days
     trend = day_index // ED_TREND_PERIOD_DAYS
-    seasonal = (day_index + facility + disease_index) % ED_SEASONAL_PERIOD_DAYS
+    seasonal = (day_index + disease_index) % ED_SEASONAL_PERIOD_DAYS
     return (
         ED_BASELINE_PERCENT
         + ED_DISEASE_INCREMENT_PERCENT * disease_index
-        + ED_FACILITY_INCREMENT_PERCENT * facility
         + ED_TREND_INCREMENT_PERCENT * trend
         + ED_SEASONAL_INCREMENT_PERCENT * seasonal
-    )
-
-
-def _total_ed_offset_percent(facility: int) -> float:
-    return (
-        TOTAL_ED_BASELINE_OFFSET_PERCENT
-        + TOTAL_ED_FACILITY_INCREMENT_PERCENT * facility
     )
 
 
@@ -149,14 +127,12 @@ def _nssp_row(
     *,
     location: str,
     date: dt.date,
-    facility: int,
     disease: str,
     value: int,
 ) -> dict:
     return {
         "date": date,
         "state_abb": location,
-        "facility": facility,
         "disease": disease,
         "target_type": "inc ed visits",
         "value": value,
@@ -168,57 +144,49 @@ def _weekending_dates() -> list[dt.date]:
     return _date_range(first_week, REPORT_DATE, step_days=DAYS_PER_WEEK)
 
 
-def _make_facility_level_nssp(
+def _make_nssp(
     *,
     locations: list[LocationData],
     diseases: list[str],
 ) -> pl.DataFrame:
+    """Make location-level NSSP data in the schema returned by `get_nssp`."""
     rows = []
     observation_dates = _date_range(FIRST_OBS_DATE, LAST_OBS_DATE)
-    facility_ids = range(FIRST_FACILITY_ID, N_FACILITIES + 1)
     for location in locations:
         for date in observation_dates:
-            for facility in facility_ids:
-                disease_total = 0
-                for disease_index, disease in enumerate(diseases):
-                    value = _count_from_population_percent(
-                        location.population,
-                        _ed_percent(date, disease_index, facility),
-                    )
-                    disease_total += value
-                    rows.append(
-                        _nssp_row(
-                            location=location.abbr,
-                            date=date,
-                            facility=facility,
-                            disease=disease,
-                            value=value,
-                        )
-                    )
-
-                total_value = disease_total + _count_from_population_percent(
+            disease_total = 0
+            for disease_index, disease in enumerate(diseases):
+                value = _count_from_population_percent(
                     location.population,
-                    _total_ed_offset_percent(facility),
+                    _ed_percent(date, disease_index),
                 )
+                disease_total += value
                 rows.append(
                     _nssp_row(
                         location=location.abbr,
                         date=date,
-                        facility=facility,
-                        disease="total",
-                        value=total_value,
+                        disease=disease,
+                        value=value,
                     )
                 )
 
-    return pl.DataFrame(rows).select(cs.by_name(_FACILITY_LEVEL_NSSP_DATA_COLS))
+            total_value = disease_total + _count_from_population_percent(
+                location.population,
+                TOTAL_ED_OFFSET_PERCENT,
+            )
+            rows.append(
+                _nssp_row(
+                    location=location.abbr,
+                    date=date,
+                    disease="total",
+                    value=total_value,
+                )
+            )
 
-
-def _make_state_level_nssp(facility_level_nssp: pl.DataFrame) -> pl.DataFrame:
     return (
-        facility_level_nssp.group_by(cs.exclude("facility", "value"))
-        .agg(pl.col("value").sum())
-        .sort(["date", "state_abb", "disease"])
-        .select(cs.by_name(_LOC_LEVEL_NSSP_DATA_COLS))
+        pl.DataFrame(rows)
+        .select(cs.by_name(_SOURCE_DATA_COLS))
+        .sort("state_abb", "disease", "date")
     )
 
 
@@ -245,7 +213,7 @@ def _make_nhsn(
             }
         )
 
-    return pl.DataFrame(rows).select(cs.by_name(_NHSN_COLS))
+    return pl.DataFrame(rows).select(cs.by_name(_SOURCE_DATA_COLS))
 
 
 def make_forecast_data(
@@ -261,11 +229,10 @@ def make_forecast_data(
     location_data = _location_data(locations)
     location_by_abbr = {item.abbr: item for item in location_data}
     disease_index = diseases.index(disease)
-    facility_level_nssp = _make_facility_level_nssp(
+    nssp_data = _make_nssp(
         locations=location_data,
         diseases=diseases,
-    )
-    nssp_data = _make_state_level_nssp(facility_level_nssp).filter(
+    ).filter(
         pl.col("state_abb") == location,
         pl.col("disease").is_in([disease, "total"]),
     )

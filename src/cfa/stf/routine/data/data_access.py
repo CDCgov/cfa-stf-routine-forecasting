@@ -94,16 +94,12 @@ def _load_dataops_nssp(
     run_date: dt.date,
 ) -> NSSPData:
     version_date = resolve_nssp_report_date()
-    source_data = (
-        get_nssp(
-            disease=[disease, "Total"],
-            loc_abb=loc_abb,
-            dataset="gold",
-            start_date=first_training_date,
-            lazy=False,
-        )
-        .rename({"reference_date": "date", "value": "ed_visits"})
-        .select(["date", "geo_value", "disease", "ed_visits"])
+    source_data = get_nssp(
+        disease=[disease, "total"],
+        state_abb=loc_abb,
+        dataset="gold",
+        start_date=first_training_date,
+        lazy=False,
     )
     freshness = nssp_freshness(
         selected_version_date=version_date,
@@ -111,20 +107,20 @@ def _load_dataops_nssp(
         run_date=run_date,
     )
     data = (
-        source_data.filter(pl.col("disease").is_in([disease, "Total"]))
+        source_data.filter(pl.col("disease").is_in([disease, "total"]))
         .pivot(
             on="disease",
-            values="ed_visits",
+            values="value",
         )
         .rename({disease: "observed_ed_visits"})
         .with_columns(
-            other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
+            other_ed_visits=pl.col("total") - pl.col("observed_ed_visits"),
             data_type=pl.when(pl.col("date") <= last_training_date)
             .then(pl.lit("train"))
             .otherwise(pl.lit("eval")),
             resolution=pl.lit("daily"),
         )
-        .drop("Total")
+        .drop("total", "target_type")
         .sort("date")
     )
     return NSSPData(data=data, freshness=freshness)
@@ -155,28 +151,28 @@ def _load_dataops_nhsn(
     prelim, version_date = select_latest_nhsn_release()
     source_data = get_nhsn_hrd(
         disease=disease,
-        loc_abb=loc_abb,
+        state_abb=loc_abb,
         prelim=prelim,
         start_date=first_training_date,
         lazy=False,
     )
     freshness = nhsn_freshness(
         selected_version_date=version_date,
-        latest_observed_date=source_data.get_column("weekendingdate").max(),
+        latest_observed_date=source_data.get_column("date").max(),
         run_date=run_date,
     )
     data = (
-        source_data.filter(pl.col("weekendingdate") >= first_training_date)
+        source_data.filter(pl.col("date") >= first_training_date)
         .with_columns(
-            data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+            data_type=pl.when(pl.col("date") <= last_training_date)
             .then(pl.lit("train"))
             .otherwise(pl.lit("eval")),
             resolution=pl.lit("epiweekly"),
         )
         .select(
-            "weekendingdate",
-            "jurisdiction",
-            "hospital_admissions",
+            "date",
+            "state_abb",
+            "value",
             "data_type",
             "resolution",
         )

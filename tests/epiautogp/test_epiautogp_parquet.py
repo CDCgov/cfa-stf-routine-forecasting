@@ -18,7 +18,7 @@ def _write_synthetic_input(path: Path) -> None:
     input_data = {
         "dates": [date.isoformat() for date in dates],
         "reports": reports,
-        "pathogen": "COVID-19",
+        "pathogen": "covid",
         "location": "US",
         "target": "nssp",
         "frequency": "daily",
@@ -80,6 +80,6 @@ def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
     assert samples[".variable"].unique().to_list() == ["prop_disease_ed_visits"]
     assert samples["resolution"].unique().to_list() == ["daily"]
     assert samples["geo_value"].unique().to_list() == ["US"]
-    assert samples["disease"].unique().to_list() == ["COVID-19"]
+    assert samples["disease"].unique().to_list() == ["covid"]
     assert samples[".value"].min() >= 0.0
     assert samples[".value"].max() <= 1.0

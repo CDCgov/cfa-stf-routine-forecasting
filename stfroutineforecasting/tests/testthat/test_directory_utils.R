@@ -1,14 +1,14 @@
 valid_model_batch <- dplyr::bind_rows(
   tibble::tibble(
-    dirname = "covid-19_r_2024-02-03_f_2021-04-01_t_2024-01-23",
-    disease = "COVID-19",
+    dirname = "covid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
+    disease = "covid",
     report_date = lubridate::ymd("2024-02-03"),
     first_training_date = lubridate::ymd("2021-04-1"),
     last_training_date = lubridate::ymd("2024-01-23")
   ),
   tibble::tibble(
-    dirname = "influenza_r_2022-12-11_f_2021-02-05_t_2027-12-30",
-    disease = "Influenza",
+    dirname = "flu_r_2022-12-11_f_2021-02-05_t_2027-12-30",
+    disease = "flu",
     report_date = lubridate::ymd("2022-12-11"),
     first_training_date = lubridate::ymd("2021-02-5"),
     last_training_date = lubridate::ymd("2027-12-30")
@@ -16,8 +16,8 @@ valid_model_batch <- dplyr::bind_rows(
 )
 
 invalid_model_batch_dirs <- c(
-  "qcovid-19_r_2024-02-03_f_2021-04-01_t_2024-01-23",
-  "influenza_r_2022-12-33_f_2021-02-05_t_2027-12-30"
+  "qcovid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
+  "flu_r_2022-12-33_f_2021-02-05_t_2027-12-30"
 )
 
 target_locations <- c("ME", "US")
@@ -93,12 +93,12 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
   withr::with_tempdir({
     ## create some directories
     valid_covid <- c(
-      "covid-19_r_2024-02-01_f_2021-01-01_t_2024-01-31",
-      "covid-19_r"
+      "covid_r_2024-02-01_f_2021-01-01_t_2024-01-31",
+      "covid_r"
     )
     valid_flu <- c(
-      "influenza_r_2022-11-12_f_2022-11-01_t_2022_11_10",
-      "influenza_r"
+      "flu_r_2022-11-12_f_2022-11-01_t_2022_11_10",
+      "flu_r"
     )
     valid_rsv <- c(
       "rsv_r_2022-11-12_f_2022-11-01_t_2022_11_10",
@@ -109,16 +109,16 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
     invalid_dirs <- c(
       "this_is_not_valid",
       "covid19_r",
-      "covid-19-r",
-      "influenza-r",
+      "covid-r",
+      "flu-r",
       "influnza_r",
-      "covid-19",
-      "influenza"
+      "covid",
+      "flu"
     )
 
     invalid_files <- c(
-      "covid-19_r.txt",
-      "influenza_r.txt",
+      "covid_r.txt",
+      "flu_r.txt",
       "rsv_r.txt"
     )
     fs::dir_create(c(valid_dirs, invalid_dirs))
@@ -133,27 +133,27 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
 
     result_valid <- get_all_model_batch_dirs(
       ".",
-      c("COVID-19", "Influenza", "RSV")
+      c("covid", "flu", "rsv")
     )
 
     result_valid_alt <- get_all_model_batch_dirs(
       ".",
-      c("Influenza", "RSV", "COVID-19")
+      c("flu", "rsv", "covid")
     )
 
     result_valid_covid <- get_all_model_batch_dirs(
       ".",
-      "COVID-19"
+      "covid"
     )
 
     result_valid_flu <- get_all_model_batch_dirs(
       ".",
-      "Influenza"
+      "flu"
     )
 
     result_valid_rsv <- get_all_model_batch_dirs(
       ".",
-      "RSV"
+      "rsv"
     )
 
     expect_setequal(result_all, expected_all_files)

@@ -1,11 +1,10 @@
-#' Utilities for handling and parsing directory names
-#' based on cfa-stf-routine-forecasting pipeline conventions.
+#' Canonical disease names
+#'
+#' Disease identifiers used in model batch directory names and forecast outputs.
+#'
+#' @format A character vector containing `"covid"`, `"flu"`, and `"rsv"`.
 
-disease_map_lower <- c(
-  "covid-19" = "COVID-19",
-  "influenza" = "Influenza",
-  "rsv" = "RSV"
-)
+disease_names <- c("covid", "flu", "rsv")
 
 #' Parse model batch directory name.
 #'
@@ -17,8 +16,8 @@ disease_map_lower <- c(
 #'
 #' @param model_batch_dir_path Path to the model batch
 #' directory to parse. Will parse only the basename.
-#' @return A list of quantities: `disease`, `report_date`,
-#' `first_training_date`, and `last_training_date`.
+#' @return A one-row tibble containing canonical `disease`, `report_date`,
+#' `first_training_date`, and `last_training_date` values.
 #' @export
 parse_model_batch_dir_path <- function(model_batch_dir_path) {
   pattern <- "(.+)_r_(.+)_f_(.+)_t_(.+)"
@@ -48,7 +47,11 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
       )
     }) |>
     dplyr::mutate(
-      disease = unname(disease_map_lower[.data$disease]),
+      disease = dplyr::if_else(
+        .data$disease %in% disease_names,
+        .data$disease,
+        NA_character_
+      ),
       report_date = lubridate::ymd(.data$report_date, quiet = TRUE),
       first_training_date = lubridate::ymd(
         .data$first_training_date,
@@ -63,8 +66,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
   if (anyNA(result)) {
     stop(
       "Could not parse extracted disease and/or date ",
-      "values expected 'disease' to be one of 'covid-19' ",
-      "and 'influenza' and all dates to be valid dates in ",
+      "values expected 'disease' to be one of 'covid', 'flu', ",
+      "or 'rsv' and all dates to be valid dates in ",
       "YYYY-MM-DD format. Got: ",
       glue::glue(
         "disease: {matches[2]}, ",
@@ -86,9 +89,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #' date, and extract key quantities of interest.
 #'
 #' @param model_run_dir_path Path to parse.
-#' @return A list of parsed attributes:
-#' `location`, `disease`, `report_date`,
-#' `first_training_date`, and `last_training_date`.
+#' @return A one-row tibble containing `location`, canonical `disease`,
+#' `report_date`, `first_training_date`, and `last_training_date` values.
 #'
 #' @export
 parse_model_run_dir_path <- function(model_run_dir_path) {
@@ -112,13 +114,12 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
 #' @param dir_of_batch_dirs Directory in which to look for
 #' "model batch" directories, each of which represents an
 #' individual forecast date / pathogen / dataset combination.
-#' @param diseases Names of the diseases to match, as a vector of strings,
-#' or a single disease as a string.
+#' @param diseases Canonical disease identifiers to match (`"covid"`, `"flu"`,
+#' or `"rsv"`), supplied as a character vector.
 #' @return A vector of paths to the forecast subdirectories.
 #' @export
 get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
-  # disease names are lowercase by convention
-  match_patterns <- stringr::str_c(tolower(diseases), "_r", collapse = "|")
+  match_patterns <- stringr::str_c(diseases, "_r", collapse = "|")
 
   dirs <- tibble::tibble(
     dir_path = fs::dir_ls(

@@ -16,12 +16,12 @@ Each model has a standalone `just` recipe that runs one disease/location pair.
 The PyRenew recipe runs the H, E, and HE versions once each; the EpiAutoGP recipe runs weekly NHSN counts, weekly NSSP percentages, daily NSSP disease counts, and daily NSSP other counts.
 
 ```bash
-just test-fable mock CA COVID-19
-just test-pyrenew mock CA COVID-19
-just test-epiautogp mock CA COVID-19
+just test-fable mock CA covid
+just test-pyrenew mock CA covid
+just test-epiautogp mock CA covid
 ```
 
 Replace `mock` with `real` to use CFA DataOps data.
-All arguments are optional; the defaults are `auto`, `CA`, and `COVID-19`.
+All arguments are optional; the defaults are `auto`, `CA`, and `covid`.
 
 The combined test remains available through `just e2e auto`, `just e2e real`, or `just e2e mock`.

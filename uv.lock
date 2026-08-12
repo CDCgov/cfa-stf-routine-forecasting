@@ -771,8 +771,8 @@ dependencies = [
 
 [[package]]
 name = "cfa-stf-data"
-version = "0.1.0"
-source = { git = "https://github.com/CDCgov/cfa-stf-data?rev=main#1f82b20b1b7c5274dfa40907577e139145ca4e61" }
+version = "0.2.0"
+source = { git = "https://github.com/CDCgov/cfa-stf-data?rev=v0.2.0#eda49507f8be451e681b884d940e3bf6b7877b4d" }
 dependencies = [
     { name = "cfa-catalog-public" },
     { name = "cfa-dataops" },
@@ -843,7 +843,7 @@ requires-dist = [
     { name = "arviz", extras = ["h5netcdf"], git = "https://github.com/arviz-devs/arviz?rev=main" },
     { name = "cfa-cloudops", git = "https://github.com/CDCgov/cfa-cloudops.git" },
     { name = "cfa-dagster", git = "https://github.com/cdcgov/cfa-dagster?rev=v1.4.0" },
-    { name = "cfa-stf-data", git = "https://github.com/CDCgov/cfa-stf-data?rev=main" },
+    { name = "cfa-stf-data", git = "https://github.com/CDCgov/cfa-stf-data?rev=v0.2.0" },
     { name = "cfa-stf-forecasttools", git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main" },
     { name = "dagster" },
     { name = "jax" },

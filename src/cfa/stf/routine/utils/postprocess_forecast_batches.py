@@ -22,7 +22,7 @@ from cfa.stf.routine.utils.common_utils import (
 
 
 def _hubverse_table_filename(report_date: str | dt.date, disease: str) -> str:
-    return f"{report_date}-{disease.lower()}-hubverse-table.parquet"
+    return f"{report_date}-{disease}-hubverse-table.parquet"
 
 
 # Batch collation assumes producer schemas already match. Type drift such as an
@@ -76,7 +76,7 @@ def model_batch_dir_to_target_path(
 
 def main(
     base_forecast_dir: Path | str,
-    diseases: list[str] | set[str] = ["COVID-19", "Influenza", "RSV"],
+    diseases: list[str] | set[str] = ["covid", "flu", "rsv"],
     skip_existing: bool = True,
     local_copy_dir: Path | str = "",
 ) -> None:
@@ -119,12 +119,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--diseases",
         type=str,
-        default="COVID-19 Influenza RSV",
+        default="covid flu rsv",
         help=(
             "Name(s) of disease(s) to postprocess, "
             "as a whitespace-separated string. Supported "
-            "values are 'COVID-19' , 'RSV' and 'Influenza'. "
-            "Default 'COVID-19 Influenza RSV' (i.e. postprocess all)."
+            "values are 'covid', 'flu', and 'rsv'. "
+            "Default 'covid flu rsv' (i.e. postprocess all)."
         ),
     )
     parser.add_argument(

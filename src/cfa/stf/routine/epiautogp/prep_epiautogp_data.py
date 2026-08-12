@@ -134,7 +134,7 @@ def convert_to_epiautogp_json(
     {
         "dates": ["2024-01-01", "2024-01-02", ...],
         "reports": [45.0, 52.0, ...],
-        "pathogen": "COVID-19",
+        "pathogen": "covid",
         "location": "CA",
         "target": "nssp",
         "frequency": "epiweekly",
@@ -263,7 +263,7 @@ def _read_tsv_data(
     tsv_path : Path
         Path to the TSV file containing surveillance data
     disease : str
-        Disease name (case-insensitive)
+        Canonical disease name
     location : str
         Geographic location code (e.g., "CA", "US")
     target : str
@@ -300,11 +300,7 @@ def _read_tsv_data(
     # Read TSV file
     df = pl.read_csv(tsv_path, separator="\t")
 
-    # Filter for the specified location and disease (case-insensitive for disease)
-    df = df.filter(
-        (pl.col("geo_value") == location)
-        & (pl.col("disease").str.to_uppercase() == disease.upper())
-    )
+    df = df.filter((pl.col("geo_value") == location) & (pl.col("disease") == disease))
 
     if df.height == 0:
         raise ValueError(f"No data found for {disease} {location} in {tsv_path}")

@@ -11,8 +11,8 @@ parse_model_batch_dir_path(model_batch_dir_path)
 directory to parse. Will parse only the basename.}
 }
 \value{
-A list of quantities: \code{disease}, \code{report_date},
-\code{first_training_date}, and \code{last_training_date}.
+A one-row tibble containing canonical \code{disease}, \code{report_date},
+\code{first_training_date}, and \code{last_training_date} values.
 }
 \description{
 Parse the name of a model batch directory

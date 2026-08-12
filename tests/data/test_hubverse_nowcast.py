@@ -26,7 +26,7 @@ HUBVERSE_SCHEMA = {
 
 def _spec(
     *,
-    disease: str = "COVID-19",
+    disease: str = "covid",
     loc: str = "CA",
     report_date: dt.date = ORIGIN,
     target: str = "nhsn",
@@ -105,9 +105,9 @@ def test_converts_shuffled_rows_to_complete_ordered_trajectories(tmp_path):
 @pytest.mark.parametrize(
     ("disease", "target"),
     [
-        ("COVID-19", "wk inc covid hosp"),
-        ("Influenza", "wk inc flu hosp"),
-        ("RSV", "wk inc rsv hosp"),
+        ("covid", "wk inc covid hosp"),
+        ("flu", "wk inc flu hosp"),
+        ("rsv", "wk inc rsv hosp"),
     ],
 )
 def test_maps_supported_diseases_and_location_case_insensitively(
@@ -310,7 +310,7 @@ def test_rejects_mismatched_observation_vectors(tmp_path):
 def test_rejects_unsupported_disease(tmp_path):
     source = HubverseNowcast(
         containing_dir=_write_artifact(tmp_path),
-        forecast_spec=_spec(disease="Measles"),
+        forecast_spec=_spec(disease="measles"),
     )
 
     with pytest.raises(ValueError, match="No Hubverse NHSN target mapping"):

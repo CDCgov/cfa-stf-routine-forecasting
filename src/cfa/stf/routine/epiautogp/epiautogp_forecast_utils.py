@@ -157,7 +157,7 @@ def _build_reporting_delay_nowcast(
     """Build a ReportingDelayNowcast, fetching the PMF if not supplied."""
     if reporting_delay_pmf is None:
         reporting_delay_pmf = get_nnh_right_truncation_pmf(
-            loc_abb=forecast_spec.loc,
+            state_abb=forecast_spec.loc,
             disease=forecast_spec.disease,
             as_of=forecast_spec.report_date,
             reference_date=forecast_spec.report_date,
@@ -240,7 +240,7 @@ def setup_forecast_pipeline(
     Parameters
     ----------
     disease : str
-        Disease to model (e.g., "COVID-19", "Influenza", "RSV")
+        Disease to model ("covid", "flu", or "rsv")
     loc : str
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
     target : str

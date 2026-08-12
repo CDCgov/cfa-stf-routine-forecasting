@@ -44,9 +44,9 @@ make_forecast_figure <- function(
   geo_value <- for_plotting_tbl$geo_value
 
   disease_name_pretty <- c(
-    "COVID-19" = "COVID-19",
-    "Influenza" = "Flu",
-    "RSV" = "RSV"
+    "covid" = "COVID-19",
+    "flu" = "Flu",
+    "rsv" = "RSV"
   )[[disease]]
 
   parsed_variable_name <- parse_variable_name(.variable)

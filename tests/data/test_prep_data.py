@@ -59,6 +59,19 @@ def test_process_and_save_loc_data_handles_present_sources(
         model_data = json.load(file)
     assert (model_data["nssp_training_data"] is not None) == ("nssp" in sources)
     assert (model_data["nhsn_training_data"] is not None) == ("nhsn" in sources)
+    if "nssp" in sources:
+        assert set(model_data["nssp_training_data"]) == {
+            "date",
+            "geo_value",
+            "observed_ed_visits",
+            "other_ed_visits",
+        }
+    if "nhsn" in sources:
+        assert set(model_data["nhsn_training_data"]) == {
+            "weekendingdate",
+            "jurisdiction",
+            "hospital_admissions",
+        }
 
     combined_data = pl.read_csv(tmp_path / "combined_data.tsv", separator="\t")
     assert set(combined_data.get_column(".variable")) == expected_variables
@@ -87,20 +100,20 @@ def test_process_and_save_loc_param_loads_pmfs_from_cfa_stf_data(
 
     process_and_save_loc_param(
         loc_abb="CA",
-        disease="COVID-19",
+        disease="covid",
         fit_ed_visits=True,
         save_dir=tmp_path,
         as_of=as_of,
     )
 
     mock_generation_interval.assert_called_once_with(
-        disease="COVID-19",
+        disease="covid",
         as_of=as_of,
     )
-    mock_delay.assert_called_once_with(disease="COVID-19", as_of=as_of)
+    mock_delay.assert_called_once_with(disease="covid", as_of=as_of)
     mock_right_truncation.assert_called_once_with(
-        loc_abb="CA",
-        disease="COVID-19",
+        state_abb="CA",
+        disease="covid",
         as_of=as_of,
         reference_date=as_of,
     )

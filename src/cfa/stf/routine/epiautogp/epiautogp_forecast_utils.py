@@ -16,7 +16,6 @@ from cfa.stf.data import get_nnh_right_truncation_pmf
 
 from cfa.stf.routine.data.data_access import (
     ForecastData,
-    dataops_disease_name,
     load_forecast_data,
 )
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
@@ -159,7 +158,7 @@ def _build_reporting_delay_nowcast(
     if reporting_delay_pmf is None:
         reporting_delay_pmf = get_nnh_right_truncation_pmf(
             state_abb=forecast_spec.loc,
-            disease=dataops_disease_name(forecast_spec.disease),
+            disease=forecast_spec.disease,
             as_of=forecast_spec.report_date,
             reference_date=forecast_spec.report_date,
         )
@@ -241,7 +240,7 @@ def setup_forecast_pipeline(
     Parameters
     ----------
     disease : str
-        Disease to model (e.g., "COVID-19", "Influenza", "RSV")
+        Disease to model ("covid", "flu", or "rsv")
     loc : str
         Two-letter USPS location abbreviation (e.g., "CA", "NY")
     target : str

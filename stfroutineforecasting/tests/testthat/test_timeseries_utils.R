@@ -14,7 +14,7 @@ base_date <- as.Date("2024-01-01")
 test_that("load_training_data returns training rows without data_type", {
   withr::with_tempdir({
     model_dir <- fs::path(
-      "covid-19_r_2024-01-03_f_2024-01-01_t_2024-01-02",
+      "covid_r_2024-01-03_f_2024-01-01_t_2024-01-02",
       "model_runs",
       "CA",
       "fable_e_daily"
@@ -23,7 +23,7 @@ test_that("load_training_data returns training rows without data_type", {
     input_data <- tibble::tibble(
       date = rep(base_date + 0:2, each = 2),
       geo_value = "CA",
-      disease = "COVID-19",
+      disease = "covid",
       data_type = rep(c("train", "train", "eval"), each = 2),
       .variable = rep(c("observed_ed_visits", "other_ed_visits"), 3),
       .value = c(10, 90, 11, 99, 12, 108),
@@ -40,7 +40,7 @@ test_that("load_training_data returns training rows without data_type", {
     expect_equal(result$data$date, base_date + 0:1)
     expect_false("data_type" %in% colnames(result$data))
     expect_equal(result$geo_value, "CA")
-    expect_equal(result$disease, "COVID-19")
+    expect_equal(result$disease, "covid")
     expect_equal(result$resolution, "daily")
   })
 })
@@ -57,7 +57,7 @@ test_that("format_timeseries_output formats forecast data correctly", {
   result <- format_timeseries_output(
     forecast_data = forecast_data,
     geo_value = "US",
-    disease = "COVID-19",
+    disease = "covid",
     resolution = "daily",
     output_type_id = ".draw"
   )
@@ -79,7 +79,7 @@ test_that("format_timeseries_output formats forecast data correctly", {
 
   # Check that geo_value and disease are set correctly
   expect_true(all(result$geo_value == "US"))
-  expect_true(all(result$disease == "COVID-19"))
+  expect_true(all(result$disease == "covid"))
   expect_true(all(result$resolution == "daily"))
 
   # Check that data was pivoted (should have 2 variables x 3 dates = 6 rows)
@@ -96,7 +96,7 @@ test_that("format_timeseries_output handles proportion variables", {
   result <- format_timeseries_output(
     forecast_data = forecast_data,
     geo_value = "CA",
-    disease = "Influenza",
+    disease = "flu",
     resolution = "epiweekly",
     output_type_id = ".draw"
   )

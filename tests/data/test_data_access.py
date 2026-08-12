@@ -21,21 +21,6 @@ def _freshness(source: str) -> data_access.DataFreshness:
     )
 
 
-@pytest.mark.parametrize(
-    ("disease", "expected"),
-    [
-        ("COVID-19", "covid"),
-        ("COVID-19/Omicron", "covid"),
-        ("Influenza", "flu"),
-        ("RSV", "rsv"),
-        ("Total", "total"),
-        ("covid", "covid"),
-    ],
-)
-def test_dataops_disease_name_returns_canonical_name(disease, expected):
-    assert data_access.dataops_disease_name(disease) == expected
-
-
 def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
@@ -72,7 +57,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
 
     result = data_access._load_dataops_nssp(
         loc_abb="CA",
-        disease="COVID-19",
+        disease="covid",
         first_training_date=dt.date(2025, 12, 1),
         last_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
@@ -137,7 +122,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     )
 
     result = data_access._load_dataops_nhsn(
-        disease="COVID-19",
+        disease="covid",
         loc_abb="CA",
         first_training_date=dt.date(2026, 1, 1),
         last_training_date=dt.date(2026, 1, 7),
@@ -187,7 +172,7 @@ def test_forecast_data_allows_one_source(source_name):
     )
     forecast_data = data_access.ForecastData(
         loc_abb="CA",
-        disease="COVID-19",
+        disease="covid",
         report_date=dt.date(2026, 1, 7),
         loc_pop=39_000_000,
         right_truncation_offset=0,
@@ -204,7 +189,7 @@ def test_forecast_data_requires_at_least_one_source():
     with pytest.raises(ValueError, match="at least one data source"):
         data_access.ForecastData(
             loc_abb="CA",
-            disease="COVID-19",
+            disease="covid",
             report_date=dt.date(2026, 1, 7),
             loc_pop=39_000_000,
             right_truncation_offset=0,
@@ -414,7 +399,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     )
 
     forecast_data = data_access.load_forecast_data(
-        disease="COVID-19",
+        disease="covid",
         loc_abb="CA",
         run_date=report_date,
         first_training_date=dt.date(2025, 12, 1),
@@ -423,7 +408,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     )
 
     assert forecast_data.loc_abb == "CA"
-    assert forecast_data.disease == "COVID-19"
+    assert forecast_data.disease == "covid"
     assert forecast_data.report_date == report_date
     assert forecast_data.loc_pop == 39_000_000
     assert forecast_data.right_truncation_offset == 0
@@ -466,13 +451,13 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     assert not forecast_data.is_stale
     assert calls["nssp"] == {
         "loc_abb": "CA",
-        "disease": "COVID-19",
+        "disease": "covid",
         "first_training_date": dt.date(2025, 12, 1),
         "last_training_date": dt.date(2026, 1, 7),
         "run_date": report_date,
     }
     assert calls["nhsn"] == {
-        "disease": "COVID-19",
+        "disease": "covid",
         "loc_abb": "CA",
         "first_training_date": dt.date(2025, 12, 1),
         "last_training_date": dt.date(2026, 1, 7),
@@ -536,7 +521,7 @@ def test_load_forecast_data_only_loads_requested_source(
     )
 
     forecast_data = data_access.load_forecast_data(
-        disease="COVID-19",
+        disease="covid",
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
         first_training_date=dt.date(2025, 12, 1),
@@ -562,7 +547,7 @@ def test_load_forecast_data_only_loads_requested_source(
 def test_load_forecast_data_rejects_invalid_sources(sources, message):
     with pytest.raises(ValueError, match=message):
         data_access.load_forecast_data(
-            disease="COVID-19",
+            disease="covid",
             loc_abb="CA",
             run_date=dt.date(2026, 1, 8),
             first_training_date=dt.date(2025, 12, 1),

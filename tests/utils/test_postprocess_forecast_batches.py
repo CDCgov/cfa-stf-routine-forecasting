@@ -20,17 +20,17 @@ class TestHubverseTableFilename:
         [
             (
                 dt.date(2024, 12, 21),
-                "COVID-19",
-                "2024-12-21-covid-19-hubverse-table.parquet",
+                "covid",
+                "2024-12-21-covid-hubverse-table.parquet",
             ),
             (
                 "2024-12-21",
-                "Influenza",
-                "2024-12-21-influenza-hubverse-table.parquet",
+                "flu",
+                "2024-12-21-flu-hubverse-table.parquet",
             ),
             (
                 dt.date(2025, 1, 5),
-                "RSV",
+                "rsv",
                 "2025-01-05-rsv-hubverse-table.parquet",
             ),
         ],
@@ -44,7 +44,7 @@ class TestCombineHubverseTables:
 
     def _make_batch_dir(self, tmp_path: Path) -> Path:
         """Create a model batch directory with a valid name."""
-        batch_dir = tmp_path / "covid-19_r_2024-12-21_f_2024-09-22_t_2024-12-20"
+        batch_dir = tmp_path / "covid_r_2024-12-21_f_2024-09-22_t_2024-12-20"
         batch_dir.mkdir()
         return batch_dir
 
@@ -71,7 +71,7 @@ class TestCombineHubverseTables:
 
         combine_hubverse_tables(batch_dir)
 
-        output = batch_dir / "2024-12-21-covid-19-hubverse-table.parquet"
+        output = batch_dir / "2024-12-21-covid-hubverse-table.parquet"
         assert output.exists()
 
     def test_combine_concatenates_multiple_tables(self, tmp_path):
@@ -85,7 +85,7 @@ class TestCombineHubverseTables:
 
         combine_hubverse_tables(batch_dir)
 
-        output = batch_dir / "2024-12-21-covid-19-hubverse-table.parquet"
+        output = batch_dir / "2024-12-21-covid-hubverse-table.parquet"
         result = pl.read_parquet(output)
         assert result.shape[0] == 2
         assert set(result["location"].to_list()) == {"CA", "TX"}
@@ -99,7 +99,7 @@ class TestCombineHubverseTables:
 
         combine_hubverse_tables(batch_dir)
 
-        output = batch_dir / "2024-12-21-covid-19-hubverse-table.parquet"
+        output = batch_dir / "2024-12-21-covid-hubverse-table.parquet"
         result = pl.read_parquet(output)
         assert result.shape[0] == 1
         assert result["location"][0] == "WA"

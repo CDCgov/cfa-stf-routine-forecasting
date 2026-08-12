@@ -1,11 +1,7 @@
 #' Utilities for handling and parsing directory names
 #' based on cfa-stf-routine-forecasting pipeline conventions.
 
-disease_map_lower <- c(
-  "covid-19" = "COVID-19",
-  "influenza" = "Influenza",
-  "rsv" = "RSV"
-)
+disease_names <- c("covid", "flu", "rsv")
 
 #' Parse model batch directory name.
 #'
@@ -48,7 +44,11 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
       )
     }) |>
     dplyr::mutate(
-      disease = unname(disease_map_lower[.data$disease]),
+      disease = dplyr::if_else(
+        .data$disease %in% disease_names,
+        .data$disease,
+        NA_character_
+      ),
       report_date = lubridate::ymd(.data$report_date, quiet = TRUE),
       first_training_date = lubridate::ymd(
         .data$first_training_date,
@@ -63,8 +63,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
   if (anyNA(result)) {
     stop(
       "Could not parse extracted disease and/or date ",
-      "values expected 'disease' to be one of 'covid-19' ",
-      "and 'influenza' and all dates to be valid dates in ",
+      "values expected 'disease' to be one of 'covid', 'flu', ",
+      "or 'rsv' and all dates to be valid dates in ",
       "YYYY-MM-DD format. Got: ",
       glue::glue(
         "disease: {matches[2]}, ",
@@ -117,8 +117,7 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
 #' @return A vector of paths to the forecast subdirectories.
 #' @export
 get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
-  # disease names are lowercase by convention
-  match_patterns <- stringr::str_c(tolower(diseases), "_r", collapse = "|")
+  match_patterns <- stringr::str_c(diseases, "_r", collapse = "|")
 
   dirs <- tibble::tibble(
     dir_path = fs::dir_ls(

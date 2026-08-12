@@ -118,7 +118,7 @@ def main(
     Parameters
     ----------
     disease : str
-        Disease to model (e.g., "COVID-19", "Influenza", "RSV")
+        Disease to model ("covid", "flu", or "rsv")
     run_date : datetime.date
         Date of the forecast run
     loc : str

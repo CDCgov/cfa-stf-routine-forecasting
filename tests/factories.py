@@ -17,7 +17,7 @@ DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 def make_test_forecast_data(
     *,
     loc_abb: str = "CA",
-    disease: str = "COVID-19",
+    disease: str = "covid",
     report_date: dt.date = DEFAULT_REPORT_DATE,
     first_training_date: dt.date | None = None,
     last_training_date: dt.date | None = None,

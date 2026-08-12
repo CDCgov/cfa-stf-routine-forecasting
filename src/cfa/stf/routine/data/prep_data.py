@@ -14,7 +14,7 @@ from cfa.stf.data import (
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pyrenew_multisignal.hew import approx_lognorm
 
-from cfa.stf.routine.data.data_access import ForecastData, dataops_disease_name
+from cfa.stf.routine.data.data_access import ForecastData
 
 
 def combine_surveillance_data(
@@ -153,13 +153,11 @@ def process_and_save_loc_param(
     loc_pop_df = get_us_loc_pop_tbl()
     loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
     pop_fraction = jnp.array([1])
-    canonical_disease = dataops_disease_name(disease)
-
     generation_interval_pmf = get_nnh_generation_interval_pmf(
-        disease=canonical_disease,
+        disease=disease,
         as_of=as_of,
     )
-    delay_pmf = get_nnh_delay_pmf(disease=canonical_disease, as_of=as_of)
+    delay_pmf = get_nnh_delay_pmf(disease=disease, as_of=as_of)
     # We do not model a zero infection-to-recorded-admission delay.
     delay_pmf[0] = 0.0
     delay_pmf = jnp.array(delay_pmf)
@@ -168,7 +166,7 @@ def process_and_save_loc_param(
     try:
         right_truncation_pmf = get_nnh_right_truncation_pmf(
             state_abb=loc_abb,
-            disease=canonical_disease,
+            disease=disease,
             as_of=as_of,
             reference_date=as_of,
         )

@@ -15,18 +15,6 @@ from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 ForecastSourceName = Literal["nssp", "nhsn"]
 _FORECAST_SOURCE_NAMES = frozenset(get_args(ForecastSourceName))
-_DATAOPS_DISEASE_NAMES = {
-    "COVID-19": "covid",
-    "COVID-19/Omicron": "covid",
-    "Influenza": "flu",
-    "RSV": "rsv",
-    "Total": "total",
-}
-
-
-def dataops_disease_name(disease: str) -> str:
-    """Return the canonical disease name used by cfa-stf-data."""
-    return _DATAOPS_DISEASE_NAMES.get(disease, disease)
 
 
 @dataclass(frozen=True)
@@ -106,9 +94,8 @@ def _load_dataops_nssp(
     run_date: dt.date,
 ) -> NSSPData:
     version_date = resolve_nssp_report_date()
-    canonical_disease = dataops_disease_name(disease)
     source_data = get_nssp(
-        disease=[canonical_disease, "total"],
+        disease=[disease, "total"],
         state_abb=loc_abb,
         dataset="gold",
         start_date=first_training_date,
@@ -120,12 +107,12 @@ def _load_dataops_nssp(
         run_date=run_date,
     )
     data = (
-        source_data.filter(pl.col("disease").is_in([canonical_disease, "total"]))
+        source_data.filter(pl.col("disease").is_in([disease, "total"]))
         .pivot(
             on="disease",
             values="value",
         )
-        .rename({canonical_disease: "observed_ed_visits"})
+        .rename({disease: "observed_ed_visits"})
         .with_columns(
             other_ed_visits=pl.col("total") - pl.col("observed_ed_visits"),
             data_type=pl.when(pl.col("date") <= last_training_date)
@@ -163,7 +150,7 @@ def _load_dataops_nhsn(
 ) -> NHSNData:
     prelim, version_date = select_latest_nhsn_release()
     source_data = get_nhsn_hrd(
-        disease=dataops_disease_name(disease),
+        disease=disease,
         state_abb=loc_abb,
         prelim=prelim,
         start_date=first_training_date,

@@ -100,7 +100,7 @@ def test_process_and_save_loc_param_loads_pmfs_from_cfa_stf_data(
 
     process_and_save_loc_param(
         loc_abb="CA",
-        disease="COVID-19",
+        disease="covid",
         fit_ed_visits=True,
         save_dir=tmp_path,
         as_of=as_of,

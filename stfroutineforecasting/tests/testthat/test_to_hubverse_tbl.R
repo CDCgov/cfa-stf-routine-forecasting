@@ -9,7 +9,7 @@ raw_samples_fixture <- tibble::tibble(
   .draw = c(1L, 2L),
   date = as.Date(c("2024-02-04", "2024-02-10")),
   geo_value = "US",
-  disease = "COVID-19",
+  disease = "covid",
   resolution = c("daily", "epiweekly"),
   .variable = c("observed_hospital_admissions", "observed_ed_visits"),
   .value = c(11, 22)
@@ -17,7 +17,7 @@ raw_samples_fixture <- tibble::tibble(
 
 withr::with_tempdir({
   model_dir <- fs::path(
-    "covid-19_r_2024-02-03_f_2021-04-01_t_2024-01-23",
+    "covid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
     "model_runs",
     "US",
     "pyrenew_e"

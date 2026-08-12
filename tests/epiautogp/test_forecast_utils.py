@@ -41,7 +41,7 @@ def base_context(tmp_path):
     """
     return ForecastPipelineContext(
         forecast_spec=ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 12, 20),
             target="nssp",
@@ -80,7 +80,7 @@ class TestSetupForecastPipeline:
         mock_load_data.return_value = make_test_forecast_data()
 
         context = setup_forecast_pipeline(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             target="nssp",
             frequency="epiweekly",
@@ -119,7 +119,7 @@ class TestSetupForecastPipeline:
         mock_load_data.return_value = make_test_forecast_data(sources={target})
 
         setup_forecast_pipeline(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             target=target,
             frequency="epiweekly",
@@ -148,7 +148,7 @@ class TestSetupForecastPipeline:
         mock_load_data.return_value = make_test_forecast_data()
 
         context = setup_forecast_pipeline(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             target="nssp",
             frequency="epiweekly",
@@ -161,9 +161,7 @@ class TestSetupForecastPipeline:
             nowcast_source_name="none",
         )
 
-        expected_batch_dir = (
-            tmp_path / "covid-19_r_2024-12-20_f_2024-09-22_t_2024-12-20"
-        )
+        expected_batch_dir = tmp_path / "covid_r_2024-12-20_f_2024-09-22_t_2024-12-20"
         expected_run_dir = expected_batch_dir / "model_runs" / "CA"
 
         assert context.model_batch_dir == expected_batch_dir
@@ -189,7 +187,7 @@ class TestSetupForecastPipeline:
         mock_get_right_truncation_pmf.return_value = [0.25, 0.75]
 
         context = setup_forecast_pipeline(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             target="nssp",
             frequency="daily",
@@ -230,7 +228,7 @@ class TestSetupForecastPipeline:
         mock_load_data.return_value = make_test_forecast_data()
 
         context = setup_forecast_pipeline(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             target="nssp",
             frequency="daily",
@@ -251,7 +249,7 @@ class TestSetupForecastPipeline:
     def test_reporting_delay_errors_for_percentage_targets(self):
         """Test reporting-delay fails for percentage data (numerator/denominator)."""
         spec = ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 12, 20),
             target="nssp",
@@ -268,7 +266,7 @@ class TestSetupForecastPipeline:
     @pytest.mark.parametrize("target", ["nssp", "nhsn"])
     def test_reporting_delay_returns_source_for_count_target(self, target):
         spec = ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 12, 20),
             target=target,
@@ -287,7 +285,7 @@ class TestSetupForecastPipeline:
     def test_reporting_delay_warns_for_non_daily_frequency(self, caplog):
         """Test reporting-delay logs a soft cadence warning on non-daily runs."""
         spec = ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 12, 20),
             target="nssp",
@@ -307,7 +305,7 @@ class TestSetupForecastPipeline:
     def test_none_keyword_returns_no_source(self):
         """Test 'none' resolves to no nowcast source regardless of config."""
         spec = ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 12, 20),
             target="nssp",
@@ -325,7 +323,7 @@ class TestSetupForecastPipeline:
     def test_unknown_keyword_raises(self):
         """Test an unrecognised keyword raises a descriptive error."""
         spec = ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 12, 20),
             target="nssp",

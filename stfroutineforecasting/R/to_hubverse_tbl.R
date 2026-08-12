@@ -1,17 +1,11 @@
 var_to_target <- function(variable, disease) {
-  disease_abbr <- dplyr::replace_values(
-    disease,
-    "Influenza" ~ "flu",
-    "COVID-19" ~ "covid",
-    "RSV" ~ "rsv"
-  )
   dplyr::replace_values(
     variable,
-    "observed_hospital_admissions" ~ glue::glue("inc {disease_abbr} hosp"),
-    "observed_ed_visits" ~ glue::glue("inc {disease_abbr} ed visits"),
+    "observed_hospital_admissions" ~ glue::glue("inc {disease} hosp"),
+    "observed_ed_visits" ~ glue::glue("inc {disease} ed visits"),
     "other_ed_visits" ~ glue::glue("inc other ed visits"),
     "prop_disease_ed_visits" ~ glue::glue(
-      "inc {disease_abbr} prop ed visits"
+      "inc {disease} prop ed visits"
     )
   )
 }

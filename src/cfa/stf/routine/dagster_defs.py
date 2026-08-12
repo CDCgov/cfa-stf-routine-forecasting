@@ -176,7 +176,7 @@ azure_batch_execution_config = ExecutionConfig(
 # ============================================================================
 
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["COVID-19"]
+SUPPORTED_DISEASES = ["covid"]
 
 # Disease dimensions
 DISEASES = SUPPORTED_DISEASES
@@ -285,8 +285,8 @@ class EModelExclusions(
 class WModelExclusions(
     dg.ConfigurableResource
 ):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
-    # only COVID-19 is valid for W
-    diseases: GraphDimension[Disease] = GraphDimension(["COVID-19"])  # type: ignore[reportInvalidTypeForm]
+    # only covid is valid for W
+    diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
 
 
 class PostProcessConfig(dg.Config):
@@ -298,7 +298,7 @@ class PostProcessConfig(dg.Config):
     skip_existing: bool = False
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
-    postprocess_diseases: list[str] = ["COVID-19"]
+    postprocess_diseases: list[str] = ["covid"]
 
 
 # ============================================================================

@@ -15,12 +15,8 @@ from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 from cfa.stf.routine._paths import DATA_DIR, UTILS_DIR
 from cfa.stf.routine.utils.cli_utils import run_command
 
-# Disease mapping and location abbreviations
-disease_map_lower_ = {
-    "influenza": "Influenza",
-    "covid-19": "COVID-19",
-    "rsv": "RSV",
-}
+# Canonical disease names and location abbreviations
+DISEASE_NAMES = frozenset({"covid", "flu", "rsv"})
 loc_abbrs_ = LOCATION_LIST
 
 
@@ -183,10 +179,7 @@ def get_model_batch_dir_name(
     last_training_date: dt.date,
 ) -> str:
     """Build the standard model batch directory name."""
-    return (
-        f"{disease.lower()}_r_{report_date}_f_"
-        f"{first_training_date}_t_{last_training_date}"
-    )
+    return f"{disease}_r_{report_date}_f_{first_training_date}_t_{last_training_date}"
 
 
 def run_r_script(
@@ -500,15 +493,15 @@ def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
             f"Invalid model batch directory name format: {model_batch_dir_name}"
         )
 
-    if disease not in disease_map_lower_:
-        valid_diseases = ", ".join(disease_map_lower_.keys())
+    if disease not in DISEASE_NAMES:
+        valid_diseases = ", ".join(sorted(DISEASE_NAMES))
         raise ValueError(
             f"Unknown disease '{disease}' in model batch directory name. "
             f"Valid diseases are: {valid_diseases}"
         )
 
     return dict(
-        disease=disease_map_lower_[disease],
+        disease=disease,
         report_date=dt.datetime.strptime(report_date, "%Y-%m-%d").date(),
         first_training_date=dt.datetime.strptime(
             first_training_date, "%Y-%m-%d"
@@ -564,11 +557,7 @@ def get_all_forecast_dirs(
             "or a datetime.date instance. "
             f"Got {type(report_date)}."
         )
-    valid_starts = tuple(
-        [f"{disease.lower()}_r_{report_date_str}" for disease in diseases]
-    )
-    # by convention, disease names are
-    # lowercase in directory patterns
+    valid_starts = tuple([f"{disease}_r_{report_date_str}" for disease in diseases])
 
     return [
         f.name

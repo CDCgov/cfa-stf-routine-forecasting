@@ -23,7 +23,7 @@ from cfa.stf.routine.data.hubverse_nowcast import (
 )
 
 DEFAULT_LOCATIONS = ["CA", "US"]
-DEFAULT_DISEASES = ["COVID-19", "Influenza"]
+DEFAULT_DISEASES = ["covid", "flu"]
 REPORT_DATE = dt.date.today()
 LAST_OBS_DATE = REPORT_DATE - dt.timedelta(
     days=1
@@ -60,7 +60,6 @@ HUBVERSE_N_SAMPLES = 40
 HUBVERSE_LOGNORMAL_SIGMA = 0.05
 HUBVERSE_RANDOM_SEED = 12345
 
-_NSSP_DISEASE_NAMES = {"COVID-19": "COVID-19/Omicron"}
 _FACILITY_LEVEL_NSSP_DATA_COLS = [
     "reference_date",
     "report_date",
@@ -203,7 +202,7 @@ def _make_facility_level_nssp(
                             location=location.abbr,
                             date=date,
                             facility=facility,
-                            disease=_NSSP_DISEASE_NAMES.get(disease, disease),
+                            disease=disease,
                             value=value,
                         )
                     )
@@ -217,7 +216,7 @@ def _make_facility_level_nssp(
                         location=location.abbr,
                         date=date,
                         facility=facility,
-                        disease="Total",
+                        disease="total",
                         value=total_value,
                     )
                 )
@@ -271,8 +270,6 @@ def make_forecast_data(
     location_data = _location_data(locations)
     location_by_abbr = {item.abbr: item for item in location_data}
     disease_index = diseases.index(disease)
-    nssp_disease = _NSSP_DISEASE_NAMES.get(disease, disease)
-
     facility_level_nssp = _make_facility_level_nssp(
         locations=location_data,
         diseases=diseases,
@@ -281,9 +278,8 @@ def make_forecast_data(
         _make_state_level_nssp(facility_level_nssp)
         .filter(
             pl.col("geo_value") == location,
-            pl.col("disease").is_in([nssp_disease, "Total"]),
+            pl.col("disease").is_in([disease, "total"]),
         )
-        .with_columns(disease=pl.col("disease").replace({nssp_disease: disease}))
         .rename({"reference_date": "date", "geo_value": "state_abb"})
         .select(["date", "state_abb", "disease", "value"])
     )
@@ -318,13 +314,13 @@ def make_forecast_data(
                 )
                 .rename({disease: "observed_ed_visits"})
                 .with_columns(
-                    other_ed_visits=pl.col("Total") - pl.col("observed_ed_visits"),
+                    other_ed_visits=pl.col("total") - pl.col("observed_ed_visits"),
                     data_type=pl.when(pl.col("date") <= last_training_date)
                     .then(pl.lit("train"))
                     .otherwise(pl.lit("eval")),
                     resolution=pl.lit("daily"),
                 )
-                .drop("Total")
+                .drop("total")
                 .sort("date")
             ),
             freshness=nssp_freshness,
@@ -411,7 +407,7 @@ def _make_location_hubverse_nowcasts(
         sigma=HUBVERSE_LOGNORMAL_SIGMA,
         size=(HUBVERSE_N_SAMPLES, n_nowcast_dates),
     )
-    disease_id = disease.lower().replace("-", "").replace(" ", "_")
+    disease_id = disease
 
     return [
         {
@@ -465,7 +461,7 @@ def _write_disease_hubverse_nowcasts(
         base_dir
         / "private_data"
         / HUBVERSE_NOWCAST_DIR_NAME
-        / disease.lower()
+        / disease
         / HUBVERSE_MODEL_OUTPUT_SUBDIR
     )
     output_dir.mkdir(parents=True, exist_ok=True)

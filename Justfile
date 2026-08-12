@@ -26,7 +26,7 @@ e2e data_mode="auto":
       --e2e-data-mode "{{data_mode}}"
 
 # Test Fable for one disease and location with mock or real DataOps data.
-test-fable data_mode="auto" location="CA" disease="COVID-19":
+test-fable data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
       tests/integration/test_fable_forecast.py \
       --e2e-data-mode "{{data_mode}}" \
@@ -34,7 +34,7 @@ test-fable data_mode="auto" location="CA" disease="COVID-19":
       --model-test-disease "{{disease}}"
 
 # Test PyRenew for one disease and location with mock or real DataOps data.
-test-pyrenew data_mode="auto" location="CA" disease="COVID-19":
+test-pyrenew data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
       tests/integration/test_pyrenew_forecast.py \
       --e2e-data-mode "{{data_mode}}" \
@@ -42,7 +42,7 @@ test-pyrenew data_mode="auto" location="CA" disease="COVID-19":
       --model-test-disease "{{disease}}"
 
 # Test EpiAutoGP for one disease and location with mock or real DataOps data.
-test-epiautogp data_mode="auto" location="CA" disease="COVID-19":
+test-epiautogp data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
       tests/integration/test_epiautogp_forecast.py \
       --e2e-data-mode "{{data_mode}}" \

@@ -159,6 +159,16 @@ jobs:
           tag: ${{ needs.build-pipeline-image.outputs.tag }}
         steps:
 
+          - name: Checkout Repo
+            id: checkout_repo
+            uses: actions/checkout@v7
+
+          # From: https://stackoverflow.com/a/58035262/2097171
+          - name: Extract branch name
+            shell: bash
+            run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+            id: get-branch
+
           # From: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-cloud-providers#requesting-the-jwt-using-the-actions-core-toolkit
           - name: Install OIDC Client from Core Package
             run: npm install @actions/core@1.6.0 @actions/http-client
@@ -186,8 +196,10 @@ jobs:
                 --federated-token ${{ steps.idtoken.outputs.id_token }} \
                 --output none
 
-                echo 'Cloning repo'
-                git clone https://github.com/cdcgov/cfa-stf-routine-forecasting
+                CURRENT_BRANCH="${{ steps.get-branch.outputs.branch }}"
+                echo "Cloning repo at branch '$CURRENT_BRANCH'"
+                git clone -b "$CURRENT_BRANCH" https://github.com/${{ github.repository }}.git
+                cd cfa-stf-routine-forecasting
 
                 echo 'Running uv sync'
                 cd cfa-stf-routine-forecasting

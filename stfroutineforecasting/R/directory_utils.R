@@ -1,5 +1,8 @@
-#' Utilities for handling and parsing directory names
-#' based on cfa-stf-routine-forecasting pipeline conventions.
+#' Canonical disease names
+#'
+#' Disease identifiers used in model batch directory names and forecast outputs.
+#'
+#' @format A character vector containing `"covid"`, `"flu"`, and `"rsv"`.
 
 disease_names <- c("covid", "flu", "rsv")
 
@@ -13,8 +16,8 @@ disease_names <- c("covid", "flu", "rsv")
 #'
 #' @param model_batch_dir_path Path to the model batch
 #' directory to parse. Will parse only the basename.
-#' @return A list of quantities: `disease`, `report_date`,
-#' `first_training_date`, and `last_training_date`.
+#' @return A one-row tibble containing canonical `disease`, `report_date`,
+#' `first_training_date`, and `last_training_date` values.
 #' @export
 parse_model_batch_dir_path <- function(model_batch_dir_path) {
   pattern <- "(.+)_r_(.+)_f_(.+)_t_(.+)"
@@ -86,9 +89,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #' date, and extract key quantities of interest.
 #'
 #' @param model_run_dir_path Path to parse.
-#' @return A list of parsed attributes:
-#' `location`, `disease`, `report_date`,
-#' `first_training_date`, and `last_training_date`.
+#' @return A one-row tibble containing `location`, canonical `disease`,
+#' `report_date`, `first_training_date`, and `last_training_date` values.
 #'
 #' @export
 parse_model_run_dir_path <- function(model_run_dir_path) {
@@ -112,8 +114,8 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
 #' @param dir_of_batch_dirs Directory in which to look for
 #' "model batch" directories, each of which represents an
 #' individual forecast date / pathogen / dataset combination.
-#' @param diseases Names of the diseases to match, as a vector of strings,
-#' or a single disease as a string.
+#' @param diseases Canonical disease identifiers to match (`"covid"`, `"flu"`,
+#' or `"rsv"`), supplied as a character vector.
 #' @return A vector of paths to the forecast subdirectories.
 #' @export
 get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {

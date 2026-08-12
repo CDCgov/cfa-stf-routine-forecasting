@@ -14,9 +14,8 @@
 #' @return A list with:
 #' `data` (processed training data tibble),
 #' `geo_value`,
-#' `disease`,
-#' `resolution` ("daily" or "epiweekly"), and
-#' `prefix` (file prefix based on resolution).
+#' `disease` (canonical disease identifier), and
+#' `resolution` (`"daily"` or `"epiweekly"`).
 #' @export
 load_training_data <- function(
   model_dir,
@@ -59,7 +58,8 @@ load_training_data <- function(
 #' @param forecast_data A data frame containing forecast results with date,
 #'   output type identifier, and forecast variables.
 #' @param geo_value Geographic identifier for the forecast location.
-#' @param disease Disease name for the forecast.
+#' @param disease Canonical disease identifier for the forecast (`"covid"`,
+#' `"flu"`, or `"rsv"`).
 #' @param resolution Temporal resolution ("daily" or "epiweekly").
 #' @param output_type_id Output type identifiers
 #' (e.g., ".draw" for samples, "quantile_level" for quantiles).

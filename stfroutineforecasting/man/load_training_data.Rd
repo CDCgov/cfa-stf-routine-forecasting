@@ -18,9 +18,8 @@ directory containing model run data.}
 A list with:
 \code{data} (processed training data tibble),
 \code{geo_value},
-\code{disease},
-\code{resolution} ("daily" or "epiweekly"), and
-\code{prefix} (file prefix based on resolution).
+\code{disease} (canonical disease identifier), and
+\code{resolution} (\code{"daily"} or \code{"epiweekly"}).
 }
 \description{
 Loads and preprocesses training data for timeseries

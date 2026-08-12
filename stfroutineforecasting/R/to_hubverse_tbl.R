@@ -13,7 +13,9 @@ var_to_target <- function(variable, disease) {
 
 #' Convert raw samples to preliminary format
 #'
-#' @param samples_path The path to the raw samples file, in parquet format. The path should be of the form "model_runs/{batch_id}/{model_id}/samples.parquet", where {batch_id} is the ID of the model batch and {model_id} is the ID of the model run.
+#' @param samples_path Path to the raw samples Parquet file, with form
+#' `model_runs/<batch_id>/<model_id>/samples.parquet`, where `<batch_id>` is the
+#' model batch identifier and `<model_id>` is the model run identifier.
 #'
 #' @returns A data frame of preliminary samples.
 #'

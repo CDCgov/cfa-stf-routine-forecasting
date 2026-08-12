@@ -179,10 +179,6 @@ jobs:
               wait_for_completion: true
               print_logs: true
               script: |
-                echo "Installing libstdc++6"
-                sudo apt-get update
-                sudo apt-get install -y libstdc++6
-
                 echo "Logging into Azure CLI"
                 az login --service-principal \
                 --username ${{ secrets.AZURE_STFT_SP_CLIENT_ID }} \
@@ -194,7 +190,15 @@ jobs:
                 git clone https://github.com/cdcgov/cfa-stf-routine-forecasting
 
                 echo 'Running uv sync'
-                cd cfa-stf-routine-forecasting && uv sync && source .venv/bin/activate
+                cd cfa-stf-routine-forecasting
+                uv python install --managed-python
+                uv sync --managed-python
+                source .venv/bin/activate
+
+                echo "Python:"
+                which python
+                readlink -f "$(which python)"
+                python --version
 
                 REPORT_DATE="$(TZ=America/New_York date +%F)"
                 export GITHUB_HEAD_REF=${{ github.head_ref }}

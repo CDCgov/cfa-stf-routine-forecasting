@@ -205,8 +205,8 @@ class TestSetupForecastPipeline:
         assert isinstance(context.nowcast_source, ReportingDelayNowcast)
         assert context.nowcast_source.reporting_delay_pmf == [0.25, 0.75]
         mock_get_right_truncation_pmf.assert_called_once_with(
-            loc_abb="CA",
-            disease="COVID-19",
+            state_abb="CA",
+            disease="covid",
             as_of=dt.date(2024, 12, 20),
             reference_date=dt.date(2024, 12, 20),
         )

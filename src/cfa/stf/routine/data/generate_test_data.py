@@ -284,8 +284,8 @@ def make_forecast_data(
             pl.col("disease").is_in([nssp_disease, "Total"]),
         )
         .with_columns(disease=pl.col("disease").replace({nssp_disease: disease}))
-        .rename({"reference_date": "date", "value": "ed_visits"})
-        .select(["date", "geo_value", "disease", "ed_visits"])
+        .rename({"reference_date": "date", "geo_value": "state_abb"})
+        .select(["date", "state_abb", "disease", "value"])
     )
     nhsn_data = _make_nhsn(
         location=location_by_abbr[location],
@@ -314,7 +314,7 @@ def make_forecast_data(
             data=(
                 nssp_data.pivot(
                     on="disease",
-                    values="ed_visits",
+                    values="value",
                 )
                 .rename({disease: "observed_ed_visits"})
                 .with_columns(
@@ -335,17 +335,24 @@ def make_forecast_data(
     nhsn = (
         NHSNData(
             data=(
-                nhsn_data.filter(pl.col("weekendingdate") >= first_training_date)
+                nhsn_data.rename(
+                    {
+                        "weekendingdate": "date",
+                        "jurisdiction": "state_abb",
+                        "hospital_admissions": "value",
+                    }
+                )
+                .filter(pl.col("date") >= first_training_date)
                 .with_columns(
-                    data_type=pl.when(pl.col("weekendingdate") <= last_training_date)
+                    data_type=pl.when(pl.col("date") <= last_training_date)
                     .then(pl.lit("train"))
                     .otherwise(pl.lit("eval")),
                     resolution=pl.lit("epiweekly"),
                 )
                 .select(
-                    "weekendingdate",
-                    "jurisdiction",
-                    "hospital_admissions",
+                    "date",
+                    "state_abb",
+                    "value",
                     "data_type",
                     "resolution",
                 )

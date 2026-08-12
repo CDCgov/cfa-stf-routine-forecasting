@@ -16,6 +16,7 @@ from cfa.stf.data import get_nnh_right_truncation_pmf
 
 from cfa.stf.routine.data.data_access import (
     ForecastData,
+    dataops_disease_name,
     load_forecast_data,
 )
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
@@ -157,8 +158,8 @@ def _build_reporting_delay_nowcast(
     """Build a ReportingDelayNowcast, fetching the PMF if not supplied."""
     if reporting_delay_pmf is None:
         reporting_delay_pmf = get_nnh_right_truncation_pmf(
-            loc_abb=forecast_spec.loc,
-            disease=forecast_spec.disease,
+            state_abb=forecast_spec.loc,
+            disease=dataops_disease_name(forecast_spec.disease),
             as_of=forecast_spec.report_date,
             reference_date=forecast_spec.report_date,
         )

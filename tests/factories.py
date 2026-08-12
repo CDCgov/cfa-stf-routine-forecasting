@@ -31,7 +31,7 @@ def make_test_forecast_data(
     nssp_data = pl.DataFrame(
         {
             "date": [last_training_date],
-            "geo_value": [loc_abb],
+            "state_abb": [loc_abb],
             "observed_ed_visits": [10],
             "other_ed_visits": [90],
             "data_type": ["train"],
@@ -40,9 +40,9 @@ def make_test_forecast_data(
     )
     nhsn_data = pl.DataFrame(
         {
-            "weekendingdate": [last_training_date],
-            "jurisdiction": [loc_abb],
-            "hospital_admissions": [5],
+            "date": [last_training_date],
+            "state_abb": [loc_abb],
+            "value": [5],
             "data_type": ["train"],
             "resolution": ["epiweekly"],
         }

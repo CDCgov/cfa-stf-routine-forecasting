@@ -21,25 +21,41 @@ def _freshness(source: str) -> data_access.DataFreshness:
     )
 
 
+@pytest.mark.parametrize(
+    ("disease", "expected"),
+    [
+        ("COVID-19", "covid"),
+        ("COVID-19/Omicron", "covid"),
+        ("Influenza", "flu"),
+        ("RSV", "rsv"),
+        ("Total", "total"),
+        ("covid", "covid"),
+    ],
+)
+def test_dataops_disease_name_returns_canonical_name(disease, expected):
+    assert data_access.dataops_disease_name(disease) == expected
+
+
 def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
         {
-            "reference_date": [
+            "date": [
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 7),
                 dt.date(2026, 1, 7),
                 dt.date(2026, 1, 7),
             ],
-            "geo_value": ["CA"] * 5,
+            "state_abb": ["CA"] * 5,
             "disease": [
-                "COVID-19",
-                "Total",
-                "Total",
-                "Influenza",
-                "COVID-19",
+                "covid",
+                "total",
+                "total",
+                "flu",
+                "covid",
             ],
+            "target_type": ["inc ed visits"] * 5,
             "value": [12, 120, 100, 8, 10],
         }
     )
@@ -85,8 +101,8 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     assert result.freshness.latest_observed_date == dt.date(2026, 1, 8)
     assert not result.freshness.is_stale
     assert calls == {
-        "disease": ["COVID-19", "Total"],
-        "loc_abb": "CA",
+        "disease": ["covid", "total"],
+        "state_abb": "CA",
         "dataset": "gold",
         "start_date": dt.date(2025, 12, 1),
         "lazy": False,
@@ -97,15 +113,16 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
         {
-            "weekendingdate": [
+            "date": [
                 dt.date(2025, 12, 27),
                 dt.date(2026, 1, 10),
                 dt.date(2026, 1, 1),
                 dt.date(2026, 1, 7),
             ],
-            "jurisdiction": ["CA"] * 4,
-            "disease": ["COVID-19"] * 4,
-            "hospital_admissions": [3, 6, 4, 5],
+            "state_abb": ["CA"] * 4,
+            "disease": ["covid"] * 4,
+            "target_type": ["wk inc hosp"] * 4,
+            "value": [3, 6, 4, 5],
         }
     )
     monkeypatch.setattr(
@@ -130,13 +147,13 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     assert result.prelim
     expected = pl.DataFrame(
         {
-            "weekendingdate": [
+            "date": [
                 dt.date(2026, 1, 10),
                 dt.date(2026, 1, 1),
                 dt.date(2026, 1, 7),
             ],
-            "jurisdiction": ["CA"] * 3,
-            "hospital_admissions": [6, 4, 5],
+            "state_abb": ["CA"] * 3,
+            "value": [6, 4, 5],
             "data_type": ["eval", "train", "train"],
             "resolution": ["epiweekly"] * 3,
         }
@@ -146,8 +163,8 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     assert result.freshness.latest_observed_date == dt.date(2026, 1, 10)
     assert not result.freshness.is_stale
     assert calls == {
-        "disease": "COVID-19",
-        "loc_abb": "CA",
+        "disease": "covid",
+        "state_abb": "CA",
         "prelim": True,
         "start_date": dt.date(2026, 1, 1),
         "lazy": False,
@@ -357,7 +374,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
         data=pl.DataFrame(
             {
                 "date": [dt.date(2026, 1, 8)],
-                "geo_value": ["CA"],
+                "state_abb": ["CA"],
                 "observed_ed_visits": [10],
                 "other_ed_visits": [90],
                 "data_type": ["eval"],
@@ -369,9 +386,9 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     nhsn = data_access.NHSNData(
         data=pl.DataFrame(
             {
-                "weekendingdate": [dt.date(2026, 1, 3)],
-                "jurisdiction": ["CA"],
-                "hospital_admissions": [5],
+                "date": [dt.date(2026, 1, 3)],
+                "state_abb": ["CA"],
+                "value": [5],
                 "data_type": ["train"],
                 "resolution": ["epiweekly"],
             }
@@ -472,7 +489,7 @@ def test_load_forecast_data_only_loads_requested_source(
         data=pl.DataFrame(
             {
                 "date": [dt.date(2026, 1, 8)],
-                "geo_value": ["CA"],
+                "state_abb": ["CA"],
                 "observed_ed_visits": [10],
                 "other_ed_visits": [90],
                 "data_type": ["eval"],
@@ -484,9 +501,9 @@ def test_load_forecast_data_only_loads_requested_source(
     nhsn = data_access.NHSNData(
         data=pl.DataFrame(
             {
-                "weekendingdate": [dt.date(2026, 1, 3)],
-                "jurisdiction": ["CA"],
-                "hospital_admissions": [5],
+                "date": [dt.date(2026, 1, 3)],
+                "state_abb": ["CA"],
+                "value": [5],
                 "data_type": ["train"],
                 "resolution": ["epiweekly"],
             }

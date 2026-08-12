@@ -14,7 +14,7 @@ from cfa.stf.data import (
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pyrenew_multisignal.hew import approx_lognorm
 
-from cfa.stf.routine.data.data_access import ForecastData
+from cfa.stf.routine.data.data_access import ForecastData, dataops_disease_name
 
 
 def combine_surveillance_data(
@@ -26,21 +26,22 @@ def combine_surveillance_data(
     source_frames = []
     if nssp_data is not None:
         source_frames.append(
-            nssp_data.unpivot(
+            nssp_data.rename({"state_abb": "geo_value"})
+            .unpivot(
                 on=["observed_ed_visits", "other_ed_visits"],
                 variable_name=".variable",
                 index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
                 value_name=".value",
-            ).with_columns(pl.lit(None).alias("lab_site_index"))
+            )
+            .with_columns(pl.lit(None).alias("lab_site_index"))
         )
 
     if nhsn_data is not None:
         source_frames.append(
             nhsn_data.rename(
                 {
-                    "weekendingdate": "date",
-                    "jurisdiction": "geo_value",
-                    "hospital_admissions": "observed_hospital_admissions",
+                    "state_abb": "geo_value",
+                    "value": "observed_hospital_admissions",
                 }
             )
             .unpivot(
@@ -103,12 +104,22 @@ def process_and_save_loc_data(
         "right_truncation_offset": forecast_data.right_truncation_offset,
         "nwss_training_data": None,
         "nssp_training_data": (
-            nssp_training_data.drop("resolution", "data_type").to_dict(as_series=False)
+            nssp_training_data.drop("resolution", "data_type")
+            .rename({"state_abb": "geo_value"})
+            .to_dict(as_series=False)
             if nssp_training_data is not None
             else None
         ),
         "nhsn_training_data": (
-            nhsn_training_data.drop("resolution", "data_type").to_dict(as_series=False)
+            nhsn_training_data.drop("resolution", "data_type")
+            .rename(
+                {
+                    "date": "weekendingdate",
+                    "state_abb": "jurisdiction",
+                    "value": "hospital_admissions",
+                }
+            )
+            .to_dict(as_series=False)
             if nhsn_training_data is not None
             else None
         ),
@@ -142,12 +153,13 @@ def process_and_save_loc_param(
     loc_pop_df = get_us_loc_pop_tbl()
     loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
     pop_fraction = jnp.array([1])
+    canonical_disease = dataops_disease_name(disease)
 
     generation_interval_pmf = get_nnh_generation_interval_pmf(
-        disease=disease,
+        disease=canonical_disease,
         as_of=as_of,
     )
-    delay_pmf = get_nnh_delay_pmf(disease=disease, as_of=as_of)
+    delay_pmf = get_nnh_delay_pmf(disease=canonical_disease, as_of=as_of)
     # We do not model a zero infection-to-recorded-admission delay.
     delay_pmf[0] = 0.0
     delay_pmf = jnp.array(delay_pmf)
@@ -155,8 +167,8 @@ def process_and_save_loc_param(
 
     try:
         right_truncation_pmf = get_nnh_right_truncation_pmf(
-            loc_abb=loc_abb,
-            disease=disease,
+            state_abb=loc_abb,
+            disease=canonical_disease,
             as_of=as_of,
             reference_date=as_of,
         )

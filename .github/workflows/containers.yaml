@@ -154,7 +154,7 @@ jobs:
         environment: |-
           ${{ (github.ref_name == 'main') && 'production' || 'test' }}
 
-        name: Copy image from GHCR to ACR
+        name: End-to-end test via Dagster
         outputs:
           tag: ${{ needs.build-pipeline-image.outputs.tag }}
         steps:
@@ -186,8 +186,11 @@ jobs:
                 --federated-token ${{ steps.idtoken.outputs.id_token }} \
                 --output none
 
+                echo 'Cloning repo'
+                git clone https://github.com/cdcgov/cfa-stf-routine-forecasting
+
                 echo 'Running uv sync'
-                uv sync && source .venv/bin/activate
+                cd cfa-stf-routine-forecasting && uv sync && source .venv/bin/activate
 
                 REPORT_DATE="$(TZ=America/New_York date +%F)"
                 export GITHUB_HEAD_REF=${{ github.head_ref }}

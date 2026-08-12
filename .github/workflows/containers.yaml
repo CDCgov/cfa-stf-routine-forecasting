@@ -171,14 +171,18 @@ jobs:
                 const id_token = await coredemo.getIDToken('api://AzureADTokenExchange')
                 coredemo.setOutput('id_token', id_token)
 
-          - name: ACR Import
-            uses: CDCgov/cfa-actions/runner-action@v1.5.0
+          - name: Run test
+            uses: CDCgov/cfa-actions/runner-action@gio-runner-id
             with:
               github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
               github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
               wait_for_completion: true
               print_logs: true
               script: |
+                echo "Installing libstdc++6"
+                sudo apt-get update
+                sudo apt-get install -y libstdc++6
+
                 echo "Logging into Azure CLI"
                 az login --service-principal \
                 --username ${{ secrets.AZURE_STFT_SP_CLIENT_ID }} \

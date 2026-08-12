@@ -1,8 +1,10 @@
 # Basic Imports
 import datetime as dt
+import json
 import logging
 import os
 import subprocess
+import warnings
 from enum import StrEnum
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -44,6 +46,14 @@ from cfa.stf.routine.utils.common_utils import (
 )
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
+log = logging.getLogger(__name__)
+
+# ignore beta automation condition sensor warnings
+warnings.filterwarnings(
+    "ignore",
+    message=r".*AutomationConditionSensorDefinition.*is currently in beta.*",
+)
+
 # ============================================================================
 # DAGSTER INITIALIZATION
 # ============================================================================
@@ -84,11 +94,13 @@ container_workdir = Path(
 
 # Get branch name from git, defaulting to main if not in a git repo
 try:
-    current_branch_name = str(Repository(local_workdir).head.shorthand)
-    print(f"Branch name from git: {current_branch_name}")
+    current_branch_name = os.environ.get("GITHUB_HEAD_REF") or str(
+        Repository(local_workdir).head.shorthand
+    )
+    log.debug(f"Branch name from git: {current_branch_name}")
 except Exception:
     current_branch_name = "main"
-    print("No .git folder detected; using main as the branch name")
+    log.warning("No .git folder detected; using main as the branch name")
 
 # Use 'latest' tag for production or main branch, otherwise use branch name
 registry = "cfaprdbatchcr.azurecr.io"
@@ -880,6 +892,31 @@ refresh_prod_server_image_config = dg.RunConfig(
 )
 def refresh_prod_server_image():
     refresh_prod_server_image_op()
+
+
+E2E_LOCATIONS = ["CA", "US"]
+
+
+def e2e_config() -> dg.RunConfig:
+    return dg.RunConfig(
+        resources={
+            "model_base_config": ModelBaseConfig(
+                locations=GraphDimension(E2E_LOCATIONS)
+            ),
+        },
+        execution=azure_batch_execution_config.to_run_config(),
+    )
+
+
+def e2e_json() -> str:
+    return json.dumps(e2e_config().to_config_dict())
+
+
+end_to_end = dg.define_asset_job(
+    name="end_to_end",
+    selection=dg.AssetSelection.groups("WeeklyForecastInitial", "WeeklyForecastFusion"),
+    config=e2e_config(),
+)
 
 
 @dg.schedule(

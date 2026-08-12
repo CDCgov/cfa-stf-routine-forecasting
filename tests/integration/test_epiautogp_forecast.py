@@ -42,10 +42,7 @@ def test_epiautogp_forecast(pipeline_workspace, monkeypatch, request):
         diseases=[disease],
     )
     hubverse_nowcast_dir = (
-        pipeline_workspace
-        / "private_data"
-        / HUBVERSE_NOWCAST_DIR_NAME
-        / disease.lower()
+        pipeline_workspace / "private_data" / HUBVERSE_NOWCAST_DIR_NAME / disease
     )
 
     for (

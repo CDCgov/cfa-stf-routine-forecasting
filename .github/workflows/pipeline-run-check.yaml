@@ -65,7 +65,7 @@ jobs:
           tests/integration/test_fable_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
-          --model-test-disease COVID-19
+          --model-test-disease covid
 
   pyrenew:
     name: PyRenew H/E/HE model test
@@ -85,7 +85,7 @@ jobs:
           tests/integration/test_pyrenew_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
-          --model-test-disease COVID-19
+          --model-test-disease covid
 
   epiautogp:
     name: EpiAutoGP model test
@@ -108,4 +108,4 @@ jobs:
           tests/integration/test_epiautogp_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
-          --model-test-disease COVID-19
+          --model-test-disease covid

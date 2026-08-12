@@ -182,7 +182,7 @@ def run_epiautogp(
 
 
 def model_batch_dir(workspace: Path, disease: str) -> Path:
-    candidates = list((workspace / FORECAST_DIR_NAME).glob(f"{disease.lower()}_r_*"))
+    candidates = list((workspace / FORECAST_DIR_NAME).glob(f"{disease}_r_*"))
     assert len(candidates) == 1, (
         f"Expected one batch directory for {disease}, "
         f"found {len(candidates)} in {workspace / FORECAST_DIR_NAME}"

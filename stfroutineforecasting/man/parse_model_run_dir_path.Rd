@@ -10,9 +10,8 @@ parse_model_run_dir_path(model_run_dir_path)
 \item{model_run_dir_path}{Path to parse.}
 }
 \value{
-A list of parsed attributes:
-\code{location}, \code{disease}, \code{report_date},
-\code{first_training_date}, and \code{last_training_date}.
+A one-row tibble containing \code{location}, canonical \code{disease},
+\code{report_date}, \code{first_training_date}, and \code{last_training_date} values.
 }
 \description{
 Parse path to a model run directory

@@ -108,7 +108,7 @@ Data conversion utilities for EpiAutoGP JSON format.
 {
   "dates": ["2024-09-22", "2024-09-23", ...],
   "reports": [45.5, 52.3, ...],
-  "pathogen": "COVID-19",
+  "pathogen": "covid",
   "location": "DC",
   "target": "nssp",
   "frequency": "daily",

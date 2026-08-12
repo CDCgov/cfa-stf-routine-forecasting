@@ -25,21 +25,22 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
         {
-            "reference_date": [
+            "date": [
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 7),
                 dt.date(2026, 1, 7),
                 dt.date(2026, 1, 7),
             ],
-            "geo_value": ["CA"] * 5,
+            "state_abb": ["CA"] * 5,
             "disease": [
-                "COVID-19",
-                "Total",
-                "Total",
-                "Influenza",
-                "COVID-19",
+                "covid",
+                "total",
+                "total",
+                "flu",
+                "covid",
             ],
+            "target_type": ["inc ed visits"] * 5,
             "value": [12, 120, 100, 8, 10],
         }
     )
@@ -56,7 +57,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
 
     result = data_access._load_dataops_nssp(
         loc_abb="CA",
-        disease="COVID-19",
+        disease="covid",
         first_training_date=dt.date(2025, 12, 1),
         last_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
@@ -85,8 +86,8 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     assert result.freshness.latest_observed_date == dt.date(2026, 1, 8)
     assert not result.freshness.is_stale
     assert calls == {
-        "disease": ["COVID-19", "Total"],
-        "loc_abb": "CA",
+        "disease": ["covid", "total"],
+        "state_abb": "CA",
         "dataset": "gold",
         "start_date": dt.date(2025, 12, 1),
         "lazy": False,
@@ -97,15 +98,16 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
         {
-            "weekendingdate": [
+            "date": [
                 dt.date(2025, 12, 27),
                 dt.date(2026, 1, 10),
                 dt.date(2026, 1, 1),
                 dt.date(2026, 1, 7),
             ],
-            "jurisdiction": ["CA"] * 4,
-            "disease": ["COVID-19"] * 4,
-            "hospital_admissions": [3, 6, 4, 5],
+            "state_abb": ["CA"] * 4,
+            "disease": ["covid"] * 4,
+            "target_type": ["wk inc hosp"] * 4,
+            "value": [3, 6, 4, 5],
         }
     )
     monkeypatch.setattr(
@@ -120,7 +122,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     )
 
     result = data_access._load_dataops_nhsn(
-        disease="COVID-19",
+        disease="covid",
         loc_abb="CA",
         first_training_date=dt.date(2026, 1, 1),
         last_training_date=dt.date(2026, 1, 7),
@@ -130,13 +132,13 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     assert result.prelim
     expected = pl.DataFrame(
         {
-            "weekendingdate": [
+            "date": [
                 dt.date(2026, 1, 10),
                 dt.date(2026, 1, 1),
                 dt.date(2026, 1, 7),
             ],
-            "jurisdiction": ["CA"] * 3,
-            "hospital_admissions": [6, 4, 5],
+            "state_abb": ["CA"] * 3,
+            "value": [6, 4, 5],
             "data_type": ["eval", "train", "train"],
             "resolution": ["epiweekly"] * 3,
         }
@@ -146,8 +148,8 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     assert result.freshness.latest_observed_date == dt.date(2026, 1, 10)
     assert not result.freshness.is_stale
     assert calls == {
-        "disease": "COVID-19",
-        "loc_abb": "CA",
+        "disease": "covid",
+        "state_abb": "CA",
         "prelim": True,
         "start_date": dt.date(2026, 1, 1),
         "lazy": False,
@@ -170,7 +172,7 @@ def test_forecast_data_allows_one_source(source_name):
     )
     forecast_data = data_access.ForecastData(
         loc_abb="CA",
-        disease="COVID-19",
+        disease="covid",
         report_date=dt.date(2026, 1, 7),
         loc_pop=39_000_000,
         right_truncation_offset=0,
@@ -187,7 +189,7 @@ def test_forecast_data_requires_at_least_one_source():
     with pytest.raises(ValueError, match="at least one data source"):
         data_access.ForecastData(
             loc_abb="CA",
-            disease="COVID-19",
+            disease="covid",
             report_date=dt.date(2026, 1, 7),
             loc_pop=39_000_000,
             right_truncation_offset=0,
@@ -357,7 +359,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
         data=pl.DataFrame(
             {
                 "date": [dt.date(2026, 1, 8)],
-                "geo_value": ["CA"],
+                "state_abb": ["CA"],
                 "observed_ed_visits": [10],
                 "other_ed_visits": [90],
                 "data_type": ["eval"],
@@ -369,9 +371,9 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     nhsn = data_access.NHSNData(
         data=pl.DataFrame(
             {
-                "weekendingdate": [dt.date(2026, 1, 3)],
-                "jurisdiction": ["CA"],
-                "hospital_admissions": [5],
+                "date": [dt.date(2026, 1, 3)],
+                "state_abb": ["CA"],
+                "value": [5],
                 "data_type": ["train"],
                 "resolution": ["epiweekly"],
             }
@@ -397,7 +399,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     )
 
     forecast_data = data_access.load_forecast_data(
-        disease="COVID-19",
+        disease="covid",
         loc_abb="CA",
         run_date=report_date,
         first_training_date=dt.date(2025, 12, 1),
@@ -406,7 +408,7 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     )
 
     assert forecast_data.loc_abb == "CA"
-    assert forecast_data.disease == "COVID-19"
+    assert forecast_data.disease == "covid"
     assert forecast_data.report_date == report_date
     assert forecast_data.loc_pop == 39_000_000
     assert forecast_data.right_truncation_offset == 0
@@ -449,13 +451,13 @@ def test_load_forecast_data_uses_dataops_loaders(monkeypatch):
     assert not forecast_data.is_stale
     assert calls["nssp"] == {
         "loc_abb": "CA",
-        "disease": "COVID-19",
+        "disease": "covid",
         "first_training_date": dt.date(2025, 12, 1),
         "last_training_date": dt.date(2026, 1, 7),
         "run_date": report_date,
     }
     assert calls["nhsn"] == {
-        "disease": "COVID-19",
+        "disease": "covid",
         "loc_abb": "CA",
         "first_training_date": dt.date(2025, 12, 1),
         "last_training_date": dt.date(2026, 1, 7),
@@ -472,7 +474,7 @@ def test_load_forecast_data_only_loads_requested_source(
         data=pl.DataFrame(
             {
                 "date": [dt.date(2026, 1, 8)],
-                "geo_value": ["CA"],
+                "state_abb": ["CA"],
                 "observed_ed_visits": [10],
                 "other_ed_visits": [90],
                 "data_type": ["eval"],
@@ -484,9 +486,9 @@ def test_load_forecast_data_only_loads_requested_source(
     nhsn = data_access.NHSNData(
         data=pl.DataFrame(
             {
-                "weekendingdate": [dt.date(2026, 1, 3)],
-                "jurisdiction": ["CA"],
-                "hospital_admissions": [5],
+                "date": [dt.date(2026, 1, 3)],
+                "state_abb": ["CA"],
+                "value": [5],
                 "data_type": ["train"],
                 "resolution": ["epiweekly"],
             }
@@ -519,7 +521,7 @@ def test_load_forecast_data_only_loads_requested_source(
     )
 
     forecast_data = data_access.load_forecast_data(
-        disease="COVID-19",
+        disease="covid",
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
         first_training_date=dt.date(2025, 12, 1),
@@ -545,7 +547,7 @@ def test_load_forecast_data_only_loads_requested_source(
 def test_load_forecast_data_rejects_invalid_sources(sources, message):
     with pytest.raises(ValueError, match=message):
         data_access.load_forecast_data(
-            disease="COVID-19",
+            disease="covid",
             loc_abb="CA",
             run_date=dt.date(2026, 1, 8),
             first_training_date=dt.date(2025, 12, 1),

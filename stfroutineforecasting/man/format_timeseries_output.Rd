@@ -19,7 +19,8 @@ output type identifier, and forecast variables.}
 
 \item{geo_value}{Geographic identifier for the forecast location.}
 
-\item{disease}{Disease name for the forecast.}
+\item{disease}{Canonical disease identifier for the forecast (\code{"covid"},
+\code{"flu"}, or \code{"rsv"}).}
 
 \item{resolution}{Temporal resolution ("daily" or "epiweekly").}
 

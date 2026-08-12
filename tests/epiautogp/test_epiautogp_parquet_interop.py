@@ -81,7 +81,7 @@ def _write_epiautogp_input(path: Path) -> None:
     input_data = {
         "dates": [date.isoformat() for date in dates],
         "reports": reports,
-        "pathogen": "COVID-19",
+        "pathogen": "covid",
         "location": "US",
         "target": "nssp",
         "frequency": "daily",
@@ -97,7 +97,7 @@ def _write_epiautogp_input(path: Path) -> None:
 def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]:
     tmp_dir = tmp_path_factory.mktemp("epiautogp-parquet-interop")
     try:
-        batch_dir = tmp_dir / "covid-19_r_2024-02-03_f_2024-01-01_t_2024-02-01"
+        batch_dir = tmp_dir / "covid_r_2024-02-03_f_2024-01-01_t_2024-02-01"
         model_fit_dir = batch_dir / "model_runs" / "US" / "epiautogp_nssp_daily_pct"
         input_path = tmp_dir / "epiautogp-input.json"
         _write_epiautogp_input(input_path)
@@ -157,7 +157,7 @@ def _write_fable_reference_model_samples(batch_dir: Path) -> Path:
         ) |>
           stfroutineforecasting::format_timeseries_output(
             geo_value = "US",
-            disease = "COVID-19",
+            disease = "covid",
             resolution = "daily",
             output_type_id = ".draw"
           )
@@ -277,7 +277,7 @@ def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
         pytest.skip("Rscript is not available")
 
     combined_path = (
-        epiautogp_interop_paths.batch_dir / "2024-02-03-covid-19-hubverse-table.parquet"
+        epiautogp_interop_paths.batch_dir / "2024-02-03-covid-hubverse-table.parquet"
     )
     assert combined_path.is_file()
     combined = pl.read_parquet(combined_path)

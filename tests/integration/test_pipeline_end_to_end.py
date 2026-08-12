@@ -143,7 +143,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             batch_info = parse_model_batch_dir_name(batch_dir.name)
             postprocessed_path = (
                 batch_dir
-                / f"{batch_info['report_date']}-{disease.lower()}-hubverse-table.parquet"
+                / f"{batch_info['report_date']}-{disease}-hubverse-table.parquet"
             )
             assert postprocessed_path.is_file(), (
                 f"Missing postprocessed hubverse table: {postprocessed_path}"

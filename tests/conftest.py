@@ -35,7 +35,7 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--model-test-disease",
-        default="COVID-19",
+        default="covid",
         help="Disease for single-model integration tests.",
     )
 

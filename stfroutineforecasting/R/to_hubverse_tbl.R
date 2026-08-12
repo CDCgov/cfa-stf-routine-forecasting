@@ -1,17 +1,11 @@
 var_to_target <- function(variable, disease) {
-  disease_abbr <- dplyr::replace_values(
-    disease,
-    "Influenza" ~ "flu",
-    "COVID-19" ~ "covid",
-    "RSV" ~ "rsv"
-  )
   dplyr::replace_values(
     variable,
-    "observed_hospital_admissions" ~ glue::glue("inc {disease_abbr} hosp"),
-    "observed_ed_visits" ~ glue::glue("inc {disease_abbr} ed visits"),
+    "observed_hospital_admissions" ~ glue::glue("inc {disease} hosp"),
+    "observed_ed_visits" ~ glue::glue("inc {disease} ed visits"),
     "other_ed_visits" ~ glue::glue("inc other ed visits"),
     "prop_disease_ed_visits" ~ glue::glue(
-      "inc {disease_abbr} prop ed visits"
+      "inc {disease} prop ed visits"
     )
   )
 }
@@ -19,7 +13,9 @@ var_to_target <- function(variable, disease) {
 
 #' Convert raw samples to preliminary format
 #'
-#' @param samples_path The path to the raw samples file, in parquet format. The path should be of the form "model_runs/{batch_id}/{model_id}/samples.parquet", where {batch_id} is the ID of the model batch and {model_id} is the ID of the model run.
+#' @param samples_path Path to the raw samples Parquet file, with form
+#' `model_runs/<batch_id>/<model_id>/samples.parquet`, where `<batch_id>` is the
+#' model batch identifier and `<model_id>` is the model run identifier.
 #'
 #' @returns A data frame of preliminary samples.
 #'

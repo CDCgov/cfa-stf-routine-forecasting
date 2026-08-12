@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 HUBVERSE_MODEL_OUTPUT_SUBDIR = Path("model-output", "CFA-nowcastNHSN")
 HUBVERSE_TARGETS = {
-    "COVID-19": "wk inc covid hosp",
-    "Influenza": "wk inc flu hosp",
-    "RSV": "wk inc rsv hosp",
+    "covid": "wk inc covid hosp",
+    "flu": "wk inc flu hosp",
+    "rsv": "wk inc rsv hosp",
 }
 REQUIRED_HUBVERSE_COLUMNS = {
     "origin_date",

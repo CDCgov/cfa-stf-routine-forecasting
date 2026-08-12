@@ -19,7 +19,7 @@ class _StopAfterDataBoundary(Exception):
             forecast_epiautogp,
             "setup_forecast_pipeline",
             {
-                "disease": "COVID-19",
+                "disease": "covid",
                 "run_date": dt.date(2026, 1, 7),
                 "loc": "CA",
                 "output_dir": Path("unused"),
@@ -35,7 +35,7 @@ class _StopAfterDataBoundary(Exception):
             forecast_fable,
             "load_forecast_data",
             {
-                "disease": "COVID-19",
+                "disease": "covid",
                 "loc": "CA",
                 "output_dir": Path("unused"),
                 "n_training_days": 90,
@@ -50,7 +50,7 @@ class _StopAfterDataBoundary(Exception):
             forecast_pyrenew,
             "load_forecast_data",
             {
-                "disease": "COVID-19",
+                "disease": "covid",
                 "loc": "CA",
                 "priors_path": Path("unused"),
                 "output_dir": Path("unused"),
@@ -116,7 +116,7 @@ def test_pyrenew_requests_sources_for_fitted_signals(
 
     with pytest.raises(_StopAfterDataBoundary):
         forecast_pyrenew.main(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             priors_path=Path("unused"),
             output_dir=Path("unused"),

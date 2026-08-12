@@ -20,7 +20,7 @@ def _spec(
 ) -> ForecastSpec:
     """Build a ForecastSpec varying only the applicability fields."""
     return ForecastSpec(
-        disease="COVID-19",
+        disease="covid",
         loc="CA",
         report_date=dt.date(2024, 1, 1),
         target=target,

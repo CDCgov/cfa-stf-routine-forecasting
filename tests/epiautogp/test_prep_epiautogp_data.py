@@ -98,7 +98,7 @@ class TestDateExclusionFiltering:
                 "date": dates,
                 "value": values,
                 "geo_value": ["CA"] * N_DAYS,
-                "disease": ["COVID-19"] * N_DAYS,
+                "disease": ["covid"] * N_DAYS,
             }
         )
 
@@ -276,7 +276,7 @@ class TestDateExclusionFiltering:
         assert "geo_value" in filtered_df.columns
         assert "disease" in filtered_df.columns
         assert all(filtered_df["geo_value"] == "CA")
-        assert all(filtered_df["disease"] == "COVID-19")
+        assert all(filtered_df["disease"] == "covid")
 
 
 class FakeNowcastSource:
@@ -303,7 +303,7 @@ def _write_combined_data(path):
             {
                 "date": dt.date(2024, 1, 1),
                 "geo_value": "CA",
-                "disease": "COVID-19",
+                "disease": "covid",
                 "data_type": "train",
                 ".variable": "observed_ed_visits",
                 ".value": 10.0,
@@ -311,7 +311,7 @@ def _write_combined_data(path):
             {
                 "date": dt.date(2024, 1, 2),
                 "geo_value": "CA",
-                "disease": "COVID-19",
+                "disease": "covid",
                 "data_type": "train",
                 ".variable": "observed_ed_visits",
                 ".value": 20.0,
@@ -319,7 +319,7 @@ def _write_combined_data(path):
             {
                 "date": dt.date(2024, 1, 3),
                 "geo_value": "CA",
-                "disease": "COVID-19",
+                "disease": "covid",
                 "data_type": "eval",
                 ".variable": "observed_ed_visits",
                 ".value": 999.0,
@@ -337,7 +337,7 @@ def _epiautogp_context(tmp_path, nowcast_source=None):
     )
     return ForecastPipelineContext(
         forecast_spec=ForecastSpec(
-            disease="COVID-19",
+            disease="covid",
             loc="CA",
             report_date=dt.date(2024, 1, 3),
             target="nssp",

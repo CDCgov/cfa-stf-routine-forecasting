@@ -7,7 +7,9 @@
 raw_samples_to_prelim(samples_path)
 }
 \arguments{
-\item{samples_path}{The path to the raw samples file, in parquet format. The path should be of the form "model_runs/{batch_id}/{model_id}/samples.parquet", where {batch_id} is the ID of the model batch and {model_id} is the ID of the model run.}
+\item{samples_path}{Path to the raw samples Parquet file, with form
+\verb{model_runs/<batch_id>/<model_id>/samples.parquet}, where \verb{<batch_id>} is the
+model batch identifier and \verb{<model_id>} is the model run identifier.}
 }
 \value{
 A data frame of preliminary samples.

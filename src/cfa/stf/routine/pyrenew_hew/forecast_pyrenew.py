@@ -123,7 +123,7 @@ class PyRenewPipeline(ForecastPipeline):
         self.logger.info("Copying and recording priors from %s...", self.priors_path)
         copy_and_record_priors(self.priors_path, run.model_dir)
 
-    def after_data_preparation(self, run: ForecastRun) -> None:
+    def after_data_serialization(self, run: ForecastRun) -> None:
         process_and_save_loc_param(
             loc_abb=run.loc,
             disease=run.disease,

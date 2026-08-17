@@ -10,7 +10,7 @@ from cfa.stf.routine.data.data_access import (
     ForecastSourceName,
     load_forecast_inputs,
 )
-from cfa.stf.routine.data.prep_data import process_and_save_loc_data
+from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import (
     append_prop_data_to_combined_data,
@@ -45,7 +45,6 @@ class ForecastPipeline(ABC):
         self.exclude_last_n_days = exclude_last_n_days
         self.fail_on_stale_data = fail_on_stale_data
         self.logger = logger or logging.getLogger(type(self).__module__)
-        self.forecast_run: ForecastRun | None = None
 
     @property
     @abstractmethod
@@ -60,7 +59,7 @@ class ForecastPipeline(ABC):
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
-    def setup_run(self) -> ForecastRun:
+    def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
         first_training_date, last_training_date = calculate_training_dates(
             self.run_date,
@@ -100,7 +99,7 @@ class ForecastPipeline(ABC):
     def before_data_preparation(self, run: ForecastRun) -> None:
         """Run model-specific work before common data serialization."""
 
-    def after_data_preparation(self, run: ForecastRun) -> None:
+    def after_data_serialization(self, run: ForecastRun) -> None:
         """Run model-specific work after common data serialization."""
 
     def prepare_model_inputs(self, run: ForecastRun) -> None:
@@ -108,12 +107,12 @@ class ForecastPipeline(ABC):
         run.data_dir.mkdir(parents=True, exist_ok=True)
         self.before_data_preparation(run)
         self.logger.info("Processing data for %s", run.loc)
-        process_and_save_loc_data(
+        serialize_data(
             forecast_run=run,
             save_dir=run.data_dir,
             logger=self.logger,
         )
-        self.after_data_preparation(run)
+        self.after_data_serialization(run)
         append_prop_data_to_combined_data(run.data_dir / "combined_data.tsv")
         self.logger.info("Data preparation complete.")
 
@@ -138,8 +137,7 @@ class ForecastPipeline(ABC):
     def execute(self) -> None:
         """Execute the complete forecast pipeline lifecycle."""
         self.validate_configuration()
-        run = self.setup_run()
-        self.forecast_run = run
+        run = self.build_forecast_run()
         self.resolve_run_dependencies(run)
         self.prepare_model_inputs(run)
         self.fit_and_forecast(run)

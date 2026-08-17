@@ -30,8 +30,8 @@ class TestPipeline(ForecastPipeline):
     def before_data_preparation(self, run):
         self.events.append("before_prepare")
 
-    def after_data_preparation(self, run):
-        self.events.append("after_prepare")
+    def after_data_serialization(self, run):
+        self.events.append("after_serialize")
 
     def fit_and_forecast(self, run):
         self.events.append("forecast")
@@ -55,7 +55,9 @@ def _pipeline(tmp_path, *, events=None, fail_on_stale_data=False):
     )
 
 
-def test_setup_run_loads_inputs_and_constructs_canonical_state(monkeypatch, tmp_path):
+def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
+    monkeypatch, tmp_path
+):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     inputs = make_test_forecast_inputs(sources={"nssp"})
@@ -73,7 +75,7 @@ def test_setup_run_loads_inputs_and_constructs_canonical_state(monkeypatch, tmp_
     monkeypatch.setattr(pipeline_module, "load_forecast_inputs", load)
 
     pipeline = _pipeline(tmp_path, fail_on_stale_data=True)
-    run = pipeline.setup_run()
+    run = pipeline.build_forecast_run()
 
     assert run == ForecastRun(
         disease="covid",
@@ -124,12 +126,12 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         pipeline,
-        "setup_run",
-        lambda: events.append("setup") or run,
+        "build_forecast_run",
+        lambda: events.append("build_run") or run,
     )
     monkeypatch.setattr(
         pipeline_module,
-        "process_and_save_loc_data",
+        "serialize_data",
         lambda **kwargs: events.append("serialize"),
     )
     monkeypatch.setattr(
@@ -152,16 +154,15 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path):
 
     assert events == [
         "validate",
-        "setup",
+        "build_run",
         "resolve",
         "before_prepare",
         "serialize",
-        "after_prepare",
+        "after_serialize",
         "append_prop",
         "forecast",
         "before_postprocess",
         "figures",
         "hubverse",
     ]
-    assert pipeline.forecast_run is run
     assert run.data_dir.is_dir()

@@ -80,7 +80,7 @@ def combine_surveillance_data(
     )
 
 
-def process_and_save_loc_data(
+def serialize_data(
     forecast_run: "ForecastRun",
     save_dir: Path,
     logger: logging.Logger | None = None,

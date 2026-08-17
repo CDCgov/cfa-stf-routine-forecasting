@@ -81,7 +81,7 @@ def test_epiweekly_pipeline_aggregates_common_inputs(mock_generate, tmp_path):
     pipeline = _pipeline(tmp_path, frequency="epiweekly")
     run = _run(tmp_path)
 
-    pipeline.after_data_preparation(run)
+    pipeline.after_data_serialization(run)
 
     mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
 

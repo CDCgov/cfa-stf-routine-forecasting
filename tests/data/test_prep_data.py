@@ -7,8 +7,8 @@ import pytest
 from tests.factories import make_test_forecast_inputs
 
 from cfa.stf.routine.data.prep_data import (
-    process_and_save_loc_data,
     process_and_save_loc_param,
+    serialize_data,
 )
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
@@ -43,7 +43,7 @@ from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
         ),
     ],
 )
-def test_process_and_save_loc_data_handles_present_sources(
+def test_serialize_data_handles_present_sources(
     tmp_path,
     sources,
     expected_variables,
@@ -61,7 +61,7 @@ def test_process_and_save_loc_data_handles_present_sources(
         inputs=make_test_forecast_inputs(sources=sources),
     )
 
-    process_and_save_loc_data(
+    serialize_data(
         forecast_run=forecast_run,
         save_dir=tmp_path,
     )

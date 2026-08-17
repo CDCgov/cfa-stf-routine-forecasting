@@ -48,7 +48,7 @@ class FablePipeline(ForecastPipeline):
     def sources(self) -> set[ForecastSourceName]:
         return {"nssp"}
 
-    def after_data_preparation(self, run: ForecastRun) -> None:
+    def after_data_serialization(self, run: ForecastRun) -> None:
         if self.epiweekly:
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(run.data_dir, overwrite_daily=True)

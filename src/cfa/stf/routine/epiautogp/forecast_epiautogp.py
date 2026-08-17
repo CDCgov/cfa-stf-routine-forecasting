@@ -220,7 +220,7 @@ class EpiAutoGPPipeline(ForecastPipeline):
             hubverse_nowcast_dir=self.hubverse_nowcast_dir,
         )
 
-    def after_data_preparation(self, run: ForecastRun) -> None:
+    def after_data_serialization(self, run: ForecastRun) -> None:
         if self.config.frequency == "epiweekly":
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(run.data_dir, overwrite_daily=True)

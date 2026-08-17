@@ -45,7 +45,7 @@ def test_fable_pipeline_aggregates_weekly_inputs(mock_generate, tmp_path):
     )
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.after_data_preparation(run)
+    pipeline.after_data_serialization(run)
 
     mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
 
@@ -111,7 +111,7 @@ def test_pyrenew_pipeline_extends_common_data_preparation(
     run = _run(tmp_path, model_name=pipeline.model_name)
 
     pipeline.before_data_preparation(run)
-    pipeline.after_data_preparation(run)
+    pipeline.after_data_serialization(run)
 
     mock_copy.assert_called_once_with(Path("priors.py"), run.model_dir)
     assert mock_params.call_args.kwargs == {

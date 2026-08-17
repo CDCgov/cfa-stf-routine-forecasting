@@ -8,23 +8,19 @@ list-based implementation to ensure correctness.
 
 import datetime as dt
 import json
-import logging
 from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from tests.factories import make_test_forecast_data
+from tests.factories import make_test_forecast_inputs
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.epiautogp_forecast_utils import (
-    ForecastPipelineContext,
-    ForecastSpec,
-    ModelPaths,
-)
+from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.prep_epiautogp_data import (
     _apply_date_exclusions,
     convert_to_epiautogp_json,
 )
+from cfa.stf.routine.forecast_run import ForecastRun
 
 N_DAYS = 10
 
@@ -328,33 +324,24 @@ def _write_combined_data(path):
     ).write_csv(path, separator="\t")
 
 
-def _epiautogp_context(tmp_path, nowcast_source=None):
+def _epiautogp_run(tmp_path):
     report_date = dt.date(2024, 1, 3)
-    forecast_data = make_test_forecast_data(
+    forecast_inputs = make_test_forecast_inputs(
         report_date=report_date,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
     )
-    return ForecastPipelineContext(
-        forecast_spec=ForecastSpec(
-            disease="covid",
-            loc="CA",
-            report_date=dt.date(2024, 1, 3),
-            target="nssp",
-            frequency="daily",
-            ed_visit_type="observed",
-        ),
-        model_name="test_model",
+    return ForecastRun(
+        disease="covid",
+        loc="CA",
+        report_date=report_date,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
         n_forecast_days=28,
         exclude_last_n_days=0,
-        exclude_date_ranges=None,
-        model_batch_dir=tmp_path / "batch",
-        model_run_dir=tmp_path / "batch" / "model_runs" / "CA",
-        forecast_data=forecast_data,
-        logger=logging.getLogger(),
-        nowcast_source=nowcast_source,
+        model_name="test_model",
+        output_dir=tmp_path,
+        inputs=forecast_inputs,
     )
 
 
@@ -363,17 +350,14 @@ class TestConvertToEpiAutoGpJson:
 
     def test_only_training_rows_are_serialized_without_nowcast_source(self, tmp_path):
         """Test converter excludes evaluation rows from model input."""
-        data_path = tmp_path / "combined_data.tsv"
+        forecast_run = _epiautogp_run(tmp_path)
+        data_path = forecast_run.data_dir / "combined_data.tsv"
+        data_path.parent.mkdir(parents=True)
         _write_combined_data(data_path)
-        paths = ModelPaths(
-            model_output_dir=tmp_path / "model",
-            data_dir=tmp_path,
-            training_data=data_path,
-        )
 
         output_path = convert_to_epiautogp_json(
-            context=_epiautogp_context(tmp_path),
-            paths=paths,
+            forecast_run=forecast_run,
+            config=EpiAutoGPConfig("nssp", "daily", "observed"),
         )
 
         output = json.loads(output_path.read_text())
@@ -384,18 +368,16 @@ class TestConvertToEpiAutoGpJson:
 
     def test_nowcast_source_serializes_nowcast_data(self, tmp_path):
         """Test converter writes nowcast data supplied by the context source."""
-        data_path = tmp_path / "combined_data.tsv"
+        forecast_run = _epiautogp_run(tmp_path)
+        data_path = forecast_run.data_dir / "combined_data.tsv"
+        data_path.parent.mkdir(parents=True)
         _write_combined_data(data_path)
-        paths = ModelPaths(
-            model_output_dir=tmp_path / "model",
-            data_dir=tmp_path,
-            training_data=data_path,
-        )
         source = FakeNowcastSource()
 
         output_path = convert_to_epiautogp_json(
-            context=_epiautogp_context(tmp_path, nowcast_source=source),
-            paths=paths,
+            forecast_run=forecast_run,
+            config=EpiAutoGPConfig("nssp", "daily", "observed"),
+            nowcast_source=source,
         )
 
         output = json.loads(output_path.read_text())

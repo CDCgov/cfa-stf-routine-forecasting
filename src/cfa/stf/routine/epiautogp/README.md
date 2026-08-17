@@ -43,34 +43,33 @@ Main entry point for the forecasting pipeline.
 - `n_forecast_draws`: Number of forecast draws (default: 2000)
 - `smc_data_proportion`: Data proportion per SMC step (default: 0.1)
 
-### `forecast_spec.py`
+### `config.py`
 
-Defines the `ForecastSpec` value object — a frozen dataclass bundling the six fields that identify a single forecast run: `disease`, `loc`, `report_date`, `target`, `frequency`, `ed_visit_type`.
-These fields travel together through the pipeline and have inter-field validity constraints (see `_validate_epiautogp_parameters`), so they're treated as one cohesive unit.
-Lives in its own module to avoid an import cycle between `nowcast.py` and `epiautogp_forecast_utils.py`.
+Defines the frozen `EpiAutoGPConfig` value object for model-specific options: `target`, `frequency`, `ed_visit_type`, and excluded date ranges.
+Disease, location, report date, training dates, loaded inputs, and output paths come from the shared `ForecastRun`.
 
-### `epiautogp_forecast_utils.py`
+### Shared forecast lifecycle
 
-Shared utilities for the forecast pipeline, containing modular functions for each pipeline stage.
+`EpiAutoGPPipeline` extends the repository-wide `ForecastPipeline` lifecycle used by Fable and PyRenew.
+Shared setup constructs one canonical `ForecastRun`; EpiAutoGP then resolves its nowcast source, performs optional epiweekly aggregation, converts the run to JSON, executes Julia, and uses the common post-processing stage.
 
-**Data Classes:**
+**Key Types:**
 
-- **`ForecastPipelineContext`**: Container for shared pipeline state.
-  Embeds a `ForecastSpec` plus workflow-only fields (training dates, output directories, data sources, logger, nowcast source).
-- **`ModelPaths`**: Container for output directory structure and file paths
+- **`ForecastInputs`**: Loaded surveillance frames, freshness, population, and right-truncation metadata.
+- **`ForecastRun`**: Canonical run identity, training window, forecast horizon, model name, inputs, and derived output paths.
+- **`EpiAutoGPPipeline`**: EpiAutoGP-specific implementation of the shared pipeline lifecycle.
 
 **Key Functions:**
 
-- **`setup_forecast_pipeline()`**: Builds the `ForecastSpec`, resolves the nowcast source, and assembles a `ForecastPipelineContext` for downstream stages.
 - **`_resolve_nowcast_source()`**: Dispatches on `nowcast_source_name` to construct a `NowcastSource`.
-  Its explicit source-specific arguments are validated against the selected source.
+  Applicability uses `EpiAutoGPConfig`, while source loading uses the canonical `ForecastRun` identity.
 
 ### `nowcast.py`, `reporting_delay_nowcast.py`, and `../data/hubverse_nowcast.py`
 
 Pluggable nowcasting sources for nowcasting recent observations.
 
 - **`NowcastData`** (`../data/nowcast.py`): Stores nowcast dates and report trajectories.
-- **`NowcastSource`** (`../data/nowcast.py`): Protocol declaring `ensure_applicable(*, forecast_spec) -> None` and `get_nowcast_data(*, dates, reports) -> NowcastData` (the action).
+- **`NowcastSource`** (`../data/nowcast.py`): Protocol declaring `ensure_applicable(*, config) -> None` and `get_nowcast_data(*, dates, reports) -> NowcastData`.
 - **`FixedNowcast`**: Trivial source wrapping a precomputed `NowcastData`.
 - **`ReportingDelayNowcast`**: Inflates the most-recent observations by the inverse of a reporting-delay PMF.
   Applies to count series (rejects `ed_visit_type="pct"`); warns when used on a non-daily series since the PMF support is daily by convention.
@@ -160,7 +159,7 @@ output_dir/
 
 This module follows the same design patterns as other forecasting models in the cfa-stf-routine-forecasting pipeline:
 
-- Shared pipeline utilities (`setup_forecast_pipeline`, `prepare_model_data`)
+- Shared `ForecastPipeline.execute()` lifecycle and canonical `ForecastRun` state
 - Common data formats (TSV training data, hubverse tables)
 - Consistent directory structure
 - Modular, reusable functions exported through `__init__.py`

@@ -1,0 +1,77 @@
+"""Canonical state for one materialized forecast run."""
+
+import datetime as dt
+from dataclasses import dataclass
+from pathlib import Path
+
+from cfa.stf.routine.data.data_access import (
+    DataFreshness,
+    ForecastInputs,
+    NHSNData,
+    NSSPData,
+)
+from cfa.stf.routine.utils.common_utils import get_model_batch_dir_name
+
+
+@dataclass(frozen=True)
+class ForecastRun:
+    """Canonical shared state for one model, location, and forecast vintage."""
+
+    disease: str
+    loc: str
+    report_date: dt.date
+    first_training_date: dt.date
+    last_training_date: dt.date
+    n_forecast_days: int
+    exclude_last_n_days: int
+    model_name: str
+    output_dir: Path
+    inputs: ForecastInputs
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "output_dir", Path(self.output_dir))
+
+    @property
+    def model_batch_dir(self) -> Path:
+        return self.output_dir / get_model_batch_dir_name(
+            disease=self.disease,
+            report_date=self.report_date,
+            first_training_date=self.first_training_date,
+            last_training_date=self.last_training_date,
+        )
+
+    @property
+    def model_run_dir(self) -> Path:
+        return self.model_batch_dir / "model_runs" / self.loc
+
+    @property
+    def model_dir(self) -> Path:
+        return self.model_run_dir / self.model_name
+
+    @property
+    def data_dir(self) -> Path:
+        return self.model_dir / "data"
+
+    @property
+    def loc_pop(self) -> int:
+        return self.inputs.loc_pop
+
+    @property
+    def right_truncation_offset(self) -> int:
+        return self.inputs.right_truncation_offset
+
+    @property
+    def nssp(self) -> NSSPData | None:
+        return self.inputs.nssp
+
+    @property
+    def nhsn(self) -> NHSNData | None:
+        return self.inputs.nhsn
+
+    @property
+    def freshness(self) -> tuple[DataFreshness, ...]:
+        return self.inputs.freshness
+
+    @property
+    def is_stale(self) -> bool:
+        return self.inputs.is_stale

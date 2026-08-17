@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-import os
 import shutil
 import tomllib
 from pathlib import Path
@@ -9,23 +8,15 @@ import tomli_w
 from pyrenew_multisignal.hew.utils import pyrenew_model_name_from_flags
 
 from cfa.stf.routine._paths import PYRENEW_HEW_DIR
-from cfa.stf.routine.data.data_access import load_forecast_data
-from cfa.stf.routine.data.prep_data import (
-    process_and_save_loc_data,
-    process_and_save_loc_param,
-)
+from cfa.stf.routine.data.data_access import ForecastSourceName
+from cfa.stf.routine.data.prep_data import process_and_save_loc_param
+from cfa.stf.routine.forecast_pipeline import ForecastPipeline
+from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.pyrenew_hew.fit_pyrenew_model import fit_and_save_model
 from cfa.stf.routine.pyrenew_hew.generate_predictive import (
     generate_and_save_predictions,
 )
-from cfa.stf.routine.utils.common_utils import (
-    append_prop_data_to_combined_data,
-    calculate_training_dates,
-    get_model_batch_dir_name,
-    make_figures_from_model_fit_dir,
-    model_fit_dir_to_hub_tbl,
-    run_r_script,
-)
+from cfa.stf.routine.utils.common_utils import run_r_script
 
 
 def copy_and_record_priors(priors_path: Path, model_dir: Path):
@@ -58,6 +49,121 @@ def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
     return None
 
 
+class PyRenewPipeline(ForecastPipeline):
+    """Single-location PyRenew HEW forecast pipeline."""
+
+    def __init__(
+        self,
+        *,
+        priors_path: Path,
+        n_chains: int,
+        n_warmup: int,
+        n_samples: int,
+        fit_ed_visits: bool = False,
+        fit_hospital_admissions: bool = False,
+        fit_wastewater: bool = False,
+        forecast_ed_visits: bool = False,
+        forecast_hospital_admissions: bool = False,
+        forecast_wastewater: bool = False,
+        rng_key: int | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.priors_path = priors_path
+        self.n_chains = n_chains
+        self.n_warmup = n_warmup
+        self.n_samples = n_samples
+        self.fit_ed_visits = fit_ed_visits
+        self.fit_hospital_admissions = fit_hospital_admissions
+        self.fit_wastewater = fit_wastewater
+        self.forecast_ed_visits = forecast_ed_visits
+        self.forecast_hospital_admissions = forecast_hospital_admissions
+        self.forecast_wastewater = forecast_wastewater
+        self.rng_key = rng_key
+
+    @property
+    def model_name(self) -> str:
+        return pyrenew_model_name_from_flags(
+            fit_ed_visits=self.fit_ed_visits,
+            fit_hospital_admissions=self.fit_hospital_admissions,
+            fit_wastewater=self.fit_wastewater,
+        )
+
+    @property
+    def sources(self) -> set[ForecastSourceName]:
+        sources: set[ForecastSourceName] = set()
+        if self.fit_ed_visits:
+            sources.add("nssp")
+        if self.fit_hospital_admissions:
+            sources.add("nhsn")
+        return sources
+
+    def validate_configuration(self) -> None:
+        if self.fit_wastewater or self.forecast_wastewater:
+            raise ValueError(
+                "Wastewater data loading is no longer supported in this pipeline."
+            )
+
+        signals = ["ed_visits", "hospital_admissions"]
+        for signal in signals:
+            fit = getattr(self, f"fit_{signal}")
+            forecast = getattr(self, f"forecast_{signal}")
+            if fit and not forecast:
+                raise ValueError(
+                    "This pipeline does not currently support "
+                    "fitting to but not forecasting a signal. "
+                    f"Asked to fit but not forecast {signal}."
+                )
+        if not any(getattr(self, f"fit_{signal}") for signal in signals):
+            raise ValueError(
+                "pyrenew_null (fitting to no signals) is not supported by this pipeline"
+            )
+
+    def before_data_preparation(self, run: ForecastRun) -> None:
+        self.logger.info("Copying and recording priors from %s...", self.priors_path)
+        copy_and_record_priors(self.priors_path, run.model_dir)
+
+    def after_data_preparation(self, run: ForecastRun) -> None:
+        process_and_save_loc_param(
+            loc_abb=run.loc,
+            disease=run.disease,
+            fit_ed_visits=self.fit_ed_visits,
+            save_dir=run.data_dir,
+            as_of=run.report_date,
+        )
+
+    def fit_and_forecast(self, run: ForecastRun) -> None:
+        self.logger.info("Fitting model...")
+        fit_and_save_model(
+            run.model_dir,
+            n_warmup=self.n_warmup,
+            n_samples=self.n_samples,
+            n_chains=self.n_chains,
+            fit_ed_visits=self.fit_ed_visits,
+            fit_hospital_admissions=self.fit_hospital_admissions,
+            fit_wastewater=self.fit_wastewater,
+            rng_key=self.rng_key,
+        )
+        self.logger.info("Model fitting complete")
+
+        self.logger.info("Performing posterior prediction / forecasting...")
+        n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days
+        generate_and_save_predictions(
+            run.model_run_dir,
+            run.model_name,
+            n_days_past_last_training,
+            predict_ed_visits=self.forecast_ed_visits,
+            predict_hospital_admissions=self.forecast_hospital_admissions,
+            predict_wastewater=self.forecast_wastewater,
+            rng_key=self.rng_key,
+        )
+        self.logger.info("All forecasting complete.")
+
+    def before_post_process(self, run: ForecastRun) -> None:
+        self.logger.info("Creating daily counts...")
+        create_samples_from_pyrenew_fit_dir(run.model_dir)
+
+
 def main(
     disease: str,
     loc: str,
@@ -82,141 +188,26 @@ def main(
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    if fit_wastewater or forecast_wastewater:
-        raise ValueError(
-            "Wastewater data loading is no longer supported in this pipeline."
-        )
-
-    pyrenew_model_name = pyrenew_model_name_from_flags(
-        fit_ed_visits=fit_ed_visits,
-        fit_hospital_admissions=fit_hospital_admissions,
-        fit_wastewater=fit_wastewater,
-    )
-
-    logger.info(
-        "Starting single-location forecasting pipeline for "
-        f"model {pyrenew_model_name}, location {loc}, "
-        f"and run date {run_date}."
-    )
-    signals = ["ed_visits", "hospital_admissions"]
-
-    for signal in signals:
-        fit = locals().get(f"fit_{signal}", False)
-        forecast = locals().get(f"forecast_{signal}", False)
-        if fit and not forecast:
-            raise ValueError(
-                "This pipeline does not currently support "
-                "fitting to but not forecasting a signal. "
-                f"Asked to fit but not forecast {signal}."
-            )
-    any_fit = any([locals().get(f"fit_{signal}", False) for signal in signals])
-    if not any_fit:
-        raise ValueError(
-            "pyrenew_null (fitting to no signals) is not supported by this pipeline"
-        )
-
-    first_training_date, last_training_date = calculate_training_dates(
-        run_date,
-        n_training_days,
-        exclude_last_n_days,
-        logger,
-    )
-
-    sources = set()
-    if fit_ed_visits:
-        sources.add("nssp")
-    if fit_hospital_admissions:
-        sources.add("nhsn")
-
-    forecast_data = load_forecast_data(
+    PyRenewPipeline(
         disease=disease,
-        loc_abb=loc,
-        run_date=run_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-        sources=sources,
-        fail_on_stale_data=fail_on_stale_data,
-        logger=logger,
-    )
-    model_batch_dir_name = get_model_batch_dir_name(
-        disease=disease,
-        report_date=run_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-    )
-
-    model_batch_dir = Path(output_dir, model_batch_dir_name)
-
-    model_run_dir = Path(model_batch_dir, "model_runs", loc)
-    model_dir = Path(model_run_dir, pyrenew_model_name)
-    data_dir = Path(model_dir, "data")
-    os.makedirs(data_dir, exist_ok=True)
-
-    logger.info(f"Copying and recording priors from {priors_path}...")
-    copy_and_record_priors(priors_path, model_dir)
-
-    logger.info(f"Processing {loc}")
-    process_and_save_loc_data(
-        forecast_data=forecast_data,
-        save_dir=data_dir,
-        logger=logger,
-    )
-
-    process_and_save_loc_param(
-        loc_abb=loc,
-        disease=disease,
-        fit_ed_visits=fit_ed_visits,
-        save_dir=data_dir,
-        as_of=run_date,
-    )
-    append_prop_data_to_combined_data(Path(data_dir, "combined_data.tsv"))
-    logger.info("Data preparation complete.")
-
-    logger.info("Fitting model...")
-
-    fit_and_save_model(
-        model_dir,
+        loc=loc,
+        priors_path=priors_path,
+        output_dir=output_dir,
+        n_training_days=n_training_days,
+        n_forecast_days=n_forecast_days,
+        n_chains=n_chains,
         n_warmup=n_warmup,
         n_samples=n_samples,
-        n_chains=n_chains,
+        run_date=run_date,
+        exclude_last_n_days=exclude_last_n_days,
         fit_ed_visits=fit_ed_visits,
         fit_hospital_admissions=fit_hospital_admissions,
         fit_wastewater=fit_wastewater,
+        forecast_ed_visits=forecast_ed_visits,
+        forecast_hospital_admissions=forecast_hospital_admissions,
+        forecast_wastewater=forecast_wastewater,
         rng_key=rng_key,
-    )
-    logger.info("Model fitting complete")
-
-    logger.info("Performing posterior prediction / forecasting...")
-
-    n_days_past_last_training = n_forecast_days + exclude_last_n_days
-    generate_and_save_predictions(
-        model_run_dir,
-        pyrenew_model_name,
-        n_days_past_last_training,
-        predict_ed_visits=forecast_ed_visits,
-        predict_hospital_admissions=forecast_hospital_admissions,
-        predict_wastewater=forecast_wastewater,
-        rng_key=rng_key,
-    )
-    # pipe this into something that creates samples.parquet
-    logger.info("All forecasting complete.")
-
-    logger.info("Postprocessing forecast...")
-
-    # Create daily counts
-    logger.info("Creating daily counts...")
-    create_samples_from_pyrenew_fit_dir(model_dir)
-    make_figures_from_model_fit_dir(
-        model_dir,
-        save_figs=True,
-        save_ci=True,
-    )
-    model_fit_dir_to_hub_tbl(model_dir)
-
-    logger.info(
-        "Single-location pipeline complete "
-        f"for model {pyrenew_model_name}, "
-        f"location {loc}, and "
-        f"run date {run_date}."
-    )
+        fail_on_stale_data=fail_on_stale_data,
+        logger=logger,
+    ).execute()
     return None

@@ -44,10 +44,9 @@ class NHSNData(ForecastSourceData):
 
 
 @dataclass(frozen=True)
-class ForecastData:
-    loc_abb: str
-    disease: str
-    report_date: dt.date
+class ForecastInputs:
+    """Surveillance inputs and metadata loaded for one forecast run."""
+
     loc_pop: int
     right_truncation_offset: int
     nssp: NSSPData | None = None
@@ -55,7 +54,7 @@ class ForecastData:
 
     def __post_init__(self) -> None:
         if self.nssp is None and self.nhsn is None:
-            raise ValueError("ForecastData requires at least one data source")
+            raise ValueError("ForecastInputs requires at least one data source")
 
     @property
     def sources(self) -> tuple[ForecastSourceData, ...]:
@@ -266,7 +265,7 @@ def apply_freshness_policy(
     logger.warning(message)
 
 
-def load_forecast_data(
+def load_forecast_inputs(
     *,
     disease: str,
     loc_abb: str,
@@ -276,7 +275,7 @@ def load_forecast_data(
     sources: Collection[ForecastSourceName],
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
-) -> ForecastData:
+) -> ForecastInputs:
     logger = logger or logging.getLogger(__name__)
     requested_sources = frozenset(sources)
     if not requested_sources:
@@ -320,10 +319,7 @@ def load_forecast_data(
     # The first entry of a source right-truncation PMF corresponds to reports
     # for reference_date = report_date - 1 as of report_date.
     right_truncation_offset = (run_date - last_training_date).days - 1
-    return ForecastData(
-        loc_abb=loc_abb,
-        disease=disease,
-        report_date=run_date,
+    return ForecastInputs(
         loc_pop=loc_pop,
         right_truncation_offset=right_truncation_offset,
         nssp=nssp,

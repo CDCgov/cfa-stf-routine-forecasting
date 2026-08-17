@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 import polars as pl
@@ -14,7 +15,8 @@ from cfa.stf.data import (
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 from pyrenew_multisignal.hew import approx_lognorm
 
-from cfa.stf.routine.data.data_access import ForecastData
+if TYPE_CHECKING:
+    from cfa.stf.routine.forecast_run import ForecastRun
 
 
 def combine_surveillance_data(
@@ -79,7 +81,7 @@ def combine_surveillance_data(
 
 
 def process_and_save_loc_data(
-    forecast_data: ForecastData,
+    forecast_run: "ForecastRun",
     save_dir: Path,
     logger: logging.Logger | None = None,
 ) -> None:
@@ -89,19 +91,19 @@ def process_and_save_loc_data(
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
     nssp_training_data = (
-        forecast_data.nssp.data.filter(pl.col("data_type") == "train")
-        if forecast_data.nssp is not None
+        forecast_run.nssp.data.filter(pl.col("data_type") == "train")
+        if forecast_run.nssp is not None
         else None
     )
     nhsn_training_data = (
-        forecast_data.nhsn.data.filter(pl.col("data_type") == "train")
-        if forecast_data.nhsn is not None
+        forecast_run.nhsn.data.filter(pl.col("data_type") == "train")
+        if forecast_run.nhsn is not None
         else None
     )
 
     data_for_model_fit = {
-        "loc_pop": forecast_data.loc_pop,
-        "right_truncation_offset": forecast_data.right_truncation_offset,
+        "loc_pop": forecast_run.loc_pop,
+        "right_truncation_offset": forecast_run.right_truncation_offset,
         "nwss_training_data": None,
         "nssp_training_data": (
             nssp_training_data.drop("resolution", "data_type")
@@ -132,12 +134,12 @@ def process_and_save_loc_data(
         json.dump(data_for_model_fit, json_file, default=str)
 
     combined_data = combine_surveillance_data(
-        disease=forecast_data.disease,
-        nssp_data=forecast_data.nssp.data if forecast_data.nssp is not None else None,
-        nhsn_data=forecast_data.nhsn.data if forecast_data.nhsn is not None else None,
+        disease=forecast_run.disease,
+        nssp_data=forecast_run.nssp.data if forecast_run.nssp is not None else None,
+        nhsn_data=forecast_run.nhsn.data if forecast_run.nhsn is not None else None,
     )
 
-    logger.info(f"Saving {forecast_data.loc_abb} to {save_dir}")
+    logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 
     combined_data.write_csv(Path(save_dir, "combined_data.tsv"), separator="\t")
     return None

@@ -4,12 +4,13 @@ from unittest.mock import patch
 
 import polars as pl
 import pytest
-from tests.factories import make_test_forecast_data
+from tests.factories import make_test_forecast_inputs
 
 from cfa.stf.routine.data.prep_data import (
     process_and_save_loc_data,
     process_and_save_loc_param,
 )
+from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
 
 
@@ -47,10 +48,21 @@ def test_process_and_save_loc_data_handles_present_sources(
     sources,
     expected_variables,
 ):
-    forecast_data = make_test_forecast_data(sources=sources)
+    forecast_run = ForecastRun(
+        disease="covid",
+        loc="CA",
+        report_date=dt.date(2024, 12, 20),
+        first_training_date=dt.date(2024, 9, 22),
+        last_training_date=dt.date(2024, 12, 20),
+        n_forecast_days=28,
+        exclude_last_n_days=0,
+        model_name="test_model",
+        output_dir=tmp_path,
+        inputs=make_test_forecast_inputs(sources=sources),
+    )
 
     process_and_save_loc_data(
-        forecast_data=forecast_data,
+        forecast_run=forecast_run,
         save_dir=tmp_path,
     )
     append_prop_data_to_combined_data(tmp_path / "combined_data.tsv")

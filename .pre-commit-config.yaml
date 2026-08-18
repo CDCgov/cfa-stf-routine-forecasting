@@ -11,7 +11,7 @@ repos:
       - id: trailing-whitespace
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.2
+    rev: v0.16.3
     hooks:
       # Sort imports
       - id: ruff-check
@@ -19,7 +19,7 @@ repos:
       - id: ruff-format
     # UV Pre-Commit Hook
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.12.3
+    rev: 0.12.5
     hooks:
       - id: uv-lock
   # Bash
@@ -58,7 +58,7 @@ repos:
         exclude: ^src/cfa/stf/routine/epiautogp/Manifest\.toml$
   # Quarto / Markdown
   - repo: https://github.com/jolars/panache-pre-commit
-    rev: v3.3.0
+    rev: v3.4.0
     hooks:
       - id: panache-format
       - id: panache-lint

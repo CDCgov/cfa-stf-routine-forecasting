@@ -1,10 +1,8 @@
 import datetime as dt
 import logging
 import shutil
-import tomllib
 from pathlib import Path
 
-import tomli_w
 from pyrenew_multisignal.hew.utils import pyrenew_model_name_from_flags
 
 from cfa.stf.routine._paths import PYRENEW_HEW_DIR
@@ -22,24 +20,8 @@ from cfa.stf.routine.pyrenew_hew.model_inputs import (
 from cfa.stf.routine.utils.common_utils import run_r_script
 
 
-def copy_and_record_priors(priors_path: Path, model_dir: Path):
-    metadata_file = Path(model_dir, "metadata.toml")
+def copy_priors(priors_path: Path, model_dir: Path) -> None:
     shutil.copyfile(priors_path, Path(model_dir, "priors.py"))
-
-    if metadata_file.exists():
-        with open(metadata_file, "rb") as file:
-            metadata = tomllib.load(file)
-    else:
-        metadata = {}
-
-    new_metadata = {
-        "priors_path": str(priors_path),
-    }
-
-    metadata.update(new_metadata)
-
-    with open(metadata_file, "wb") as file:
-        tomli_w.dump(metadata, file)
 
 
 def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
@@ -127,8 +109,8 @@ class PyRenewPipeline(ForecastPipeline):
             run=run,
             fit_ed_visits=self.fit_ed_visits,
         )
-        self.logger.info("Copying and recording priors from %s...", self.priors_path)
-        copy_and_record_priors(self.priors_path, run.model_dir)
+        self.logger.info("Copying priors from %s...", self.priors_path)
+        copy_priors(self.priors_path, run.model_dir)
         serialize_pyrenew_model_params(
             run=run,
             model_inputs=model_inputs,

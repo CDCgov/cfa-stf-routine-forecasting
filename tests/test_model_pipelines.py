@@ -102,7 +102,7 @@ def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, messa
 
 
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")
-@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.copy_and_record_priors")
+@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.copy_priors")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.resolve_pyrenew_model_inputs")
 def test_pyrenew_pipeline_extends_common_data_preparation(
     mock_resolve,

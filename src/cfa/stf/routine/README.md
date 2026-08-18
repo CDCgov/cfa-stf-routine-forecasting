@@ -152,7 +152,6 @@ The base class provides optional hooks around common work:
   | Hook                                          | Use it to                                              |
   | --------------------------------------------- | ------------------------------------------------------ |
   | `validate_configuration()`                    | Reject invalid option combinations before loading data |
-  | `before_data_preparation(run)`                | Copy metadata or create assets before serialization    |
   | `after_data_serialization(run, model_inputs)` | Transform or supplement serialized inputs              |
   | `before_post_process(run)`                    | Convert native model output into `samples.parquet`     |
 

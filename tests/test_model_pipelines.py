@@ -116,7 +116,6 @@ def test_pyrenew_pipeline_extends_common_data_preparation(
         right_truncation_pmf=(1.0,),
     )
 
-    pipeline.before_data_preparation(run)
     pipeline.after_data_serialization(run, model_inputs)
 
     mock_copy.assert_called_once_with(Path("priors.py"), run.model_dir)

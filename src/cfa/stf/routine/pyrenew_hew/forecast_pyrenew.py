@@ -129,15 +129,13 @@ class PyRenewPipeline(ForecastPipeline[PyRenewModelInputs]):
             fit_ed_visits=self.fit_ed_visits,
         )
 
-    def before_data_preparation(self, run: ForecastRun) -> None:
-        self.logger.info("Copying and recording priors from %s...", self.priors_path)
-        copy_and_record_priors(self.priors_path, run.model_dir)
-
     def after_data_serialization(
         self,
         run: ForecastRun,
         model_inputs: PyRenewModelInputs,
     ) -> None:
+        self.logger.info("Copying and recording priors from %s...", self.priors_path)
+        copy_and_record_priors(self.priors_path, run.model_dir)
         serialize_pyrenew_model_params(
             run=run,
             model_inputs=model_inputs,

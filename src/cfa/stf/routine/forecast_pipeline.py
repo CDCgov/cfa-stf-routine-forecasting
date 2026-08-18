@@ -97,9 +97,6 @@ class ForecastPipeline[ModelInputsT](ABC):
     def resolve_model_inputs(self, run: ForecastRun) -> ModelInputsT:
         """Resolve model-specific inputs that require the materialized run state."""
 
-    def before_data_preparation(self, run: ForecastRun) -> None:
-        """Run model-specific work before common data serialization."""
-
     def after_data_serialization(
         self,
         run: ForecastRun,
@@ -114,7 +111,6 @@ class ForecastPipeline[ModelInputsT](ABC):
     ) -> None:
         """Serialize common inputs and apply model-specific preparation hooks."""
         run.data_dir.mkdir(parents=True, exist_ok=True)
-        self.before_data_preparation(run)
         self.logger.info("Processing data for %s", run.loc)
         serialize_data(
             forecast_run=run,

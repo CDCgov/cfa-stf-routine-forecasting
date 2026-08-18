@@ -28,9 +28,6 @@ class TestPipeline(ForecastPipeline[str]):
         self.events.append("resolve")
         return "resolved_model_inputs"
 
-    def before_data_preparation(self, run):
-        self.events.append("before_prepare")
-
     def after_data_serialization(self, run, model_inputs):
         assert model_inputs == "resolved_model_inputs"
         self.events.append("after_serialize")
@@ -161,7 +158,6 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "validate",
         "build_run",
         "resolve",
-        "before_prepare",
         "serialize",
         "after_serialize",
         "append_prop",

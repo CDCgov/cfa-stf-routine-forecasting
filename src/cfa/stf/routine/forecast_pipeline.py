@@ -149,6 +149,13 @@ class ForecastPipeline[ModelInputsT](ABC):
 
     def execute(self) -> None:
         """Execute the complete forecast pipeline lifecycle."""
+        self.logger.info(
+            "Starting single-location pipeline for model %s, location %s, and run "
+            "date %s.",
+            self.model_name,
+            self.loc,
+            self.run_date,
+        )
         self.validate_configuration()
         run = self.build_forecast_run()
         model_inputs = self.resolve_model_inputs(run)

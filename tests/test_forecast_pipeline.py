@@ -110,7 +110,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run.right_truncation_offset == 0
 
 
-def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path):
+def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     events = []
@@ -154,7 +154,8 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path):
         lambda *args: events.append("hubverse"),
     )
 
-    pipeline.execute()
+    with caplog.at_level(logging.INFO, logger="test-forecast-pipeline"):
+        pipeline.execute()
 
     assert events == [
         "validate",
@@ -170,3 +171,8 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path):
         "hubverse",
     ]
     assert run.data_dir.is_dir()
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages[0] == (
+        "Starting single-location pipeline for model test_model, location CA, "
+        "and run date 2024-12-20."
+    )

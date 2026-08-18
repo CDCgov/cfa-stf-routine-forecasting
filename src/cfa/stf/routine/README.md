@@ -70,8 +70,11 @@ def main(
     run_date: dt.date,
     exclude_last_n_days: int = 0,
     fail_on_stale_data: bool = False,
+    logger: logging.Logger | None = None,
 ) -> None:
-    logging.basicConfig(level=logging.INFO)
+    if logger is None:
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
     MyModelPipeline(
         disease=disease,
         loc=loc,
@@ -82,13 +85,15 @@ def main(
         exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
         n_samples=n_samples,
-        logger=logging.getLogger(__name__),
+        logger=logger,
     ).execute()
 ```
 
 The base constructor arguments in the example are shared by all models.
 Put model-specific settings on the subclass, preferably as keyword-only arguments.
 The module-level `main()` function is the boundary used by orchestration and integration tests; it should construct the pipeline and call `execute()`.
+Accept an optional logger so orchestrators can preserve their structured logging context.
+Configure the default Python logger only when the caller does not provide one.
 
 ## 2. Implement the required contracts
 

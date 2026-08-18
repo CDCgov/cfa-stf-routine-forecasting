@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 from pathlib import Path
 
 import pytest
@@ -79,16 +80,21 @@ def test_entrypoint_constructs_pipeline_with_shared_options(
     expected_sources,
 ):
     captured = {}
+    logger = logging.getLogger(f"test-{module.__name__}")
     pipeline_class = getattr(module, pipeline_class_name)
 
     def stop_before_execution(self):
         captured["pipeline"] = self
         raise _StopBeforeExecution
 
+    def fail_if_called(**kwargs):
+        pytest.fail(f"basicConfig called with an injected logger: {kwargs}")
+
     monkeypatch.setattr(pipeline_class, "execute", stop_before_execution)
+    monkeypatch.setattr(module.logging, "basicConfig", fail_if_called)
 
     with pytest.raises(_StopBeforeExecution):
-        module.main(**main_kwargs)
+        module.main(**main_kwargs, logger=logger)
 
     pipeline = captured["pipeline"]
     assert pipeline.fail_on_stale_data is True
@@ -96,6 +102,7 @@ def test_entrypoint_constructs_pipeline_with_shared_options(
     assert pipeline.disease == "covid"
     assert pipeline.loc == "CA"
     assert pipeline.run_date == dt.date(2026, 1, 7)
+    assert pipeline.logger is logger
 
 
 @pytest.mark.parametrize(

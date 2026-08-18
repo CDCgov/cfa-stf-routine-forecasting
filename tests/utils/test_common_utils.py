@@ -1,7 +1,9 @@
 """Unit tests for common utility functions."""
 
 import datetime as dt
+import inspect
 import logging
+import sys
 
 import polars as pl
 import pytest
@@ -12,6 +14,8 @@ from cfa.stf.routine.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
     parse_exclude_date_ranges,
+    run_julia_script,
+    run_r_script,
 )
 
 
@@ -204,6 +208,10 @@ class TestDataWranglingUtils:
 class TestCLIUtils:
     """Tests for command-line utilities."""
 
+    @pytest.mark.parametrize("runner", [run_r_script, run_julia_script])
+    def test_script_runners_capture_output_by_default(self, runner):
+        assert inspect.signature(runner).parameters["capture_output"].default is True
+
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""
         result = run_command(
@@ -222,6 +230,29 @@ class TestCLIUtils:
                 "python",
                 ["-c", "import sys; sys.exit(1)"],
                 text=True,
+            )
+
+    def test_run_command_can_inherit_output_streams(self, capfd):
+        result = run_command(
+            sys.executable,
+            [
+                "-c",
+                "import sys; print('child out'); print('child err', file=sys.stderr)",
+            ],
+            capture_output=False,
+        )
+
+        captured = capfd.readouterr()
+        assert result.returncode == 0
+        assert "child out" in captured.out
+        assert "child err" in captured.err
+
+    def test_run_command_without_capture_reports_exit_code(self):
+        with pytest.raises(RuntimeError, match="failed with exit code 2"):
+            run_command(
+                sys.executable,
+                ["-c", "import sys; sys.exit(2)"],
+                capture_output=False,
             )
 
     def test_run_command_with_executor_flags_python(self, tmp_path):

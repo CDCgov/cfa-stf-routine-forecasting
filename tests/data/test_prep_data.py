@@ -5,6 +5,7 @@ import polars as pl
 import pytest
 from tests.factories import make_test_surveillance_inputs
 
+from cfa.stf.routine.data import prep_data
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
@@ -40,10 +41,15 @@ from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
     ],
 )
 def test_serialize_data_handles_present_sources(
+    monkeypatch,
     tmp_path,
     sources,
     expected_variables,
 ):
+    def fail_if_called(**kwargs):
+        pytest.fail(f"basicConfig called from serialize_data: {kwargs}")
+
+    monkeypatch.setattr(prep_data.logging, "basicConfig", fail_if_called)
     forecast_run = ForecastRun(
         disease="covid",
         loc="CA",

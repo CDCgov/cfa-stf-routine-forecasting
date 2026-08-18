@@ -27,6 +27,7 @@ def fable_e_other_forecasts(
         FABLE_DIR / "fit_fable.R",
         script_args,
         function_name="fit_fable",
+        capture_output=False,
     )
     return None
 
@@ -85,13 +86,11 @@ def main(
     exclude_last_n_days: int = 0,
     epiweekly: bool = False,
     fail_on_stale_data: bool = False,
+    logger: logging.Logger | None = None,
 ) -> None:
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.info(
-        "Starting single-location fable E-other forecasting pipeline for "
-        f"location {loc}, and run date {run_date}."
-    )
+    if logger is None:
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
 
     FablePipeline(
         disease=disease,

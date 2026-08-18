@@ -200,9 +200,11 @@ def main(
     forecast_wastewater: bool = False,
     rng_key: int | None = None,
     fail_on_stale_data: bool = False,
+    logger: logging.Logger | None = None,
 ) -> None:
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+    if logger is None:
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
 
     PyRenewPipeline(
         disease=disease,

@@ -98,6 +98,7 @@ def run_epiautogp_forecast(
         args_to_epiautogp,
         executor_flags=executor_flags,
         function_name="run_epiautogp_forecast",
+        capture_output=False,
     )
     return None
 
@@ -304,6 +305,7 @@ def main(
     reporting_delay_pmf: list[float] | None = None,
     hubverse_nowcast_dir: Path | str | None = None,
     fail_on_stale_data: bool = False,
+    logger: logging.Logger | None = None,
 ) -> None:
     """
     Run the complete EpiAutoGP forecasting pipeline for a single location.
@@ -385,8 +387,9 @@ def main(
     The model name is automatically generated based on target, frequency, and ed_visit_type parameters.
     """
     # Step 0: Set up logging, model name and params to pass to epiautogp
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+    if logger is None:
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
 
     # Parse exclude_date_ranges
     parsed_exclude_date_ranges = parse_exclude_date_ranges(exclude_date_ranges)
@@ -395,11 +398,6 @@ def main(
             f"Excluding {len(parsed_exclude_date_ranges)} date range(s): "
             f"{parsed_exclude_date_ranges}"
         )
-
-    logger.info(
-        "Starting single-location EpiAutoGP forecasting pipeline for "
-        f"location {loc}, and run date {run_date}"
-    )
 
     EpiAutoGPPipeline(
         disease=disease,

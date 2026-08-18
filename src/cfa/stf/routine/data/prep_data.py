@@ -76,7 +76,6 @@ def serialize_data(
     save_dir: Path,
     logger: logging.Logger | None = None,
 ) -> None:
-    logging.basicConfig(level=logging.INFO)
     logger = logger or logging.getLogger(__name__)
 
     Path(save_dir).mkdir(parents=True, exist_ok=True)

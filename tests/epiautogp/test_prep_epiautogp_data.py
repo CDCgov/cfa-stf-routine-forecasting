@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from tests.factories import make_test_surveillance_inputs
+from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
@@ -20,7 +20,6 @@ from cfa.stf.routine.epiautogp.prep_epiautogp_data import (
     _apply_date_exclusions,
     convert_to_epiautogp_json,
 )
-from cfa.stf.routine.forecast_run import ForecastRun
 
 N_DAYS = 10
 
@@ -326,22 +325,13 @@ def _write_combined_data(path):
 
 def _epiautogp_run(tmp_path):
     report_date = dt.date(2024, 1, 3)
-    surveillance = make_test_surveillance_inputs(
-        report_date=report_date,
-        first_training_date=dt.date(2024, 1, 1),
-        last_training_date=dt.date(2024, 1, 2),
-    )
-    return ForecastRun(
-        disease="covid",
-        loc="CA",
-        report_date=report_date,
-        first_training_date=dt.date(2024, 1, 1),
-        last_training_date=dt.date(2024, 1, 2),
-        n_forecast_days=28,
-        exclude_last_n_days=0,
-        model_name="test_model",
+    return make_test_forecast_run(
         output_dir=tmp_path,
-        surveillance=surveillance,
+        report_date=report_date,
+        n_training_days=2,
+        first_training_date=dt.date(2024, 1, 1),
+        last_training_date=dt.date(2024, 1, 2),
+        model_name="test_model",
     )
 
 

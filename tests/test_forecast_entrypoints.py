@@ -9,12 +9,8 @@ from cfa.stf.routine.fable import forecast_fable
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
 
 
-class _StopBeforeExecution(Exception):
-    pass
-
-
 @pytest.mark.parametrize(
-    ("module", "pipeline_class_name", "main_kwargs", "expected_sources"),
+    ("module", "pipeline_class_name", "main_kwargs", "expected_pipeline_kwargs"),
     [
         pytest.param(
             forecast_epiautogp,
@@ -23,14 +19,47 @@ class _StopBeforeExecution(Exception):
                 "disease": "covid",
                 "run_date": dt.date(2026, 1, 7),
                 "loc": "CA",
-                "output_dir": Path("unused"),
-                "n_training_days": 90,
-                "n_forecast_days": 28,
+                "output_dir": Path("epiautogp-output"),
+                "n_training_days": 91,
+                "n_forecast_days": 29,
                 "target": "nssp",
-                "frequency": "daily",
+                "frequency": "epiweekly",
+                "ed_visit_type": "other",
+                "exclude_last_n_days": 2,
+                "exclude_date_ranges": "2025-12-01:2025-12-03",
+                "n_particles": 11,
+                "n_mcmc": 12,
+                "n_hmc": 13,
+                "n_forecast_draws": 14,
+                "smc_data_proportion": 0.25,
+                "n_threads": 3,
+                "nowcast_source_name": "reporting-delay",
+                "reporting_delay_pmf": [0.25, 0.75],
                 "fail_on_stale_data": True,
             },
-            {"nssp"},
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "target": "nssp",
+                "frequency": "epiweekly",
+                "ed_visit_type": "other",
+                "output_dir": Path("epiautogp-output"),
+                "n_training_days": 91,
+                "n_forecast_days": 29,
+                "exclude_last_n_days": 2,
+                "exclude_date_ranges": [(dt.date(2025, 12, 1), dt.date(2025, 12, 3))],
+                "nowcast_source_name": "reporting-delay",
+                "reporting_delay_pmf": [0.25, 0.75],
+                "hubverse_nowcast_dir": None,
+                "run_date": dt.date(2026, 1, 7),
+                "fail_on_stale_data": True,
+                "n_particles": 11,
+                "n_mcmc": 12,
+                "n_hmc": 13,
+                "n_forecast_draws": 14,
+                "smc_data_proportion": 0.25,
+                "n_threads": 3,
+            },
             id="epiautogp",
         ),
         pytest.param(
@@ -39,14 +68,27 @@ class _StopBeforeExecution(Exception):
             {
                 "disease": "covid",
                 "loc": "CA",
-                "output_dir": Path("unused"),
-                "n_training_days": 90,
-                "n_forecast_days": 28,
-                "n_samples": 10,
+                "output_dir": Path("fable-output"),
+                "n_training_days": 92,
+                "n_forecast_days": 30,
+                "n_samples": 15,
                 "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 3,
+                "epiweekly": True,
                 "fail_on_stale_data": True,
             },
-            {"nssp"},
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "output_dir": Path("fable-output"),
+                "n_training_days": 92,
+                "n_forecast_days": 30,
+                "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 3,
+                "fail_on_stale_data": True,
+                "n_samples": 15,
+                "epiweekly": True,
+            },
             id="fable",
         ),
         pytest.param(
@@ -55,54 +97,79 @@ class _StopBeforeExecution(Exception):
             {
                 "disease": "covid",
                 "loc": "CA",
-                "priors_path": Path("unused"),
-                "output_dir": Path("unused"),
-                "n_training_days": 90,
-                "n_forecast_days": 28,
-                "n_chains": 1,
-                "n_warmup": 1,
-                "n_samples": 1,
+                "priors_path": Path("priors.py"),
+                "output_dir": Path("pyrenew-output"),
+                "n_training_days": 93,
+                "n_forecast_days": 31,
+                "n_chains": 2,
+                "n_warmup": 3,
+                "n_samples": 4,
                 "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 4,
                 "fit_ed_visits": True,
+                "fit_hospital_admissions": True,
+                "fit_wastewater": True,
                 "forecast_ed_visits": True,
+                "forecast_hospital_admissions": True,
+                "forecast_wastewater": True,
+                "rng_key": 123,
                 "fail_on_stale_data": True,
             },
-            {"nssp"},
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "priors_path": Path("priors.py"),
+                "output_dir": Path("pyrenew-output"),
+                "n_training_days": 93,
+                "n_forecast_days": 31,
+                "n_chains": 2,
+                "n_warmup": 3,
+                "n_samples": 4,
+                "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 4,
+                "fit_ed_visits": True,
+                "fit_hospital_admissions": True,
+                "fit_wastewater": True,
+                "forecast_ed_visits": True,
+                "forecast_hospital_admissions": True,
+                "forecast_wastewater": True,
+                "rng_key": 123,
+                "fail_on_stale_data": True,
+            },
             id="pyrenew",
         ),
     ],
 )
-def test_entrypoint_constructs_pipeline_with_shared_options(
+def test_entrypoint_forwards_all_pipeline_options(
     monkeypatch,
     module,
     pipeline_class_name,
     main_kwargs,
-    expected_sources,
+    expected_pipeline_kwargs,
 ):
     captured = {}
     logger = logging.getLogger(f"test-{module.__name__}")
-    pipeline_class = getattr(module, pipeline_class_name)
 
-    def stop_before_execution(self):
-        captured["pipeline"] = self
-        raise _StopBeforeExecution
+    class PipelineSpy:
+        def __init__(self, **kwargs):
+            captured["kwargs"] = kwargs
+
+        def execute(self):
+            captured["executed"] = True
 
     def fail_if_called(**kwargs):
         pytest.fail(f"basicConfig called with an injected logger: {kwargs}")
 
-    monkeypatch.setattr(pipeline_class, "execute", stop_before_execution)
+    monkeypatch.setattr(module, pipeline_class_name, PipelineSpy)
     monkeypatch.setattr(module.logging, "basicConfig", fail_if_called)
 
-    with pytest.raises(_StopBeforeExecution):
-        module.main(**main_kwargs, logger=logger)
+    module.main(**main_kwargs, logger=logger)
 
-    pipeline = captured["pipeline"]
-    assert pipeline.fail_on_stale_data is True
-    assert pipeline.sources == expected_sources
-    assert pipeline.disease == "covid"
-    assert pipeline.loc == "CA"
-    assert pipeline.run_date == dt.date(2026, 1, 7)
-    assert pipeline.logger is logger
+    assert captured["kwargs"] == {
+        **expected_pipeline_kwargs,
+        "logger": logger,
+    }
+    assert captured["executed"] is True
 
 
 @pytest.mark.parametrize(

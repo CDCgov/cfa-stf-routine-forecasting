@@ -4,27 +4,24 @@ from unittest.mock import patch
 
 import pytest
 
-from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.pyrenew_hew.model_inputs import (
     PyRenewModelInputs,
     resolve_pyrenew_model_inputs,
     serialize_pyrenew_model_params,
 )
-from tests.factories import make_test_surveillance_inputs
+from tests.factories import make_test_forecast_run
 
 
-def _run(tmp_path) -> ForecastRun:
-    return ForecastRun(
+def _run(tmp_path):
+    return make_test_forecast_run(
+        output_dir=tmp_path,
         disease="covid",
         loc="CA",
         report_date=dt.date(2026, 7, 28),
         first_training_date=dt.date(2026, 4, 29),
         last_training_date=dt.date(2026, 7, 27),
-        n_forecast_days=28,
-        exclude_last_n_days=0,
         model_name="pyrenew_e",
-        output_dir=tmp_path,
-        surveillance=make_test_surveillance_inputs(loc_pop=39_000_000),
+        loc_pop=39_000_000,
     )
 
 

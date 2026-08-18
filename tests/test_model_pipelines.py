@@ -5,24 +5,16 @@ from unittest.mock import patch
 import pytest
 
 from cfa.stf.routine.fable.forecast_fable import FablePipeline
-from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import PyRenewPipeline
 from cfa.stf.routine.pyrenew_hew.model_inputs import PyRenewModelInputs
-from tests.factories import make_test_surveillance_inputs
+from tests.factories import make_test_forecast_run
 
 
 def _run(tmp_path, *, model_name="test_model", exclude_last_n_days=2):
-    return ForecastRun(
-        disease="covid",
-        loc="CA",
-        report_date=dt.date(2024, 12, 20),
-        first_training_date=dt.date(2024, 9, 22),
-        last_training_date=dt.date(2024, 12, 18),
-        n_forecast_days=28,
+    return make_test_forecast_run(
+        output_dir=tmp_path,
         exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
-        output_dir=tmp_path,
-        surveillance=make_test_surveillance_inputs(),
     )
 
 

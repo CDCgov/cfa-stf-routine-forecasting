@@ -1,7 +1,6 @@
 """Unit tests for common utility functions."""
 
 import datetime as dt
-import inspect
 import logging
 import sys
 
@@ -9,6 +8,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from cfa.stf.routine.utils import common_utils
 from cfa.stf.routine.utils.cli_utils import run_command
 from cfa.stf.routine.utils.common_utils import (
     append_prop_data_to_combined_data,
@@ -208,9 +208,39 @@ class TestDataWranglingUtils:
 class TestCLIUtils:
     """Tests for command-line utilities."""
 
-    @pytest.mark.parametrize("runner", [run_r_script, run_julia_script])
-    def test_script_runners_capture_output_by_default(self, runner):
-        assert inspect.signature(runner).parameters["capture_output"].default is True
+    @pytest.mark.parametrize(
+        ("runner", "expected_executable"),
+        [(run_r_script, "Rscript"), (run_julia_script, "julia")],
+    )
+    def test_script_runners_capture_output_by_default(
+        self,
+        monkeypatch,
+        runner,
+        expected_executable,
+    ):
+        calls = []
+        sentinel = object()
+
+        def fake_run_command(executable, args, **kwargs):
+            calls.append((executable, args, kwargs))
+            return sentinel
+
+        monkeypatch.setattr(common_utils, "run_command", fake_run_command)
+
+        result = runner("script", ["arg"])
+
+        assert result is sentinel
+        assert calls == [
+            (
+                expected_executable,
+                ["script", "arg"],
+                {
+                    "function_name": None,
+                    "capture_output": True,
+                    "text": False,
+                },
+            )
+        ]
 
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""

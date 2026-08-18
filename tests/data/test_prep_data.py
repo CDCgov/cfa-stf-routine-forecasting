@@ -1,13 +1,11 @@
-import datetime as dt
 import json
 
 import polars as pl
 import pytest
-from tests.factories import make_test_surveillance_inputs
+from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data import prep_data
 from cfa.stf.routine.data.prep_data import serialize_data
-from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
 
 
@@ -50,17 +48,9 @@ def test_serialize_data_handles_present_sources(
         pytest.fail(f"basicConfig called from serialize_data: {kwargs}")
 
     monkeypatch.setattr(prep_data.logging, "basicConfig", fail_if_called)
-    forecast_run = ForecastRun(
-        disease="covid",
-        loc="CA",
-        report_date=dt.date(2024, 12, 20),
-        first_training_date=dt.date(2024, 9, 22),
-        last_training_date=dt.date(2024, 12, 20),
-        n_forecast_days=28,
-        exclude_last_n_days=0,
-        model_name="test_model",
+    forecast_run = make_test_forecast_run(
         output_dir=tmp_path,
-        surveillance=make_test_surveillance_inputs(sources=sources),
+        sources=sources,
     )
 
     serialize_data(

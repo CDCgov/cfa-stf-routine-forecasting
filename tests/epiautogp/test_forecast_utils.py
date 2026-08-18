@@ -3,7 +3,7 @@ import logging
 from unittest.mock import patch
 
 import pytest
-from tests.factories import make_test_surveillance_inputs
+from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
@@ -12,21 +12,13 @@ from cfa.stf.routine.epiautogp.forecast_epiautogp import (
     _resolve_nowcast_source,
 )
 from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
-from cfa.stf.routine.forecast_run import ForecastRun
 
 
 def _run(tmp_path, *, sources=("nssp", "nhsn")):
-    return ForecastRun(
-        disease="covid",
-        loc="CA",
-        report_date=dt.date(2024, 12, 20),
-        first_training_date=dt.date(2024, 9, 22),
-        last_training_date=dt.date(2024, 12, 20),
-        n_forecast_days=28,
-        exclude_last_n_days=0,
-        model_name="epiautogp_nssp_daily",
+    return make_test_forecast_run(
         output_dir=tmp_path,
-        surveillance=make_test_surveillance_inputs(sources=sources),
+        model_name="epiautogp_nssp_daily",
+        sources=sources,
     )
 
 
@@ -145,7 +137,7 @@ def test_run_model_passes_prepared_input_and_model_options(
     assert mock_forecast.call_args.kwargs["execution_settings"]["threads"] == 6
 
 
-def test_reporting_delay_fetches_pmf_from_run(monkeypatch, tmp_path):
+def test_reporting_delay_fetches_pmf_from_run(tmp_path):
     get_pmf = patch(
         "cfa.stf.routine.epiautogp.forecast_epiautogp.get_nnh_right_truncation_pmf",
         return_value=[0.25, 0.75],
@@ -167,7 +159,7 @@ def test_reporting_delay_fetches_pmf_from_run(monkeypatch, tmp_path):
     )
 
 
-def test_direct_reporting_delay_pmf_skips_fetch(monkeypatch, tmp_path):
+def test_direct_reporting_delay_pmf_skips_fetch(tmp_path):
     with patch(
         "cfa.stf.routine.epiautogp.forecast_epiautogp.get_nnh_right_truncation_pmf"
     ) as mock_get_pmf:
@@ -217,8 +209,47 @@ def test_hubverse_resolution_uses_run_and_config(tmp_path):
     )
 
     assert isinstance(source, HubverseNowcast)
+    assert source.containing_dir == tmp_path
     assert source.forecast_run is run
     assert source.config is config
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        EpiAutoGPConfig("nssp", "epiweekly", "observed"),
+        EpiAutoGPConfig("nhsn", "daily", "observed"),
+        EpiAutoGPConfig("nhsn", "epiweekly", "pct"),
+    ],
+)
+def test_hubverse_resolution_propagates_applicability_errors(tmp_path, config):
+    with pytest.raises(ValueError, match="only applicable"):
+        _resolve_nowcast_source(
+            forecast_run=_run(tmp_path),
+            config=config,
+            nowcast_source_name="hubverse",
+            hubverse_nowcast_dir=tmp_path,
+        )
+
+
+def test_hubverse_resolution_requires_containing_directory(tmp_path):
+    with pytest.raises(ValueError, match="hubverse_nowcast_dir is required"):
+        _resolve_nowcast_source(
+            forecast_run=_run(tmp_path),
+            config=EpiAutoGPConfig("nhsn", "epiweekly", "observed"),
+            nowcast_source_name="hubverse",
+        )
+
+
+def test_nowcast_resolution_rejects_mutually_exclusive_inputs(tmp_path):
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _resolve_nowcast_source(
+            forecast_run=_run(tmp_path),
+            config=EpiAutoGPConfig("nhsn", "epiweekly", "observed"),
+            nowcast_source_name="hubverse",
+            reporting_delay_pmf=[0.5, 0.5],
+            hubverse_nowcast_dir=tmp_path,
+        )
 
 
 def test_none_and_invalid_nowcast_names(tmp_path):

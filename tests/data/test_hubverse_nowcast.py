@@ -4,13 +4,11 @@ import datetime as dt
 
 import polars as pl
 import pytest
-from tests.factories import make_test_surveillance_inputs
+from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.forecast_epiautogp import _resolve_nowcast_source
-from cfa.stf.routine.forecast_run import ForecastRun
 
 ORIGIN = dt.date(2026, 7, 18)
 NOWCAST_DATES = [dt.date(2026, 7, 4), dt.date(2026, 7, 11)]
@@ -32,23 +30,15 @@ def _run(
     disease: str = "covid",
     loc: str = "CA",
     report_date: dt.date = ORIGIN,
-) -> ForecastRun:
-    return ForecastRun(
+):
+    return make_test_forecast_run(
+        output_dir=tmp_path,
         disease=disease,
         loc=loc,
         report_date=report_date,
-        first_training_date=dt.date(2026, 1, 1),
-        last_training_date=report_date,
-        n_forecast_days=28,
-        exclude_last_n_days=0,
+        last_training_date=report_date - dt.timedelta(days=1),
         model_name="epiautogp_nhsn_epiweekly",
-        output_dir=tmp_path,
-        surveillance=make_test_surveillance_inputs(
-            loc_abb=loc,
-            disease=disease,
-            report_date=report_date,
-            sources={"nhsn"},
-        ),
+        sources={"nhsn"},
     )
 
 
@@ -148,18 +138,6 @@ def test_maps_supported_diseases_and_location_case_insensitively(
     assert _get_nowcast(source).reports == [[10.0, 11.0], [20.0, 21.0]]
 
 
-def test_resolver_builds_source_for_materialized_directory(tmp_path):
-    result = _resolve_nowcast_source(
-        forecast_run=_run(tmp_path),
-        config=_config(),
-        nowcast_source_name="hubverse",
-        hubverse_nowcast_dir=tmp_path,
-    )
-
-    assert isinstance(result, HubverseNowcast)
-    assert result.containing_dir == tmp_path
-
-
 @pytest.mark.parametrize(
     ("spec", "invalid_setting"),
     [
@@ -171,45 +149,6 @@ def test_resolver_builds_source_for_materialized_directory(tmp_path):
 def test_validation_explains_inapplicable_model_configuration(spec, invalid_setting):
     with pytest.raises(ValueError, match=invalid_setting):
         HubverseNowcast.ensure_applicable(config=spec)
-
-
-@pytest.mark.parametrize(
-    "spec",
-    [
-        _config(target="nssp"),
-        _config(frequency="daily"),
-        _config(ed_visit_type="pct"),
-    ],
-)
-def test_resolver_propagates_applicability_error(tmp_path, spec):
-    with pytest.raises(ValueError, match="only applicable"):
-        _resolve_nowcast_source(
-            forecast_run=_run(tmp_path),
-            config=spec,
-            nowcast_source_name="hubverse",
-            hubverse_nowcast_dir=tmp_path,
-        )
-
-
-def test_resolver_requires_containing_directory(tmp_path):
-    with pytest.raises(ValueError, match="hubverse_nowcast_dir is required"):
-        _resolve_nowcast_source(
-            forecast_run=_run(tmp_path),
-            config=_config(),
-            nowcast_source_name="hubverse",
-            hubverse_nowcast_dir=None,
-        )
-
-
-def test_resolver_rejects_reporting_pmf_with_hubverse_directory(tmp_path):
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        _resolve_nowcast_source(
-            forecast_run=_run(tmp_path),
-            config=_config(),
-            nowcast_source_name="hubverse",
-            reporting_delay_pmf=[0.5, 0.5],
-            hubverse_nowcast_dir=tmp_path,
-        )
 
 
 @pytest.mark.parametrize("artifact_count", [0, 2])

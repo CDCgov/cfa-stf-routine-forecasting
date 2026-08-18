@@ -3,12 +3,12 @@ import logging
 from unittest.mock import patch
 
 import pytest
-from tests.factories import make_test_forecast_inputs
+from tests.factories import make_test_surveillance_inputs
 
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.forecast_epiautogp import (
-    EpiAutoGPDependencies,
+    EpiAutoGPModelInputs,
     EpiAutoGPPipeline,
     _resolve_nowcast_source,
 )
@@ -27,7 +27,7 @@ def _run(tmp_path, *, sources=("nssp", "nhsn")):
         exclude_last_n_days=0,
         model_name="epiautogp_nssp_daily",
         output_dir=tmp_path,
-        inputs=make_test_forecast_inputs(sources=sources),
+        surveillance=make_test_surveillance_inputs(sources=sources),
     )
 
 
@@ -77,17 +77,17 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
         pipeline.validate_configuration()
 
 
-def test_pipeline_returns_resolved_dependencies_without_mutating_state(tmp_path):
+def test_pipeline_returns_resolved_model_inputs_without_mutating_state(tmp_path):
     pipeline = _pipeline(
         tmp_path,
         nowcast_source_name="reporting-delay",
         reporting_delay_pmf=[1.0],
     )
 
-    dependencies = pipeline.resolve_run_dependencies(_run(tmp_path))
+    model_inputs = pipeline.resolve_model_inputs(_run(tmp_path))
 
-    assert isinstance(dependencies, EpiAutoGPDependencies)
-    assert isinstance(dependencies.nowcast_source, ReportingDelayNowcast)
+    assert isinstance(model_inputs, EpiAutoGPModelInputs)
+    assert isinstance(model_inputs.nowcast_source, ReportingDelayNowcast)
     assert not hasattr(pipeline, "nowcast_source")
 
 
@@ -96,7 +96,7 @@ def test_epiweekly_pipeline_aggregates_common_inputs(mock_generate, tmp_path):
     pipeline = _pipeline(tmp_path, frequency="epiweekly")
     run = _run(tmp_path)
 
-    pipeline.after_data_serialization(run)
+    pipeline.after_data_serialization(run, EpiAutoGPModelInputs(nowcast_source=None))
 
     mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
 
@@ -125,7 +125,7 @@ def test_fit_and_forecast_passes_run_and_model_options(
     nowcast_source = ReportingDelayNowcast(reporting_delay_pmf=[1.0])
     pipeline.fit_and_forecast(
         run,
-        EpiAutoGPDependencies(nowcast_source=nowcast_source),
+        EpiAutoGPModelInputs(nowcast_source=nowcast_source),
     )
 
     assert mock_convert.call_args.kwargs["forecast_run"] is run

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from tests.factories import make_test_forecast_inputs
+from tests.factories import make_test_surveillance_inputs
 
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
@@ -326,7 +326,7 @@ def _write_combined_data(path):
 
 def _epiautogp_run(tmp_path):
     report_date = dt.date(2024, 1, 3)
-    forecast_inputs = make_test_forecast_inputs(
+    surveillance = make_test_surveillance_inputs(
         report_date=report_date,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
@@ -341,7 +341,7 @@ def _epiautogp_run(tmp_path):
         exclude_last_n_days=0,
         model_name="test_model",
         output_dir=tmp_path,
-        inputs=forecast_inputs,
+        surveillance=surveillance,
     )
 
 

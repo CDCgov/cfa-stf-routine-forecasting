@@ -12,10 +12,10 @@ from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
-    ForecastInputs,
     ForecastSourceName,
     NHSNData,
     NSSPData,
+    SurveillanceInputs,
 )
 from cfa.stf.routine.data.hubverse_nowcast import (
     HUBVERSE_MODEL_OUTPUT_SUBDIR,
@@ -216,13 +216,13 @@ def _make_nhsn(
     return pl.DataFrame(rows).select(cs.by_name(_SOURCE_DATA_COLS))
 
 
-def make_forecast_inputs(
+def make_surveillance_inputs(
     location: str,
     disease: str,
     sources: Collection[ForecastSourceName],
     first_training_date: dt.date = FIRST_OBS_DATE,
     last_training_date: dt.date = REPORT_DATE,
-) -> ForecastInputs:
+) -> SurveillanceInputs:
     requested_sources = frozenset(sources)
     locations = sorted(set(DEFAULT_LOCATIONS + [location]))
     diseases = sorted(set(DEFAULT_DISEASES + [disease]))
@@ -306,9 +306,8 @@ def make_forecast_inputs(
         if "nhsn" in requested_sources
         else None
     )
-    return ForecastInputs(
+    return SurveillanceInputs(
         loc_pop=location_by_abbr[location].population,
-        right_truncation_offset=(REPORT_DATE - last_training_date).days - 1,
         nssp=nssp,
         nhsn=nhsn,
     )

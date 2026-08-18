@@ -48,10 +48,14 @@ class FablePipeline(ForecastPipeline[None]):
     def sources(self) -> set[ForecastSourceName]:
         return {"nssp"}
 
-    def resolve_run_dependencies(self, run: ForecastRun) -> None:
+    def resolve_model_inputs(self, run: ForecastRun) -> None:
         return None
 
-    def after_data_serialization(self, run: ForecastRun) -> None:
+    def after_data_serialization(
+        self,
+        run: ForecastRun,
+        model_inputs: None,
+    ) -> None:
         if self.epiweekly:
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(run.data_dir, overwrite_daily=True)
@@ -59,7 +63,7 @@ class FablePipeline(ForecastPipeline[None]):
     def fit_and_forecast(
         self,
         run: ForecastRun,
-        dependencies: None,
+        model_inputs: None,
     ) -> None:
         n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days
         self.logger.info("Performing fable E-other forecasting")

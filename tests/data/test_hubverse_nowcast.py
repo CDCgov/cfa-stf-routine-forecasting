@@ -4,7 +4,7 @@ import datetime as dt
 
 import polars as pl
 import pytest
-from tests.factories import make_test_forecast_inputs
+from tests.factories import make_test_surveillance_inputs
 
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.nowcast import NowcastData
@@ -43,7 +43,7 @@ def _run(
         exclude_last_n_days=0,
         model_name="epiautogp_nhsn_epiweekly",
         output_dir=tmp_path,
-        inputs=make_test_forecast_inputs(
+        surveillance=make_test_surveillance_inputs(
             loc_abb=loc,
             disease=disease,
             report_date=report_date,

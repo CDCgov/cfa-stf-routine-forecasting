@@ -7,7 +7,8 @@ import pytest
 from cfa.stf.routine.fable.forecast_fable import FablePipeline
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import PyRenewPipeline
-from tests.factories import make_test_forecast_inputs
+from cfa.stf.routine.pyrenew_hew.model_inputs import PyRenewModelInputs
+from tests.factories import make_test_surveillance_inputs
 
 
 def _run(tmp_path, *, model_name="test_model", exclude_last_n_days=2):
@@ -21,7 +22,7 @@ def _run(tmp_path, *, model_name="test_model", exclude_last_n_days=2):
         exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
         output_dir=tmp_path,
-        inputs=make_test_forecast_inputs(),
+        surveillance=make_test_surveillance_inputs(),
     )
 
 
@@ -45,7 +46,7 @@ def test_fable_pipeline_aggregates_weekly_inputs(mock_generate, tmp_path):
     )
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.after_data_serialization(run)
+    pipeline.after_data_serialization(run, None)
 
     mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
 
@@ -100,7 +101,7 @@ def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, messa
         _pyrenew_pipeline(tmp_path, **overrides).validate_configuration()
 
 
-@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.process_and_save_loc_param")
+@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.copy_and_record_priors")
 def test_pyrenew_pipeline_extends_common_data_preparation(
     mock_copy,
@@ -109,17 +110,20 @@ def test_pyrenew_pipeline_extends_common_data_preparation(
 ):
     pipeline = _pyrenew_pipeline(tmp_path)
     run = _run(tmp_path, model_name=pipeline.model_name)
+    model_inputs = PyRenewModelInputs(
+        generation_interval_pmf=(1.0,),
+        infection_to_admission_pmf=(0.0, 1.0),
+        right_truncation_pmf=(1.0,),
+    )
 
     pipeline.before_data_preparation(run)
-    pipeline.after_data_serialization(run)
+    pipeline.after_data_serialization(run, model_inputs)
 
     mock_copy.assert_called_once_with(Path("priors.py"), run.model_dir)
     assert mock_params.call_args.kwargs == {
-        "loc_abb": "CA",
-        "disease": "covid",
-        "fit_ed_visits": True,
+        "run": run,
+        "model_inputs": model_inputs,
         "save_dir": run.data_dir,
-        "as_of": dt.date(2024, 12, 20),
     }
 
 
@@ -137,7 +141,8 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     pipeline = _pyrenew_pipeline(tmp_path)
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.fit_and_forecast(run, None)
+    model_inputs = PyRenewModelInputs((1.0,), (0.0, 1.0), (1.0,))
+    pipeline.fit_and_forecast(run, model_inputs)
     pipeline.before_post_process(run)
 
     assert mock_fit.call_args.args == (run.model_dir,)

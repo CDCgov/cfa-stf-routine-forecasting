@@ -30,8 +30,8 @@ VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
 @dataclass(frozen=True)
-class EpiAutoGPDependencies:
-    """Run-dependent resources resolved for an EpiAutoGP forecast."""
+class EpiAutoGPModelInputs:
+    """Model-specific inputs resolved for an EpiAutoGP forecast run."""
 
     nowcast_source: NowcastSource | None
 
@@ -160,7 +160,7 @@ def _resolve_nowcast_source(
             )
 
 
-class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPDependencies]):
+class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPModelInputs]):
     """Single-location EpiAutoGP forecast pipeline."""
 
     def __init__(
@@ -218,8 +218,8 @@ class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPDependencies]):
             self.config.ed_visit_type,
         )
 
-    def resolve_run_dependencies(self, run: ForecastRun) -> EpiAutoGPDependencies:
-        return EpiAutoGPDependencies(
+    def resolve_model_inputs(self, run: ForecastRun) -> EpiAutoGPModelInputs:
+        return EpiAutoGPModelInputs(
             nowcast_source=_resolve_nowcast_source(
                 forecast_run=run,
                 config=self.config,
@@ -229,7 +229,11 @@ class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPDependencies]):
             )
         )
 
-    def after_data_serialization(self, run: ForecastRun) -> None:
+    def after_data_serialization(
+        self,
+        run: ForecastRun,
+        model_inputs: EpiAutoGPModelInputs,
+    ) -> None:
         if self.config.frequency == "epiweekly":
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(run.data_dir, overwrite_daily=True)
@@ -237,13 +241,13 @@ class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPDependencies]):
     def fit_and_forecast(
         self,
         run: ForecastRun,
-        dependencies: EpiAutoGPDependencies,
+        model_inputs: EpiAutoGPModelInputs,
     ) -> None:
         self.logger.info("Converting data to EpiAutoGP JSON format...")
         input_json_path = convert_to_epiautogp_json(
             forecast_run=run,
             config=self.config,
-            nowcast_source=dependencies.nowcast_source,
+            nowcast_source=model_inputs.nowcast_source,
             logger=self.logger,
         )
 

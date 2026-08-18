@@ -1,15 +1,11 @@
 import datetime as dt
 import json
-from unittest.mock import patch
 
 import polars as pl
 import pytest
-from tests.factories import make_test_forecast_inputs
+from tests.factories import make_test_surveillance_inputs
 
-from cfa.stf.routine.data.prep_data import (
-    process_and_save_loc_param,
-    serialize_data,
-)
+from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
 
@@ -58,7 +54,7 @@ def test_serialize_data_handles_present_sources(
         exclude_last_n_days=0,
         model_name="test_model",
         output_dir=tmp_path,
-        inputs=make_test_forecast_inputs(sources=sources),
+        surveillance=make_test_surveillance_inputs(sources=sources),
     )
 
     serialize_data(
@@ -87,45 +83,3 @@ def test_serialize_data_handles_present_sources(
 
     combined_data = pl.read_csv(tmp_path / "combined_data.tsv", separator="\t")
     assert set(combined_data.get_column(".variable")) == expected_variables
-
-
-@patch("cfa.stf.routine.data.prep_data.approx_lognorm", return_value=(1.2, 0.3))
-@patch("cfa.stf.routine.data.prep_data.get_us_loc_pop_tbl")
-@patch("cfa.stf.routine.data.prep_data.get_nnh_right_truncation_pmf")
-@patch("cfa.stf.routine.data.prep_data.get_nnh_delay_pmf")
-@patch("cfa.stf.routine.data.prep_data.get_nnh_generation_interval_pmf")
-def test_process_and_save_loc_param_loads_pmfs_from_cfa_stf_data(
-    mock_generation_interval,
-    mock_delay,
-    mock_right_truncation,
-    mock_loc_pop,
-    _mock_approx_lognorm,
-    tmp_path,
-):
-    as_of = dt.date(2026, 7, 28)
-    mock_generation_interval.return_value = [0.4, 0.6]
-    mock_delay.return_value = [0.2, 0.3, 0.5]
-    mock_right_truncation.return_value = [0.25, 0.75]
-    mock_loc_pop.return_value = pl.DataFrame(
-        {"abbr": ["CA"], "population": [39_000_000]}
-    )
-
-    process_and_save_loc_param(
-        loc_abb="CA",
-        disease="covid",
-        fit_ed_visits=True,
-        save_dir=tmp_path,
-        as_of=as_of,
-    )
-
-    mock_generation_interval.assert_called_once_with(
-        disease="covid",
-        as_of=as_of,
-    )
-    mock_delay.assert_called_once_with(disease="covid", as_of=as_of)
-    mock_right_truncation.assert_called_once_with(
-        state_abb="CA",
-        disease="covid",
-        as_of=as_of,
-        reference_date=as_of,
-    )

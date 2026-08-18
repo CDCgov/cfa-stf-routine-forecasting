@@ -6,9 +6,9 @@ from pathlib import Path
 
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
-    ForecastInputs,
     NHSNData,
     NSSPData,
+    SurveillanceInputs,
 )
 from cfa.stf.routine.utils.common_utils import get_model_batch_dir_name
 
@@ -26,7 +26,7 @@ class ForecastRun:
     exclude_last_n_days: int
     model_name: str
     output_dir: Path
-    inputs: ForecastInputs
+    surveillance: SurveillanceInputs
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "output_dir", Path(self.output_dir))
@@ -54,24 +54,26 @@ class ForecastRun:
 
     @property
     def loc_pop(self) -> int:
-        return self.inputs.loc_pop
+        return self.surveillance.loc_pop
 
     @property
     def right_truncation_offset(self) -> int:
-        return self.inputs.right_truncation_offset
+        # The first entry of a source right-truncation PMF corresponds to reports
+        # for reference_date = report_date - 1 as of report_date.
+        return (self.report_date - self.last_training_date).days - 1
 
     @property
     def nssp(self) -> NSSPData | None:
-        return self.inputs.nssp
+        return self.surveillance.nssp
 
     @property
     def nhsn(self) -> NHSNData | None:
-        return self.inputs.nhsn
+        return self.surveillance.nhsn
 
     @property
     def freshness(self) -> tuple[DataFreshness, ...]:
-        return self.inputs.freshness
+        return self.surveillance.freshness
 
     @property
     def is_stale(self) -> bool:
-        return self.inputs.is_stale
+        return self.surveillance.is_stale

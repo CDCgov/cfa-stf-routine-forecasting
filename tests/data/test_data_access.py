@@ -157,7 +157,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
 
 
 @pytest.mark.parametrize("source_name", ["nssp", "nhsn"])
-def test_forecast_inputs_allows_one_source(source_name):
+def test_surveillance_inputs_allows_one_source(source_name):
     source = (
         data_access.NSSPData(
             data=pl.DataFrame(),
@@ -170,23 +170,21 @@ def test_forecast_inputs_allows_one_source(source_name):
             prelim=False,
         )
     )
-    forecast_inputs = data_access.ForecastInputs(
+    surveillance = data_access.SurveillanceInputs(
         loc_pop=39_000_000,
-        right_truncation_offset=0,
         nssp=source if source_name == "nssp" else None,
         nhsn=source if source_name == "nhsn" else None,
     )
 
-    assert forecast_inputs.sources == (source,)
-    assert forecast_inputs.freshness == (source.freshness,)
-    assert not forecast_inputs.is_stale
+    assert surveillance.sources == (source,)
+    assert surveillance.freshness == (source.freshness,)
+    assert not surveillance.is_stale
 
 
-def test_forecast_inputs_requires_at_least_one_source():
+def test_surveillance_inputs_requires_at_least_one_source():
     with pytest.raises(ValueError, match="at least one data source"):
-        data_access.ForecastInputs(
+        data_access.SurveillanceInputs(
             loc_pop=39_000_000,
-            right_truncation_offset=0,
         )
 
 
@@ -335,7 +333,7 @@ def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
     assert selected_version == dt.date(2026, 1, 8)
 
 
-def test_load_forecast_inputs_uses_dataops_loaders(monkeypatch):
+def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     calls = {}
     report_date = dt.date(2026, 1, 8)
 
@@ -392,7 +390,7 @@ def test_load_forecast_inputs_uses_dataops_loaders(monkeypatch):
         lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
     )
 
-    forecast_inputs = data_access.load_forecast_inputs(
+    surveillance = data_access.load_surveillance_inputs(
         disease="covid",
         loc_abb="CA",
         run_date=report_date,
@@ -401,8 +399,7 @@ def test_load_forecast_inputs_uses_dataops_loaders(monkeypatch):
         sources={"nssp", "nhsn"},
     )
 
-    assert forecast_inputs.loc_pop == 39_000_000
-    assert forecast_inputs.right_truncation_offset == 0
+    assert surveillance.loc_pop == 39_000_000
     expected_nssp = pl.DataFrame(
         {
             "observed_ed_visits": [10],
@@ -412,7 +409,7 @@ def test_load_forecast_inputs_uses_dataops_loaders(monkeypatch):
         }
     )
     assert_frame_equal(
-        forecast_inputs.nssp.data.select(
+        surveillance.nssp.data.select(
             "observed_ed_visits",
             "other_ed_visits",
             "data_type",
@@ -427,19 +424,19 @@ def test_load_forecast_inputs_uses_dataops_loaders(monkeypatch):
         }
     )
     assert_frame_equal(
-        forecast_inputs.nhsn.data.select("data_type", "resolution"),
+        surveillance.nhsn.data.select("data_type", "resolution"),
         expected_nhsn,
     )
-    assert forecast_inputs.nhsn.prelim
+    assert surveillance.nhsn.prelim
     assert all(
         isinstance(source, data_access.ForecastSourceData)
-        for source in forecast_inputs.sources
+        for source in surveillance.sources
     )
-    assert forecast_inputs.freshness == (
-        forecast_inputs.nssp.freshness,
-        forecast_inputs.nhsn.freshness,
+    assert surveillance.freshness == (
+        surveillance.nssp.freshness,
+        surveillance.nhsn.freshness,
     )
-    assert not forecast_inputs.is_stale
+    assert not surveillance.is_stale
     assert calls["nssp"] == {
         "loc_abb": "CA",
         "disease": "covid",
@@ -457,7 +454,7 @@ def test_load_forecast_inputs_uses_dataops_loaders(monkeypatch):
 
 
 @pytest.mark.parametrize("requested_source", ["nssp", "nhsn"])
-def test_load_forecast_inputs_only_loads_requested_source(
+def test_load_surveillance_inputs_only_loads_requested_source(
     monkeypatch,
     requested_source,
 ):
@@ -511,7 +508,7 @@ def test_load_forecast_inputs_only_loads_requested_source(
         lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
     )
 
-    forecast_inputs = data_access.load_forecast_inputs(
+    surveillance = data_access.load_surveillance_inputs(
         disease="covid",
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
@@ -521,9 +518,9 @@ def test_load_forecast_inputs_only_loads_requested_source(
         fail_on_stale_data=True,
     )
 
-    assert (forecast_inputs.nssp is not None) == (requested_source == "nssp")
-    assert (forecast_inputs.nhsn is not None) == (requested_source == "nhsn")
-    assert tuple(record.source for record in forecast_inputs.freshness) == (
+    assert (surveillance.nssp is not None) == (requested_source == "nssp")
+    assert (surveillance.nhsn is not None) == (requested_source == "nhsn")
+    assert tuple(record.source for record in surveillance.freshness) == (
         requested_source,
     )
 
@@ -535,9 +532,9 @@ def test_load_forecast_inputs_only_loads_requested_source(
         pytest.param({"nwss"}, "Unknown forecast data source", id="unknown"),
     ],
 )
-def test_load_forecast_inputs_rejects_invalid_sources(sources, message):
+def test_load_surveillance_inputs_rejects_invalid_sources(sources, message):
     with pytest.raises(ValueError, match=message):
-        data_access.load_forecast_inputs(
+        data_access.load_surveillance_inputs(
             disease="covid",
             loc_abb="CA",
             run_date=dt.date(2026, 1, 8),

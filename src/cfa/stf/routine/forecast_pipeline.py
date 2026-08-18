@@ -8,7 +8,7 @@ from pathlib import Path
 
 from cfa.stf.routine.data.data_access import (
     ForecastSourceName,
-    load_forecast_inputs,
+    load_surveillance_inputs,
 )
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
@@ -20,7 +20,7 @@ from cfa.stf.routine.utils.common_utils import (
 )
 
 
-class ForecastPipeline[DependenciesT](ABC):
+class ForecastPipeline[ModelInputsT](ABC):
     """Template lifecycle shared by all single-location forecast pipelines."""
 
     def __init__(
@@ -67,7 +67,7 @@ class ForecastPipeline[DependenciesT](ABC):
             self.exclude_last_n_days,
             self.logger,
         )
-        inputs = load_forecast_inputs(
+        surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
             run_date=self.run_date,
@@ -87,23 +87,31 @@ class ForecastPipeline[DependenciesT](ABC):
             exclude_last_n_days=self.exclude_last_n_days,
             model_name=self.model_name,
             output_dir=self.output_dir,
-            inputs=inputs,
+            surveillance=surveillance,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)
         self.logger.info("Model run directory: %s", run.model_run_dir)
         return run
 
     @abstractmethod
-    def resolve_run_dependencies(self, run: ForecastRun) -> DependenciesT:
-        """Resolve model resources that require the materialized run state."""
+    def resolve_model_inputs(self, run: ForecastRun) -> ModelInputsT:
+        """Resolve model-specific inputs that require the materialized run state."""
 
     def before_data_preparation(self, run: ForecastRun) -> None:
         """Run model-specific work before common data serialization."""
 
-    def after_data_serialization(self, run: ForecastRun) -> None:
+    def after_data_serialization(
+        self,
+        run: ForecastRun,
+        model_inputs: ModelInputsT,
+    ) -> None:
         """Run model-specific work after common data serialization."""
 
-    def prepare_model_inputs(self, run: ForecastRun) -> None:
+    def prepare_model_inputs(
+        self,
+        run: ForecastRun,
+        model_inputs: ModelInputsT,
+    ) -> None:
         """Serialize common inputs and apply model-specific preparation hooks."""
         run.data_dir.mkdir(parents=True, exist_ok=True)
         self.before_data_preparation(run)
@@ -113,7 +121,7 @@ class ForecastPipeline[DependenciesT](ABC):
             save_dir=run.data_dir,
             logger=self.logger,
         )
-        self.after_data_serialization(run)
+        self.after_data_serialization(run, model_inputs)
         append_prop_data_to_combined_data(run.data_dir / "combined_data.tsv")
         self.logger.info("Data preparation complete.")
 
@@ -121,7 +129,7 @@ class ForecastPipeline[DependenciesT](ABC):
     def fit_and_forecast(
         self,
         run: ForecastRun,
-        dependencies: DependenciesT,
+        model_inputs: ModelInputsT,
     ) -> None:
         """Fit the configured model and write its forecast samples."""
 
@@ -143,9 +151,9 @@ class ForecastPipeline[DependenciesT](ABC):
         """Execute the complete forecast pipeline lifecycle."""
         self.validate_configuration()
         run = self.build_forecast_run()
-        dependencies = self.resolve_run_dependencies(run)
-        self.prepare_model_inputs(run)
-        self.fit_and_forecast(run, dependencies)
+        model_inputs = self.resolve_model_inputs(run)
+        self.prepare_model_inputs(run, model_inputs)
+        self.fit_and_forecast(run, model_inputs)
         self.post_process(run)
         self.logger.info(
             "Single-location pipeline complete for model %s, location %s, and run "

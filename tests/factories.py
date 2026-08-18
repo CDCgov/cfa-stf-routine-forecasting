@@ -5,16 +5,16 @@ import polars as pl
 
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
-    ForecastInputs,
     ForecastSourceName,
     NHSNData,
     NSSPData,
+    SurveillanceInputs,
 )
 
 DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 
 
-def make_test_forecast_inputs(
+def make_test_surveillance_inputs(
     *,
     loc_abb: str = "CA",
     disease: str = "covid",
@@ -24,7 +24,7 @@ def make_test_forecast_inputs(
     loc_pop: int = 1,
     nhsn_prelim: bool = False,
     sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
-) -> ForecastInputs:
+) -> SurveillanceInputs:
     last_training_date = last_training_date or report_date
     requested_sources = frozenset(sources)
 
@@ -75,9 +75,8 @@ def make_test_forecast_inputs(
         if "nhsn" in requested_sources
         else None
     )
-    return ForecastInputs(
+    return SurveillanceInputs(
         loc_pop=loc_pop,
-        right_truncation_offset=(report_date - last_training_date).days - 1,
         nssp=nssp,
         nhsn=nhsn,
     )

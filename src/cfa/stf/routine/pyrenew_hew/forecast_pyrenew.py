@@ -9,12 +9,16 @@ from pyrenew_multisignal.hew.utils import pyrenew_model_name_from_flags
 
 from cfa.stf.routine._paths import PYRENEW_HEW_DIR
 from cfa.stf.routine.data.data_access import ForecastSourceName
-from cfa.stf.routine.data.prep_data import process_and_save_loc_param
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.pyrenew_hew.fit_pyrenew_model import fit_and_save_model
 from cfa.stf.routine.pyrenew_hew.generate_predictive import (
     generate_and_save_predictions,
+)
+from cfa.stf.routine.pyrenew_hew.model_inputs import (
+    PyRenewModelInputs,
+    resolve_pyrenew_model_inputs,
+    serialize_pyrenew_model_params,
 )
 from cfa.stf.routine.utils.common_utils import run_r_script
 
@@ -49,7 +53,7 @@ def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
     return None
 
 
-class PyRenewPipeline(ForecastPipeline[None]):
+class PyRenewPipeline(ForecastPipeline[PyRenewModelInputs]):
     """Single-location PyRenew HEW forecast pipeline."""
 
     def __init__(
@@ -119,26 +123,31 @@ class PyRenewPipeline(ForecastPipeline[None]):
                 "pyrenew_null (fitting to no signals) is not supported by this pipeline"
             )
 
-    def resolve_run_dependencies(self, run: ForecastRun) -> None:
-        return None
+    def resolve_model_inputs(self, run: ForecastRun) -> PyRenewModelInputs:
+        return resolve_pyrenew_model_inputs(
+            run=run,
+            fit_ed_visits=self.fit_ed_visits,
+        )
 
     def before_data_preparation(self, run: ForecastRun) -> None:
         self.logger.info("Copying and recording priors from %s...", self.priors_path)
         copy_and_record_priors(self.priors_path, run.model_dir)
 
-    def after_data_serialization(self, run: ForecastRun) -> None:
-        process_and_save_loc_param(
-            loc_abb=run.loc,
-            disease=run.disease,
-            fit_ed_visits=self.fit_ed_visits,
+    def after_data_serialization(
+        self,
+        run: ForecastRun,
+        model_inputs: PyRenewModelInputs,
+    ) -> None:
+        serialize_pyrenew_model_params(
+            run=run,
+            model_inputs=model_inputs,
             save_dir=run.data_dir,
-            as_of=run.report_date,
         )
 
     def fit_and_forecast(
         self,
         run: ForecastRun,
-        dependencies: None,
+        model_inputs: PyRenewModelInputs,
     ) -> None:
         self.logger.info("Fitting model...")
         fit_and_save_model(

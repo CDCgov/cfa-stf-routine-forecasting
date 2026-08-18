@@ -1,19 +1,10 @@
-import datetime as dt
 import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.data import (
-    get_nnh_delay_pmf,
-    get_nnh_generation_interval_pmf,
-    get_nnh_right_truncation_pmf,
-)
-from cfa.stf.forecasttools import get_us_loc_pop_tbl
-from pyrenew_multisignal.hew import approx_lognorm
 
 if TYPE_CHECKING:
     from cfa.stf.routine.forecast_run import ForecastRun
@@ -142,57 +133,4 @@ def serialize_data(
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 
     combined_data.write_csv(Path(save_dir, "combined_data.tsv"), separator="\t")
-    return None
-
-
-def process_and_save_loc_param(
-    loc_abb,
-    disease,
-    fit_ed_visits,
-    save_dir,
-    as_of: dt.date | None = None,
-) -> None:
-    loc_pop_df = get_us_loc_pop_tbl()
-    loc_pop = loc_pop_df.filter(pl.col("abbr") == loc_abb).item(0, "population")
-    pop_fraction = jnp.array([1])
-    generation_interval_pmf = get_nnh_generation_interval_pmf(
-        disease=disease,
-        as_of=as_of,
-    )
-    delay_pmf = get_nnh_delay_pmf(disease=disease, as_of=as_of)
-    # We do not model a zero infection-to-recorded-admission delay.
-    delay_pmf[0] = 0.0
-    delay_pmf = jnp.array(delay_pmf)
-    delay_pmf = (delay_pmf / delay_pmf.sum()).tolist()
-
-    try:
-        right_truncation_pmf = get_nnh_right_truncation_pmf(
-            state_abb=loc_abb,
-            disease=disease,
-            as_of=as_of,
-            reference_date=as_of,
-        )
-    except ValueError:
-        if fit_ed_visits:
-            raise
-        right_truncation_pmf = [1]
-
-    inf_to_hosp_admit_lognormal_loc, inf_to_hosp_admit_lognormal_scale = approx_lognorm(
-        jnp.array(delay_pmf)[1:],  # only fit the non-zero delays
-        loc_guess=0,
-        scale_guess=0.5,
-    )
-
-    model_params = {
-        "population_size": loc_pop,
-        "pop_fraction": pop_fraction.tolist(),
-        "generation_interval_pmf": generation_interval_pmf,
-        "right_truncation_pmf": right_truncation_pmf,
-        "inf_to_hosp_admit_lognormal_loc": inf_to_hosp_admit_lognormal_loc,
-        "inf_to_hosp_admit_lognormal_scale": inf_to_hosp_admit_lognormal_scale,
-        "inf_to_hosp_admit_pmf": delay_pmf,
-    }
-    with open(Path(save_dir, "model_params.json"), "w") as json_file:
-        json.dump(model_params, json_file, default=str)
-
     return None

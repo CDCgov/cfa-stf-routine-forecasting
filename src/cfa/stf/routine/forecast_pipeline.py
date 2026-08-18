@@ -20,7 +20,7 @@ from cfa.stf.routine.utils.common_utils import (
 )
 
 
-class ForecastPipeline(ABC):
+class ForecastPipeline[DependenciesT](ABC):
     """Template lifecycle shared by all single-location forecast pipelines."""
 
     def __init__(
@@ -93,7 +93,8 @@ class ForecastPipeline(ABC):
         self.logger.info("Model run directory: %s", run.model_run_dir)
         return run
 
-    def resolve_run_dependencies(self, run: ForecastRun) -> None:
+    @abstractmethod
+    def resolve_run_dependencies(self, run: ForecastRun) -> DependenciesT:
         """Resolve model resources that require the materialized run state."""
 
     def before_data_preparation(self, run: ForecastRun) -> None:
@@ -117,7 +118,11 @@ class ForecastPipeline(ABC):
         self.logger.info("Data preparation complete.")
 
     @abstractmethod
-    def fit_and_forecast(self, run: ForecastRun) -> None:
+    def fit_and_forecast(
+        self,
+        run: ForecastRun,
+        dependencies: DependenciesT,
+    ) -> None:
         """Fit the configured model and write its forecast samples."""
 
     def before_post_process(self, run: ForecastRun) -> None:
@@ -138,9 +143,9 @@ class ForecastPipeline(ABC):
         """Execute the complete forecast pipeline lifecycle."""
         self.validate_configuration()
         run = self.build_forecast_run()
-        self.resolve_run_dependencies(run)
+        dependencies = self.resolve_run_dependencies(run)
         self.prepare_model_inputs(run)
-        self.fit_and_forecast(run)
+        self.fit_and_forecast(run, dependencies)
         self.post_process(run)
         self.logger.info(
             "Single-location pipeline complete for model %s, location %s, and run "

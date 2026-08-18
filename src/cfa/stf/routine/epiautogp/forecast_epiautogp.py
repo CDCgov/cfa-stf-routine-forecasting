@@ -1,5 +1,6 @@
 import datetime as dt
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast, get_args
 
@@ -26,6 +27,13 @@ from cfa.stf.routine.utils.common_utils import (
 _FIT_SCRIPT = Path(__file__).parent / "fit_epiautogp.jl"
 NowcastSourceName = Literal["none", "reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
+
+
+@dataclass(frozen=True)
+class EpiAutoGPDependencies:
+    """Run-dependent resources resolved for an EpiAutoGP forecast."""
+
+    nowcast_source: NowcastSource | None
 
 
 def run_epiautogp_forecast(
@@ -152,7 +160,7 @@ def _resolve_nowcast_source(
             )
 
 
-class EpiAutoGPPipeline(ForecastPipeline):
+class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPDependencies]):
     """Single-location EpiAutoGP forecast pipeline."""
 
     def __init__(
@@ -189,7 +197,6 @@ class EpiAutoGPPipeline(ForecastPipeline):
         self.nowcast_source_name = nowcast_source_name
         self.reporting_delay_pmf = reporting_delay_pmf
         self.hubverse_nowcast_dir = hubverse_nowcast_dir
-        self.nowcast_source: NowcastSource | None = None
 
     @property
     def model_name(self) -> str:
@@ -211,13 +218,15 @@ class EpiAutoGPPipeline(ForecastPipeline):
             self.config.ed_visit_type,
         )
 
-    def resolve_run_dependencies(self, run: ForecastRun) -> None:
-        self.nowcast_source = _resolve_nowcast_source(
-            forecast_run=run,
-            config=self.config,
-            nowcast_source_name=self.nowcast_source_name,
-            reporting_delay_pmf=self.reporting_delay_pmf,
-            hubverse_nowcast_dir=self.hubverse_nowcast_dir,
+    def resolve_run_dependencies(self, run: ForecastRun) -> EpiAutoGPDependencies:
+        return EpiAutoGPDependencies(
+            nowcast_source=_resolve_nowcast_source(
+                forecast_run=run,
+                config=self.config,
+                nowcast_source_name=self.nowcast_source_name,
+                reporting_delay_pmf=self.reporting_delay_pmf,
+                hubverse_nowcast_dir=self.hubverse_nowcast_dir,
+            )
         )
 
     def after_data_serialization(self, run: ForecastRun) -> None:
@@ -225,12 +234,16 @@ class EpiAutoGPPipeline(ForecastPipeline):
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(run.data_dir, overwrite_daily=True)
 
-    def fit_and_forecast(self, run: ForecastRun) -> None:
+    def fit_and_forecast(
+        self,
+        run: ForecastRun,
+        dependencies: EpiAutoGPDependencies,
+    ) -> None:
         self.logger.info("Converting data to EpiAutoGP JSON format...")
         input_json_path = convert_to_epiautogp_json(
             forecast_run=run,
             config=self.config,
-            nowcast_source=self.nowcast_source,
+            nowcast_source=dependencies.nowcast_source,
             logger=self.logger,
         )
 

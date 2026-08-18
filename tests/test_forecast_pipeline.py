@@ -6,7 +6,7 @@ from cfa.stf.routine.forecast_run import ForecastRun
 from tests.factories import make_test_forecast_inputs
 
 
-class TestPipeline(ForecastPipeline):
+class TestPipeline(ForecastPipeline[str]):
     __test__ = False
 
     def __init__(self, *, events=None, **kwargs):
@@ -26,6 +26,7 @@ class TestPipeline(ForecastPipeline):
 
     def resolve_run_dependencies(self, run):
         self.events.append("resolve")
+        return "resolved_dependencies"
 
     def before_data_preparation(self, run):
         self.events.append("before_prepare")
@@ -33,7 +34,8 @@ class TestPipeline(ForecastPipeline):
     def after_data_serialization(self, run):
         self.events.append("after_serialize")
 
-    def fit_and_forecast(self, run):
+    def fit_and_forecast(self, run, dependencies):
+        assert dependencies == "resolved_dependencies"
         self.events.append("forecast")
 
     def before_post_process(self, run):

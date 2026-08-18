@@ -58,7 +58,7 @@ def test_fable_pipeline_forecasts_through_excluded_tail(mock_forecast, tmp_path)
     )
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.fit_and_forecast(run)
+    pipeline.fit_and_forecast(run, None)
 
     mock_forecast.assert_called_once_with(run.model_dir, 30, 10)
 
@@ -137,7 +137,7 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     pipeline = _pyrenew_pipeline(tmp_path)
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.fit_and_forecast(run)
+    pipeline.fit_and_forecast(run, None)
     pipeline.before_post_process(run)
 
     assert mock_fit.call_args.args == (run.model_dir,)

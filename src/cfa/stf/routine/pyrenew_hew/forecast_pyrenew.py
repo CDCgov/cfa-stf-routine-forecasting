@@ -49,7 +49,7 @@ def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
     return None
 
 
-class PyRenewPipeline(ForecastPipeline):
+class PyRenewPipeline(ForecastPipeline[None]):
     """Single-location PyRenew HEW forecast pipeline."""
 
     def __init__(
@@ -119,6 +119,9 @@ class PyRenewPipeline(ForecastPipeline):
                 "pyrenew_null (fitting to no signals) is not supported by this pipeline"
             )
 
+    def resolve_run_dependencies(self, run: ForecastRun) -> None:
+        return None
+
     def before_data_preparation(self, run: ForecastRun) -> None:
         self.logger.info("Copying and recording priors from %s...", self.priors_path)
         copy_and_record_priors(self.priors_path, run.model_dir)
@@ -132,7 +135,11 @@ class PyRenewPipeline(ForecastPipeline):
             as_of=run.report_date,
         )
 
-    def fit_and_forecast(self, run: ForecastRun) -> None:
+    def fit_and_forecast(
+        self,
+        run: ForecastRun,
+        dependencies: None,
+    ) -> None:
         self.logger.info("Fitting model...")
         fit_and_save_model(
             run.model_dir,

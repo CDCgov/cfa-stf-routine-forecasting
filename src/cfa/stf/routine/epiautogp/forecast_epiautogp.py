@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast, get_args
 
@@ -27,13 +26,6 @@ from cfa.stf.routine.utils.common_utils import (
 _FIT_SCRIPT = Path(__file__).parent / "fit_epiautogp.jl"
 NowcastSourceName = Literal["none", "reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
-
-
-@dataclass(frozen=True)
-class EpiAutoGPModelInputs:
-    """Model-specific inputs resolved for an EpiAutoGP forecast run."""
-
-    nowcast_source: NowcastSource | None
 
 
 def run_epiautogp_forecast(
@@ -161,7 +153,7 @@ def _resolve_nowcast_source(
             )
 
 
-class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPModelInputs]):
+class EpiAutoGPPipeline(ForecastPipeline):
     """Single-location EpiAutoGP forecast pipeline."""
 
     def __init__(
@@ -219,39 +211,28 @@ class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPModelInputs]):
             self.config.ed_visit_type,
         )
 
-    def resolve_model_inputs(self, run: ForecastRun) -> EpiAutoGPModelInputs:
-        return EpiAutoGPModelInputs(
-            nowcast_source=_resolve_nowcast_source(
-                forecast_run=run,
-                config=self.config,
-                nowcast_source_name=self.nowcast_source_name,
-                reporting_delay_pmf=self.reporting_delay_pmf,
-                hubverse_nowcast_dir=self.hubverse_nowcast_dir,
-            )
-        )
-
-    def after_data_serialization(
-        self,
-        run: ForecastRun,
-        model_inputs: EpiAutoGPModelInputs,
-    ) -> None:
+    def transform_serialized_data(self, run: ForecastRun) -> None:
         if self.config.frequency == "epiweekly":
             self.logger.info("Generating epiweekly datasets from daily datasets...")
             generate_epiweekly_data(run.data_dir, overwrite_daily=True)
 
-    def fit_and_forecast(
-        self,
-        run: ForecastRun,
-        model_inputs: EpiAutoGPModelInputs,
-    ) -> None:
-        self.logger.info("Converting data to EpiAutoGP JSON format...")
-        input_json_path = convert_to_epiautogp_json(
+    def prepare_model_artifacts(self, run: ForecastRun) -> None:
+        nowcast_source = _resolve_nowcast_source(
             forecast_run=run,
             config=self.config,
-            nowcast_source=model_inputs.nowcast_source,
+            nowcast_source_name=self.nowcast_source_name,
+            reporting_delay_pmf=self.reporting_delay_pmf,
+            hubverse_nowcast_dir=self.hubverse_nowcast_dir,
+        )
+        self.logger.info("Converting data to EpiAutoGP JSON format...")
+        convert_to_epiautogp_json(
+            forecast_run=run,
+            config=self.config,
+            nowcast_source=nowcast_source,
             logger=self.logger,
         )
 
+    def run_model(self, run: ForecastRun) -> None:
         n_ahead = (
             (run.n_forecast_days + 6) // 7
             if self.config.frequency == "epiweekly"
@@ -276,7 +257,7 @@ class EpiAutoGPPipeline(ForecastPipeline[EpiAutoGPModelInputs]):
 
         self.logger.info("Performing EpiAutoGP forecasting...")
         run_epiautogp_forecast(
-            json_input_path=input_json_path,
+            json_input_path=run.model_dir / f"{run.model_name}_input.json",
             model_dir=run.model_dir,
             params=params,
             execution_settings=execution_settings,

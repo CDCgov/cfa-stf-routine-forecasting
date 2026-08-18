@@ -46,7 +46,7 @@ def test_fable_pipeline_aggregates_weekly_inputs(mock_generate, tmp_path):
     )
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.after_data_serialization(run, None)
+    pipeline.transform_serialized_data(run)
 
     mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
 
@@ -59,7 +59,7 @@ def test_fable_pipeline_forecasts_through_excluded_tail(mock_forecast, tmp_path)
     )
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.fit_and_forecast(run, None)
+    pipeline.run_model(run)
 
     mock_forecast.assert_called_once_with(run.model_dir, 30, 10)
 
@@ -103,7 +103,9 @@ def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, messa
 
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.copy_and_record_priors")
+@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.resolve_pyrenew_model_inputs")
 def test_pyrenew_pipeline_extends_common_data_preparation(
+    mock_resolve,
     mock_copy,
     mock_params,
     tmp_path,
@@ -115,9 +117,11 @@ def test_pyrenew_pipeline_extends_common_data_preparation(
         infection_to_admission_pmf=(0.0, 1.0),
         right_truncation_pmf=(1.0,),
     )
+    mock_resolve.return_value = model_inputs
 
-    pipeline.after_data_serialization(run, model_inputs)
+    pipeline.prepare_model_artifacts(run)
 
+    mock_resolve.assert_called_once_with(run=run, fit_ed_visits=True)
     mock_copy.assert_called_once_with(Path("priors.py"), run.model_dir)
     assert mock_params.call_args.kwargs == {
         "run": run,
@@ -140,9 +144,7 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     pipeline = _pyrenew_pipeline(tmp_path)
     run = _run(tmp_path, model_name=pipeline.model_name)
 
-    model_inputs = PyRenewModelInputs((1.0,), (0.0, 1.0), (1.0,))
-    pipeline.fit_and_forecast(run, model_inputs)
-    pipeline.before_post_process(run)
+    pipeline.run_model(run)
 
     assert mock_fit.call_args.args == (run.model_dir,)
     assert mock_fit.call_args.kwargs["n_chains"] == 2

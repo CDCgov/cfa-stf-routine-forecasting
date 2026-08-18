@@ -36,7 +36,7 @@ from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
 
 
-class MyModelPipeline(ForecastPipeline[None]):
+class MyModelPipeline(ForecastPipeline):
     def __init__(self, *, n_samples: int, **kwargs) -> None:
         super().__init__(**kwargs)
         self.n_samples = n_samples
@@ -51,10 +51,7 @@ class MyModelPipeline(ForecastPipeline[None]):
         # Valid sources are currently "nssp" and "nhsn".
         return {"nssp"}
 
-    def resolve_model_inputs(self, run: ForecastRun) -> None:
-        return None
-
-    def fit_and_forecast(self, run: ForecastRun, model_inputs: None) -> None:
+    def run_model(self, run: ForecastRun) -> None:
         # Replace this example with the real fit and forecast implementation.
         samples = pl.DataFrame(...)
         samples.write_parquet(run.model_dir / "samples.parquet")
@@ -105,9 +102,7 @@ Every subclass must implement:
   The currently supported values are `"nssp"` (daily emergency-department visits) and `"nhsn"` (epiweekly hospital admissions).
   At least one source is required.
   Supporting a new source also requires changes to [`data/data_access.py`](data/data_access.py) and [`data/prep_data.py`](data/prep_data.py).
-- `resolve_model_inputs(run)`: resolve parameters or artifacts that depend on loaded data or run metadata.
-  Return `None` if no extra inputs are needed.
-- `fit_and_forecast(run, model_inputs)`: run the model and create `run.model_dir / "samples.parquet"`.
+- `run_model(run)`: run the model and create a standardized `run.model_dir / "samples.parquet"`.
 
 `ForecastRun` is the source of truth for dates, surveillance data, population, and output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
@@ -147,16 +142,17 @@ See [`fable/fit_fable.R`](fable/fit_fable.R) for an R writer and EpiAutoGP's [`f
 
 ## 3. Use hooks only where needed
 
-The base class provides optional hooks around common work:
+The base class provides optional hooks for model-specific input preparation:
 
-  | Hook                                          | Use it to                                              |
-  | --------------------------------------------- | ------------------------------------------------------ |
-  | `validate_configuration()`                    | Reject invalid option combinations before loading data |
-  | `after_data_serialization(run, model_inputs)` | Transform or supplement serialized inputs              |
-  | `before_post_process(run)`                    | Convert native model output into `samples.parquet`     |
+  | Hook                             | Use it to                                                |
+  | -------------------------------- | -------------------------------------------------------- |
+  | `validate_configuration()`       | Reject invalid option combinations before loading data   |
+  | `transform_serialized_data(run)` | Transform common data, such as epiweekly aggregation     |
+  | `prepare_model_artifacts(run)`   | Create model-specific inputs, such as JSON or parameters |
 
-Do not override `execute()`, `build_forecast_run()`, `prepare_model_inputs()`, or `post_process()` unless the shared lifecycle itself must change.
+Do not override `execute()`, `build_forecast_run()`, `prepare_input_artifacts()`, or `publish_outputs()` unless the shared lifecycle itself must change.
 Keeping those methods common preserves data freshness checks and compatible outputs.
+`run_model()` is responsible for any native-output conversion needed to leave a standardized `samples.parquet` for publishing.
 
 When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
 For daily models this often means generating `run.n_forecast_days + run.exclude_last_n_days` days from the last training date; see the Fable and PyRenew implementations.

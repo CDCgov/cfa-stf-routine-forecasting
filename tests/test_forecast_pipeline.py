@@ -6,7 +6,7 @@ from cfa.stf.routine.forecast_run import ForecastRun
 from tests.factories import make_test_surveillance_inputs
 
 
-class TestPipeline(ForecastPipeline[str]):
+class TestPipeline(ForecastPipeline):
     __test__ = False
 
     def __init__(self, *, events=None, **kwargs):
@@ -24,20 +24,14 @@ class TestPipeline(ForecastPipeline[str]):
     def validate_configuration(self):
         self.events.append("validate")
 
-    def resolve_model_inputs(self, run):
-        self.events.append("resolve")
-        return "resolved_model_inputs"
+    def transform_serialized_data(self, run):
+        self.events.append("transform")
 
-    def after_data_serialization(self, run, model_inputs):
-        assert model_inputs == "resolved_model_inputs"
-        self.events.append("after_serialize")
+    def prepare_model_artifacts(self, run):
+        self.events.append("prepare_artifacts")
 
-    def fit_and_forecast(self, run, model_inputs):
-        assert model_inputs == "resolved_model_inputs"
-        self.events.append("forecast")
-
-    def before_post_process(self, run):
-        self.events.append("before_postprocess")
+    def run_model(self, run):
+        self.events.append("run_model")
 
 
 def _pipeline(tmp_path, *, events=None, fail_on_stale_data=False):
@@ -157,12 +151,11 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     assert events == [
         "validate",
         "build_run",
-        "resolve",
         "serialize",
-        "after_serialize",
+        "transform",
         "append_prop",
-        "forecast",
-        "before_postprocess",
+        "prepare_artifacts",
+        "run_model",
         "figures",
         "hubverse",
     ]

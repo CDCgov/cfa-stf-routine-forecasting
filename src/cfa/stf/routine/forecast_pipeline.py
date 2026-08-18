@@ -20,7 +20,7 @@ from cfa.stf.routine.utils.common_utils import (
 )
 
 
-class ForecastPipeline[ModelInputsT](ABC):
+class ForecastPipeline(ABC):
     """Template lifecycle shared by all single-location forecast pipelines."""
 
     def __init__(
@@ -93,23 +93,14 @@ class ForecastPipeline[ModelInputsT](ABC):
         self.logger.info("Model run directory: %s", run.model_run_dir)
         return run
 
-    @abstractmethod
-    def resolve_model_inputs(self, run: ForecastRun) -> ModelInputsT:
-        """Resolve model-specific inputs that require the materialized run state."""
+    def transform_serialized_data(self, run: ForecastRun) -> None:
+        """Transform common serialized data into the model's required form."""
 
-    def after_data_serialization(
-        self,
-        run: ForecastRun,
-        model_inputs: ModelInputsT,
-    ) -> None:
-        """Run model-specific work after common data serialization."""
+    def prepare_model_artifacts(self, run: ForecastRun) -> None:
+        """Create additional files required to run the model."""
 
-    def prepare_model_inputs(
-        self,
-        run: ForecastRun,
-        model_inputs: ModelInputsT,
-    ) -> None:
-        """Serialize common inputs and apply model-specific preparation hooks."""
+    def prepare_input_artifacts(self, run: ForecastRun) -> None:
+        """Create all common and model-specific input artifacts."""
         run.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger.info("Processing data for %s", run.loc)
         serialize_data(
@@ -117,24 +108,17 @@ class ForecastPipeline[ModelInputsT](ABC):
             save_dir=run.data_dir,
             logger=self.logger,
         )
-        self.after_data_serialization(run, model_inputs)
+        self.transform_serialized_data(run)
         append_prop_data_to_combined_data(run.data_dir / "combined_data.tsv")
+        self.prepare_model_artifacts(run)
         self.logger.info("Data preparation complete.")
 
     @abstractmethod
-    def fit_and_forecast(
-        self,
-        run: ForecastRun,
-        model_inputs: ModelInputsT,
-    ) -> None:
-        """Fit the configured model and write its forecast samples."""
+    def run_model(self, run: ForecastRun) -> None:
+        """Run the configured model and write standardized forecast samples."""
 
-    def before_post_process(self, run: ForecastRun) -> None:
-        """Run model-specific output conversion before common post-processing."""
-
-    def post_process(self, run: ForecastRun) -> None:
+    def publish_outputs(self, run: ForecastRun) -> None:
         """Generate standard plots and the model-level Hubverse table."""
-        self.before_post_process(run)
         make_figures_from_model_fit_dir(
             model_fit_dir=run.model_dir,
             save_figs=True,
@@ -154,10 +138,9 @@ class ForecastPipeline[ModelInputsT](ABC):
         )
         self.validate_configuration()
         run = self.build_forecast_run()
-        model_inputs = self.resolve_model_inputs(run)
-        self.prepare_model_inputs(run, model_inputs)
-        self.fit_and_forecast(run, model_inputs)
-        self.post_process(run)
+        self.prepare_input_artifacts(run)
+        self.run_model(run)
+        self.publish_outputs(run)
         self.logger.info(
             "Single-location pipeline complete for model %s, location %s, and run "
             "date %s.",

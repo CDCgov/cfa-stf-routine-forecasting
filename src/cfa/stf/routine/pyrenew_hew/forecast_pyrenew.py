@@ -16,7 +16,6 @@ from cfa.stf.routine.pyrenew_hew.generate_predictive import (
     generate_and_save_predictions,
 )
 from cfa.stf.routine.pyrenew_hew.model_inputs import (
-    PyRenewModelInputs,
     resolve_pyrenew_model_inputs,
     serialize_pyrenew_model_params,
 )
@@ -53,7 +52,7 @@ def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
     return None
 
 
-class PyRenewPipeline(ForecastPipeline[PyRenewModelInputs]):
+class PyRenewPipeline(ForecastPipeline):
     """Single-location PyRenew HEW forecast pipeline."""
 
     def __init__(
@@ -123,17 +122,11 @@ class PyRenewPipeline(ForecastPipeline[PyRenewModelInputs]):
                 "pyrenew_null (fitting to no signals) is not supported by this pipeline"
             )
 
-    def resolve_model_inputs(self, run: ForecastRun) -> PyRenewModelInputs:
-        return resolve_pyrenew_model_inputs(
+    def prepare_model_artifacts(self, run: ForecastRun) -> None:
+        model_inputs = resolve_pyrenew_model_inputs(
             run=run,
             fit_ed_visits=self.fit_ed_visits,
         )
-
-    def after_data_serialization(
-        self,
-        run: ForecastRun,
-        model_inputs: PyRenewModelInputs,
-    ) -> None:
         self.logger.info("Copying and recording priors from %s...", self.priors_path)
         copy_and_record_priors(self.priors_path, run.model_dir)
         serialize_pyrenew_model_params(
@@ -142,11 +135,7 @@ class PyRenewPipeline(ForecastPipeline[PyRenewModelInputs]):
             save_dir=run.data_dir,
         )
 
-    def fit_and_forecast(
-        self,
-        run: ForecastRun,
-        model_inputs: PyRenewModelInputs,
-    ) -> None:
+    def run_model(self, run: ForecastRun) -> None:
         self.logger.info("Fitting model...")
         fit_and_save_model(
             run.model_dir,
@@ -172,8 +161,6 @@ class PyRenewPipeline(ForecastPipeline[PyRenewModelInputs]):
             rng_key=self.rng_key,
         )
         self.logger.info("All forecasting complete.")
-
-    def before_post_process(self, run: ForecastRun) -> None:
         self.logger.info("Creating daily counts...")
         create_samples_from_pyrenew_fit_dir(run.model_dir)
 

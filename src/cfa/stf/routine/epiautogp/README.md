@@ -51,13 +51,12 @@ Disease, location, report date, training dates, loaded inputs, and output paths 
 ### Shared forecast lifecycle
 
 `EpiAutoGPPipeline` extends the repository-wide `ForecastPipeline` lifecycle used by Fable and PyRenew.
-Shared setup constructs one canonical `ForecastRun`; EpiAutoGP then resolves its model-specific `EpiAutoGPModelInputs`, performs optional epiweekly aggregation, converts the run to JSON, executes Julia, and uses the common post-processing stage.
+Shared setup constructs one canonical `ForecastRun`; EpiAutoGP then performs optional epiweekly aggregation, resolves its nowcast source, converts the prepared data to JSON, executes Julia, and publishes the standardized output through the common stage.
 
 **Key Types:**
 
 - **`SurveillanceInputs`**: Loaded surveillance frames, freshness, and location population.
 - **`ForecastRun`**: Canonical run identity, training window, forecast horizon, model name, surveillance inputs, and derived metadata and output paths.
-- **`EpiAutoGPModelInputs`**: The nowcast source resolved for a particular forecast run.
 - **`EpiAutoGPPipeline`**: EpiAutoGP-specific implementation of the shared pipeline lifecycle.
 
 **Key Functions:**

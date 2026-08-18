@@ -95,7 +95,7 @@ registry = "cfaprdbatchcr.azurecr.io"
 tag = (
     "latest"
     if (is_production or current_branch_name == "main")
-    else current_branch_name
+    else current_branch_name.replace("/", "-")
 )
 image = f"{registry}/{local_workdir.name}:{tag}"
 

@@ -142,8 +142,6 @@ class PyRenewPipeline(ForecastPipeline):
             predict_wastewater=self.forecast_wastewater,
             rng_key=self.rng_key,
         )
-        self.logger.info("All forecasting complete.")
-        self.logger.info("Creating daily counts...")
         create_samples_from_pyrenew_fit_dir(run.model_dir)
 
 

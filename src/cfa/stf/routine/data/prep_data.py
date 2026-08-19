@@ -23,15 +23,18 @@ def aggregate_epiweekly_nssp(data: pl.DataFrame) -> pl.DataFrame:
         missing = ", ".join(sorted(missing_columns))
         raise ValueError(f"Cannot aggregate NSSP data; missing column(s): {missing}")
 
-    grouping_columns = [
-        column
-        for column in data.columns
-        if column not in {"date", "data_type", "resolution", *value_columns}
-    ]
+    value_selector = cs.by_name(value_columns)
+    grouping_selector = cs.exclude(
+        value_selector,
+        "date",
+        "data_type",
+        "resolution",
+    )
+    grouping_columns = list(cs.expand_selector(data, grouping_selector))
     id_columns = [*grouping_columns, "data_type", ".variable"]
     long_data = data.unpivot(
-        on=value_columns,
-        index=["date", *grouping_columns, "data_type"],
+        on=value_selector,
+        index=cs.exclude(value_selector, "resolution"),
         variable_name=".variable",
         value_name=".value",
     )

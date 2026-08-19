@@ -13,15 +13,35 @@ would require distinct PMFs for the numerator and denominator series (see
 import datetime as dt
 import logging
 from dataclasses import dataclass
+from itertools import accumulate
 
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.reporting_delay import (
-    inflate_report,
-    reporting_inflation_factors,
-)
 
 logger = logging.getLogger(__name__)
+REPORTING_FRACTION_TOL = 1e-9
+
+
+def reporting_inflation_factors(pmf: list[float]) -> list[float]:
+    """Return incomplete reporting CDF entries, ordered oldest first."""
+    return [
+        fraction
+        for fraction in accumulate(pmf)
+        if fraction < 1.0 - REPORTING_FRACTION_TOL
+    ]
+
+
+def inflate_report(report: float, fraction: float) -> float:
+    """Inflate one partial report using its expected reporting fraction."""
+    if fraction < 0.0:
+        raise ValueError(f"Reporting fraction must be nonnegative: {fraction}")
+    if fraction == 0.0:
+        if report == 0.0:
+            return 0.0
+        raise ValueError(
+            "Cannot inflate a positive report with zero reporting fraction"
+        )
+    return (report + 1.0 - fraction) / fraction
 
 
 @dataclass(frozen=True)

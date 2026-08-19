@@ -7,12 +7,11 @@ import pytest
 
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.nowcast import FixedNowcast
-from cfa.stf.routine.epiautogp.reporting_delay import (
+from cfa.stf.routine.epiautogp.reporting_delay_nowcast import (
+    ReportingDelayNowcast,
     inflate_report,
     reporting_inflation_factors,
 )
-from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
 def _spec(
@@ -151,17 +150,6 @@ class TestReportingDelayNowcastGetNowcastData:
         )
         assert result.dates == [dt.date(2024, 1, 2)]
         assert result.reports[0] == [0.0]
-
-
-class TestFixedNowcast:
-    def test_ensure_applicable_accepts_any_spec(self):
-        assert FixedNowcast.ensure_applicable(config=_spec()) is None
-
-    def test_returns_stored_data(self):
-        data = NowcastData(dates=[dt.date(2024, 1, 1)], reports=[[1.0]])
-        source = FixedNowcast(data=data)
-        out = source.get_nowcast_data(dates=[dt.date(2024, 5, 1)], reports=[42.0])
-        assert out is data
 
 
 def test_no_nan_in_inflate():

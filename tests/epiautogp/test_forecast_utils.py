@@ -10,6 +10,7 @@ from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.forecast_epiautogp import (
     EpiAutoGPPipeline,
     _resolve_nowcast_source,
+    run_epiautogp_forecast,
 )
 from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
@@ -121,11 +122,9 @@ def test_run_model_passes_prepared_input_and_model_options(
 
     pipeline.run_model(run)
 
-    assert mock_forecast.call_args.kwargs["json_input_path"] == (
-        run.model_dir / f"{run.model_name}_input.json"
-    )
-    assert mock_forecast.call_args.kwargs["model_dir"] == run.model_dir
-    assert mock_forecast.call_args.kwargs["params"] == {
+    assert mock_forecast.call_args.kwargs == {
+        "json_input_path": run.model_dir / f"{run.model_name}_input.json",
+        "model_dir": run.model_dir,
         "n_ahead": 4,
         "n_particles": 2,
         "n_mcmc": 3,
@@ -133,8 +132,41 @@ def test_run_model_passes_prepared_input_and_model_options(
         "n_forecast_draws": 5,
         "transformation": "percentage",
         "smc_data_proportion": 0.2,
+        "n_threads": 6,
     }
-    assert mock_forecast.call_args.kwargs["execution_settings"]["threads"] == 6
+
+
+@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_julia_script")
+def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
+    input_path = tmp_path / "input.json"
+    model_dir = tmp_path / "model"
+
+    run_epiautogp_forecast(
+        input_path,
+        model_dir,
+        n_ahead=4,
+        n_particles=2,
+        n_mcmc=3,
+        n_hmc=4,
+        n_forecast_draws=5,
+        transformation="boxcox",
+        smc_data_proportion=0.25,
+        n_threads=6,
+    )
+
+    assert model_dir.is_dir()
+    assert mock_run_julia.call_args.args[1] == [
+        f"--json-input={input_path}",
+        f"--output-dir={model_dir}",
+        "--n-ahead=4",
+        "--n-particles=2",
+        "--n-mcmc=3",
+        "--n-hmc=4",
+        "--n-forecast-draws=5",
+        "--transformation=boxcox",
+        "--smc-data-proportion=0.25",
+    ]
+    assert mock_run_julia.call_args.kwargs["executor_flags"][1] == "--threads=6"
 
 
 def test_reporting_delay_fetches_pmf_from_run(tmp_path):

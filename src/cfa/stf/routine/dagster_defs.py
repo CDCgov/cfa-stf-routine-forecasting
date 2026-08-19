@@ -353,7 +353,6 @@ def _run_fable_e_other(
         epiweekly=epiweekly,
         run_date=run_date,
         fail_on_stale_data=model_base_config.fail_on_stale_data,
-        logger=context.log,
     )
 
 
@@ -402,7 +401,6 @@ def _run_pyrenew_model(
         rng_key=pyrenew_config.rng_key,
         run_date=run_date,
         fail_on_stale_data=model_base_config.fail_on_stale_data,
-        logger=context.log,
         **fit_flags,
         **forecast_flags,
     )

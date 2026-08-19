@@ -29,18 +29,14 @@ def _common_kwargs(tmp_path):
     }
 
 
-@patch("cfa.stf.routine.fable.forecast_fable.generate_epiweekly_data")
-def test_fable_pipeline_aggregates_weekly_inputs(mock_generate, tmp_path):
+def test_fable_pipeline_selects_weekly_nssp_inputs(tmp_path):
     pipeline = FablePipeline(
         **_common_kwargs(tmp_path),
         n_samples=10,
         epiweekly=True,
     )
-    run = _run(tmp_path, model_name=pipeline.model_name)
 
-    pipeline.transform_serialized_data(run)
-
-    mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
+    assert pipeline.nssp_frequency == "epiweekly"
 
 
 @patch("cfa.stf.routine.fable.forecast_fable.fable_e_other_forecasts")

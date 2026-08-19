@@ -1,13 +1,90 @@
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 import polars.selectors as cs
+from cfa.stf.forecasttools import daily_to_weekly
 
 if TYPE_CHECKING:
     from cfa.stf.routine.forecast_run import ForecastRun
+
+
+NSSPFrequency = Literal["daily", "epiweekly"]
+
+
+def aggregate_epiweekly_nssp(data: pl.DataFrame) -> pl.DataFrame:
+    """Aggregate NSSP data using the shared forecasttools implementation."""
+    value_columns = ["observed_ed_visits", "other_ed_visits"]
+    required_columns = {"date", "data_type", "resolution", *value_columns}
+    missing_columns = required_columns - set(data.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Cannot aggregate NSSP data; missing column(s): {missing}")
+
+    grouping_columns = [
+        column
+        for column in data.columns
+        if column not in {"date", "data_type", "resolution", *value_columns}
+    ]
+    id_columns = [*grouping_columns, "data_type", ".variable"]
+    long_data = data.unpivot(
+        on=value_columns,
+        index=["date", *grouping_columns, "data_type"],
+        variable_name=".variable",
+        value_name=".value",
+    )
+    weekly_data = daily_to_weekly(
+        long_data,
+        value_col=".value",
+        date_col="date",
+        id_cols=id_columns,
+        weekly_value_name=".value",
+        standard="MMWR",
+        with_week_end_date=True,
+        week_end_date_name="date",
+        strict=True,
+    )
+    if weekly_data.is_empty():
+        return data.clear()
+
+    # R's sum() propagates NA while Polars sum() ignores nulls. Preserve the
+    # R forecasttools behavior while using its Python counterpart for grouping.
+    weekly_nulls = daily_to_weekly(
+        long_data.with_columns(
+            pl.col(".value").is_null().cast(pl.Int8).alias("_is_null")
+        ),
+        value_col="_is_null",
+        date_col="date",
+        id_cols=id_columns,
+        weekly_value_name="_n_null",
+        standard="MMWR",
+        with_week_end_date=True,
+        week_end_date_name="date",
+        strict=True,
+    )
+    join_columns = ["week", "weekyear", *id_columns, "date"]
+    aggregated = (
+        weekly_data.join(
+            weekly_nulls.select(*join_columns, "_n_null"),
+            on=join_columns,
+            how="left",
+        )
+        .with_columns(
+            pl.when(pl.col("_n_null") == 0).then(pl.col(".value")).alias(".value")
+        )
+        .pivot(
+            on=".variable",
+            index=["date", *grouping_columns, "data_type"],
+            values=".value",
+        )
+        .with_columns(
+            pl.lit("epiweekly").alias("resolution"),
+        )
+        .select(data.columns)
+    )
+    return aggregated.sort([*grouping_columns, "date"])
 
 
 def combine_surveillance_data(
@@ -75,6 +152,8 @@ def serialize_data(
     forecast_run: "ForecastRun",
     save_dir: Path,
     logger: logging.Logger | None = None,
+    *,
+    nssp_frequency: NSSPFrequency = "daily",
 ) -> None:
     logger = logger or logging.getLogger(__name__)
 
@@ -123,9 +202,13 @@ def serialize_data(
     with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
         json.dump(data_for_model_fit, json_file, default=str)
 
+    nssp_data = forecast_run.nssp.data if forecast_run.nssp is not None else None
+    if nssp_data is not None and nssp_frequency == "epiweekly":
+        nssp_data = aggregate_epiweekly_nssp(nssp_data)
+
     combined_data = combine_surveillance_data(
         disease=forecast_run.disease,
-        nssp_data=forecast_run.nssp.data if forecast_run.nssp is not None else None,
+        nssp_data=nssp_data,
         nhsn_data=forecast_run.nhsn.data if forecast_run.nhsn is not None else None,
     )
 

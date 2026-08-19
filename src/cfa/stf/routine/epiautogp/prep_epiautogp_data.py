@@ -8,6 +8,7 @@ from pathlib import Path
 import polars as pl
 
 from cfa.stf.routine.data.nowcast import NowcastData, NowcastSource
+from cfa.stf.routine.data.prep_data import aggregate_epiweekly_nssp
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.forecast_run import ForecastRun
 
@@ -34,38 +35,6 @@ def _validate_epiautogp_parameters(
             "ed_visit_type is only applicable when target='nssp'. "
             "For NHSN, ed_visit_type must be 'observed' (the default)."
         )
-
-
-def _aggregate_epiweekly_nssp(data: pl.DataFrame) -> pl.DataFrame:
-    """Sum complete Sunday-through-Saturday NSSP weeks."""
-    week_end = pl.col("date") + pl.duration(
-        days=(pl.lit(6) - pl.col("date").dt.weekday()) % 7
-    )
-    return (
-        data.with_columns(
-            pl.col("date").alias("_observation_date"),
-            week_end.alias("date"),
-        )
-        .group_by("date")
-        .agg(
-            pl.col("observed_ed_visits").sum(),
-            pl.col("other_ed_visits").sum(),
-            pl.col("_observation_date").n_unique().alias("_n_days"),
-            pl.col("observed_ed_visits").count().alias("_n_observed"),
-            pl.col("other_ed_visits").count().alias("_n_other"),
-        )
-        .filter(pl.col("_n_days") == 7)
-        .with_columns(
-            pl.when(pl.col("_n_observed") == 7)
-            .then(pl.col("observed_ed_visits"))
-            .alias("observed_ed_visits"),
-            pl.when(pl.col("_n_other") == 7)
-            .then(pl.col("other_ed_visits"))
-            .alias("other_ed_visits"),
-        )
-        .drop("_n_days", "_n_observed", "_n_other")
-        .sort("date")
-    )
 
 
 def _apply_date_exclusions(
@@ -104,9 +73,10 @@ def _extract_model_series(
     if config.target == "nssp":
         if forecast_run.nssp is None:
             raise ValueError("The forecast run does not contain NSSP data")
-        data = forecast_run.nssp.data.filter(pl.col("data_type") == "train")
+        data = forecast_run.nssp.data
         if config.frequency == "epiweekly":
-            data = _aggregate_epiweekly_nssp(data)
+            data = aggregate_epiweekly_nssp(data)
+        data = data.filter(pl.col("data_type") == "train")
 
         value = {
             "observed": pl.col("observed_ed_visits"),

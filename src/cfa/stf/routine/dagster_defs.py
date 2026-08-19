@@ -95,7 +95,7 @@ registry = "cfaprdbatchcr.azurecr.io"
 tag = (
     "latest"
     if (is_production or current_branch_name == "main")
-    else current_branch_name
+    else current_branch_name.replace("/", "-")
 )
 image = f"{registry}/{local_workdir.name}:{tag}"
 
@@ -353,6 +353,7 @@ def _run_fable_e_other(
         epiweekly=epiweekly,
         run_date=run_date,
         fail_on_stale_data=model_base_config.fail_on_stale_data,
+        logger=context.log,
     )
 
 
@@ -401,6 +402,7 @@ def _run_pyrenew_model(
         rng_key=pyrenew_config.rng_key,
         run_date=run_date,
         fail_on_stale_data=model_base_config.fail_on_stale_data,
+        logger=context.log,
         **fit_flags,
         **forecast_flags,
     )

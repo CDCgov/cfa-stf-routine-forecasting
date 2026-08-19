@@ -15,7 +15,7 @@ import logging
 from dataclasses import dataclass
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.forecast_spec import ForecastSpec
+from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.reporting_delay import (
     inflate_report,
     reporting_inflation_factors,
@@ -38,21 +38,21 @@ class ReportingDelayNowcast:
     @staticmethod
     def ensure_applicable(
         *,
-        forecast_spec: ForecastSpec,
+        config: EpiAutoGPConfig,
     ) -> None:
         # The estimator multiplies recent observations by 1/reporting_fraction.
         # For a percentage (numerator / denominator) the same factor applies to
         # both terms and cancels, so reject ed_visit_type="pct". Target and
         # frequency are not gating conditions: any count series can be
         # corrected when paired with a PMF on its native cadence.
-        if forecast_spec.frequency != "daily":
+        if config.frequency != "daily":
             logger.warning(
                 "Using reporting-delay nowcasting for frequency=%r. Confirm "
                 "the reporting-delay PMF support matches the model cadence.",
-                forecast_spec.frequency,
+                config.frequency,
             )
 
-        if forecast_spec.ed_visit_type == "pct":
+        if config.ed_visit_type == "pct":
             raise ValueError(
                 "Reporting-delay nowcasting is not applicable when "
                 "ed_visit_type='pct': applying the same reporting-delay "

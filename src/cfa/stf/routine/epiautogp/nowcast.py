@@ -6,7 +6,7 @@ import datetime as dt
 from dataclasses import dataclass
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.forecast_spec import ForecastSpec
+from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 
 
 @dataclass(frozen=True)
@@ -20,7 +20,7 @@ class FixedNowcast:
     @staticmethod
     def ensure_applicable(
         *,
-        forecast_spec: ForecastSpec,
+        config: EpiAutoGPConfig,
     ) -> None:
         pass
 

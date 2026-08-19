@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 from pathlib import Path
 
 import pytest
@@ -8,88 +9,167 @@ from cfa.stf.routine.fable import forecast_fable
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
 
 
-class _StopAfterDataBoundary(Exception):
-    pass
-
-
 @pytest.mark.parametrize(
-    ("module", "dependency_name", "main_kwargs"),
+    ("module", "pipeline_class_name", "main_kwargs", "expected_pipeline_kwargs"),
     [
         pytest.param(
             forecast_epiautogp,
-            "setup_forecast_pipeline",
+            "EpiAutoGPPipeline",
             {
                 "disease": "covid",
                 "run_date": dt.date(2026, 1, 7),
                 "loc": "CA",
-                "output_dir": Path("unused"),
-                "n_training_days": 90,
-                "n_forecast_days": 28,
+                "output_dir": Path("epiautogp-output"),
+                "n_training_days": 91,
+                "n_forecast_days": 29,
                 "target": "nssp",
-                "frequency": "daily",
+                "frequency": "epiweekly",
+                "ed_visit_type": "other",
+                "exclude_last_n_days": 2,
+                "exclude_date_ranges": "2025-12-01:2025-12-03",
+                "n_particles": 11,
+                "n_mcmc": 12,
+                "n_hmc": 13,
+                "n_forecast_draws": 14,
+                "smc_data_proportion": 0.25,
+                "n_threads": 3,
+                "nowcast_source_name": "reporting-delay",
+                "reporting_delay_pmf": [0.25, 0.75],
                 "fail_on_stale_data": True,
+            },
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "target": "nssp",
+                "frequency": "epiweekly",
+                "ed_visit_type": "other",
+                "output_dir": Path("epiautogp-output"),
+                "n_training_days": 91,
+                "n_forecast_days": 29,
+                "exclude_last_n_days": 2,
+                "exclude_date_ranges": [(dt.date(2025, 12, 1), dt.date(2025, 12, 3))],
+                "nowcast_source_name": "reporting-delay",
+                "reporting_delay_pmf": [0.25, 0.75],
+                "hubverse_nowcast_dir": None,
+                "run_date": dt.date(2026, 1, 7),
+                "fail_on_stale_data": True,
+                "n_particles": 11,
+                "n_mcmc": 12,
+                "n_hmc": 13,
+                "n_forecast_draws": 14,
+                "smc_data_proportion": 0.25,
+                "n_threads": 3,
             },
             id="epiautogp",
         ),
         pytest.param(
             forecast_fable,
-            "load_forecast_data",
+            "FablePipeline",
             {
                 "disease": "covid",
                 "loc": "CA",
-                "output_dir": Path("unused"),
-                "n_training_days": 90,
-                "n_forecast_days": 28,
-                "n_samples": 10,
+                "output_dir": Path("fable-output"),
+                "n_training_days": 92,
+                "n_forecast_days": 30,
+                "n_samples": 15,
                 "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 3,
+                "epiweekly": True,
                 "fail_on_stale_data": True,
+            },
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "output_dir": Path("fable-output"),
+                "n_training_days": 92,
+                "n_forecast_days": 30,
+                "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 3,
+                "fail_on_stale_data": True,
+                "n_samples": 15,
+                "epiweekly": True,
             },
             id="fable",
         ),
         pytest.param(
             forecast_pyrenew,
-            "load_forecast_data",
+            "PyRenewPipeline",
             {
                 "disease": "covid",
                 "loc": "CA",
-                "priors_path": Path("unused"),
-                "output_dir": Path("unused"),
-                "n_training_days": 90,
-                "n_forecast_days": 28,
-                "n_chains": 1,
-                "n_warmup": 1,
-                "n_samples": 1,
+                "priors_path": Path("priors.py"),
+                "output_dir": Path("pyrenew-output"),
+                "n_training_days": 93,
+                "n_forecast_days": 31,
+                "n_chains": 2,
+                "n_warmup": 3,
+                "n_samples": 4,
                 "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 4,
                 "fit_ed_visits": True,
+                "fit_hospital_admissions": True,
+                "fit_wastewater": True,
                 "forecast_ed_visits": True,
+                "forecast_hospital_admissions": True,
+                "forecast_wastewater": True,
+                "rng_key": 123,
+                "fail_on_stale_data": True,
+            },
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "priors_path": Path("priors.py"),
+                "output_dir": Path("pyrenew-output"),
+                "n_training_days": 93,
+                "n_forecast_days": 31,
+                "n_chains": 2,
+                "n_warmup": 3,
+                "n_samples": 4,
+                "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 4,
+                "fit_ed_visits": True,
+                "fit_hospital_admissions": True,
+                "fit_wastewater": True,
+                "forecast_ed_visits": True,
+                "forecast_hospital_admissions": True,
+                "forecast_wastewater": True,
+                "rng_key": 123,
                 "fail_on_stale_data": True,
             },
             id="pyrenew",
         ),
     ],
 )
-def test_entrypoint_forwards_fail_on_stale_data(
+def test_entrypoint_forwards_all_pipeline_options(
     monkeypatch,
     module,
-    dependency_name,
+    pipeline_class_name,
     main_kwargs,
+    expected_pipeline_kwargs,
 ):
-    dependency_kwargs = {}
+    captured = {}
+    logger = logging.getLogger(f"test-{module.__name__}")
 
-    def stop_at_data_boundary(**kwargs):
-        dependency_kwargs.update(kwargs)
-        raise _StopAfterDataBoundary
+    class PipelineSpy:
+        def __init__(self, **kwargs):
+            captured["kwargs"] = kwargs
 
-    monkeypatch.setattr(module, dependency_name, stop_at_data_boundary)
+        def execute(self):
+            captured["executed"] = True
 
-    with pytest.raises(_StopAfterDataBoundary):
-        module.main(**main_kwargs)
+    def fail_if_called(**kwargs):
+        pytest.fail(f"basicConfig called with an injected logger: {kwargs}")
 
-    assert dependency_kwargs["fail_on_stale_data"] is True
-    if module is forecast_fable:
-        assert dependency_kwargs["sources"] == {"nssp"}
-    if module is forecast_pyrenew:
-        assert dependency_kwargs["sources"] == {"nssp"}
+    monkeypatch.setattr(module, pipeline_class_name, PipelineSpy)
+    monkeypatch.setattr(module.logging, "basicConfig", fail_if_called)
+
+    module.main(**main_kwargs, logger=logger)
+
+    assert captured["kwargs"] == {
+        **expected_pipeline_kwargs,
+        "logger": logger,
+    }
+    assert captured["executed"] is True
 
 
 @pytest.mark.parametrize(
@@ -100,36 +180,26 @@ def test_entrypoint_forwards_fail_on_stale_data(
         pytest.param(True, True, {"nssp", "nhsn"}, id="pyrenew-he"),
     ],
 )
-def test_pyrenew_requests_sources_for_fitted_signals(
-    monkeypatch,
+def test_pyrenew_pipeline_requests_sources_for_fitted_signals(
     fit_ed_visits,
     fit_hospital_admissions,
     expected_sources,
 ):
-    dependency_kwargs = {}
+    pipeline = forecast_pyrenew.PyRenewPipeline(
+        disease="covid",
+        loc="CA",
+        priors_path=Path("unused"),
+        output_dir=Path("unused"),
+        n_training_days=90,
+        n_forecast_days=28,
+        n_chains=1,
+        n_warmup=1,
+        n_samples=1,
+        run_date=dt.date(2026, 1, 7),
+        fit_ed_visits=fit_ed_visits,
+        fit_hospital_admissions=fit_hospital_admissions,
+        forecast_ed_visits=fit_ed_visits,
+        forecast_hospital_admissions=fit_hospital_admissions,
+    )
 
-    def stop_at_data_boundary(**kwargs):
-        dependency_kwargs.update(kwargs)
-        raise _StopAfterDataBoundary
-
-    monkeypatch.setattr(forecast_pyrenew, "load_forecast_data", stop_at_data_boundary)
-
-    with pytest.raises(_StopAfterDataBoundary):
-        forecast_pyrenew.main(
-            disease="covid",
-            loc="CA",
-            priors_path=Path("unused"),
-            output_dir=Path("unused"),
-            n_training_days=90,
-            n_forecast_days=28,
-            n_chains=1,
-            n_warmup=1,
-            n_samples=1,
-            run_date=dt.date(2026, 1, 7),
-            fit_ed_visits=fit_ed_visits,
-            fit_hospital_admissions=fit_hospital_admissions,
-            forecast_ed_visits=fit_ed_visits,
-            forecast_hospital_admissions=fit_hospital_admissions,
-        )
-
-    assert dependency_kwargs["sources"] == expected_sources
+    assert pipeline.sources == expected_sources

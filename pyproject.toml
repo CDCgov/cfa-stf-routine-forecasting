@@ -28,7 +28,6 @@ dependencies = [
     "pyrenew",
     "pyrenew-multisignal",
     "pypdf>=6.10.1",
-    "tomli-w>=1.1.0",
 ]
 
 [project.scripts]

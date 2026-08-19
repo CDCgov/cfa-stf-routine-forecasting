@@ -49,6 +49,10 @@ def run_command(
 
     if result.returncode != 0:
         error_name = function_name or executable
+        if not capture_output:
+            raise RuntimeError(
+                f"{error_name} failed with exit code {result.returncode}."
+            )
         error_msg = result.stderr.decode("utf-8") if not text else result.stderr
         raise RuntimeError(f"{error_name}: {error_msg}")
 

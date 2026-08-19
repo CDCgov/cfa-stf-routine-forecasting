@@ -2,16 +2,20 @@
 
 import datetime as dt
 import logging
+import sys
 
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from cfa.stf.routine.utils import common_utils
 from cfa.stf.routine.utils.cli_utils import run_command
 from cfa.stf.routine.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
     parse_exclude_date_ranges,
+    run_julia_script,
+    run_r_script,
 )
 
 
@@ -204,6 +208,40 @@ class TestDataWranglingUtils:
 class TestCLIUtils:
     """Tests for command-line utilities."""
 
+    @pytest.mark.parametrize(
+        ("runner", "expected_executable"),
+        [(run_r_script, "Rscript"), (run_julia_script, "julia")],
+    )
+    def test_script_runners_capture_output_by_default(
+        self,
+        monkeypatch,
+        runner,
+        expected_executable,
+    ):
+        calls = []
+        sentinel = object()
+
+        def fake_run_command(executable, args, **kwargs):
+            calls.append((executable, args, kwargs))
+            return sentinel
+
+        monkeypatch.setattr(common_utils, "run_command", fake_run_command)
+
+        result = runner("script", ["arg"])
+
+        assert result is sentinel
+        assert calls == [
+            (
+                expected_executable,
+                ["script", "arg"],
+                {
+                    "function_name": None,
+                    "capture_output": True,
+                    "text": False,
+                },
+            )
+        ]
+
     def test_run_command_with_python_echo(self):
         """Smoke test run_command with simple Python echo."""
         result = run_command(
@@ -222,6 +260,29 @@ class TestCLIUtils:
                 "python",
                 ["-c", "import sys; sys.exit(1)"],
                 text=True,
+            )
+
+    def test_run_command_can_inherit_output_streams(self, capfd):
+        result = run_command(
+            sys.executable,
+            [
+                "-c",
+                "import sys; print('child out'); print('child err', file=sys.stderr)",
+            ],
+            capture_output=False,
+        )
+
+        captured = capfd.readouterr()
+        assert result.returncode == 0
+        assert "child out" in captured.out
+        assert "child err" in captured.err
+
+    def test_run_command_without_capture_reports_exit_code(self):
+        with pytest.raises(RuntimeError, match="failed with exit code 2"):
+            run_command(
+                sys.executable,
+                ["-c", "import sys; sys.exit(2)"],
+                capture_output=False,
             )
 
     def test_run_command_with_executor_flags_python(self, tmp_path):

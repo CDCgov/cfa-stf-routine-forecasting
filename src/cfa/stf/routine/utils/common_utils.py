@@ -12,7 +12,7 @@ import polars as pl
 from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
-from cfa.stf.routine._paths import UTILS_DIR
+from cfa.stf.routine._paths import DATA_DIR, UTILS_DIR
 from cfa.stf.routine.utils.cli_utils import run_command
 
 # Canonical disease names and location abbreviations
@@ -726,3 +726,17 @@ def append_prop_data_to_combined_data(
         data.write_csv(path, null_value="NA")
     elif suffix == ".parquet":
         data.write_parquet(path)
+
+
+def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> None:
+    """Generate epiweekly datasets from daily datasets using an R script."""
+    args = [str(data_dir)]
+    if overwrite_daily:
+        args.append("--overwrite-daily")
+
+    run_r_script(
+        DATA_DIR / "generate_epiweekly_data.R",
+        args,
+        function_name="generate_epiweekly_data",
+    )
+    return None

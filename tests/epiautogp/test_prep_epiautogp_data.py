@@ -18,11 +18,58 @@ from tests.factories import make_test_forecast_run
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.prep_epiautogp_data import (
+    _aggregate_epiweekly_nssp,
     _apply_date_exclusions,
     convert_to_epiautogp_json,
 )
 
 N_DAYS = 10
+
+
+def test_aggregate_epiweekly_nssp_preserves_wide_series_shape():
+    dates = [dt.date(2024, 12, 15) + dt.timedelta(days=index) for index in range(28)]
+    observed = list(range(1, 29))
+    observed[3] = None
+    data = pl.DataFrame(
+        {
+            "date": dates,
+            "state_abb": ["CA"] * 28,
+            "observed_ed_visits": observed,
+            "other_ed_visits": list(range(101, 129)),
+            "data_type": ["train"] * 26 + ["eval"] * 2,
+            "resolution": ["daily"] * 28,
+        }
+    )
+
+    result = _aggregate_epiweekly_nssp(data)
+
+    assert result.select(
+        "date",
+        "observed_ed_visits",
+        "other_ed_visits",
+    ).rows() == [
+        (dt.date(2024, 12, 21), None, 728),
+        (dt.date(2024, 12, 28), 77, 777),
+        (dt.date(2025, 1, 4), 126, 826),
+    ]
+
+
+def test_aggregate_epiweekly_nssp_returns_typed_empty_frame():
+    data = pl.DataFrame(
+        {
+            "date": [dt.date(2024, 1, 1)],
+            "state_abb": ["CA"],
+            "observed_ed_visits": [1],
+            "other_ed_visits": [9],
+            "data_type": ["train"],
+            "resolution": ["daily"],
+        }
+    )
+
+    result = _aggregate_epiweekly_nssp(data)
+
+    assert result.is_empty()
+    assert result.schema == data.schema
 
 
 def filter_dates_by_exclusions_lists(

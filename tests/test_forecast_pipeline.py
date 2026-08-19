@@ -26,6 +26,9 @@ class TestPipeline(ForecastPipeline):
     def validate_configuration(self):
         self.events.append("validate")
 
+    def transform_serialized_data(self, run):
+        self.events.append("transform")
+
     def prepare_model_artifacts(self, run):
         self.events.append("prepare_artifacts")
 
@@ -146,6 +149,7 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "validate",
         "build_run",
         "serialize",
+        "transform",
         "append_prop",
         "prepare_artifacts",
         "run_model",

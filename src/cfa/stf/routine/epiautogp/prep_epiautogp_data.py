@@ -6,9 +6,10 @@ import logging
 from pathlib import Path
 
 import polars as pl
+import polars.selectors as cs
+from cfa.stf.forecasttools import daily_to_weekly
 
 from cfa.stf.routine.data.nowcast import NowcastData, NowcastSource
-from cfa.stf.routine.data.prep_data import aggregate_epiweekly_nssp
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.forecast_run import ForecastRun
 
@@ -35,6 +36,56 @@ def _validate_epiautogp_parameters(
             "ed_visit_type is only applicable when target='nssp'. "
             "For NHSN, ed_visit_type must be 'observed' (the default)."
         )
+
+
+def _aggregate_epiweekly_nssp(data: pl.DataFrame) -> pl.DataFrame:
+    """Aggregate NSSP data using the shared forecasttools implementation."""
+    value_columns = ["observed_ed_visits", "other_ed_visits"]
+    required_columns = {"date", "data_type", "resolution", *value_columns}
+    missing_columns = required_columns - set(data.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"Cannot aggregate NSSP data; missing column(s): {missing}")
+
+    value_selector = cs.by_name(value_columns)
+    grouping_selector = cs.exclude(
+        value_selector,
+        "date",
+        "data_type",
+        "resolution",
+    )
+    grouping_columns = list(cs.expand_selector(data, grouping_selector))
+    id_columns = [*grouping_columns, "data_type", ".variable"]
+    long_data = data.unpivot(
+        on=value_selector,
+        index=cs.exclude(value_selector, "resolution"),
+        variable_name=".variable",
+        value_name=".value",
+    )
+    weekly_data = daily_to_weekly(
+        long_data,
+        value_col=".value",
+        date_col="date",
+        id_cols=id_columns,
+        weekly_value_name=".value",
+        standard="MMWR",
+        with_week_end_date=True,
+        week_end_date_name="date",
+        strict=True,
+    )
+    if weekly_data.is_empty():
+        return data.clear()
+
+    aggregated = (
+        weekly_data.pivot(
+            on=".variable",
+            index=["date", *grouping_columns, "data_type"],
+            values=".value",
+        )
+        .with_columns(pl.lit("epiweekly").alias("resolution"))
+        .select(data.columns)
+    )
+    return aggregated.sort([*grouping_columns, "date"])
 
 
 def _apply_date_exclusions(
@@ -75,7 +126,7 @@ def _extract_model_series(
             raise ValueError("The forecast run does not contain NSSP data")
         data = forecast_run.nssp.data
         if config.frequency == "epiweekly":
-            data = aggregate_epiweekly_nssp(data)
+            data = _aggregate_epiweekly_nssp(data)
         data = data.filter(pl.col("data_type") == "train")
 
         value = {

@@ -92,10 +92,14 @@ def test_prepare_model_artifacts_resolves_nowcast_without_mutating_state(
     assert not hasattr(pipeline, "nowcast_source")
 
 
-def test_epiweekly_pipeline_selects_weekly_nssp_inputs(tmp_path):
+@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.generate_epiweekly_data")
+def test_epiweekly_pipeline_aggregates_common_inputs(mock_generate, tmp_path):
     pipeline = _pipeline(tmp_path, frequency="epiweekly")
+    run = _run(tmp_path)
 
-    assert pipeline.nssp_frequency == "epiweekly"
+    pipeline.transform_serialized_data(run)
+
+    mock_generate.assert_called_once_with(run.data_dir, overwrite_daily=True)
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")

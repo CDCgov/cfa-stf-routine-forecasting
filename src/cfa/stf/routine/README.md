@@ -144,10 +144,11 @@ See [`fable/fit_fable.R`](fable/fit_fable.R) for an R writer and EpiAutoGP's [`f
 
 The base class provides optional hooks for model-specific input preparation:
 
-  | Hook                           | Use it to                                                |
-  | ------------------------------ | -------------------------------------------------------- |
-  | `validate_configuration()`     | Reject invalid option combinations before loading data   |
-  | `prepare_model_artifacts(run)` | Create model-specific inputs, such as JSON or parameters |
+  | Hook                             | Use it to                                                |
+  | -------------------------------- | -------------------------------------------------------- |
+  | `validate_configuration()`       | Reject invalid option combinations before loading data   |
+  | `transform_serialized_data(run)` | Transform common data, such as epiweekly aggregation     |
+  | `prepare_model_artifacts(run)`   | Create model-specific inputs, such as JSON or parameters |
 
 Do not override `execute()`, `build_forecast_run()`, `prepare_input_artifacts()`, or `publish_outputs()` unless the shared lifecycle itself must change.
 Keeping those methods common preserves data freshness checks and compatible outputs.

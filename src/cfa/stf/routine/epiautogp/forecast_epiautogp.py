@@ -18,6 +18,7 @@ from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowc
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.common_utils import (
+    generate_epiweekly_data,
     parse_exclude_date_ranges,
     run_julia_script,
 )
@@ -181,9 +182,10 @@ class EpiAutoGPPipeline(ForecastPipeline):
             self.config.ed_visit_type,
         )
 
-    @property
-    def nssp_frequency(self) -> Literal["daily", "epiweekly"]:
-        return self.config.frequency
+    def transform_serialized_data(self, run: ForecastRun) -> None:
+        if self.config.frequency == "epiweekly":
+            self.logger.info("Generating epiweekly datasets from daily datasets...")
+            generate_epiweekly_data(run.data_dir, overwrite_daily=True)
 
     def prepare_model_artifacts(self, run: ForecastRun) -> None:
         nowcast_source = _resolve_nowcast_source(

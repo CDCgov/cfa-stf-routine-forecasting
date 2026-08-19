@@ -5,7 +5,6 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from pathlib import Path
-from typing import Literal
 
 from cfa.stf.routine.data.data_access import (
     ForecastSourceName,
@@ -60,11 +59,6 @@ class ForecastPipeline(ABC):
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
-    @property
-    def nssp_frequency(self) -> Literal["daily", "epiweekly"]:
-        """NSSP frequency to write to shared serialized model inputs."""
-        return "daily"
-
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
         first_training_date, last_training_date = calculate_training_dates(
@@ -99,6 +93,9 @@ class ForecastPipeline(ABC):
         self.logger.info("Model run directory: %s", run.model_run_dir)
         return run
 
+    def transform_serialized_data(self, run: ForecastRun) -> None:
+        """Transform common serialized data into the model's required form."""
+
     def prepare_model_artifacts(self, run: ForecastRun) -> None:
         """Create additional files required to run the model."""
 
@@ -109,9 +106,9 @@ class ForecastPipeline(ABC):
         serialize_data(
             forecast_run=run,
             save_dir=run.data_dir,
-            nssp_frequency=self.nssp_frequency,
             logger=self.logger,
         )
+        self.transform_serialized_data(run)
         append_prop_data_to_combined_data(run.data_dir / "combined_data.tsv")
         self.prepare_model_artifacts(run)
         self.logger.info("Data preparation complete.")

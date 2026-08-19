@@ -1,13 +1,15 @@
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import Literal
 
 from cfa.stf.routine._paths import FABLE_DIR
 from cfa.stf.routine.data.data_access import ForecastSourceName
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
-from cfa.stf.routine.utils.common_utils import run_r_script
+from cfa.stf.routine.utils.common_utils import (
+    generate_epiweekly_data,
+    run_r_script,
+)
 
 
 def fable_e_other_forecasts(
@@ -47,9 +49,10 @@ class FablePipeline(ForecastPipeline):
     def sources(self) -> set[ForecastSourceName]:
         return {"nssp"}
 
-    @property
-    def nssp_frequency(self) -> Literal["daily", "epiweekly"]:
-        return "epiweekly" if self.epiweekly else "daily"
+    def transform_serialized_data(self, run: ForecastRun) -> None:
+        if self.epiweekly:
+            self.logger.info("Generating epiweekly datasets from daily datasets...")
+            generate_epiweekly_data(run.data_dir, overwrite_daily=True)
 
     def run_model(self, run: ForecastRun) -> None:
         n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days

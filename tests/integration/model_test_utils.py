@@ -3,17 +3,17 @@ from pathlib import Path
 
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
+from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
-from cfa.stf.routine.data import prep_data
 from cfa.stf.routine.data.generate_test_data import (
     REPORT_DATE,
     REPORTING_DELAY_PMF,
-    make_forecast_data,
+    make_surveillance_inputs,
 )
-from cfa.stf.routine.epiautogp import epiautogp_forecast_utils as epiautogp_utils
 from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
+from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
@@ -54,7 +54,7 @@ def resolve_data_mode(request) -> str:
 
 
 def patch_dataops_with_mock_data(monkeypatch) -> None:
-    def load_forecast_data(
+    def load_surveillance_inputs(
         *,
         disease,
         loc_abb,
@@ -64,7 +64,7 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         sources,
         **kwargs,
     ):
-        return make_forecast_data(
+        return make_surveillance_inputs(
             location=loc_abb,
             disease=disease,
             sources=sources,
@@ -72,26 +72,28 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
             last_training_date=last_training_date,
         )
 
-    for module in (fable_module, pyrenew_module):
-        monkeypatch.setattr(module, "load_forecast_data", load_forecast_data)
-    monkeypatch.setattr(epiautogp_utils, "load_forecast_data", load_forecast_data)
     monkeypatch.setattr(
-        prep_data,
+        forecast_pipeline_module,
+        "load_surveillance_inputs",
+        load_surveillance_inputs,
+    )
+    monkeypatch.setattr(
+        pyrenew_inputs_module,
         "get_nnh_generation_interval_pmf",
         lambda **kwargs: GENERATION_INTERVAL_PMF.copy(),
     )
     monkeypatch.setattr(
-        prep_data,
+        pyrenew_inputs_module,
         "get_nnh_delay_pmf",
         lambda **kwargs: DELAY_PMF.copy(),
     )
     monkeypatch.setattr(
-        prep_data,
+        pyrenew_inputs_module,
         "get_nnh_right_truncation_pmf",
         lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )
     monkeypatch.setattr(
-        epiautogp_utils,
+        epiautogp_module,
         "get_nnh_right_truncation_pmf",
         lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )

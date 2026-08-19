@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from cfa.stf.routine.epiautogp.forecast_spec import ForecastSpec
+    from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ class NowcastSource(Protocol):
     def ensure_applicable(
         self,
         *,
-        forecast_spec: ForecastSpec,
+        config: EpiAutoGPConfig,
     ) -> None:
         """Ensure this source applies to a forecast configuration."""
         ...

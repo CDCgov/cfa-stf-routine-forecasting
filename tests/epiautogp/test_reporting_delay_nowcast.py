@@ -6,7 +6,7 @@ import math
 import pytest
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.forecast_spec import ForecastSpec
+from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.nowcast import FixedNowcast
 from cfa.stf.routine.epiautogp.reporting_delay import (
     inflate_report,
@@ -17,12 +17,9 @@ from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowc
 
 def _spec(
     *, target: str = "nssp", ed_visit_type: str = "observed", frequency: str = "daily"
-) -> ForecastSpec:
-    """Build a ForecastSpec varying only the applicability fields."""
-    return ForecastSpec(
-        disease="covid",
-        loc="CA",
-        report_date=dt.date(2024, 1, 1),
+) -> EpiAutoGPConfig:
+    """Build an EpiAutoGPConfig varying only the applicability fields."""
+    return EpiAutoGPConfig(
         target=target,
         frequency=frequency,
         ed_visit_type=ed_visit_type,
@@ -77,7 +74,7 @@ class TestReportingDelayNowcastEnsureApplicable:
         # spec for protocol compatibility but ignored here. The resolver
         # enforces daily cadence via a soft warning.
         spec = _spec(target=target, ed_visit_type=ed_visit_type, frequency="daily")
-        assert ReportingDelayNowcast.ensure_applicable(forecast_spec=spec) is None
+        assert ReportingDelayNowcast.ensure_applicable(config=spec) is None
 
     def test_percentage_target_raises_with_explanation(self):
         spec = _spec(ed_visit_type="pct")
@@ -86,7 +83,7 @@ class TestReportingDelayNowcastEnsureApplicable:
             ValueError,
             match="same reporting-delay inflation factor.*would cancel out",
         ):
-            ReportingDelayNowcast.ensure_applicable(forecast_spec=spec)
+            ReportingDelayNowcast.ensure_applicable(config=spec)
 
 
 class TestReportingDelayNowcastGetNowcastData:
@@ -158,7 +155,7 @@ class TestReportingDelayNowcastGetNowcastData:
 
 class TestFixedNowcast:
     def test_ensure_applicable_accepts_any_spec(self):
-        assert FixedNowcast.ensure_applicable(forecast_spec=_spec()) is None
+        assert FixedNowcast.ensure_applicable(config=_spec()) is None
 
     def test_returns_stored_data(self):
         data = NowcastData(dates=[dt.date(2024, 1, 1)], reports=[[1.0]])

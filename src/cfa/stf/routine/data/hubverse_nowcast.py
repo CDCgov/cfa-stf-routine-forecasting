@@ -12,7 +12,8 @@ import polars as pl
 from cfa.stf.routine.data.nowcast import NowcastData
 
 if TYPE_CHECKING:
-    from cfa.stf.routine.epiautogp.forecast_spec import ForecastSpec
+    from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
+    from cfa.stf.routine.forecast_run import ForecastRun
 
 HUBVERSE_MODEL_OUTPUT_SUBDIR = Path("model-output", "CFA-nowcastNHSN")
 HUBVERSE_TARGETS = {
@@ -36,25 +37,26 @@ class HubverseNowcast:
     """Read one materialized Hubverse sample artifact as nowcast trajectories."""
 
     containing_dir: Path
-    forecast_spec: ForecastSpec
+    forecast_run: ForecastRun
+    config: EpiAutoGPConfig
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "containing_dir", Path(self.containing_dir))
 
     @staticmethod
-    def ensure_applicable(*, forecast_spec: ForecastSpec) -> None:
+    def ensure_applicable(*, config: EpiAutoGPConfig) -> None:
         """Whether Hubverse NHSN sample output matches the requested model."""
         if (
-            forecast_spec.target != "nhsn"
-            or forecast_spec.frequency != "epiweekly"
-            or forecast_spec.ed_visit_type != "observed"
+            config.target != "nhsn"
+            or config.frequency != "epiweekly"
+            or config.ed_visit_type != "observed"
         ):
             raise ValueError(
                 "Hubverse nowcasting is only applicable when target='nhsn', "
                 "frequency='epiweekly', and ed_visit_type='observed'; got "
-                f"target={forecast_spec.target!r}, "
-                f"frequency={forecast_spec.frequency!r}, and "
-                f"ed_visit_type={forecast_spec.ed_visit_type!r}."
+                f"target={config.target!r}, "
+                f"frequency={config.frequency!r}, and "
+                f"ed_visit_type={config.ed_visit_type!r}."
             )
 
     def _artifact_path(self) -> Path:
@@ -73,11 +75,11 @@ class HubverseNowcast:
 
     def _expected_target(self) -> str:
         try:
-            return HUBVERSE_TARGETS[self.forecast_spec.disease]
+            return HUBVERSE_TARGETS[self.forecast_run.disease]
         except KeyError as exc:
             raise ValueError(
                 "No Hubverse NHSN target mapping for disease "
-                f"{self.forecast_spec.disease!r}."
+                f"{self.forecast_run.disease!r}."
             ) from exc
 
     def get_nowcast_data(
@@ -111,7 +113,7 @@ class HubverseNowcast:
         if hubverse.get_column("origin_date").null_count():
             raise ValueError("Hubverse Parquet contains missing origin_date values.")
         origins = hubverse.get_column("origin_date").unique().to_list()
-        expected_origin = self.forecast_spec.report_date
+        expected_origin = self.forecast_run.report_date
         if len(origins) != 1 or origins[0] != expected_origin:
             raise ValueError(
                 "Hubverse Parquet must contain exactly the EpiAutoGP run vintage "
@@ -125,21 +127,21 @@ class HubverseNowcast:
                 f"Hubverse Parquet contains no rows for target {expected_target!r}."
             )
 
-        expected_location = self.forecast_spec.loc.lower()
+        expected_location = self.forecast_run.loc.lower()
         location_rows = target_rows.filter(
             pl.col("location").str.to_lowercase() == expected_location
         )
         if location_rows.is_empty():
             raise ValueError(
                 "Hubverse Parquet contains no rows for location "
-                f"{self.forecast_spec.loc!r} and target {expected_target!r}."
+                f"{self.forecast_run.loc!r} and target {expected_target!r}."
             )
 
         samples = location_rows.filter(pl.col("output_type") == "sample")
         if samples.is_empty():
             raise ValueError(
                 "Hubverse Parquet contains no sample rows for location "
-                f"{self.forecast_spec.loc!r} and target {expected_target!r}."
+                f"{self.forecast_run.loc!r} and target {expected_target!r}."
             )
 
         nullable_columns = [

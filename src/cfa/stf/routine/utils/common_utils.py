@@ -9,10 +9,10 @@ import subprocess
 from pathlib import Path
 
 import polars as pl
-from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data
+from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data, daily_to_weekly
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
-from cfa.stf.routine._paths import DATA_DIR, UTILS_DIR
+from cfa.stf.routine._paths import UTILS_DIR
 from cfa.stf.routine.utils.cli_utils import run_command
 
 # Canonical disease names and location abbreviations
@@ -619,7 +619,7 @@ def create_prop_samples(
     aggregate_other: bool = False,
     save: bool = True,
 ) -> None:
-    """Create proportion samples by calling the R script.
+    """Create proportion samples from two model outputs.
 
     Parameters
     ----------
@@ -650,35 +650,144 @@ def create_prop_samples(
     -------
     None
     """
-    args = [
-        str(model_run_dir),
-        "--num-model-name",
-        num_model_name,
-        "--other-model-name",
-        other_model_name,
-        "--num-var-name",
-        num_var_name,
-        "--other-var-name",
-        other_var_name,
-        "--prop-var-name",
-        prop_var_name,
-    ]
-    if augment_num_with_obs:
-        args.append("--augment-num-with-obs")
-    if augment_other_with_obs:
-        args.append("--augment-other-with-obs")
-    if aggregate_num:
-        args.append("--aggregate-num")
-    if aggregate_other:
-        args.append("--aggregate-other")
-    if save:
-        args.append("--save")
+    model_run_dir = Path(model_run_dir)
 
-    run_r_script(
-        UTILS_DIR / "create_prop_samples.R",
-        args,
-        function_name="create_prop_samples",
+    def read_model_output(
+        model_name: str, var_name: str, filename: str
+    ) -> pl.DataFrame:
+        path = model_run_dir / model_name / filename
+        if path.suffix == ".parquet":
+            data = pl.read_parquet(path)
+        else:
+            data = pl.read_csv(
+                path,
+                separator="\t",
+                null_values="NA",
+                try_parse_dates=True,
+            )
+
+        data = (
+            data.filter(pl.col(".variable") == var_name)
+            .drop(".variable")
+            .rename({".value": var_name})
+            .drop(".chain", ".iteration", strict=False)
+        )
+        populated_columns = [
+            column
+            for column in data.columns
+            if not data.get_column(column).is_null().all()
+        ]
+        return data.select(populated_columns)
+
+    def augment_with_observations(
+        samples: pl.DataFrame, observations: pl.DataFrame
+    ) -> pl.DataFrame:
+        sample_resolutions = samples.get_column("resolution").unique().to_list()
+        observation_resolutions = (
+            observations.get_column("resolution").unique().to_list()
+        )
+        if len(sample_resolutions) != 1 or len(observation_resolutions) != 1:
+            raise ValueError("Samples and observations must each have one resolution")
+        if sample_resolutions != observation_resolutions:
+            raise ValueError("Sample and observation resolutions must match")
+
+        first_forecast_date = samples.get_column("date").min()
+        draws = samples.select(".draw").unique().sort(".draw")
+        observed_samples = (
+            observations.filter(pl.col("date") < first_forecast_date)
+            .join(draws, how="cross")
+            .with_columns(
+                pl.lit("train").alias("data_type"),
+                pl.lit(sample_resolutions[0]).alias("resolution"),
+            )
+        )
+        return pl.concat([observed_samples, samples], how="diagonal_relaxed")
+
+    def aggregate_to_epiweekly(data: pl.DataFrame, var_name: str) -> pl.DataFrame:
+        id_columns = [
+            column for column in data.columns if column not in {"date", var_name}
+        ]
+        return (
+            daily_to_weekly(
+                data,
+                value_col=var_name,
+                date_col="date",
+                id_cols=id_columns,
+                weekly_value_name=var_name,
+                standard="MMWR",
+                with_week_end_date=True,
+                week_end_date_name="date",
+                strict=True,
+            )
+            .with_columns(pl.lit("epiweekly").alias("resolution"))
+            .drop("week", "weekyear")
+        )
+
+    def to_prop(
+        numerator: pl.DataFrame,
+        other: pl.DataFrame,
+    ) -> pl.DataFrame:
+        join_columns = [
+            column
+            for column in numerator.columns
+            if column in other.columns and column not in {num_var_name, other_var_name}
+        ]
+        return (
+            numerator.join(other, on=join_columns, how="inner", nulls_equal=True)
+            .with_columns(
+                (
+                    pl.col(num_var_name)
+                    / (pl.col(num_var_name) + pl.col(other_var_name))
+                ).alias(".value"),
+                pl.lit(prop_var_name).alias(".variable"),
+            )
+            .drop(num_var_name, other_var_name)
+        )
+
+    num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
+    other_samples = read_model_output(
+        other_model_name, other_var_name, "samples.parquet"
     )
+    num_data = read_model_output(num_model_name, num_var_name, "data/combined_data.tsv")
+    other_data = read_model_output(
+        other_model_name, other_var_name, "data/combined_data.tsv"
+    )
+
+    if augment_num_with_obs:
+        num_samples = augment_with_observations(num_samples, num_data)
+    if augment_other_with_obs:
+        other_samples = augment_with_observations(other_samples, other_data)
+    if aggregate_num:
+        num_samples = aggregate_to_epiweekly(num_samples, num_var_name)
+        num_data = aggregate_to_epiweekly(num_data, num_var_name)
+    if aggregate_other:
+        other_samples = aggregate_to_epiweekly(other_samples, other_var_name)
+        other_data = aggregate_to_epiweekly(other_data, other_var_name)
+
+    prop_samples = to_prop(num_samples, other_samples)
+    prop_data = to_prop(num_data, other_data)
+
+    def aggregated_model_name(model_name: str, aggregate: bool) -> str:
+        return f"epiweekly_aggregated_{model_name}" if aggregate else model_name
+
+    prop_model_name = "_".join(
+        [
+            "prop",
+            aggregated_model_name(num_model_name, aggregate_num),
+            aggregated_model_name(other_model_name, aggregate_other),
+        ]
+    )
+
+    if save:
+        prop_model_dir = model_run_dir / prop_model_name
+        data_dir = prop_model_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        prop_samples.write_parquet(prop_model_dir / "samples.parquet")
+        prop_data.write_csv(
+            data_dir / "combined_data.tsv",
+            separator="\t",
+            null_value="NA",
+        )
 
 
 def append_prop_data_to_combined_data(
@@ -726,17 +835,3 @@ def append_prop_data_to_combined_data(
         data.write_csv(path, null_value="NA")
     elif suffix == ".parquet":
         data.write_parquet(path)
-
-
-def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> None:
-    """Generate epiweekly datasets from daily datasets using an R script."""
-    args = [str(data_dir)]
-    if overwrite_daily:
-        args.append("--overwrite-daily")
-
-    run_r_script(
-        DATA_DIR / "generate_epiweekly_data.R",
-        args,
-        function_name="generate_epiweekly_data",
-    )
-    return None

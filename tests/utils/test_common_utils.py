@@ -13,6 +13,7 @@ from cfa.stf.routine.utils.cli_utils import run_command
 from cfa.stf.routine.utils.common_utils import (
     append_prop_data_to_combined_data,
     calculate_training_dates,
+    create_prop_samples,
     parse_exclude_date_ranges,
     run_julia_script,
     run_r_script,
@@ -203,6 +204,81 @@ class TestDataWranglingUtils:
             }
         )
         assert_frame_equal(result, expected)
+
+    def test_create_prop_samples_aggregates_with_python_forecasttools(self, tmp_path):
+        num_model_dir = tmp_path / "num_model"
+        other_model_dir = tmp_path / "other_model"
+        (num_model_dir / "data").mkdir(parents=True)
+        (other_model_dir / "data").mkdir(parents=True)
+
+        daily_dates = [
+            dt.date(2025, 1, 5) + dt.timedelta(days=day) for day in range(14)
+        ]
+        num_samples = pl.DataFrame(
+            {
+                "date": daily_dates,
+                "geo_value": ["CA"] * 14,
+                "disease": ["flu"] * 14,
+                ".variable": ["observed_ed_visits"] * 14,
+                ".value": list(range(1, 15)),
+                ".draw": [1] * 14,
+                ".chain": [1] * 14,
+                ".iteration": list(range(1, 15)),
+                "resolution": ["daily"] * 14,
+                "data_type": ["forecast"] * 14,
+            }
+        )
+        num_data = num_samples.drop(".draw", ".chain", ".iteration").with_columns(
+            pl.lit("train").alias("data_type")
+        )
+        weekly_dates = [dt.date(2025, 1, 11), dt.date(2025, 1, 18)]
+        other_samples = pl.DataFrame(
+            {
+                "date": weekly_dates,
+                "geo_value": ["CA"] * 2,
+                "disease": ["flu"] * 2,
+                ".variable": ["other_ed_visits"] * 2,
+                ".value": [63, 70],
+                ".draw": [1, 1],
+                "resolution": ["epiweekly"] * 2,
+                "data_type": ["forecast"] * 2,
+            }
+        )
+        other_data = other_samples.drop(".draw").with_columns(
+            pl.lit("train").alias("data_type")
+        )
+        num_samples.write_parquet(num_model_dir / "samples.parquet")
+        other_samples.write_parquet(other_model_dir / "samples.parquet")
+        num_data.write_csv(num_model_dir / "data" / "combined_data.tsv", separator="\t")
+        other_data.write_csv(
+            other_model_dir / "data" / "combined_data.tsv", separator="\t"
+        )
+
+        create_prop_samples(
+            model_run_dir=tmp_path,
+            num_model_name="num_model",
+            other_model_name="other_model",
+            aggregate_num=True,
+            augment_other_with_obs=False,
+        )
+
+        output_dir = tmp_path / "prop_epiweekly_aggregated_num_model_other_model"
+        samples = pl.read_parquet(output_dir / "samples.parquet").sort("date")
+        data = pl.read_csv(
+            output_dir / "data" / "combined_data.tsv",
+            separator="\t",
+            try_parse_dates=True,
+        ).sort("date")
+        expected_values = [28 / (28 + 63), 77 / (77 + 70)]
+        assert samples.get_column("date").to_list() == weekly_dates
+        assert samples.get_column("resolution").unique().to_list() == ["epiweekly"]
+        assert samples.get_column(".variable").unique().to_list() == [
+            "prop_disease_ed_visits"
+        ]
+        assert samples.get_column(".value").to_list() == pytest.approx(expected_values)
+        assert ".chain" not in samples.columns
+        assert ".iteration" not in samples.columns
+        assert data.get_column(".value").to_list() == pytest.approx(expected_values)
 
 
 class TestCLIUtils:

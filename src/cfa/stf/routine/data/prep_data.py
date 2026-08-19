@@ -52,32 +52,8 @@ def aggregate_epiweekly_nssp(data: pl.DataFrame) -> pl.DataFrame:
     if weekly_data.is_empty():
         return data.clear()
 
-    # R's sum() propagates NA while Polars sum() ignores nulls. Preserve the
-    # R forecasttools behavior while using its Python counterpart for grouping.
-    weekly_nulls = daily_to_weekly(
-        long_data.with_columns(
-            pl.col(".value").is_null().cast(pl.Int8).alias("_is_null")
-        ),
-        value_col="_is_null",
-        date_col="date",
-        id_cols=id_columns,
-        weekly_value_name="_n_null",
-        standard="MMWR",
-        with_week_end_date=True,
-        week_end_date_name="date",
-        strict=True,
-    )
-    join_columns = ["week", "weekyear", *id_columns, "date"]
     aggregated = (
-        weekly_data.join(
-            weekly_nulls.select(*join_columns, "_n_null"),
-            on=join_columns,
-            how="left",
-        )
-        .with_columns(
-            pl.when(pl.col("_n_null") == 0).then(pl.col(".value")).alias(".value")
-        )
-        .pivot(
+        weekly_data.pivot(
             on=".variable",
             index=["date", *grouping_columns, "data_type"],
             values=".value",

@@ -793,7 +793,7 @@ dependencies = [
 [[package]]
 name = "cfa-stf-forecasttools"
 version = "0.1.0"
-source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#56feada42d7963e13261d8e436b480f056ab5bf7" }
+source = { git = "https://github.com/CDCgov/cfa-stf-forecasttools?rev=main#0e8b526c1363625e6010a62c931710000864e4b5" }
 dependencies = [
     { name = "epiweeks" },
     { name = "numpy" },

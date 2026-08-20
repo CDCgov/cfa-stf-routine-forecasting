@@ -20,14 +20,14 @@ from cfa.stf.routine.data.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
 )
-from cfa.stf.routine.utils.common_utils import (
-    create_prop_samples,
-    make_figures_from_model_fit_dir,
-    model_fit_dir_to_hub_tbl,
-    parse_model_batch_dir_name,
-)
+from cfa.stf.routine.utils.directory_utils import parse_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     main as postprocess_batches,
+)
+from cfa.stf.routine.utils.prop_utils import create_prop_samples
+from cfa.stf.routine.utils.r_utils import (
+    make_figures_from_model_fit_dir,
+    model_fit_dir_to_hub_tbl,
 )
 
 EXPECTED_MODELS = [

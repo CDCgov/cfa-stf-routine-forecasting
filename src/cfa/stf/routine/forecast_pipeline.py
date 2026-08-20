@@ -12,9 +12,9 @@ from cfa.stf.routine.data.data_access import (
 )
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
-from cfa.stf.routine.utils.common_utils import (
-    append_prop_data_to_combined_data,
-    calculate_training_dates,
+from cfa.stf.routine.utils.date_utils import calculate_training_dates
+from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
+from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
 )

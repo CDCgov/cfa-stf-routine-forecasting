@@ -10,7 +10,7 @@ from cfa.stf.routine.data.data_access import (
     NSSPData,
     SurveillanceInputs,
 )
-from cfa.stf.routine.utils.common_utils import get_model_batch_dir_name
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 
 @dataclass(frozen=True)

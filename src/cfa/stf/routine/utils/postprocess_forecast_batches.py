@@ -15,7 +15,7 @@ from pathlib import Path
 import polars as pl
 
 from cfa.stf.routine.utils import collate_plots as cp
-from cfa.stf.routine.utils.common_utils import (
+from cfa.stf.routine.utils.directory_utils import (
     get_all_forecast_dirs,
     parse_model_batch_dir_name,
 )

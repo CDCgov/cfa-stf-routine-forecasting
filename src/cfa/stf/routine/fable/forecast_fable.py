@@ -6,10 +6,8 @@ from cfa.stf.routine._paths import FABLE_DIR
 from cfa.stf.routine.data.data_access import ForecastSourceName
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
-from cfa.stf.routine.utils.common_utils import (
-    generate_epiweekly_data,
-    run_r_script,
-)
+from cfa.stf.routine.utils.data_utils import generate_epiweekly_data
+from cfa.stf.routine.utils.language_utils import run_r_script
 
 
 def fable_e_other_forecasts(

@@ -6,7 +6,7 @@ from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data import prep_data
 from cfa.stf.routine.data.prep_data import serialize_data
-from cfa.stf.routine.utils.common_utils import append_prop_data_to_combined_data
+from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
 
 
 @pytest.mark.parametrize(

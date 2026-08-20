@@ -14,7 +14,6 @@ from cfa.stf.forecasttools import (
     LOCATION_LIST,
     append_prop_data,
     augment_samples_with_observations,
-    create_proportions,
     daily_to_weekly,
 )
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
@@ -676,7 +675,6 @@ def create_prop_samples(
         data = (
             data.filter(pl.col(".variable") == var_name)
             .drop(".variable")
-            .rename({".value": var_name})
             .drop(".chain", ".iteration", strict=False)
         )
         populated_columns = [
@@ -686,15 +684,15 @@ def create_prop_samples(
         ]
         return data.select(populated_columns)
 
-    def aggregate_to_epiweekly(data: pl.DataFrame, var_name: str) -> pl.DataFrame:
-        id_columns = list(cs.expand_selector(data, cs.exclude("date", var_name)))
+    def aggregate_to_epiweekly(data: pl.DataFrame) -> pl.DataFrame:
+        id_columns = list(cs.expand_selector(data, cs.exclude("date", ".value")))
         return (
             daily_to_weekly(
                 data,
-                value_col=var_name,
+                value_col=".value",
                 date_col="date",
                 id_cols=id_columns,
-                weekly_value_name=var_name,
+                weekly_value_name=".value",
                 standard="MMWR",
                 with_week_end_date=True,
                 week_end_date_name="date",
@@ -702,6 +700,30 @@ def create_prop_samples(
             )
             .with_columns(pl.lit("epiweekly").alias("resolution"))
             .drop("week", "weekyear")
+        )
+
+    def to_prop(
+        numerator: pl.DataFrame,
+        other: pl.DataFrame,
+    ) -> pl.DataFrame:
+        join_columns = sorted(
+            set(numerator.columns).intersection(other.columns) - {".value"}
+        )
+        return (
+            numerator.join(
+                other,
+                on=join_columns,
+                how="inner",
+                suffix="_other",
+                nulls_equal=True,
+            )
+            .with_columns(
+                (pl.col(".value") / (pl.col(".value") + pl.col(".value_other"))).alias(
+                    ".value"
+                ),
+                pl.lit(prop_var_name).alias(".variable"),
+            )
+            .drop(".value_other")
         )
 
     num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
@@ -718,26 +740,14 @@ def create_prop_samples(
     if augment_other_with_obs:
         other_samples = augment_samples_with_observations(other_samples, other_data)
     if aggregate_num:
-        num_samples = aggregate_to_epiweekly(num_samples, num_var_name)
-        num_data = aggregate_to_epiweekly(num_data, num_var_name)
+        num_samples = aggregate_to_epiweekly(num_samples)
+        num_data = aggregate_to_epiweekly(num_data)
     if aggregate_other:
-        other_samples = aggregate_to_epiweekly(other_samples, other_var_name)
-        other_data = aggregate_to_epiweekly(other_data, other_var_name)
+        other_samples = aggregate_to_epiweekly(other_samples)
+        other_data = aggregate_to_epiweekly(other_data)
 
-    prop_samples = create_proportions(
-        numerator_df=num_samples,
-        other_df=other_samples,
-        num_val_col=num_var_name,
-        other_val_col=other_var_name,
-        prop_var=prop_var_name,
-    )
-    prop_data = create_proportions(
-        numerator_df=num_data,
-        other_df=other_data,
-        num_val_col=num_var_name,
-        other_val_col=other_var_name,
-        prop_var=prop_var_name,
-    )
+    prop_samples = to_prop(num_samples, other_samples)
+    prop_data = to_prop(num_data, other_data)
 
     def aggregated_model_name(model_name: str, aggregate: bool) -> str:
         return f"epiweekly_aggregated_{model_name}" if aggregate else model_name

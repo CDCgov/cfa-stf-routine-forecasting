@@ -461,7 +461,6 @@ def _run_fusion_model(
         other_model_name=other_model_name,
         aggregate_num=aggregate_num,
         aggregate_other=aggregate_other,
-        save=True,
     )
 
     fusion_model_fit_dir = Path(model_loc_dir, fusion_model_name)

@@ -20,7 +20,6 @@ def create_prop_fusion_model(
     augment_other_with_obs: bool = True,
     aggregate_num: bool = False,
     aggregate_other: bool = False,
-    save: bool = True,
 ) -> None:
     """Create a proportion fusion model using the bundled R script."""
     args = [
@@ -44,11 +43,10 @@ def create_prop_fusion_model(
         args.append("--aggregate-num")
     if aggregate_other:
         args.append("--aggregate-other")
-    if save:
-        args.append("--save")
+    args.append("--save")
 
     run_r_script(
-        UTILS_DIR / "create_prop_samples.R",
+        UTILS_DIR / "create_prop_fusion_model.R",
         args,
         function_name="create_prop_fusion_model",
     )

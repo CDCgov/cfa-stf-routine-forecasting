@@ -85,7 +85,6 @@ def _run_fusions(model_run_dir: Path) -> None:
             num_model_name=fusion_spec["num_model_name"],
             other_model_name=fusion_spec["other_model_name"],
             aggregate_num=fusion_spec["aggregate_num"],
-            save=True,
         )
         fusion_model_dir = model_run_dir / fusion_spec["fusion_model_name"]
         make_figures_from_model_fit_dir(

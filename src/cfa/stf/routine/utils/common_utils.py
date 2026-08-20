@@ -9,7 +9,13 @@ import subprocess
 from pathlib import Path
 
 import polars as pl
-from cfa.stf.forecasttools import LOCATION_LIST, append_prop_data, daily_to_weekly
+from cfa.stf.forecasttools import (
+    LOCATION_LIST,
+    append_prop_data,
+    augment_samples_with_observations,
+    create_proportions,
+    daily_to_weekly,
+)
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
 from cfa.stf.routine._paths import UTILS_DIR
@@ -679,30 +685,6 @@ def create_prop_samples(
         ]
         return data.select(populated_columns)
 
-    def augment_with_observations(
-        samples: pl.DataFrame, observations: pl.DataFrame
-    ) -> pl.DataFrame:
-        sample_resolutions = samples.get_column("resolution").unique().to_list()
-        observation_resolutions = (
-            observations.get_column("resolution").unique().to_list()
-        )
-        if len(sample_resolutions) != 1 or len(observation_resolutions) != 1:
-            raise ValueError("Samples and observations must each have one resolution")
-        if sample_resolutions != observation_resolutions:
-            raise ValueError("Sample and observation resolutions must match")
-
-        first_forecast_date = samples.get_column("date").min()
-        draws = samples.select(".draw").unique().sort(".draw")
-        observed_samples = (
-            observations.filter(pl.col("date") < first_forecast_date)
-            .join(draws, how="cross")
-            .with_columns(
-                pl.lit("train").alias("data_type"),
-                pl.lit(sample_resolutions[0]).alias("resolution"),
-            )
-        )
-        return pl.concat([observed_samples, samples], how="diagonal_relaxed")
-
     def aggregate_to_epiweekly(data: pl.DataFrame, var_name: str) -> pl.DataFrame:
         id_columns = [
             column for column in data.columns if column not in {"date", var_name}
@@ -723,27 +705,6 @@ def create_prop_samples(
             .drop("week", "weekyear")
         )
 
-    def to_prop(
-        numerator: pl.DataFrame,
-        other: pl.DataFrame,
-    ) -> pl.DataFrame:
-        join_columns = [
-            column
-            for column in numerator.columns
-            if column in other.columns and column not in {num_var_name, other_var_name}
-        ]
-        return (
-            numerator.join(other, on=join_columns, how="inner", nulls_equal=True)
-            .with_columns(
-                (
-                    pl.col(num_var_name)
-                    / (pl.col(num_var_name) + pl.col(other_var_name))
-                ).alias(".value"),
-                pl.lit(prop_var_name).alias(".variable"),
-            )
-            .drop(num_var_name, other_var_name)
-        )
-
     num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
     other_samples = read_model_output(
         other_model_name, other_var_name, "samples.parquet"
@@ -754,9 +715,9 @@ def create_prop_samples(
     )
 
     if augment_num_with_obs:
-        num_samples = augment_with_observations(num_samples, num_data)
+        num_samples = augment_samples_with_observations(num_samples, num_data)
     if augment_other_with_obs:
-        other_samples = augment_with_observations(other_samples, other_data)
+        other_samples = augment_samples_with_observations(other_samples, other_data)
     if aggregate_num:
         num_samples = aggregate_to_epiweekly(num_samples, num_var_name)
         num_data = aggregate_to_epiweekly(num_data, num_var_name)
@@ -764,8 +725,20 @@ def create_prop_samples(
         other_samples = aggregate_to_epiweekly(other_samples, other_var_name)
         other_data = aggregate_to_epiweekly(other_data, other_var_name)
 
-    prop_samples = to_prop(num_samples, other_samples)
-    prop_data = to_prop(num_data, other_data)
+    prop_samples = create_proportions(
+        numerator_df=num_samples,
+        other_df=other_samples,
+        num_val_col=num_var_name,
+        other_val_col=other_var_name,
+        prop_var=prop_var_name,
+    )
+    prop_data = create_proportions(
+        numerator_df=num_data,
+        other_df=other_data,
+        num_val_col=num_var_name,
+        other_val_col=other_var_name,
+        prop_var=prop_var_name,
+    )
 
     def aggregated_model_name(model_name: str, aggregate: bool) -> str:
         return f"epiweekly_aggregated_{model_name}" if aggregate else model_name

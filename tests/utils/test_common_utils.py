@@ -280,6 +280,81 @@ class TestDataWranglingUtils:
         assert ".iteration" not in samples.columns
         assert data.get_column(".value").to_list() == pytest.approx(expected_values)
 
+    def test_create_prop_samples_augments_other_samples_with_observations(
+        self, tmp_path
+    ):
+        num_model_dir = tmp_path / "num_model"
+        other_model_dir = tmp_path / "other_model"
+        (num_model_dir / "data").mkdir(parents=True)
+        (other_model_dir / "data").mkdir(parents=True)
+
+        training_date = dt.date(2025, 1, 1)
+        forecast_date = dt.date(2025, 1, 2)
+        shared_columns = {
+            "geo_value": ["CA"] * 4,
+            "disease": ["flu"] * 4,
+            ".draw": [1, 2, 1, 2],
+            "resolution": ["daily"] * 4,
+            "data_type": ["train", "train", "forecast", "forecast"],
+        }
+        num_samples = pl.DataFrame(
+            {
+                "date": [training_date] * 2 + [forecast_date] * 2,
+                **shared_columns,
+                ".variable": ["observed_ed_visits"] * 4,
+                ".value": [2, 3, 4, 5],
+            }
+        )
+        other_samples = pl.DataFrame(
+            {
+                "date": [forecast_date] * 2,
+                "geo_value": ["CA"] * 2,
+                "disease": ["flu"] * 2,
+                ".draw": [1, 2],
+                "resolution": ["daily"] * 2,
+                "data_type": ["forecast"] * 2,
+                ".variable": ["other_ed_visits"] * 2,
+                ".value": [6, 5],
+            }
+        )
+        num_data = num_samples.filter(pl.col("date") == training_date).drop(".draw")
+        other_data = pl.DataFrame(
+            {
+                "date": [training_date],
+                "geo_value": ["CA"],
+                "disease": ["flu"],
+                "resolution": ["daily"],
+                "data_type": ["train"],
+                ".variable": ["other_ed_visits"],
+                ".value": [8],
+            }
+        )
+        num_samples.write_parquet(num_model_dir / "samples.parquet")
+        other_samples.write_parquet(other_model_dir / "samples.parquet")
+        num_data.write_csv(num_model_dir / "data" / "combined_data.tsv", separator="\t")
+        other_data.write_csv(
+            other_model_dir / "data" / "combined_data.tsv", separator="\t"
+        )
+
+        create_prop_samples(
+            model_run_dir=tmp_path,
+            num_model_name="num_model",
+            other_model_name="other_model",
+        )
+
+        samples = pl.read_parquet(
+            tmp_path / "prop_num_model_other_model" / "samples.parquet"
+        ).sort("date", ".draw")
+        assert samples.select("date", ".draw").rows() == [
+            (training_date, 1),
+            (training_date, 2),
+            (forecast_date, 1),
+            (forecast_date, 2),
+        ]
+        assert samples.get_column(".value").to_list() == pytest.approx(
+            [2 / 10, 3 / 11, 4 / 10, 5 / 10]
+        )
+
 
 class TestCLIUtils:
     """Tests for command-line utilities."""

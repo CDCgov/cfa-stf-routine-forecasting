@@ -2,8 +2,7 @@
 
 from pathlib import Path
 
-import polars as pl
-from cfa.stf.forecasttools import append_prop_data
+from cfa.stf.forecasttools import append_prop_data, read_tabular, write_tabular
 
 from cfa.stf.routine._paths import UTILS_DIR
 from cfa.stf.routine.utils.language_utils import run_r_script
@@ -60,18 +59,7 @@ def append_prop_data_to_combined_data(
 ) -> None:
     """Append disease ED visit proportion rows when both inputs are available."""
     path = Path(data_path)
-    suffix = path.suffix.lower()
-
-    if suffix == ".tsv":
-        data = pl.read_csv(path, separator="\t", null_values="NA")
-    elif suffix == ".csv":
-        data = pl.read_csv(path, null_values="NA")
-    elif suffix == ".parquet":
-        data = pl.read_parquet(path)
-    else:
-        raise ValueError(
-            "data_path must have a supported tabular extension: .tsv, .csv, or .parquet"
-        )
+    data = read_tabular(path)
 
     required_vars = {observed_var, other_var}
     available_vars = set(data.get_column(".variable").unique().to_list())
@@ -91,9 +79,4 @@ def append_prop_data_to_combined_data(
         other_var=other_var,
         prop_var=prop_var,
     )
-    if suffix == ".tsv":
-        data.write_csv(path, separator="\t", null_value="NA")
-    elif suffix == ".csv":
-        data.write_csv(path, null_value="NA")
-    else:
-        data.write_parquet(path)
+    write_tabular(data, path)

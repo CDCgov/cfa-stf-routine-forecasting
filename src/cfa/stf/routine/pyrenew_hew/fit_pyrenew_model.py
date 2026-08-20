@@ -5,7 +5,7 @@ import jax
 import numpy as np
 from pyrenew_multisignal.hew import PyrenewHEWData
 
-from cfa.stf.routine.utils.common_utils import build_pyrenew_hew_model_from_dir
+from cfa.stf.routine.pyrenew_hew.utils import build_pyrenew_hew_model_from_dir
 
 
 def fit_and_save_model(

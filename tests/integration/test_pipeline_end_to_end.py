@@ -20,14 +20,14 @@ from cfa.stf.routine.data.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
 )
-from cfa.stf.routine.utils.common_utils import (
-    create_prop_samples,
-    make_figures_from_model_fit_dir,
-    model_fit_dir_to_hub_tbl,
-    parse_model_batch_dir_name,
-)
+from cfa.stf.routine.utils.directory_utils import parse_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     main as postprocess_batches,
+)
+from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
+from cfa.stf.routine.utils.r_utils import (
+    make_figures_from_model_fit_dir,
+    model_fit_dir_to_hub_tbl,
 )
 
 EXPECTED_MODELS = [
@@ -80,12 +80,11 @@ def _run_fusions(model_run_dir: Path) -> None:
         },
     ]
     for fusion_spec in fusion_specs:
-        create_prop_samples(
+        create_prop_fusion_model(
             model_run_dir=model_run_dir,
             num_model_name=fusion_spec["num_model_name"],
             other_model_name=fusion_spec["other_model_name"],
             aggregate_num=fusion_spec["aggregate_num"],
-            save=True,
         )
         fusion_model_dir = model_run_dir / fusion_spec["fusion_model_name"]
         make_figures_from_model_fit_dir(

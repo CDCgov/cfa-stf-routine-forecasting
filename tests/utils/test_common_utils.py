@@ -1,4 +1,4 @@
-"""Unit tests for common utility functions."""
+"""Unit tests for shared utility functions."""
 
 import datetime as dt
 import logging
@@ -8,15 +8,14 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from cfa.stf.routine.utils import common_utils
+from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
-from cfa.stf.routine.utils.common_utils import (
-    append_prop_data_to_combined_data,
+from cfa.stf.routine.utils.date_utils import (
     calculate_training_dates,
     parse_exclude_date_ranges,
-    run_julia_script,
-    run_r_script,
 )
+from cfa.stf.routine.utils.language_utils import run_julia_script, run_r_script
+from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
 
 
 class TestValidationUtils:
@@ -225,7 +224,7 @@ class TestCLIUtils:
             calls.append((executable, args, kwargs))
             return sentinel
 
-        monkeypatch.setattr(common_utils, "run_command", fake_run_command)
+        monkeypatch.setattr(language_utils, "run_command", fake_run_command)
 
         result = runner("script", ["arg"])
 

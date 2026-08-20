@@ -64,7 +64,7 @@ to_prop <- function(num, other, num_var_name, other_var_name, prop_var_name) {
     rename(.value = !!prop_var_name)
 }
 
-create_prop_samples <- function(
+create_prop_fusion_model <- function(
   model_run_dir,
   num_model_name,
   other_model_name,
@@ -155,7 +155,7 @@ create_prop_samples <- function(
   ))
 }
 
-p <- arg_parser("Generate proportion samples") |>
+p <- arg_parser("Generate a proportion fusion model") |>
   add_argument(
     "model-run-dir",
     help = "Directory containing the model data and output.",
@@ -211,7 +211,7 @@ p <- arg_parser("Generate proportion samples") |>
 
 argv <- parse_args(p)
 
-create_prop_samples(
+create_prop_fusion_model(
   model_run_dir = argv$model_run_dir,
   num_model_name = argv$num_model_name,
   other_model_name = argv$other_model_name,

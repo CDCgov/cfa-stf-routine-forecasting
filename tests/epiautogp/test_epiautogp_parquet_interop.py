@@ -29,13 +29,13 @@ import polars as pl
 import pytest
 
 from cfa.stf.routine._paths import EPIAUTOGP_DIR, PYRENEW_HEW_DIR
-from cfa.stf.routine.utils.common_utils import (
-    model_fit_dir_to_hub_tbl,
+from cfa.stf.routine.utils.language_utils import (
     run_julia_script,
     run_r_code,
     run_r_script,
 )
 from cfa.stf.routine.utils.postprocess_forecast_batches import combine_hubverse_tables
+from cfa.stf.routine.utils.r_utils import model_fit_dir_to_hub_tbl
 
 FORECAST_DATES = [
     dt.date(2024, 2, 4),

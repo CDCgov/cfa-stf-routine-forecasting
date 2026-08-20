@@ -9,7 +9,7 @@ from cfa.stf.routine._paths import UTILS_DIR
 from cfa.stf.routine.utils.language_utils import run_r_script
 
 
-def create_prop_samples(
+def create_prop_fusion_model(
     model_run_dir: Path | str,
     num_model_name: str,
     other_model_name: str,
@@ -22,7 +22,7 @@ def create_prop_samples(
     aggregate_other: bool = False,
     save: bool = True,
 ) -> None:
-    """Create proportion samples using the bundled R script."""
+    """Create a proportion fusion model using the bundled R script."""
     args = [
         str(model_run_dir),
         "--num-model-name",
@@ -50,7 +50,7 @@ def create_prop_samples(
     run_r_script(
         UTILS_DIR / "create_prop_samples.R",
         args,
-        function_name="create_prop_samples",
+        function_name="create_prop_fusion_model",
     )
 
 

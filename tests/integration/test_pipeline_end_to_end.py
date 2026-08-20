@@ -24,7 +24,7 @@ from cfa.stf.routine.utils.directory_utils import parse_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     main as postprocess_batches,
 )
-from cfa.stf.routine.utils.prop_utils import create_prop_samples
+from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -80,7 +80,7 @@ def _run_fusions(model_run_dir: Path) -> None:
         },
     ]
     for fusion_spec in fusion_specs:
-        create_prop_samples(
+        create_prop_fusion_model(
             model_run_dir=model_run_dir,
             num_model_name=fusion_spec["num_model_name"],
             other_model_name=fusion_spec["other_model_name"],

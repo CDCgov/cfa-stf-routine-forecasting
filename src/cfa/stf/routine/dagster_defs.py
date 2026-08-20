@@ -38,7 +38,7 @@ from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrene
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
 from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
-from cfa.stf.routine.utils.prop_utils import create_prop_samples
+from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -455,7 +455,7 @@ def _run_fusion_model(
     """
     _throw_if_backfill(context, daily_partitions_def)
     model_loc_dir = get_model_loc_dir(context, model_base_config)
-    create_prop_samples(
+    create_prop_fusion_model(
         model_run_dir=model_loc_dir,
         num_model_name=num_model_name,
         other_model_name=other_model_name,

@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.forecasttools import daily_to_weekly
+
+from cfa.stf.routine.data.aggregation import aggregate_long_to_epiweekly
 
 if TYPE_CHECKING:
     from cfa.stf.routine.forecast_run import ForecastRun
@@ -31,24 +32,13 @@ def aggregate_epiweekly_nssp(data: pl.DataFrame) -> pl.DataFrame:
         "resolution",
     )
     grouping_columns = list(cs.expand_selector(data, grouping_selector))
-    id_columns = [*grouping_columns, "data_type", ".variable"]
     long_data = data.unpivot(
         on=value_selector,
         index=cs.exclude(value_selector, "resolution"),
         variable_name=".variable",
         value_name=".value",
     )
-    weekly_data = daily_to_weekly(
-        long_data,
-        value_col=".value",
-        date_col="date",
-        id_cols=id_columns,
-        weekly_value_name=".value",
-        standard="MMWR",
-        with_week_end_date=True,
-        week_end_date_name="date",
-        strict=True,
-    )
+    weekly_data = aggregate_long_to_epiweekly(long_data)
     if weekly_data.is_empty():
         return data.clear()
 

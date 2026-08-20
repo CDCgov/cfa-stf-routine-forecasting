@@ -9,17 +9,16 @@ import subprocess
 from pathlib import Path
 
 import polars as pl
-import polars.selectors as cs
 from cfa.stf.forecasttools import (
     LOCATION_LIST,
     append_prop_data,
     augment_samples_with_observations,
-    daily_to_weekly,
     read_tabular,
 )
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
 from cfa.stf.routine._paths import UTILS_DIR
+from cfa.stf.routine.data.aggregation import aggregate_long_to_epiweekly
 from cfa.stf.routine.utils.cli_utils import run_command
 
 # Canonical disease names and location abbreviations
@@ -675,24 +674,6 @@ def create_prop_samples(
         ]
         return data.select(populated_columns)
 
-    def aggregate_to_epiweekly(data: pl.DataFrame) -> pl.DataFrame:
-        id_columns = list(cs.expand_selector(data, cs.exclude("date", ".value")))
-        return (
-            daily_to_weekly(
-                data,
-                value_col=".value",
-                date_col="date",
-                id_cols=id_columns,
-                weekly_value_name=".value",
-                standard="MMWR",
-                with_week_end_date=True,
-                week_end_date_name="date",
-                strict=True,
-            )
-            .with_columns(pl.lit("epiweekly").alias("resolution"))
-            .drop("week", "weekyear")
-        )
-
     num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
     other_samples = read_model_output(
         other_model_name, other_var_name, "samples.parquet"
@@ -707,11 +688,11 @@ def create_prop_samples(
     if augment_other_with_obs:
         other_samples = augment_samples_with_observations(other_samples, other_data)
     if aggregate_num:
-        num_samples = aggregate_to_epiweekly(num_samples)
-        num_data = aggregate_to_epiweekly(num_data)
+        num_samples = aggregate_long_to_epiweekly(num_samples)
+        num_data = aggregate_long_to_epiweekly(num_data)
     if aggregate_other:
-        other_samples = aggregate_to_epiweekly(other_samples)
-        other_data = aggregate_to_epiweekly(other_data)
+        other_samples = aggregate_long_to_epiweekly(other_samples)
+        other_data = aggregate_long_to_epiweekly(other_data)
 
     prop_samples = append_prop_data(
         pl.concat([num_samples, other_samples], how="diagonal_relaxed"),

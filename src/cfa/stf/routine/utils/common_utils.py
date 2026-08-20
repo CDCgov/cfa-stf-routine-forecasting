@@ -15,6 +15,7 @@ from cfa.stf.forecasttools import (
     append_prop_data,
     augment_samples_with_observations,
     daily_to_weekly,
+    read_tabular,
 )
 from pyrenew_multisignal.hew import PyrenewHEWParam, build_pyrenew_hew_model
 
@@ -662,20 +663,10 @@ def create_prop_samples(
         model_name: str, var_name: str, filename: str
     ) -> pl.DataFrame:
         path = model_run_dir / model_name / filename
-        if path.suffix == ".parquet":
-            data = pl.read_parquet(path)
-        else:
-            data = pl.read_csv(
-                path,
-                separator="\t",
-                null_values="NA",
-                try_parse_dates=True,
-            )
+        data = read_tabular(path)
 
-        data = (
-            data.filter(pl.col(".variable") == var_name)
-            .drop(".variable")
-            .drop(".chain", ".iteration", strict=False)
+        data = data.filter(pl.col(".variable") == var_name).drop(
+            ".chain", ".iteration", strict=False
         )
         populated_columns = [
             column
@@ -702,30 +693,6 @@ def create_prop_samples(
             .drop("week", "weekyear")
         )
 
-    def to_prop(
-        numerator: pl.DataFrame,
-        other: pl.DataFrame,
-    ) -> pl.DataFrame:
-        join_columns = sorted(
-            set(numerator.columns).intersection(other.columns) - {".value"}
-        )
-        return (
-            numerator.join(
-                other,
-                on=join_columns,
-                how="inner",
-                suffix="_other",
-                nulls_equal=True,
-            )
-            .with_columns(
-                (pl.col(".value") / (pl.col(".value") + pl.col(".value_other"))).alias(
-                    ".value"
-                ),
-                pl.lit(prop_var_name).alias(".variable"),
-            )
-            .drop(".value_other")
-        )
-
     num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
     other_samples = read_model_output(
         other_model_name, other_var_name, "samples.parquet"
@@ -746,8 +713,18 @@ def create_prop_samples(
         other_samples = aggregate_to_epiweekly(other_samples)
         other_data = aggregate_to_epiweekly(other_data)
 
-    prop_samples = to_prop(num_samples, other_samples)
-    prop_data = to_prop(num_data, other_data)
+    prop_samples = append_prop_data(
+        pl.concat([num_samples, other_samples], how="diagonal_relaxed"),
+        observed_var=num_var_name,
+        other_var=other_var_name,
+        prop_var=prop_var_name,
+    ).filter(pl.col(".variable") == prop_var_name)
+    prop_data = append_prop_data(
+        pl.concat([num_data, other_data], how="diagonal_relaxed"),
+        observed_var=num_var_name,
+        other_var=other_var_name,
+        prop_var=prop_var_name,
+    ).filter(pl.col(".variable") == prop_var_name)
 
     def aggregated_model_name(model_name: str, aggregate: bool) -> str:
         return f"epiweekly_aggregated_{model_name}" if aggregate else model_name
@@ -782,16 +759,11 @@ def append_prop_data_to_combined_data(
     path = Path(data_path)
     suffix = path.suffix.lower()
 
-    if suffix == ".tsv":
-        data = pl.read_csv(path, separator="\t", null_values="NA")
-    elif suffix == ".csv":
-        data = pl.read_csv(path, null_values="NA")
-    elif suffix == ".parquet":
-        data = pl.read_parquet(path)
-    else:
+    if suffix not in {".tsv", ".csv", ".parquet"}:
         raise ValueError(
             "data_path must have a supported tabular extension: .tsv, .csv, or .parquet"
         )
+    data = read_tabular(path)
 
     required_vars = {observed_var, other_var}
     available_vars = set(data.get_column(".variable").unique().to_list())

@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import polars as pl
+import polars.selectors as cs
 from cfa.stf.forecasttools import (
     LOCATION_LIST,
     append_prop_data,
@@ -686,9 +687,7 @@ def create_prop_samples(
         return data.select(populated_columns)
 
     def aggregate_to_epiweekly(data: pl.DataFrame, var_name: str) -> pl.DataFrame:
-        id_columns = [
-            column for column in data.columns if column not in {"date", var_name}
-        ]
+        id_columns = list(cs.expand_selector(data, cs.exclude("date", var_name)))
         return (
             daily_to_weekly(
                 data,

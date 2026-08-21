@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from cfa.stf.routine._paths import EPIAUTOGP_DIR
-from cfa.stf.routine.utils.common_utils import run_julia_script
+from cfa.stf.routine.utils.language_utils import run_julia_script
 
 
 def _write_synthetic_input(path: Path) -> None:

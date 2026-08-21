@@ -17,7 +17,7 @@ from cfa.stf.routine.pyrenew_hew.model_inputs import (
     resolve_pyrenew_model_inputs,
     serialize_pyrenew_model_params,
 )
-from cfa.stf.routine.utils.common_utils import run_r_script
+from cfa.stf.routine.utils.language_utils import run_r_script
 
 
 def copy_priors(priors_path: Path, model_dir: Path) -> None:

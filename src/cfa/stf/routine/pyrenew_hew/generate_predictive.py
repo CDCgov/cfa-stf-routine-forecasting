@@ -13,7 +13,7 @@ from pyrenew_multisignal.hew import (
     flags_from_pyrenew_model_name,
 )
 
-from cfa.stf.routine.utils.common_utils import build_pyrenew_hew_model_from_dir
+from cfa.stf.routine.pyrenew_hew.utils import build_pyrenew_hew_model_from_dir
 
 
 def generate_and_save_predictions(

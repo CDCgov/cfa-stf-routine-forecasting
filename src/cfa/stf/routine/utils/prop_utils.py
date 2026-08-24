@@ -2,10 +2,16 @@
 
 from pathlib import Path
 
-from cfa.stf.forecasttools import append_prop_data, read_tabular, write_tabular
+import polars as pl
+from cfa.stf.forecasttools import (
+    append_prop_data,
+    augment_samples_with_observations,
+    create_proportions,
+    read_tabular,
+    write_tabular,
+)
 
-from cfa.stf.routine._paths import UTILS_DIR
-from cfa.stf.routine.utils.language_utils import run_r_script
+from cfa.stf.routine.utils.data_utils import aggregate_long_to_epiweekly
 
 
 def create_prop_fusion_model(
@@ -20,35 +26,78 @@ def create_prop_fusion_model(
     aggregate_num: bool = False,
     aggregate_other: bool = False,
 ) -> None:
-    """Create a proportion fusion model using the bundled R script."""
-    args = [
-        str(model_run_dir),
-        "--num-model-name",
-        num_model_name,
-        "--other-model-name",
-        other_model_name,
-        "--num-var-name",
-        num_var_name,
-        "--other-var-name",
-        other_var_name,
-        "--prop-var-name",
-        prop_var_name,
-    ]
-    if augment_num_with_obs:
-        args.append("--augment-num-with-obs")
-    if augment_other_with_obs:
-        args.append("--augment-other-with-obs")
-    if aggregate_num:
-        args.append("--aggregate-num")
-    if aggregate_other:
-        args.append("--aggregate-other")
-    args.append("--save")
+    """Create and save a proportion fusion model from two model outputs."""
+    model_run_dir = Path(model_run_dir)
 
-    run_r_script(
-        UTILS_DIR / "create_prop_fusion_model.R",
-        args,
-        function_name="create_prop_fusion_model",
+    def read_model_output(
+        model_name: str, var_name: str, filename: str
+    ) -> pl.DataFrame:
+        data = read_tabular(model_run_dir / model_name / filename)
+        data = (
+            data.filter(pl.col(".variable") == var_name)
+            .drop(".variable")
+            .rename({".value": var_name})
+            .drop(".chain", ".iteration", strict=False)
+        )
+        populated_columns = [
+            column
+            for column in data.columns
+            if not data.get_column(column).is_null().all()
+        ]
+        return data.select(populated_columns)
+
+    num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
+    other_samples = read_model_output(
+        other_model_name, other_var_name, "samples.parquet"
     )
+    num_data = read_model_output(num_model_name, num_var_name, "data/combined_data.tsv")
+    other_data = read_model_output(
+        other_model_name, other_var_name, "data/combined_data.tsv"
+    )
+
+    if augment_num_with_obs:
+        num_samples = augment_samples_with_observations(num_samples, num_data)
+    if augment_other_with_obs:
+        other_samples = augment_samples_with_observations(other_samples, other_data)
+    if aggregate_num:
+        num_samples = aggregate_long_to_epiweekly(num_samples, value_col=num_var_name)
+        num_data = aggregate_long_to_epiweekly(num_data, value_col=num_var_name)
+    if aggregate_other:
+        other_samples = aggregate_long_to_epiweekly(
+            other_samples, value_col=other_var_name
+        )
+        other_data = aggregate_long_to_epiweekly(other_data, value_col=other_var_name)
+
+    prop_samples = create_proportions(
+        numerator_df=num_samples,
+        other_df=other_samples,
+        num_val_col=num_var_name,
+        other_val_col=other_var_name,
+        prop_var=prop_var_name,
+    )
+    prop_data = create_proportions(
+        numerator_df=num_data,
+        other_df=other_data,
+        num_val_col=num_var_name,
+        other_val_col=other_var_name,
+        prop_var=prop_var_name,
+    )
+
+    def aggregated_model_name(model_name: str, aggregate: bool) -> str:
+        return f"epiweekly_aggregated_{model_name}" if aggregate else model_name
+
+    prop_model_name = "_".join(
+        [
+            "prop",
+            aggregated_model_name(num_model_name, aggregate_num),
+            aggregated_model_name(other_model_name, aggregate_other),
+        ]
+    )
+    prop_model_dir = model_run_dir / prop_model_name
+    data_dir = prop_model_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    write_tabular(prop_samples, prop_model_dir / "samples.parquet")
+    write_tabular(prop_data, data_dir / "combined_data.tsv")
 
 
 def append_prop_data_to_combined_data(

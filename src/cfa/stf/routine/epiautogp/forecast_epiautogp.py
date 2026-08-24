@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal, cast, get_args
 
 from cfa.stf.data import get_nnh_right_truncation_pmf
+from cfa.stf.forecasttools import write_tabular
 
 from cfa.stf.routine._paths import EPIAUTOGP_DIR
 from cfa.stf.routine.data.data_access import ForecastSourceName
@@ -212,7 +213,9 @@ class EpiAutoGPPipeline(ForecastPipeline):
     def transform_serialized_data(self, run: ForecastRun) -> None:
         if self.config.frequency == "epiweekly":
             self.logger.info("Generating epiweekly datasets from daily datasets...")
-            generate_epiweekly_data(run.data_dir, overwrite_daily=True)
+            data_path = run.data_dir / "combined_data.tsv"
+            epiweekly_data = generate_epiweekly_data(data_path)
+            write_tabular(epiweekly_data, data_path)
 
     def prepare_model_artifacts(self, run: ForecastRun) -> None:
         nowcast_source = _resolve_nowcast_source(

@@ -2,6 +2,8 @@ import datetime as dt
 import logging
 from pathlib import Path
 
+from cfa.stf.forecasttools import write_tabular
+
 from cfa.stf.routine._paths import FABLE_DIR
 from cfa.stf.routine.data.data_access import ForecastSourceName
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
@@ -50,7 +52,9 @@ class FablePipeline(ForecastPipeline):
     def transform_serialized_data(self, run: ForecastRun) -> None:
         if self.epiweekly:
             self.logger.info("Generating epiweekly datasets from daily datasets...")
-            generate_epiweekly_data(run.data_dir, overwrite_daily=True)
+            data_path = run.data_dir / "combined_data.tsv"
+            epiweekly_data = generate_epiweekly_data(data_path)
+            write_tabular(epiweekly_data, data_path)
 
     def run_model(self, run: ForecastRun) -> None:
         n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days

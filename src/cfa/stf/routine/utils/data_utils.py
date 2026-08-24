@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.forecasttools import daily_to_weekly, read_tabular, write_tabular
+from cfa.stf.forecasttools import daily_to_weekly, read_tabular
 
 
 def aggregate_long_to_epiweekly(
@@ -31,14 +31,8 @@ def aggregate_long_to_epiweekly(
     )
 
 
-def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> None:
-    """Aggregate daily ED-visit data and write a combined epiweekly dataset."""
-    data_dir = Path(data_dir)
-    data_path = data_dir / "combined_data.tsv"
-    output_path = (
-        data_path if overwrite_daily else data_dir / "epiweekly_combined_data.tsv"
-    )
-
+def generate_epiweekly_data(data_path: Path | str) -> pl.DataFrame:
+    """Read combined data and aggregate daily ED visits to complete MMWR weeks."""
     daily_data = read_tabular(data_path)
     ed_visit_filter = pl.col(".variable").str.ends_with("_ed_visits")
     daily_ed_data = daily_data.filter(ed_visit_filter)
@@ -48,6 +42,4 @@ def generate_epiweekly_data(data_dir: Path, overwrite_daily: bool = False) -> No
         [aggregate_long_to_epiweekly(daily_ed_data), other_data],
         how="diagonal_relaxed",
     ).select(daily_data.columns)
-    epiweekly_data = epiweekly_data.sort("date", ".variable")
-
-    write_tabular(epiweekly_data, output_path)
+    return epiweekly_data.sort("date", ".variable")

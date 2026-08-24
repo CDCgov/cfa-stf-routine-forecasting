@@ -66,9 +66,7 @@ def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
         combined_data_path, separator="\t"
     )
 
-    generate_epiweekly_data(tmp_path)
-
-    result = read_tabular(tmp_path / "epiweekly_combined_data.tsv")
+    result = generate_epiweekly_data(combined_data_path)
     assert result.select("date", ".variable", ".value").rows() == [
         (dt.date(2025, 1, 11), "observed_ed_visits", 28),
         (dt.date(2025, 1, 11), "observed_hospital_admissions", 3),
@@ -80,11 +78,12 @@ def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
         "resolution"
     ).unique().to_list() == ["epiweekly"]
     assert combined_data_path.exists()
+    assert not (tmp_path / "epiweekly_combined_data.tsv").exists()
 
 
-def test_generate_epiweekly_data_can_overwrite_daily_data(tmp_path):
+def test_generate_epiweekly_data_does_not_overwrite_daily_data(tmp_path):
     dates = [dt.date(2025, 1, 5) + dt.timedelta(days=day) for day in range(7)]
-    pl.DataFrame(
+    daily_data = pl.DataFrame(
         {
             "date": dates,
             "geo_value": ["CA"] * 7,
@@ -94,14 +93,16 @@ def test_generate_epiweekly_data_can_overwrite_daily_data(tmp_path):
             ".variable": ["observed_ed_visits"] * 7,
             ".value": [2] * 7,
         }
-    ).write_csv(tmp_path / "combined_data.tsv", separator="\t")
+    )
+    data_path = tmp_path / "combined_data.tsv"
+    daily_data.write_csv(data_path, separator="\t")
 
-    generate_epiweekly_data(tmp_path, overwrite_daily=True)
+    result = generate_epiweekly_data(data_path)
 
-    result = read_tabular(tmp_path / "combined_data.tsv")
     assert result.select("date", "resolution", ".value").row(0) == (
         dt.date(2025, 1, 11),
         "epiweekly",
         14,
     )
+    assert read_tabular(data_path).equals(daily_data)
     assert not (tmp_path / "epiweekly_combined_data.tsv").exists()

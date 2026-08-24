@@ -6,7 +6,7 @@ from typing import Literal, cast, get_args
 from cfa.stf.data import get_nnh_right_truncation_pmf
 
 from cfa.stf.routine._paths import EPIAUTOGP_DIR
-from cfa.stf.routine.data.data_access import ForecastSourceName
+from cfa.stf.routine.data.data_access import DataResolution, ForecastSourceName
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.nowcast import NowcastSource
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
@@ -202,8 +202,8 @@ class EpiAutoGPPipeline(ForecastPipeline):
         return {cast(ForecastSourceName, self.config.target)}
 
     @property
-    def ed_visit_input_resolution(self) -> Literal["daily", "epiweekly"]:
-        return cast(Literal["daily", "epiweekly"], self.config.frequency)
+    def ed_visit_input_resolution(self) -> DataResolution:
+        return self.config.frequency
 
     def validate_configuration(self) -> None:
         _validate_epiautogp_parameters(

@@ -1,11 +1,12 @@
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import polars as pl
 import polars.selectors as cs
 
+from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.utils.data_utils import aggregate_ed_visits_to_epiweekly
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
@@ -78,7 +79,7 @@ def serialize_data(
     forecast_run: "ForecastRun",
     save_dir: Path,
     logger: logging.Logger | None = None,
-    ed_visit_input_resolution: Literal["daily", "epiweekly"] = "daily",
+    ed_visit_input_resolution: DataResolution = "daily",
 ) -> None:
     logger = logger or logging.getLogger(__name__)
 

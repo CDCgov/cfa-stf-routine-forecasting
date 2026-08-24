@@ -5,9 +5,9 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from pathlib import Path
-from typing import Literal
 
 from cfa.stf.routine.data.data_access import (
+    DataResolution,
     ForecastSourceName,
     load_surveillance_inputs,
 )
@@ -57,7 +57,7 @@ class ForecastPipeline(ABC):
         """Surveillance sources required by this model configuration."""
 
     @property
-    def ed_visit_input_resolution(self) -> Literal["daily", "epiweekly"]:
+    def ed_visit_input_resolution(self) -> DataResolution:
         """Resolution to use for serialized ED-visit inputs."""
         return "daily"
 

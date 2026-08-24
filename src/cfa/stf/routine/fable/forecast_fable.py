@@ -1,10 +1,9 @@
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import Literal
 
 from cfa.stf.routine._paths import FABLE_DIR
-from cfa.stf.routine.data.data_access import ForecastSourceName
+from cfa.stf.routine.data.data_access import DataResolution, ForecastSourceName
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.language_utils import run_r_script
@@ -48,7 +47,7 @@ class FablePipeline(ForecastPipeline):
         return {"nssp"}
 
     @property
-    def ed_visit_input_resolution(self) -> Literal["daily", "epiweekly"]:
+    def ed_visit_input_resolution(self) -> DataResolution:
         return "epiweekly" if self.epiweekly else "daily"
 
     def run_model(self, run: ForecastRun) -> None:

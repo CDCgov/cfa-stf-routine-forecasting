@@ -13,6 +13,7 @@ from cfa.stf.data import (
 )
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
 
+DataResolution = Literal["daily", "epiweekly"]
 ForecastSourceName = Literal["nssp", "nhsn"]
 _FORECAST_SOURCE_NAMES = frozenset(get_args(ForecastSourceName))
 

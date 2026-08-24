@@ -11,15 +11,34 @@ from cfa.stf.routine.utils.data_utils import (
 )
 
 
+def _with_metadata(data: pl.DataFrame, *, resolution: str) -> pl.DataFrame:
+    return data.with_columns(
+        geo_value=pl.lit("CA"),
+        disease=pl.lit("flu"),
+        data_type=pl.lit("train"),
+        resolution=pl.lit(resolution),
+    ).select(
+        "date",
+        "geo_value",
+        "disease",
+        "data_type",
+        "resolution",
+        ".variable",
+        ".value",
+    )
+
+
 def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
-    dates = [dt.date(2025, 1, 5) + dt.timedelta(days=day) for day in range(7)]
     data = pl.DataFrame(
         {
-            "observation_date": dates,
-            "location": ["CA"] * 7,
-            "visits": list(range(1, 8)),
-            "resolution": ["daily"] * 7,
+            "observation_date": pl.date_range(
+                dt.date(2025, 1, 5), dt.date(2025, 1, 11), eager=True
+            ),
+            "visits": pl.int_range(1, 8, eager=True),
         }
+    ).with_columns(
+        pl.lit("CA").alias("location"),
+        pl.lit("daily").alias("resolution"),
     )
 
     result = aggregate_long_to_epiweekly(
@@ -43,28 +62,32 @@ def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
 def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
     tmp_path,
 ):
-    dates = [dt.date(2025, 1, 5) + dt.timedelta(days=day) for day in range(14)]
-    daily_ed_data = pl.DataFrame(
-        {
-            "date": dates * 2,
-            "geo_value": ["CA"] * 28,
-            "disease": ["flu"] * 28,
-            "data_type": ["train"] * 28,
-            "resolution": ["daily"] * 28,
-            ".variable": ["observed_ed_visits"] * 14 + ["other_ed_visits"] * 14,
-            ".value": list(range(1, 15)) + [9] * 14,
-        }
+    daily_ed_data = _with_metadata(
+        pl.DataFrame(
+            {
+                "date": pl.date_range(
+                    dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True
+                ),
+                "observed_ed_visits": pl.int_range(1, 15, eager=True),
+                "other_ed_visits": 9,
+            }
+        ).unpivot(
+            on=["observed_ed_visits", "other_ed_visits"],
+            index="date",
+            variable_name=".variable",
+            value_name=".value",
+        ),
+        resolution="daily",
     )
-    hospital_data = pl.DataFrame(
-        {
-            "date": [dt.date(2025, 1, 11)],
-            "geo_value": ["CA"],
-            "disease": ["flu"],
-            "data_type": ["train"],
-            "resolution": ["epiweekly"],
-            ".variable": ["observed_hospital_admissions"],
-            ".value": [3],
-        }
+    hospital_data = _with_metadata(
+        pl.DataFrame(
+            {
+                "date": [dt.date(2025, 1, 11)],
+                ".variable": ["observed_hospital_admissions"],
+                ".value": [3],
+            }
+        ),
+        resolution="epiweekly",
     )
     combined_data_path = tmp_path / "combined_data.tsv"
     pl.concat([daily_ed_data, hospital_data]).write_csv(
@@ -72,27 +95,18 @@ def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
     )
 
     result = generate_epiweekly_data(combined_data_path)
-    expected = pl.DataFrame(
-        {
-            "date": [
-                dt.date(2025, 1, 11),
-                dt.date(2025, 1, 11),
-                dt.date(2025, 1, 11),
-                dt.date(2025, 1, 18),
-                dt.date(2025, 1, 18),
+    expected = _with_metadata(
+        pl.DataFrame(
+            [
+                (dt.date(2025, 1, 11), "observed_ed_visits", 28),
+                (dt.date(2025, 1, 11), "observed_hospital_admissions", 3),
+                (dt.date(2025, 1, 11), "other_ed_visits", 63),
+                (dt.date(2025, 1, 18), "observed_ed_visits", 77),
+                (dt.date(2025, 1, 18), "other_ed_visits", 63),
             ],
-            "geo_value": ["CA"] * 5,
-            "disease": ["flu"] * 5,
-            "data_type": ["train"] * 5,
-            "resolution": ["epiweekly"] * 5,
-            ".variable": [
-                "observed_ed_visits",
-                "observed_hospital_admissions",
-                "other_ed_visits",
-                "observed_ed_visits",
-                "other_ed_visits",
-            ],
-            ".value": [28, 3, 63, 77, 63],
-        }
+            schema={"date": pl.Date, ".variable": pl.String, ".value": pl.Int64},
+            orient="row",
+        ),
+        resolution="epiweekly",
     )
     assert_frame_equal(result, expected)

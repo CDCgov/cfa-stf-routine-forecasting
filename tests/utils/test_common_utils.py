@@ -15,7 +15,7 @@ from cfa.stf.routine.utils.date_utils import (
     parse_exclude_date_ranges,
 )
 from cfa.stf.routine.utils.language_utils import run_julia_script, run_r_script
-from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
+from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 
 class TestValidationUtils:
@@ -103,7 +103,7 @@ class TestValidationUtils:
 class TestDataWranglingUtils:
     """Tests for data loading and processing utilities."""
 
-    def test_append_prop_data_to_combined_data_skips_non_nssp_data(self):
+    def test_append_prop_ed_data_rejects_missing_nssp_data(self):
         original = pl.DataFrame(
             {
                 "date": ["2024-01-01"],
@@ -112,14 +112,14 @@ class TestDataWranglingUtils:
                 ".value": [5],
             }
         )
-        result = append_prop_data_to_combined_data(original)
-        assert_frame_equal(result, original)
+        with pytest.raises(ValueError, match="incomplete NSSP data"):
+            append_prop_ed_data(original)
 
     @pytest.mark.parametrize(
         "present_var",
         ["observed_ed_visits", "other_ed_visits"],
     )
-    def test_append_prop_data_to_combined_data_rejects_incomplete_nssp(
+    def test_append_prop_ed_data_rejects_incomplete_nssp(
         self,
         present_var,
     ):
@@ -133,9 +133,9 @@ class TestDataWranglingUtils:
         )
 
         with pytest.raises(ValueError, match="incomplete NSSP data"):
-            append_prop_data_to_combined_data(data)
+            append_prop_ed_data(data)
 
-    def test_append_prop_data_to_combined_data_appends_proportions(self):
+    def test_append_prop_ed_data_appends_proportions(self):
         data = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01"],
@@ -145,7 +145,7 @@ class TestDataWranglingUtils:
             }
         )
 
-        result = append_prop_data_to_combined_data(data)
+        result = append_prop_ed_data(data)
         expected = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
@@ -160,7 +160,7 @@ class TestDataWranglingUtils:
         )
         assert_frame_equal(result, expected)
 
-    def test_append_prop_data_to_combined_data_allows_variable_names(self):
+    def test_append_prop_ed_data_allows_variable_names(self):
         data = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01"],
@@ -170,7 +170,7 @@ class TestDataWranglingUtils:
             }
         )
 
-        result = append_prop_data_to_combined_data(
+        result = append_prop_ed_data(
             data,
             observed_var="num_visits",
             other_var="denom_other_visits",

@@ -7,7 +7,7 @@ import polars as pl
 import polars.selectors as cs
 
 from cfa.stf.routine.utils.data_utils import aggregate_ed_visits_to_epiweekly
-from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
+from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 if TYPE_CHECKING:
     from cfa.stf.routine.forecast_run import ForecastRun
@@ -143,7 +143,8 @@ def serialize_data(
     with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
         json.dump(data_for_model_fit, json_file, default=str)
 
-    combined_data = append_prop_data_to_combined_data(combined_data)
+    if forecast_run.nssp is not None:
+        combined_data = append_prop_ed_data(combined_data)
 
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 

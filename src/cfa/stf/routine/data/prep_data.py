@@ -7,7 +7,7 @@ import polars as pl
 import polars.selectors as cs
 
 from cfa.stf.routine.data.data_access import DataResolution
-from cfa.stf.routine.utils.data_utils import aggregate_ed_visits_to_epiweekly
+from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 if TYPE_CHECKING:
@@ -85,42 +85,32 @@ def serialize_data(
 
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-    combined_data = combine_surveillance_data(
-        disease=forecast_run.disease,
-        nssp_data=forecast_run.nssp.data if forecast_run.nssp is not None else None,
-        nhsn_data=forecast_run.nhsn.data if forecast_run.nhsn is not None else None,
-    )
-    if ed_visit_input_resolution == "epiweekly":
+    nssp_data = forecast_run.nssp.data if forecast_run.nssp is not None else None
+    nhsn_data = forecast_run.nhsn.data if forecast_run.nhsn is not None else None
+    if nssp_data is not None and ed_visit_input_resolution == "epiweekly":
         logger.info("Aggregating ED visits to epiweekly resolution...")
-        combined_data = aggregate_ed_visits_to_epiweekly(combined_data)
+        nssp_data = aggregate_nssp_to_epiweekly(nssp_data)
 
-    training_data = combined_data.filter(pl.col("data_type") == "train")
-
-    nssp_training_data = None
-    if forecast_run.nssp is not None:
-        nssp_training_data = (
-            training_data.filter(
-                pl.col(".variable").is_in(["observed_ed_visits", "other_ed_visits"])
-            )
-            .pivot(on=".variable", index=["date", "geo_value"], values=".value")
-            .select(
-                "date",
-                "geo_value",
-                "observed_ed_visits",
-                "other_ed_visits",
-            )
-            .sort("date", "geo_value")
+    nssp_training_data = (
+        nssp_data.filter(pl.col("data_type") == "train")
+        .drop("resolution", "data_type")
+        .rename({"state_abb": "geo_value"})
+        if nssp_data is not None
+        else None
+    )
+    nhsn_training_data = (
+        nhsn_data.filter(pl.col("data_type") == "train")
+        .drop("resolution", "data_type")
+        .rename(
+            {
+                "date": "weekendingdate",
+                "state_abb": "jurisdiction",
+                "value": "hospital_admissions",
+            }
         )
-
-    nhsn_training_data = None
-    if forecast_run.nhsn is not None:
-        nhsn_training_data = training_data.filter(
-            pl.col(".variable") == "observed_hospital_admissions"
-        ).select(
-            pl.col("date").alias("weekendingdate"),
-            pl.col("geo_value").alias("jurisdiction"),
-            pl.col(".value").alias("hospital_admissions"),
-        )
+        if nhsn_data is not None
+        else None
+    )
 
     data_for_model_fit = {
         "loc_pop": forecast_run.loc_pop,
@@ -144,7 +134,12 @@ def serialize_data(
     with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
         json.dump(data_for_model_fit, json_file, default=str)
 
-    if forecast_run.nssp is not None:
+    combined_data = combine_surveillance_data(
+        disease=forecast_run.disease,
+        nssp_data=nssp_data,
+        nhsn_data=nhsn_data,
+    )
+    if nssp_data is not None:
         combined_data = append_prop_ed_data(combined_data)
 
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")

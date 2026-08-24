@@ -3,6 +3,7 @@
 import datetime as dt
 
 import polars as pl
+from polars.testing import assert_frame_equal
 
 from cfa.stf.routine.utils.data_utils import (
     aggregate_long_to_epiweekly,
@@ -27,10 +28,15 @@ def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
         value_col="visits",
     )
 
-    assert result.select("observation_date", "visits", "resolution").row(0) == (
-        dt.date(2025, 1, 11),
-        28,
-        "epiweekly",
+    expected = pl.DataFrame(
+        {
+            "observation_date": [dt.date(2025, 1, 11)],
+            "visits": [28],
+            "resolution": ["epiweekly"],
+        }
+    )
+    assert_frame_equal(
+        result.select("observation_date", "visits", "resolution"), expected
     )
 
 
@@ -66,13 +72,27 @@ def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
     )
 
     result = generate_epiweekly_data(combined_data_path)
-    assert result.select("date", ".variable", ".value").rows() == [
-        (dt.date(2025, 1, 11), "observed_ed_visits", 28),
-        (dt.date(2025, 1, 11), "observed_hospital_admissions", 3),
-        (dt.date(2025, 1, 11), "other_ed_visits", 63),
-        (dt.date(2025, 1, 18), "observed_ed_visits", 77),
-        (dt.date(2025, 1, 18), "other_ed_visits", 63),
-    ]
-    assert result.filter(pl.col(".variable").str.ends_with("_ed_visits")).get_column(
-        "resolution"
-    ).unique().to_list() == ["epiweekly"]
+    expected = pl.DataFrame(
+        {
+            "date": [
+                dt.date(2025, 1, 11),
+                dt.date(2025, 1, 11),
+                dt.date(2025, 1, 11),
+                dt.date(2025, 1, 18),
+                dt.date(2025, 1, 18),
+            ],
+            "geo_value": ["CA"] * 5,
+            "disease": ["flu"] * 5,
+            "data_type": ["train"] * 5,
+            "resolution": ["epiweekly"] * 5,
+            ".variable": [
+                "observed_ed_visits",
+                "observed_hospital_admissions",
+                "other_ed_visits",
+                "observed_ed_visits",
+                "other_ed_visits",
+            ],
+            ".value": [28, 3, 63, 77, 63],
+        }
+    )
+    assert_frame_equal(result, expected)

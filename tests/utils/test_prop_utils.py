@@ -3,8 +3,8 @@
 import datetime as dt
 
 import polars as pl
-import pytest
 from cfa.stf.forecasttools import read_tabular, write_tabular
+from polars.testing import assert_frame_equal
 
 from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 
@@ -68,16 +68,18 @@ def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
     output_dir = tmp_path / "prop_epiweekly_aggregated_num_model_other_model"
     samples = read_tabular(output_dir / "samples.parquet").sort("date")
     data = read_tabular(output_dir / "data" / "combined_data.tsv").sort("date")
-    expected_values = [28 / (28 + 63), 77 / (77 + 70)]
-    assert samples.get_column("date").to_list() == weekly_dates
-    assert samples.get_column("resolution").unique().to_list() == ["epiweekly"]
-    assert samples.get_column(".variable").unique().to_list() == [
-        "prop_disease_ed_visits"
-    ]
-    assert samples.get_column(".value").to_list() == pytest.approx(expected_values)
+    expected = pl.DataFrame(
+        {
+            "date": weekly_dates,
+            "resolution": ["epiweekly"] * 2,
+            ".variable": ["prop_disease_ed_visits"] * 2,
+            ".value": [28 / (28 + 63), 77 / (77 + 70)],
+        }
+    )
+    assert_frame_equal(samples.select(expected.columns), expected, check_exact=False)
     assert ".chain" not in samples.columns
     assert ".iteration" not in samples.columns
-    assert data.get_column(".value").to_list() == pytest.approx(expected_values)
+    assert_frame_equal(data.select(expected.columns), expected, check_exact=False)
 
 
 def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
@@ -129,12 +131,11 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
     )
 
     samples = read_tabular(tmp_path / "prop_num_model_other_model" / "samples.parquet")
-    assert samples.select("date", ".draw").rows() == [
-        (training_date, 1),
-        (training_date, 2),
-        (forecast_date, 1),
-        (forecast_date, 2),
-    ]
-    assert samples.get_column(".value").to_list() == pytest.approx(
-        [2 / 10, 3 / 11, 4 / 10, 5 / 10]
+    expected = pl.DataFrame(
+        {
+            "date": [training_date] * 2 + [forecast_date] * 2,
+            ".draw": [1, 2, 1, 2],
+            ".value": [2 / 10, 3 / 11, 4 / 10, 5 / 10],
+        }
     )
+    assert_frame_equal(samples.select(expected.columns), expected, check_exact=False)

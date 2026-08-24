@@ -114,7 +114,7 @@ jobs:
                 coredemo.setOutput('id_token', id_token)
 
           - name: ACR Import
-            uses: CDCgov/cfa-actions/runner-action@v1.5.0
+            uses: CDCgov/cfa-actions/runner-action@v1.6.0
             with:
               github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
               github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
@@ -141,8 +141,95 @@ jobs:
                     exit 1
                   fi
 
+    end-to-end-test:
+        needs: acr-import
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write # This is required for requesting the JWT
+          contents: read  # This is required for actions/checkout
+          packages: write # This is required for ACR import
+
+        # If we're on the main branch, the deployment environment (for use with OIDC cred on the SP) will be main,
+        # otherwise it will be test
+        environment: |-
+          ${{ (github.ref_name == 'main') && 'production' || 'test' }}
+
+        name: End-to-end test via Dagster
+        outputs:
+          tag: ${{ needs.build-pipeline-image.outputs.tag }}
+        steps:
+
+          - name: Checkout Repo
+            id: checkout_repo
+            uses: actions/checkout@v7
+
+          # From: https://stackoverflow.com/a/58035262/2097171
+          - name: Extract branch name
+            shell: bash
+            run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+            id: get-branch
+
+          # From: https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-cloud-providers#requesting-the-jwt-using-the-actions-core-toolkit
+          - name: Install OIDC Client from Core Package
+            run: npm install @actions/core@1.6.0 @actions/http-client
+          - name: Get Id Token
+            uses: actions/github-script@v9
+            id: idtoken
+            with:
+              script: |
+                const coredemo = require('@actions/core')
+                const id_token = await coredemo.getIDToken('api://AzureADTokenExchange')
+                coredemo.setOutput('id_token', id_token)
+
+          - name: Run test
+            uses: CDCgov/cfa-actions/runner-action@v1.6.0
+            with:
+              github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
+              github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
+              wait_for_completion: true
+              print_logs: true
+              script: |
+                echo "Logging into Azure CLI"
+                az login --service-principal \
+                --username ${{ secrets.AZURE_STFT_SP_CLIENT_ID }} \
+                --tenant ${{ secrets.AZURE_TENANT_ID }} \
+                --federated-token ${{ steps.idtoken.outputs.id_token }} \
+                --output none
+
+                CURRENT_BRANCH="${{ steps.get-branch.outputs.branch }}"
+                echo "Cloning repo at branch '$CURRENT_BRANCH'"
+                git clone -b "$CURRENT_BRANCH" https://github.com/${{ github.repository }}.git
+                cd cfa-stf-routine-forecasting
+
+                echo 'Running uv sync'
+                cd cfa-stf-routine-forecasting
+                uv python install --managed-python
+                uv sync --managed-python
+                source .venv/bin/activate
+
+                echo "Python:"
+                which python
+                readlink -f "$(which python)"
+                python --version
+
+                REPORT_DATE="$(TZ=America/New_York date +%F)"
+                export GITHUB_HEAD_REF=${{ github.head_ref }}
+                echo "Launching job for report date: $REPORT_DATE"
+                LOG_MSG="Run 'DAGSTER_USER=github_actions cfa-dagster-webserver' from the VAP to view the logs"
+                echo $LOG_MSG
+
+                cfa-dg launch --job end_to_end \
+                --config-json "$(python -c 'from cfa.stf.routine.dagster_defs import e2e_json; print(e2e_json())')" \
+                --partition $REPORT_DATE
+
+                  if [ $? -ne 0 ]; then
+                    echo "End to end test failed!"
+                    echo $LOG_MSG
+                    exit 1
+                  fi
+
     check_and_deploy_dagster_code:
-      needs: [ build-pipeline-image, acr-import ]
+      needs: [ build-pipeline-image, acr-import, end-to-end-test ]
       # Conditional step execution that runs only when:
       # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
       # OR
@@ -180,7 +267,7 @@ jobs:
             fi
 
         - name: Run update script with cfa runner-action
-          uses: CDCgov/cfa-actions/runner-action@v1.5.0
+          uses: CDCgov/cfa-actions/runner-action@v1.6.0
           if: >-
               ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
               ( github.event_name == 'push' && github.ref_name == 'main' && steps.dagster_changed.outputs.changed == 'true' )

@@ -100,11 +100,11 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
             "date": [forecast_date] * 2,
             "geo_value": ["CA"] * 2,
             "disease": ["flu"] * 2,
-            ".draw": [1, 2],
+            ".draw": [2, 1],
             "resolution": ["daily"] * 2,
             "data_type": ["forecast"] * 2,
             ".variable": ["other_ed_visits"] * 2,
-            ".value": [6, 5],
+            ".value": [5, 6],
         }
     )
     num_data = num_samples.filter(pl.col("date") == training_date).drop(".draw")
@@ -128,9 +128,7 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
         other_model_name="other_model",
     )
 
-    samples = read_tabular(
-        tmp_path / "prop_num_model_other_model" / "samples.parquet"
-    ).sort("date", ".draw")
+    samples = read_tabular(tmp_path / "prop_num_model_other_model" / "samples.parquet")
     assert samples.select("date", ".draw").rows() == [
         (training_date, 1),
         (training_date, 2),

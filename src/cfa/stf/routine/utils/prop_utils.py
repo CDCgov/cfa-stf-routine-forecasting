@@ -74,7 +74,7 @@ def create_prop_fusion_model(
         num_val_col=num_var_name,
         other_val_col=other_var_name,
         prop_var=prop_var_name,
-    )
+    ).sort("date", ".draw")
     prop_data = create_proportions(
         numerator_df=num_data,
         other_df=other_data,

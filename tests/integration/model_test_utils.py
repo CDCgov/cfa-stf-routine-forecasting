@@ -5,6 +5,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.data.generate_test_data import (
     REPORT_DATE,
     REPORTING_DELAY_PMF,
@@ -108,7 +109,11 @@ def configure_data_mode(request, monkeypatch) -> str:
 
 
 def run_fable(
-    workspace: Path, disease: str, location: str, *, epiweekly: bool = False
+    workspace: Path,
+    disease: str,
+    location: str,
+    *,
+    ed_visit_input_resolution: DataResolution = "daily",
 ) -> None:
     fable_module.main(
         disease=disease,
@@ -119,7 +124,7 @@ def run_fable(
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
         run_date=REPORT_DATE,
-        epiweekly=epiweekly,
+        ed_visit_input_resolution=ed_visit_input_resolution,
     )
 
 

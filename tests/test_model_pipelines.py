@@ -30,18 +30,17 @@ def _common_kwargs(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("epiweekly", "expected"),
-    [(False, "daily"), (True, "epiweekly")],
+    "resolution",
+    ["daily", "epiweekly"],
 )
-def test_fable_pipeline_declares_ed_visit_input_resolution(
-    tmp_path, epiweekly, expected
-):
+def test_fable_pipeline_declares_ed_visit_input_resolution(tmp_path, resolution):
     pipeline = FablePipeline(
         **_common_kwargs(tmp_path),
         n_samples=10,
-        epiweekly=epiweekly,
+        ed_visit_input_resolution=resolution,
     )
-    assert pipeline.ed_visit_input_resolution == expected
+    assert pipeline.ed_visit_input_resolution == resolution
+    assert pipeline.model_name == f"{resolution}_fable_e_other"
 
 
 @patch("cfa.stf.routine.fable.forecast_fable.fable_e_other_forecasts")

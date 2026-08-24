@@ -29,21 +29,19 @@ def _common_kwargs(tmp_path):
     }
 
 
-@patch("cfa.stf.routine.fable.forecast_fable.write_tabular")
-@patch("cfa.stf.routine.fable.forecast_fable.generate_epiweekly_data")
-def test_fable_pipeline_aggregates_weekly_inputs(mock_generate, mock_write, tmp_path):
+@pytest.mark.parametrize(
+    ("epiweekly", "expected"),
+    [(False, "daily"), (True, "epiweekly")],
+)
+def test_fable_pipeline_declares_ed_visit_input_resolution(
+    tmp_path, epiweekly, expected
+):
     pipeline = FablePipeline(
         **_common_kwargs(tmp_path),
         n_samples=10,
-        epiweekly=True,
+        epiweekly=epiweekly,
     )
-    run = _run(tmp_path, model_name=pipeline.model_name)
-
-    pipeline.transform_serialized_data(run)
-
-    data_path = run.data_dir / "combined_data.tsv"
-    mock_generate.assert_called_once_with(data_path)
-    mock_write.assert_called_once_with(mock_generate.return_value, data_path)
+    assert pipeline.ed_visit_input_resolution == expected
 
 
 @patch("cfa.stf.routine.fable.forecast_fable.fable_e_other_forecasts")
@@ -94,6 +92,10 @@ def _pyrenew_pipeline(tmp_path, **overrides):
 def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, message):
     with pytest.raises(ValueError, match=message):
         _pyrenew_pipeline(tmp_path, **overrides).validate_configuration()
+
+
+def test_pyrenew_pipeline_uses_daily_ed_visit_inputs(tmp_path):
+    assert _pyrenew_pipeline(tmp_path).ed_visit_input_resolution == "daily"
 
 
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")

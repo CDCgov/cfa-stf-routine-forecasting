@@ -5,6 +5,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from pathlib import Path
+from typing import Literal
 
 from cfa.stf.routine.data.data_access import (
     ForecastSourceName,
@@ -13,7 +14,6 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
-from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -56,6 +56,11 @@ class ForecastPipeline(ABC):
     def sources(self) -> Collection[ForecastSourceName]:
         """Surveillance sources required by this model configuration."""
 
+    @property
+    def ed_visit_input_resolution(self) -> Literal["daily", "epiweekly"]:
+        """Resolution to use for serialized ED-visit inputs."""
+        return "daily"
+
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
@@ -93,9 +98,6 @@ class ForecastPipeline(ABC):
         self.logger.info("Model run directory: %s", run.model_run_dir)
         return run
 
-    def transform_serialized_data(self, run: ForecastRun) -> None:
-        """Transform common serialized data into the model's required form."""
-
     def prepare_model_artifacts(self, run: ForecastRun) -> None:
         """Create additional files required to run the model."""
 
@@ -107,9 +109,8 @@ class ForecastPipeline(ABC):
             forecast_run=run,
             save_dir=run.data_dir,
             logger=self.logger,
+            ed_visit_input_resolution=self.ed_visit_input_resolution,
         )
-        self.transform_serialized_data(run)
-        append_prop_data_to_combined_data(run.data_dir / "combined_data.tsv")
         self.prepare_model_artifacts(run)
         self.logger.info("Data preparation complete.")
 

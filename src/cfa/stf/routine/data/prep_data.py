@@ -1,10 +1,13 @@
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 import polars.selectors as cs
+
+from cfa.stf.routine.utils.data_utils import aggregate_ed_visits_to_epiweekly
+from cfa.stf.routine.utils.prop_utils import append_prop_data_to_combined_data
 
 if TYPE_CHECKING:
     from cfa.stf.routine.forecast_run import ForecastRun
@@ -75,59 +78,72 @@ def serialize_data(
     forecast_run: "ForecastRun",
     save_dir: Path,
     logger: logging.Logger | None = None,
+    ed_visit_input_resolution: Literal["daily", "epiweekly"] = "daily",
 ) -> None:
     logger = logger or logging.getLogger(__name__)
 
     Path(save_dir).mkdir(parents=True, exist_ok=True)
-
-    nssp_training_data = (
-        forecast_run.nssp.data.filter(pl.col("data_type") == "train")
-        if forecast_run.nssp is not None
-        else None
-    )
-    nhsn_training_data = (
-        forecast_run.nhsn.data.filter(pl.col("data_type") == "train")
-        if forecast_run.nhsn is not None
-        else None
-    )
-
-    data_for_model_fit = {
-        "loc_pop": forecast_run.loc_pop,
-        "right_truncation_offset": forecast_run.right_truncation_offset,
-        "nwss_training_data": None,
-        "nssp_training_data": (
-            nssp_training_data.drop("resolution", "data_type")
-            .rename({"state_abb": "geo_value"})
-            .to_dict(as_series=False)
-            if nssp_training_data is not None
-            else None
-        ),
-        "nhsn_training_data": (
-            nhsn_training_data.drop("resolution", "data_type")
-            .rename(
-                {
-                    "date": "weekendingdate",
-                    "state_abb": "jurisdiction",
-                    "value": "hospital_admissions",
-                }
-            )
-            .to_dict(as_series=False)
-            if nhsn_training_data is not None
-            else None
-        ),
-        "nhsn_step_size": 7,
-        "nssp_step_size": 1,
-        "nwss_step_size": 1,
-    }
-
-    with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
-        json.dump(data_for_model_fit, json_file, default=str)
 
     combined_data = combine_surveillance_data(
         disease=forecast_run.disease,
         nssp_data=forecast_run.nssp.data if forecast_run.nssp is not None else None,
         nhsn_data=forecast_run.nhsn.data if forecast_run.nhsn is not None else None,
     )
+    if ed_visit_input_resolution == "epiweekly":
+        logger.info("Aggregating ED visits to epiweekly resolution...")
+        combined_data = aggregate_ed_visits_to_epiweekly(combined_data)
+
+    training_data = combined_data.filter(pl.col("data_type") == "train")
+
+    nssp_training_data = None
+    if forecast_run.nssp is not None:
+        nssp_training_data = (
+            training_data.filter(
+                pl.col(".variable").is_in(["observed_ed_visits", "other_ed_visits"])
+            )
+            .pivot(on=".variable", index=["date", "geo_value"], values=".value")
+            .select(
+                "date",
+                "geo_value",
+                "observed_ed_visits",
+                "other_ed_visits",
+            )
+            .sort("date", "geo_value")
+        )
+
+    nhsn_training_data = None
+    if forecast_run.nhsn is not None:
+        nhsn_training_data = training_data.filter(
+            pl.col(".variable") == "observed_hospital_admissions"
+        ).select(
+            pl.col("date").alias("weekendingdate"),
+            pl.col("geo_value").alias("jurisdiction"),
+            pl.col(".value").alias("hospital_admissions"),
+        )
+
+    data_for_model_fit = {
+        "loc_pop": forecast_run.loc_pop,
+        "right_truncation_offset": forecast_run.right_truncation_offset,
+        "nwss_training_data": None,
+        "nssp_training_data": (
+            nssp_training_data.to_dict(as_series=False)
+            if nssp_training_data is not None
+            else None
+        ),
+        "nhsn_training_data": (
+            nhsn_training_data.to_dict(as_series=False)
+            if nhsn_training_data is not None
+            else None
+        ),
+        "nhsn_step_size": 7,
+        "nssp_step_size": 7 if ed_visit_input_resolution == "epiweekly" else 1,
+        "nwss_step_size": 1,
+    }
+
+    with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
+        json.dump(data_for_model_fit, json_file, default=str)
+
+    combined_data = append_prop_data_to_combined_data(combined_data)
 
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 

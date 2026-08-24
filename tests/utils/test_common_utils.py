@@ -103,8 +103,7 @@ class TestValidationUtils:
 class TestDataWranglingUtils:
     """Tests for data loading and processing utilities."""
 
-    def test_append_prop_data_to_combined_data_skips_non_nssp_data(self, tmp_path):
-        data_path = tmp_path / "combined_data.tsv"
+    def test_append_prop_data_to_combined_data_skips_non_nssp_data(self):
         original = pl.DataFrame(
             {
                 "date": ["2024-01-01"],
@@ -113,11 +112,7 @@ class TestDataWranglingUtils:
                 ".value": [5],
             }
         )
-        original.write_csv(data_path, separator="\t")
-
-        append_prop_data_to_combined_data(data_path)
-
-        result = pl.read_csv(data_path, separator="\t")
+        result = append_prop_data_to_combined_data(original)
         assert_frame_equal(result, original)
 
     @pytest.mark.parametrize(
@@ -126,36 +121,31 @@ class TestDataWranglingUtils:
     )
     def test_append_prop_data_to_combined_data_rejects_incomplete_nssp(
         self,
-        tmp_path,
         present_var,
     ):
-        data_path = tmp_path / "combined_data.tsv"
-        pl.DataFrame(
+        data = pl.DataFrame(
             {
                 "date": ["2024-01-01"],
                 "location": ["US"],
                 ".variable": [present_var],
                 ".value": [5],
             }
-        ).write_csv(data_path, separator="\t")
+        )
 
         with pytest.raises(ValueError, match="incomplete NSSP data"):
-            append_prop_data_to_combined_data(data_path)
+            append_prop_data_to_combined_data(data)
 
-    def test_append_prop_data_to_combined_data_updates_tsv(self, tmp_path):
-        data_path = tmp_path / "combined_data.tsv"
-        pl.DataFrame(
+    def test_append_prop_data_to_combined_data_appends_proportions(self):
+        data = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01"],
                 "location": ["US", "US"],
                 ".variable": ["observed_ed_visits", "other_ed_visits"],
                 ".value": [2, 8],
             }
-        ).write_csv(data_path, separator="\t")
+        )
 
-        append_prop_data_to_combined_data(data_path)
-
-        result = pl.read_csv(data_path, separator="\t")
+        result = append_prop_data_to_combined_data(data)
         expected = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
@@ -170,25 +160,23 @@ class TestDataWranglingUtils:
         )
         assert_frame_equal(result, expected)
 
-    def test_append_prop_data_to_combined_data_allows_variable_names(self, tmp_path):
-        data_path = tmp_path / "combined_data.tsv"
-        pl.DataFrame(
+    def test_append_prop_data_to_combined_data_allows_variable_names(self):
+        data = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01"],
                 "location": ["US", "US"],
                 ".variable": ["num_visits", "denom_other_visits"],
                 ".value": [3, 7],
             }
-        ).write_csv(data_path, separator="\t")
+        )
 
-        append_prop_data_to_combined_data(
-            data_path,
+        result = append_prop_data_to_combined_data(
+            data,
             observed_var="num_visits",
             other_var="denom_other_visits",
             prop_var="prop_num_visits",
         )
 
-        result = pl.read_csv(data_path, separator="\t")
         expected = pl.DataFrame(
             {
                 "date": ["2024-01-01", "2024-01-01", "2024-01-01"],

@@ -6,8 +6,8 @@ import polars as pl
 from polars.testing import assert_frame_equal
 
 from cfa.stf.routine.utils.data_utils import (
+    aggregate_ed_visits_to_epiweekly,
     aggregate_long_to_epiweekly,
-    generate_epiweekly_data,
 )
 
 
@@ -59,9 +59,7 @@ def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
     )
 
 
-def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
-    tmp_path,
-):
+def test_aggregate_ed_visits_to_epiweekly_preserves_other_data():
     daily_ed_data = _with_metadata(
         pl.DataFrame(
             {
@@ -89,12 +87,7 @@ def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
         ),
         resolution="epiweekly",
     )
-    combined_data_path = tmp_path / "combined_data.tsv"
-    pl.concat([daily_ed_data, hospital_data]).write_csv(
-        combined_data_path, separator="\t"
-    )
-
-    result = generate_epiweekly_data(combined_data_path)
+    result = aggregate_ed_visits_to_epiweekly(pl.concat([daily_ed_data, hospital_data]))
     expected = _with_metadata(
         pl.DataFrame(
             [

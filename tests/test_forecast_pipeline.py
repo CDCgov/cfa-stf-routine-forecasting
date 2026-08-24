@@ -26,9 +26,6 @@ class TestPipeline(ForecastPipeline):
     def validate_configuration(self):
         self.events.append("validate")
 
-    def transform_serialized_data(self, run):
-        self.events.append("transform")
-
     def prepare_model_artifacts(self, run):
         self.events.append("prepare_artifacts")
 
@@ -121,16 +118,13 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "build_forecast_run",
         lambda: events.append("build_run") or run,
     )
-    monkeypatch.setattr(
-        pipeline_module,
-        "serialize_data",
-        lambda **kwargs: events.append("serialize"),
-    )
-    monkeypatch.setattr(
-        pipeline_module,
-        "append_prop_data_to_combined_data",
-        lambda *args: events.append("append_prop"),
-    )
+    serialize_kwargs = {}
+
+    def serialize(**kwargs):
+        serialize_kwargs.update(kwargs)
+        events.append("serialize")
+
+    monkeypatch.setattr(pipeline_module, "serialize_data", serialize)
     monkeypatch.setattr(
         pipeline_module,
         "make_figures_from_model_fit_dir",
@@ -149,13 +143,12 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "validate",
         "build_run",
         "serialize",
-        "transform",
-        "append_prop",
         "prepare_artifacts",
         "run_model",
         "figures",
         "hubverse",
     ]
+    assert serialize_kwargs["ed_visit_input_resolution"] == "daily"
     assert run.data_dir.is_dir()
     messages = [record.getMessage() for record in caplog.records]
     assert messages[0] == (

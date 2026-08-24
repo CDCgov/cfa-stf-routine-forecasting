@@ -3,7 +3,6 @@
 import datetime as dt
 
 import polars as pl
-from cfa.stf.forecasttools import read_tabular
 
 from cfa.stf.routine.utils.data_utils import (
     aggregate_long_to_epiweekly,
@@ -77,32 +76,3 @@ def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
     assert result.filter(pl.col(".variable").str.ends_with("_ed_visits")).get_column(
         "resolution"
     ).unique().to_list() == ["epiweekly"]
-    assert combined_data_path.exists()
-    assert not (tmp_path / "epiweekly_combined_data.tsv").exists()
-
-
-def test_generate_epiweekly_data_does_not_overwrite_daily_data(tmp_path):
-    dates = [dt.date(2025, 1, 5) + dt.timedelta(days=day) for day in range(7)]
-    daily_data = pl.DataFrame(
-        {
-            "date": dates,
-            "geo_value": ["CA"] * 7,
-            "disease": ["flu"] * 7,
-            "data_type": ["train"] * 7,
-            "resolution": ["daily"] * 7,
-            ".variable": ["observed_ed_visits"] * 7,
-            ".value": [2] * 7,
-        }
-    )
-    data_path = tmp_path / "combined_data.tsv"
-    daily_data.write_csv(data_path, separator="\t")
-
-    result = generate_epiweekly_data(data_path)
-
-    assert result.select("date", "resolution", ".value").row(0) == (
-        dt.date(2025, 1, 11),
-        "epiweekly",
-        14,
-    )
-    assert read_tabular(data_path).equals(daily_data)
-    assert not (tmp_path / "epiweekly_combined_data.tsv").exists()

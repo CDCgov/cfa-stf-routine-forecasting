@@ -37,7 +37,6 @@ Remotes:
     github::cdcgov/forecasttools,
     github::mjskay/ggdist
 Suggests:
-    checkmate,
     rcmdcheck,
     testthat (>= 3.0.0),
     withr

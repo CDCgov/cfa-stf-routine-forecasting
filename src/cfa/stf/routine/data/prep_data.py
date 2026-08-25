@@ -73,20 +73,15 @@ def serialize_data(
 
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    nssp = forecast_run.nssp
-    nssp_data = nssp.data if nssp is not None else None
-    nhsn = forecast_run.nhsn
-    nhsn_data = nhsn.data if nhsn is not None else None
-
     nssp_training_data = (
-        nssp_data.filter(pl.col("data_type") == "train")
+        forecast_run.nssp.data.filter(pl.col("data_type") == "train")
         .drop("resolution", "data_type")
         .rename({"state_abb": "geo_value"})
-        if nssp_data is not None
+        if forecast_run.nssp is not None
         else None
     )
     nhsn_training_data = (
-        nhsn_data.filter(pl.col("data_type") == "train")
+        forecast_run.nhsn.data.filter(pl.col("data_type") == "train")
         .drop("resolution", "data_type")
         .rename(
             {
@@ -95,7 +90,7 @@ def serialize_data(
                 "value": "hospital_admissions",
             }
         )
-        if nhsn_data is not None
+        if forecast_run.nhsn is not None
         else None
     )
 
@@ -113,8 +108,12 @@ def serialize_data(
             if nhsn_training_data is not None
             else None
         ),
-        "nhsn_step_size": nhsn.step_size if nhsn is not None else None,
-        "nssp_step_size": nssp.step_size if nssp is not None else None,
+        "nhsn_step_size": (
+            forecast_run.nhsn.step_size if forecast_run.nhsn is not None else None
+        ),
+        "nssp_step_size": (
+            forecast_run.nssp.step_size if forecast_run.nssp is not None else None
+        ),
         "nwss_step_size": 1,
     }
 
@@ -123,10 +122,10 @@ def serialize_data(
 
     combined_data = combine_surveillance_data(
         disease=forecast_run.disease,
-        nssp_data=nssp_data,
-        nhsn_data=nhsn_data,
+        nssp_data=(forecast_run.nssp.data if forecast_run.nssp is not None else None),
+        nhsn_data=(forecast_run.nhsn.data if forecast_run.nhsn is not None else None),
     )
-    if nssp_data is not None:
+    if forecast_run.nssp is not None:
         combined_data = append_prop_ed_data(combined_data)
 
     logger.info("Saving %s to %s", forecast_run.loc, save_dir)

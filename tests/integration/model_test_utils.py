@@ -81,6 +81,7 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
                 nssp=replace(
                     surveillance.nssp,
                     data=aggregate_nssp_to_epiweekly(surveillance.nssp.data),
+                    resolution="epiweekly",
                 ),
             )
         return surveillance

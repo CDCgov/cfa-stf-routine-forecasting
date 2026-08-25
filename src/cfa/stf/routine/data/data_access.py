@@ -2,7 +2,7 @@ import datetime as dt
 import logging
 from collections.abc import Collection
 from dataclasses import dataclass, replace
-from typing import Literal, get_args
+from typing import ClassVar, Literal, get_args
 
 import polars as pl
 from cfa.stf.data import (
@@ -17,6 +17,7 @@ from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 
 DataResolution = Literal["daily", "epiweekly"]
 ForecastSourceName = Literal["nssp", "nhsn"]
+_DATA_RESOLUTIONS = frozenset(get_args(DataResolution))
 _FORECAST_SOURCE_NAMES = frozenset(get_args(ForecastSourceName))
 
 
@@ -34,6 +35,18 @@ class DataFreshness:
 class ForecastSourceData:
     data: pl.DataFrame
     freshness: DataFreshness
+    resolution: DataResolution
+
+    def __post_init__(self) -> None:
+        if self.resolution not in _DATA_RESOLUTIONS:
+            raise ValueError(
+                f"Unsupported {type(self).__name__} resolution: {self.resolution}"
+            )
+
+    @property
+    def step_size(self) -> int:
+        """Number of days represented by one observation."""
+        return 7 if self.resolution == "epiweekly" else 1
 
 
 @dataclass(frozen=True)
@@ -43,6 +56,7 @@ class NSSPData(ForecastSourceData):
 
 @dataclass(frozen=True)
 class NHSNData(ForecastSourceData):
+    resolution: ClassVar[Literal["epiweekly"]] = "epiweekly"
     prelim: bool
 
 
@@ -124,7 +138,7 @@ def _load_dataops_nssp(
         .drop("total", "target_type")
         .sort("date")
     )
-    return NSSPData(data=data, freshness=freshness)
+    return NSSPData(data=data, freshness=freshness, resolution="daily")
 
 
 def select_latest_nhsn_release() -> tuple[bool, dt.date]:
@@ -178,7 +192,11 @@ def _load_dataops_nhsn(
             "resolution",
         )
     )
-    return NHSNData(data=data, freshness=freshness, prelim=prelim)
+    return NHSNData(
+        data=data,
+        freshness=freshness,
+        prelim=prelim,
+    )
 
 
 def nssp_freshness(
@@ -300,7 +318,11 @@ def load_surveillance_inputs(
         )
         if ed_visit_input_resolution == "epiweekly":
             logger.info("Aggregating ED visits to epiweekly resolution...")
-            nssp = replace(nssp, data=aggregate_nssp_to_epiweekly(nssp.data))
+            nssp = replace(
+                nssp,
+                data=aggregate_nssp_to_epiweekly(nssp.data),
+                resolution="epiweekly",
+            )
         freshness.append(nssp.freshness)
 
     if "nhsn" in requested_sources:

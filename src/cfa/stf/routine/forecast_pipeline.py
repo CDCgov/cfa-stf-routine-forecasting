@@ -109,7 +109,6 @@ class ForecastPipeline(ABC):
         serialize_data(
             forecast_run=run,
             logger=self.logger,
-            ed_visit_input_resolution=self.ed_visit_input_resolution,
         )
         self.prepare_model_artifacts(run)
         self.logger.info("Data preparation complete.")

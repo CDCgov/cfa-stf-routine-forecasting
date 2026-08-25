@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 import polars as pl
 import polars.selectors as cs
 
-from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 if TYPE_CHECKING:
@@ -70,15 +69,16 @@ def combine_surveillance_data(
 def serialize_data(
     forecast_run: "ForecastRun",
     logger: logging.Logger | None = None,
-    ed_visit_input_resolution: DataResolution = "daily",
 ) -> None:
     logger = logger or logging.getLogger(__name__)
     save_dir = forecast_run.data_dir
 
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    nssp_data = forecast_run.nssp.data if forecast_run.nssp is not None else None
-    nhsn_data = forecast_run.nhsn.data if forecast_run.nhsn is not None else None
+    nssp = forecast_run.nssp
+    nssp_data = nssp.data if nssp is not None else None
+    nhsn = forecast_run.nhsn
+    nhsn_data = nhsn.data if nhsn is not None else None
 
     nssp_training_data = (
         nssp_data.filter(pl.col("data_type") == "train")
@@ -115,8 +115,8 @@ def serialize_data(
             if nhsn_training_data is not None
             else None
         ),
-        "nhsn_step_size": 7,
-        "nssp_step_size": 7 if ed_visit_input_resolution == "epiweekly" else 1,
+        "nhsn_step_size": nhsn.step_size if nhsn is not None else 7,
+        "nssp_step_size": nssp.step_size if nssp is not None else 1,
         "nwss_step_size": 1,
     }
 

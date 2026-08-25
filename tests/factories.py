@@ -62,6 +62,7 @@ def make_test_surveillance_inputs(
         NSSPData(
             data=nssp_data,
             freshness=freshness("nssp"),
+            resolution="daily",
         )
         if "nssp" in requested_sources
         else None

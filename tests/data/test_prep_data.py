@@ -101,14 +101,15 @@ def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
     nssp_data = aggregate_nssp_to_epiweekly(nssp_data)
     surveillance = replace(
         forecast_run.surveillance,
-        nssp=replace(forecast_run.nssp, data=nssp_data),
+        nssp=replace(
+            forecast_run.nssp,
+            data=nssp_data,
+            resolution="epiweekly",
+        ),
     )
     forecast_run = replace(forecast_run, surveillance=surveillance)
 
-    serialize_data(
-        forecast_run=forecast_run,
-        ed_visit_input_resolution="epiweekly",
-    )
+    serialize_data(forecast_run=forecast_run)
 
     with open(forecast_run.data_dir / "data_for_model_fit.json") as file:
         model_data = json.load(file)

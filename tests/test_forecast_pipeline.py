@@ -141,11 +141,10 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     )
     serialize_kwargs = {}
 
-    def serialize(*, forecast_run, logger, ed_visit_input_resolution):
+    def serialize(*, forecast_run, logger):
         serialize_kwargs.update(
             forecast_run=forecast_run,
             logger=logger,
-            ed_visit_input_resolution=ed_visit_input_resolution,
         )
         events.append("serialize")
 
@@ -174,7 +173,6 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "hubverse",
     ]
     assert serialize_kwargs["forecast_run"] is run
-    assert serialize_kwargs["ed_visit_input_resolution"] == "epiweekly"
     assert run.data_dir.is_dir()
     messages = [record.getMessage() for record in caplog.records]
     assert messages[0] == (

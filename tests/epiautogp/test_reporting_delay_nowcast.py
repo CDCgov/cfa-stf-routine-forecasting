@@ -8,11 +8,11 @@ import pytest
 from cfa.stf.routine.data.nowcast import NowcastData
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.nowcast import FixedNowcast
-from cfa.stf.routine.epiautogp.reporting_delay import (
+from cfa.stf.routine.epiautogp.reporting_delay_nowcast import (
+    ReportingDelayNowcast,
     inflate_report,
     reporting_inflation_factors,
 )
-from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 
 def _spec(

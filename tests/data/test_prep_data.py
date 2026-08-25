@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data import prep_data
@@ -136,11 +137,17 @@ def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
             ]
         )
     ).select("date", "data_type", ".variable", ".value")
-    assert weekly_ed_data.rows() == [
-        (dt.date(2025, 1, 11), "train", "observed_ed_visits", 28.0),
-        (dt.date(2025, 1, 11), "train", "other_ed_visits", 63.0),
-        (dt.date(2025, 1, 11), "train", "prop_disease_ed_visits", 28 / 91),
-        (dt.date(2025, 1, 18), "eval", "observed_ed_visits", 77.0),
-        (dt.date(2025, 1, 18), "eval", "other_ed_visits", 63.0),
-        (dt.date(2025, 1, 18), "eval", "prop_disease_ed_visits", 77 / 140),
-    ]
+    expected = pl.DataFrame(
+        {
+            "date": [dt.date(2025, 1, 11)] * 3 + [dt.date(2025, 1, 18)] * 3,
+            "data_type": ["train"] * 3 + ["eval"] * 3,
+            ".variable": [
+                "observed_ed_visits",
+                "other_ed_visits",
+                "prop_disease_ed_visits",
+            ]
+            * 2,
+            ".value": [28.0, 63.0, 28 / 91, 77.0, 63.0, 77 / 140],
+        }
+    )
+    assert_frame_equal(weekly_ed_data, expected)

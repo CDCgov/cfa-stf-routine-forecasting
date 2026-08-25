@@ -4,9 +4,7 @@ import datetime as dt
 import logging
 import sys
 
-import polars as pl
 import pytest
-from polars.testing import assert_frame_equal
 
 from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
@@ -15,7 +13,6 @@ from cfa.stf.routine.utils.date_utils import (
     parse_exclude_date_ranges,
 )
 from cfa.stf.routine.utils.language_utils import run_julia_script, run_r_script
-from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 
 class TestValidationUtils:
@@ -98,89 +95,6 @@ class TestValidationUtils:
         """Test parsing invalid date range strings raises appropriate errors."""
         with pytest.raises(ValueError, match=error_match):
             parse_exclude_date_ranges(input_str)
-
-
-class TestDataWranglingUtils:
-    """Tests for data loading and processing utilities."""
-
-    @pytest.mark.parametrize(
-        "present_var",
-        [
-            "observed_ed_visits",
-            "other_ed_visits",
-        ],
-    )
-    def test_append_prop_ed_data_rejects_incomplete_nssp(
-        self,
-        present_var,
-    ):
-        data = pl.DataFrame(
-            {
-                "date": ["2024-01-01"],
-                "location": ["US"],
-                ".variable": [present_var],
-                ".value": [5],
-            }
-        )
-
-        with pytest.raises(ValueError, match="incomplete NSSP data"):
-            append_prop_ed_data(data)
-
-    def test_append_prop_ed_data_appends_proportions(self):
-        data = pl.DataFrame(
-            {
-                "date": ["2024-01-01", "2024-01-01"],
-                "location": ["US", "US"],
-                ".variable": ["observed_ed_visits", "other_ed_visits"],
-                ".value": [2, 8],
-            }
-        )
-
-        result = append_prop_ed_data(data)
-        expected = pl.DataFrame(
-            {
-                "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
-                "location": ["US", "US", "US"],
-                ".variable": [
-                    "observed_ed_visits",
-                    "other_ed_visits",
-                    "prop_disease_ed_visits",
-                ],
-                ".value": [2.0, 8.0, 0.2],
-            }
-        )
-        assert_frame_equal(result, expected)
-
-    def test_append_prop_ed_data_allows_variable_names(self):
-        data = pl.DataFrame(
-            {
-                "date": ["2024-01-01", "2024-01-01"],
-                "location": ["US", "US"],
-                ".variable": ["num_visits", "denom_other_visits"],
-                ".value": [3, 7],
-            }
-        )
-
-        result = append_prop_ed_data(
-            data,
-            observed_var="num_visits",
-            other_var="denom_other_visits",
-            prop_var="prop_num_visits",
-        )
-
-        expected = pl.DataFrame(
-            {
-                "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
-                "location": ["US", "US", "US"],
-                ".variable": [
-                    "denom_other_visits",
-                    "num_visits",
-                    "prop_num_visits",
-                ],
-                ".value": [7.0, 3.0, 0.3],
-            }
-        )
-        assert_frame_equal(result, expected)
 
 
 class TestCLIUtils:

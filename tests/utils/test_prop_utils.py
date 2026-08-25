@@ -3,10 +3,93 @@
 import datetime as dt
 
 import polars as pl
+import pytest
 from cfa.stf.forecasttools import read_tabular, write_tabular
 from polars.testing import assert_frame_equal
 
-from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
+from cfa.stf.routine.utils.prop_utils import (
+    append_prop_ed_data,
+    create_prop_fusion_model,
+)
+
+
+@pytest.mark.parametrize(
+    "present_var",
+    [
+        "observed_ed_visits",
+        "other_ed_visits",
+    ],
+)
+def test_append_prop_ed_data_rejects_incomplete_nssp(present_var):
+    data = pl.DataFrame(
+        {
+            "date": ["2024-01-01"],
+            "location": ["US"],
+            ".variable": [present_var],
+            ".value": [5],
+        }
+    )
+
+    with pytest.raises(ValueError, match="incomplete NSSP data"):
+        append_prop_ed_data(data)
+
+
+def test_append_prop_ed_data_appends_proportions():
+    data = pl.DataFrame(
+        {
+            "date": ["2024-01-01", "2024-01-01"],
+            "location": ["US", "US"],
+            ".variable": ["observed_ed_visits", "other_ed_visits"],
+            ".value": [2, 8],
+        }
+    )
+
+    result = append_prop_ed_data(data)
+    expected = pl.DataFrame(
+        {
+            "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
+            "location": ["US", "US", "US"],
+            ".variable": [
+                "observed_ed_visits",
+                "other_ed_visits",
+                "prop_disease_ed_visits",
+            ],
+            ".value": [2.0, 8.0, 0.2],
+        }
+    )
+    assert_frame_equal(result, expected)
+
+
+def test_append_prop_ed_data_allows_variable_names():
+    data = pl.DataFrame(
+        {
+            "date": ["2024-01-01", "2024-01-01"],
+            "location": ["US", "US"],
+            ".variable": ["num_visits", "denom_other_visits"],
+            ".value": [3, 7],
+        }
+    )
+
+    result = append_prop_ed_data(
+        data,
+        observed_var="num_visits",
+        other_var="denom_other_visits",
+        prop_var="prop_num_visits",
+    )
+
+    expected = pl.DataFrame(
+        {
+            "date": ["2024-01-01", "2024-01-01", "2024-01-01"],
+            "location": ["US", "US", "US"],
+            ".variable": [
+                "denom_other_visits",
+                "num_visits",
+                "prop_num_visits",
+            ],
+            ".value": [7.0, 3.0, 0.3],
+        }
+    )
+    assert_frame_equal(result, expected)
 
 
 def _model_frame(

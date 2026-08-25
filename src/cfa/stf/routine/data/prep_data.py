@@ -30,10 +30,8 @@ def combine_surveillance_data(
 
     if nhsn_data is not None:
         source_frames.append(
-            nhsn_data.select(
-                cs.exclude("value"),
+            nhsn_data.rename({"value": ".value"}).with_columns(
                 pl.lit("observed_hospital_admissions").alias(".variable"),
-                pl.col("value").alias(".value"),
             )
         )
 

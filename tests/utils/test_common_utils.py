@@ -103,21 +103,13 @@ class TestValidationUtils:
 class TestDataWranglingUtils:
     """Tests for data loading and processing utilities."""
 
-    def test_append_prop_ed_data_rejects_missing_nssp_data(self):
-        original = pl.DataFrame(
-            {
-                "date": ["2024-01-01"],
-                "location": ["US"],
-                ".variable": ["observed_hospital_admissions"],
-                ".value": [5],
-            }
-        )
-        with pytest.raises(ValueError, match="incomplete NSSP data"):
-            append_prop_ed_data(original)
-
     @pytest.mark.parametrize(
         "present_var",
-        ["observed_ed_visits", "other_ed_visits"],
+        [
+            "observed_hospital_admissions",
+            "observed_ed_visits",
+            "other_ed_visits",
+        ],
     )
     def test_append_prop_ed_data_rejects_incomplete_nssp(
         self,

@@ -1,7 +1,7 @@
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import Literal, cast, get_args
+from typing import Literal, get_args
 
 from cfa.stf.data import get_nnh_right_truncation_pmf
 
@@ -199,7 +199,7 @@ class EpiAutoGPPipeline(ForecastPipeline):
 
     @property
     def sources(self) -> set[ForecastSourceName]:
-        return {cast(ForecastSourceName, self.config.target)}
+        return {self.config.target}
 
     @property
     def ed_visit_input_resolution(self) -> DataResolution:

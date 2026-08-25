@@ -28,19 +28,15 @@ def combine_surveillance_data(
                 variable_name=".variable",
                 index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
                 value_name=".value",
-            ).with_columns(pl.lit(None).alias("lab_site_index"))
+            )
         )
 
     if nhsn_data is not None:
         source_frames.append(
-            nhsn_data.unpivot(
-                on="value",
-                index=cs.exclude("value"),
-                variable_name=".variable",
-                value_name=".value",
-            ).with_columns(
+            nhsn_data.select(
+                cs.exclude("value"),
                 pl.lit("observed_hospital_admissions").alias(".variable"),
-                pl.lit(None).alias("lab_site_index"),
+                pl.col("value").alias(".value"),
             )
         )
 
@@ -53,7 +49,10 @@ def combine_surveillance_data(
             how="diagonal_relaxed",
         )
         .rename({"state_abb": "geo_value"})
-        .with_columns(pl.lit(disease).alias("disease"))
+        .with_columns(
+            pl.lit(disease).alias("disease"),
+            pl.lit(None).alias("lab_site_index"),
+        )
         .sort(["date", "geo_value", ".variable"])
         .select(
             [
@@ -77,8 +76,9 @@ def serialize_data(
     ed_visit_input_resolution: DataResolution = "daily",
 ) -> None:
     logger = logger or logging.getLogger(__name__)
+    save_dir = Path(save_dir)
 
-    Path(save_dir).mkdir(parents=True, exist_ok=True)
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     nssp_data = forecast_run.nssp.data if forecast_run.nssp is not None else None
     nhsn_data = forecast_run.nhsn.data if forecast_run.nhsn is not None else None
@@ -126,7 +126,7 @@ def serialize_data(
         "nwss_step_size": 1,
     }
 
-    with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
+    with open(save_dir / "data_for_model_fit.json", "w") as json_file:
         json.dump(data_for_model_fit, json_file, default=str)
 
     combined_data = combine_surveillance_data(
@@ -137,7 +137,6 @@ def serialize_data(
     if nssp_data is not None:
         combined_data = append_prop_ed_data(combined_data)
 
-    logger.info(f"Saving {forecast_run.loc} to {save_dir}")
+    logger.info("Saving %s to %s", forecast_run.loc, save_dir)
 
-    combined_data.write_csv(Path(save_dir, "combined_data.tsv"), separator="\t")
-    return None
+    combined_data.write_csv(save_dir / "combined_data.tsv", separator="\t")

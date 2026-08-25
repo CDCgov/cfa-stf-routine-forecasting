@@ -109,11 +109,12 @@ def append_prop_ed_data(
     """Append disease ED visit proportion rows when both inputs are available."""
     required_vars = {observed_var, other_var}
     available_vars = set(data.get_column(".variable").unique().to_list())
-    if not required_vars <= available_vars:
-        missing_vars = ", ".join(sorted(required_vars - available_vars))
+    missing_vars = required_vars - available_vars
+    if missing_vars:
+        missing_vars_text = ", ".join(sorted(missing_vars))
         raise ValueError(
             "Cannot append ED visit proportions from incomplete NSSP data; "
-            f"missing variable(s): {missing_vars}"
+            f"missing variable(s): {missing_vars_text}"
         )
 
     return append_prop_data(

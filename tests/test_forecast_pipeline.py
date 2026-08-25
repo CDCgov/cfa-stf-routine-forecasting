@@ -11,9 +11,10 @@ from tests.factories import make_test_forecast_run, make_test_surveillance_input
 class TestPipeline(ForecastPipeline):
     __test__ = False
 
-    def __init__(self, *, events=None, **kwargs):
+    def __init__(self, *, events=None, ed_visit_input_resolution="daily", **kwargs):
         super().__init__(**kwargs)
         self.events = events if events is not None else []
+        self._ed_visit_input_resolution = ed_visit_input_resolution
 
     @property
     def model_name(self):
@@ -22,6 +23,10 @@ class TestPipeline(ForecastPipeline):
     @property
     def sources(self):
         return {"nssp"}
+
+    @property
+    def ed_visit_input_resolution(self):
+        return self._ed_visit_input_resolution
 
     def validate_configuration(self):
         self.events.append("validate")
@@ -33,7 +38,13 @@ class TestPipeline(ForecastPipeline):
         self.events.append("run_model")
 
 
-def _pipeline(tmp_path, *, events=None, fail_on_stale_data=False):
+def _pipeline(
+    tmp_path,
+    *,
+    events=None,
+    fail_on_stale_data=False,
+    ed_visit_input_resolution="daily",
+):
     return TestPipeline(
         disease="covid",
         loc="CA",
@@ -45,6 +56,7 @@ def _pipeline(tmp_path, *, events=None, fail_on_stale_data=False):
         fail_on_stale_data=fail_on_stale_data,
         logger=logging.getLogger("test-forecast-pipeline"),
         events=events,
+        ed_visit_input_resolution=ed_visit_input_resolution,
     )
 
 
@@ -91,6 +103,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         1,
     )
     assert calls["load"]["sources"] == {"nssp"}
+    assert calls["load"]["ed_visit_input_resolution"] == "daily"
     assert calls["load"]["fail_on_stale_data"] is True
     assert run.model_batch_dir == (
         tmp_path / "covid_r_2024-12-20_f_2024-09-20_t_2024-12-18"
@@ -157,6 +170,34 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "Starting single-location pipeline for model test_model, location CA, "
         "and run date 2024-12-20."
     )
+
+
+def test_build_forecast_run_requests_ed_visit_input_resolution(monkeypatch, tmp_path):
+    from cfa.stf.routine import forecast_pipeline as pipeline_module
+
+    pipeline = _pipeline(tmp_path, ed_visit_input_resolution="epiweekly")
+    surveillance = make_test_surveillance_inputs(sources={"nssp"})
+    calls = {}
+
+    def load(**kwargs):
+        calls.update(kwargs)
+        return surveillance
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "calculate_training_dates",
+        lambda *args: (dt.date(2024, 9, 20), dt.date(2024, 12, 19)),
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "load_surveillance_inputs",
+        load,
+    )
+
+    run = pipeline.build_forecast_run()
+
+    assert calls["ed_visit_input_resolution"] == "epiweekly"
+    assert run.surveillance is surveillance
 
 
 @pytest.mark.parametrize(

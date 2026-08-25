@@ -453,6 +453,49 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     }
 
 
+def test_load_surveillance_inputs_stores_aggregated_nssp_data(monkeypatch):
+    nssp = data_access.NSSPData(
+        data=pl.DataFrame(
+            {
+                "date": [dt.date(2026, 1, 8)],
+                "state_abb": ["CA"],
+                "observed_ed_visits": [10],
+                "other_ed_visits": [90],
+                "data_type": ["eval"],
+                "resolution": ["daily"],
+            }
+        ),
+        freshness=_freshness("nssp"),
+    )
+    prepared_nssp_data = nssp.data.clone()
+
+    def aggregate(data):
+        assert data is nssp.data
+        return prepared_nssp_data
+
+    monkeypatch.setattr(data_access, "_load_dataops_nssp", lambda **kwargs: nssp)
+    monkeypatch.setattr(data_access, "aggregate_nssp_to_epiweekly", aggregate)
+    monkeypatch.setattr(
+        data_access,
+        "get_us_loc_pop_tbl",
+        lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
+    )
+
+    surveillance = data_access.load_surveillance_inputs(
+        disease="covid",
+        loc_abb="CA",
+        run_date=dt.date(2026, 1, 8),
+        first_training_date=dt.date(2025, 12, 1),
+        last_training_date=dt.date(2026, 1, 7),
+        sources={"nssp"},
+        ed_visit_input_resolution="epiweekly",
+    )
+
+    assert surveillance.nssp.data is prepared_nssp_data
+    assert surveillance.nssp.freshness is nssp.freshness
+    assert surveillance.nssp is not nssp
+
+
 @pytest.mark.parametrize("requested_source", ["nssp", "nhsn"])
 def test_load_surveillance_inputs_only_loads_requested_source(
     monkeypatch,

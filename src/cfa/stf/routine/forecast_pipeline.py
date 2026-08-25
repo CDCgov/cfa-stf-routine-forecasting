@@ -79,6 +79,7 @@ class ForecastPipeline(ABC):
             first_training_date=first_training_date,
             last_training_date=last_training_date,
             sources=self.sources,
+            ed_visit_input_resolution=self.ed_visit_input_resolution,
             fail_on_stale_data=self.fail_on_stale_data,
             logger=self.logger,
         )

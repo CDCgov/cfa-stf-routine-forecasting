@@ -6,7 +6,6 @@ import polars as pl
 import polars.selectors as cs
 
 from cfa.stf.routine.data.data_access import DataResolution
-from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 if TYPE_CHECKING:
@@ -80,9 +79,6 @@ def serialize_data(
 
     nssp_data = forecast_run.nssp.data if forecast_run.nssp is not None else None
     nhsn_data = forecast_run.nhsn.data if forecast_run.nhsn is not None else None
-    if nssp_data is not None and ed_visit_input_resolution == "epiweekly":
-        logger.info("Aggregating ED visits to epiweekly resolution...")
-        nssp_data = aggregate_nssp_to_epiweekly(nssp_data)
 
     nssp_training_data = (
         nssp_data.filter(pl.col("data_type") == "train")

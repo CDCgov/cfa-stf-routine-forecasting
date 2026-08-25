@@ -8,6 +8,7 @@ from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data import prep_data
 from cfa.stf.routine.data.prep_data import serialize_data
+from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 
 
 @pytest.mark.parametrize(
@@ -81,7 +82,7 @@ def test_serialize_data_handles_present_sources(
     assert set(combined_data.get_column(".variable")) == expected_variables
 
 
-def test_serialize_data_uses_aggregated_ed_visits_for_both_artifacts(tmp_path):
+def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
     forecast_run = make_test_forecast_run(
         output_dir=tmp_path,
         sources=("nssp",),
@@ -97,6 +98,7 @@ def test_serialize_data_uses_aggregated_ed_visits_for_both_artifacts(tmp_path):
             "resolution": ["daily"] * 14,
         }
     )
+    nssp_data = aggregate_nssp_to_epiweekly(nssp_data)
     surveillance = replace(
         forecast_run.surveillance,
         nssp=replace(forecast_run.nssp, data=nssp_data),

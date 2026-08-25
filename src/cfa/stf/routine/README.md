@@ -142,7 +142,7 @@ See [`fable/fit_fable.R`](fable/fit_fable.R) for an R writer and EpiAutoGP's [`f
 
 ## 3. Declare input resolution and use hooks only where needed
 
-The base pipeline serializes daily ED-visit inputs by default.
+The base pipeline prepares and serializes daily ED-visit inputs by default.
 Override the `ed_visit_input_resolution` property with `"epiweekly"` when a model requires ED visits aggregated to complete MMWR weeks.
 The declared resolution applies consistently to both `combined_data.tsv` and `data_for_model_fit.json`.
 

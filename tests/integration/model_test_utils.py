@@ -1,3 +1,4 @@
+from dataclasses import replace
 from math import isclose
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
+from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
@@ -63,15 +65,25 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         first_training_date,
         last_training_date,
         sources,
+        ed_visit_input_resolution="daily",
         **kwargs,
     ):
-        return make_surveillance_inputs(
+        surveillance = make_surveillance_inputs(
             location=loc_abb,
             disease=disease,
             sources=sources,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
         )
+        if surveillance.nssp is not None and ed_visit_input_resolution == "epiweekly":
+            surveillance = replace(
+                surveillance,
+                nssp=replace(
+                    surveillance.nssp,
+                    data=aggregate_nssp_to_epiweekly(surveillance.nssp.data),
+                ),
+            )
+        return surveillance
 
     monkeypatch.setattr(
         forecast_pipeline_module,

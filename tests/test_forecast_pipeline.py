@@ -82,7 +82,11 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     monkeypatch.setattr(pipeline_module, "calculate_training_dates", calculate)
     monkeypatch.setattr(pipeline_module, "load_surveillance_inputs", load)
 
-    pipeline = _pipeline(tmp_path, fail_on_stale_data=True)
+    pipeline = _pipeline(
+        tmp_path,
+        fail_on_stale_data=True,
+        ed_visit_input_resolution="epiweekly",
+    )
     run = pipeline.build_forecast_run()
 
     assert run == ForecastRun(
@@ -103,7 +107,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         1,
     )
     assert calls["load"]["sources"] == {"nssp"}
-    assert calls["load"]["ed_visit_input_resolution"] == "daily"
+    assert calls["load"]["ed_visit_input_resolution"] == "epiweekly"
     assert calls["load"]["fail_on_stale_data"] is True
     assert run.model_batch_dir == (
         tmp_path / "covid_r_2024-12-20_f_2024-09-20_t_2024-12-18"
@@ -120,7 +124,11 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     events = []
-    pipeline = _pipeline(tmp_path, events=events)
+    pipeline = _pipeline(
+        tmp_path,
+        events=events,
+        ed_visit_input_resolution="epiweekly",
+    )
     run = make_test_forecast_run(
         output_dir=tmp_path,
         sources={"nssp"},
@@ -163,41 +171,13 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     ]
     assert serialize_kwargs["forecast_run"] is run
     assert "save_dir" not in serialize_kwargs
-    assert serialize_kwargs["ed_visit_input_resolution"] == "daily"
+    assert serialize_kwargs["ed_visit_input_resolution"] == "epiweekly"
     assert run.data_dir.is_dir()
     messages = [record.getMessage() for record in caplog.records]
     assert messages[0] == (
         "Starting single-location pipeline for model test_model, location CA, "
         "and run date 2024-12-20."
     )
-
-
-def test_build_forecast_run_requests_ed_visit_input_resolution(monkeypatch, tmp_path):
-    from cfa.stf.routine import forecast_pipeline as pipeline_module
-
-    pipeline = _pipeline(tmp_path, ed_visit_input_resolution="epiweekly")
-    surveillance = make_test_surveillance_inputs(sources={"nssp"})
-    calls = {}
-
-    def load(**kwargs):
-        calls.update(kwargs)
-        return surveillance
-
-    monkeypatch.setattr(
-        pipeline_module,
-        "calculate_training_dates",
-        lambda *args: (dt.date(2024, 9, 20), dt.date(2024, 12, 19)),
-    )
-    monkeypatch.setattr(
-        pipeline_module,
-        "load_surveillance_inputs",
-        load,
-    )
-
-    run = pipeline.build_forecast_run()
-
-    assert calls["ed_visit_input_resolution"] == "epiweekly"
-    assert run.surveillance is surveillance
 
 
 @pytest.mark.parametrize(

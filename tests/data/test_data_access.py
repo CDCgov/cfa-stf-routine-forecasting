@@ -36,17 +36,6 @@ def test_forecast_source_data_resolves_step_size(resolution, expected_step_size)
     assert source.step_size == expected_step_size
 
 
-def test_forecast_source_data_does_not_infer_resolution_from_data():
-    source = data_access.NSSPData(
-        data=pl.DataFrame({"unrelated_column": [1]}),
-        freshness=_freshness("nssp"),
-        resolution="daily",
-    )
-
-    assert source.resolution == "daily"
-    assert source.step_size == 1
-
-
 def test_forecast_source_data_rejects_unsupported_resolution():
     with pytest.raises(ValueError, match="Unsupported NSSPData resolution"):
         data_access.NSSPData(

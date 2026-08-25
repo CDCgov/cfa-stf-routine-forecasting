@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import polars as pl
 import pytest
+from cfa.stf.forecasttools import read_tabular
 from polars.testing import assert_frame_equal
 from tests.factories import make_test_forecast_run
 
@@ -78,9 +79,7 @@ def test_serialize_data_handles_present_sources(
             "hospital_admissions",
         }
 
-    combined_data = pl.read_csv(
-        forecast_run.data_dir / "combined_data.tsv", separator="\t"
-    )
+    combined_data = read_tabular(forecast_run.data_dir / "combined_data.tsv")
     assert set(combined_data.get_column(".variable")) == expected_variables
 
 
@@ -123,11 +122,7 @@ def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
         "other_ed_visits": [63],
     }
 
-    combined_data = pl.read_csv(
-        forecast_run.data_dir / "combined_data.tsv",
-        separator="\t",
-        try_parse_dates=True,
-    )
+    combined_data = read_tabular(forecast_run.data_dir / "combined_data.tsv")
     weekly_ed_data = combined_data.filter(
         pl.col(".variable").is_in(
             [

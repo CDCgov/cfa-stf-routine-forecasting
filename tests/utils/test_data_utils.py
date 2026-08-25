@@ -7,25 +7,8 @@ from polars.testing import assert_frame_equal
 
 from cfa.stf.routine.utils.data_utils import (
     aggregate_long_to_epiweekly,
-    generate_epiweekly_data,
+    aggregate_nssp_to_epiweekly,
 )
-
-
-def _with_metadata(data: pl.DataFrame, *, resolution: str) -> pl.DataFrame:
-    return data.with_columns(
-        geo_value=pl.lit("CA"),
-        disease=pl.lit("flu"),
-        data_type=pl.lit("train"),
-        resolution=pl.lit(resolution),
-    ).select(
-        "date",
-        "geo_value",
-        "disease",
-        "data_type",
-        "resolution",
-        ".variable",
-        ".value",
-    )
 
 
 def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
@@ -59,54 +42,29 @@ def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
     )
 
 
-def test_generate_epiweekly_data_aggregates_ed_visits_and_preserves_other_data(
-    tmp_path,
-):
-    daily_ed_data = _with_metadata(
-        pl.DataFrame(
-            {
-                "date": pl.date_range(
-                    dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True
-                ),
-                "observed_ed_visits": pl.int_range(1, 15, eager=True),
-                "other_ed_visits": 9,
-            }
-        ).unpivot(
-            on=["observed_ed_visits", "other_ed_visits"],
-            index="date",
-            variable_name=".variable",
-            value_name=".value",
-        ),
-        resolution="daily",
-    )
-    hospital_data = _with_metadata(
-        pl.DataFrame(
-            {
-                "date": [dt.date(2025, 1, 11)],
-                ".variable": ["observed_hospital_admissions"],
-                ".value": [3],
-            }
-        ),
-        resolution="epiweekly",
-    )
-    combined_data_path = tmp_path / "combined_data.tsv"
-    pl.concat([daily_ed_data, hospital_data]).write_csv(
-        combined_data_path, separator="\t"
+def test_aggregate_nssp_to_epiweekly_preserves_wide_source_schema():
+    data = pl.DataFrame(
+        {
+            "date": pl.date_range(
+                dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True
+            ),
+            "state_abb": ["CA"] * 14,
+            "observed_ed_visits": pl.int_range(1, 15, eager=True),
+            "other_ed_visits": [9] * 14,
+            "data_type": ["train"] * 14,
+            "resolution": ["daily"] * 14,
+        }
     )
 
-    result = generate_epiweekly_data(combined_data_path)
-    expected = _with_metadata(
-        pl.DataFrame(
-            [
-                (dt.date(2025, 1, 11), "observed_ed_visits", 28),
-                (dt.date(2025, 1, 11), "observed_hospital_admissions", 3),
-                (dt.date(2025, 1, 11), "other_ed_visits", 63),
-                (dt.date(2025, 1, 18), "observed_ed_visits", 77),
-                (dt.date(2025, 1, 18), "other_ed_visits", 63),
-            ],
-            schema={"date": pl.Date, ".variable": pl.String, ".value": pl.Int64},
-            orient="row",
-        ),
-        resolution="epiweekly",
+    result = aggregate_nssp_to_epiweekly(data)
+    expected = pl.DataFrame(
+        {
+            "date": [dt.date(2025, 1, 11), dt.date(2025, 1, 18)],
+            "state_abb": ["CA", "CA"],
+            "observed_ed_visits": [28, 77],
+            "other_ed_visits": [63, 63],
+            "data_type": ["train", "train"],
+            "resolution": ["epiweekly", "epiweekly"],
+        }
     )
     assert_frame_equal(result, expected)

@@ -74,7 +74,7 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
                 "n_samples": 15,
                 "run_date": dt.date(2026, 1, 7),
                 "exclude_last_n_days": 3,
-                "epiweekly": True,
+                "ed_visit_input_resolution": "epiweekly",
                 "fail_on_stale_data": True,
             },
             {
@@ -87,7 +87,7 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
                 "exclude_last_n_days": 3,
                 "fail_on_stale_data": True,
                 "n_samples": 15,
-                "epiweekly": True,
+                "ed_visit_input_resolution": "epiweekly",
             },
             id="fable",
         ),

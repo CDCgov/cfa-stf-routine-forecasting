@@ -1,3 +1,4 @@
+from dataclasses import replace
 from math import isclose
 from pathlib import Path
 
@@ -5,6 +6,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.data.generate_test_data import (
     REPORT_DATE,
     REPORTING_DELAY_PMF,
@@ -14,6 +16,7 @@ from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
+from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
@@ -62,15 +65,26 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         first_training_date,
         last_training_date,
         sources,
+        ed_visit_input_resolution="daily",
         **kwargs,
     ):
-        return make_surveillance_inputs(
+        surveillance = make_surveillance_inputs(
             location=loc_abb,
             disease=disease,
             sources=sources,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
         )
+        if surveillance.nssp is not None and ed_visit_input_resolution == "epiweekly":
+            surveillance = replace(
+                surveillance,
+                nssp=replace(
+                    surveillance.nssp,
+                    data=aggregate_nssp_to_epiweekly(surveillance.nssp.data),
+                    resolution="epiweekly",
+                ),
+            )
+        return surveillance
 
     monkeypatch.setattr(
         forecast_pipeline_module,
@@ -108,7 +122,11 @@ def configure_data_mode(request, monkeypatch) -> str:
 
 
 def run_fable(
-    workspace: Path, disease: str, location: str, *, epiweekly: bool = False
+    workspace: Path,
+    disease: str,
+    location: str,
+    *,
+    ed_visit_input_resolution: DataResolution = "daily",
 ) -> None:
     fable_module.main(
         disease=disease,
@@ -119,7 +137,7 @@ def run_fable(
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
         run_date=REPORT_DATE,
-        epiweekly=epiweekly,
+        ed_visit_input_resolution=ed_visit_input_resolution,
     )
 
 

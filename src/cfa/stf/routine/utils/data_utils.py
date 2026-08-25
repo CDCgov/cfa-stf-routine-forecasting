@@ -1,10 +1,8 @@
 """Utilities for preparing forecast pipeline datasets."""
 
-from pathlib import Path
-
 import polars as pl
 import polars.selectors as cs
-from cfa.stf.forecasttools import daily_to_weekly, read_tabular
+from cfa.stf.forecasttools import daily_to_weekly
 
 
 def aggregate_long_to_epiweekly(
@@ -31,15 +29,19 @@ def aggregate_long_to_epiweekly(
     )
 
 
-def generate_epiweekly_data(data_path: Path | str) -> pl.DataFrame:
-    """Read combined data and aggregate daily ED visits to complete MMWR weeks."""
-    daily_data = read_tabular(data_path)
-    ed_visit_filter = pl.col(".variable").str.ends_with("_ed_visits")
-    daily_ed_data = daily_data.filter(ed_visit_filter)
-    other_data = daily_data.filter(~ed_visit_filter)
-
-    epiweekly_data = pl.concat(
-        [aggregate_long_to_epiweekly(daily_ed_data), other_data],
-        how="diagonal_relaxed",
-    ).select(daily_data.columns)
-    return epiweekly_data.sort("date", ".variable")
+def aggregate_nssp_to_epiweekly(data: pl.DataFrame) -> pl.DataFrame:
+    """Aggregate wide daily NSSP data to complete MMWR weeks."""
+    value_columns = ["observed_ed_visits", "other_ed_visits"]
+    id_columns = [column for column in data.columns if column not in value_columns]
+    long_data = data.unpivot(
+        on=value_columns,
+        index=id_columns,
+        variable_name=".variable",
+        value_name=".value",
+    )
+    return (
+        aggregate_long_to_epiweekly(long_data)
+        .pivot(on=".variable", index=id_columns, values=".value")
+        .select(data.columns)
+        .sort("date", "state_abb")
+    )

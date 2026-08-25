@@ -140,15 +140,18 @@ Additional identifiers such as `.chain`, `.iteration`, or `lab_site_index` are a
 Draws should form coherent trajectories: the same `.draw` identifies values belonging to one sample across forecast dates.
 See [`fable/fit_fable.R`](fable/fit_fable.R) for an R writer and EpiAutoGP's [`forecast_epiautogp.py`](epiautogp/forecast_epiautogp.py) for a non-R writer.
 
-## 3. Use hooks only where needed
+## 3. Declare input resolution and use hooks only where needed
 
-The base class provides optional hooks for model-specific input preparation:
+The base pipeline prepares and serializes daily ED-visit inputs by default.
+Override the `ed_visit_input_resolution` property with `"epiweekly"` when a model requires ED visits aggregated to complete MMWR weeks.
+The declared resolution applies consistently to both `combined_data.tsv` and `data_for_model_fit.json`.
 
-  | Hook                             | Use it to                                                |
-  | -------------------------------- | -------------------------------------------------------- |
-  | `validate_configuration()`       | Reject invalid option combinations before loading data   |
-  | `transform_serialized_data(run)` | Transform common data, such as epiweekly aggregation     |
-  | `prepare_model_artifacts(run)`   | Create model-specific inputs, such as JSON or parameters |
+The base class also provides optional hooks for model-specific preparation:
+
+  | Hook                           | Use it to                                                |
+  | ------------------------------ | -------------------------------------------------------- |
+  | `validate_configuration()`     | Reject invalid option combinations before loading data   |
+  | `prepare_model_artifacts(run)` | Create model-specific inputs, such as JSON or parameters |
 
 Do not override `execute()`, `build_forecast_run()`, `prepare_input_artifacts()`, or `publish_outputs()` unless the shared lifecycle itself must change.
 Keeping those methods common preserves data freshness checks and compatible outputs.

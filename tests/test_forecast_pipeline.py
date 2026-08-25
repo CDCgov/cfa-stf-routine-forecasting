@@ -11,9 +11,10 @@ from tests.factories import make_test_forecast_run, make_test_surveillance_input
 class TestPipeline(ForecastPipeline):
     __test__ = False
 
-    def __init__(self, *, events=None, **kwargs):
+    def __init__(self, *, events=None, ed_visit_input_resolution="daily", **kwargs):
         super().__init__(**kwargs)
         self.events = events if events is not None else []
+        self._ed_visit_input_resolution = ed_visit_input_resolution
 
     @property
     def model_name(self):
@@ -23,11 +24,12 @@ class TestPipeline(ForecastPipeline):
     def sources(self):
         return {"nssp"}
 
+    @property
+    def ed_visit_input_resolution(self):
+        return self._ed_visit_input_resolution
+
     def validate_configuration(self):
         self.events.append("validate")
-
-    def transform_serialized_data(self, run):
-        self.events.append("transform")
 
     def prepare_model_artifacts(self, run):
         self.events.append("prepare_artifacts")
@@ -36,7 +38,13 @@ class TestPipeline(ForecastPipeline):
         self.events.append("run_model")
 
 
-def _pipeline(tmp_path, *, events=None, fail_on_stale_data=False):
+def _pipeline(
+    tmp_path,
+    *,
+    events=None,
+    fail_on_stale_data=False,
+    ed_visit_input_resolution="daily",
+):
     return TestPipeline(
         disease="covid",
         loc="CA",
@@ -48,6 +56,7 @@ def _pipeline(tmp_path, *, events=None, fail_on_stale_data=False):
         fail_on_stale_data=fail_on_stale_data,
         logger=logging.getLogger("test-forecast-pipeline"),
         events=events,
+        ed_visit_input_resolution=ed_visit_input_resolution,
     )
 
 
@@ -73,7 +82,11 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     monkeypatch.setattr(pipeline_module, "calculate_training_dates", calculate)
     monkeypatch.setattr(pipeline_module, "load_surveillance_inputs", load)
 
-    pipeline = _pipeline(tmp_path, fail_on_stale_data=True)
+    pipeline = _pipeline(
+        tmp_path,
+        fail_on_stale_data=True,
+        ed_visit_input_resolution="epiweekly",
+    )
     run = pipeline.build_forecast_run()
 
     assert run == ForecastRun(
@@ -94,6 +107,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         1,
     )
     assert calls["load"]["sources"] == {"nssp"}
+    assert calls["load"]["ed_visit_input_resolution"] == "epiweekly"
     assert calls["load"]["fail_on_stale_data"] is True
     assert run.model_batch_dir == (
         tmp_path / "covid_r_2024-12-20_f_2024-09-20_t_2024-12-18"
@@ -110,7 +124,10 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     events = []
-    pipeline = _pipeline(tmp_path, events=events)
+    pipeline = _pipeline(
+        tmp_path,
+        events=events,
+    )
     run = make_test_forecast_run(
         output_dir=tmp_path,
         sources={"nssp"},
@@ -121,16 +138,16 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "build_forecast_run",
         lambda: events.append("build_run") or run,
     )
-    monkeypatch.setattr(
-        pipeline_module,
-        "serialize_data",
-        lambda **kwargs: events.append("serialize"),
-    )
-    monkeypatch.setattr(
-        pipeline_module,
-        "append_prop_data_to_combined_data",
-        lambda *args: events.append("append_prop"),
-    )
+    serialize_kwargs = {}
+
+    def serialize(*, forecast_run, logger):
+        serialize_kwargs.update(
+            forecast_run=forecast_run,
+            logger=logger,
+        )
+        events.append("serialize")
+
+    monkeypatch.setattr(pipeline_module, "serialize_data", serialize)
     monkeypatch.setattr(
         pipeline_module,
         "make_figures_from_model_fit_dir",
@@ -149,13 +166,12 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "validate",
         "build_run",
         "serialize",
-        "transform",
-        "append_prop",
         "prepare_artifacts",
         "run_model",
         "figures",
         "hubverse",
     ]
+    assert serialize_kwargs["forecast_run"] is run
     assert run.data_dir.is_dir()
     messages = [record.getMessage() for record in caplog.records]
     assert messages[0] == (

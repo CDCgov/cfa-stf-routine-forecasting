@@ -29,21 +29,18 @@ def _common_kwargs(tmp_path):
     }
 
 
-@patch("cfa.stf.routine.fable.forecast_fable.write_tabular")
-@patch("cfa.stf.routine.fable.forecast_fable.generate_epiweekly_data")
-def test_fable_pipeline_aggregates_weekly_inputs(mock_generate, mock_write, tmp_path):
+@pytest.mark.parametrize(
+    "resolution",
+    ["daily", "epiweekly"],
+)
+def test_fable_pipeline_declares_ed_visit_input_resolution(tmp_path, resolution):
     pipeline = FablePipeline(
         **_common_kwargs(tmp_path),
         n_samples=10,
-        epiweekly=True,
+        ed_visit_input_resolution=resolution,
     )
-    run = _run(tmp_path, model_name=pipeline.model_name)
-
-    pipeline.transform_serialized_data(run)
-
-    data_path = run.data_dir / "combined_data.tsv"
-    mock_generate.assert_called_once_with(data_path)
-    mock_write.assert_called_once_with(mock_generate.return_value, data_path)
+    assert pipeline.ed_visit_input_resolution == resolution
+    assert pipeline.model_name == f"{resolution}_fable_e_other"
 
 
 @patch("cfa.stf.routine.fable.forecast_fable.fable_e_other_forecasts")

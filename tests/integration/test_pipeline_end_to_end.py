@@ -106,7 +106,12 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
                 run_fable(workspace, disease, location)
 
             with _status_step(f"Running epiweekly Fable for {disease}, {location}"):
-                run_fable(workspace, disease, location, epiweekly=True)
+                run_fable(
+                    workspace,
+                    disease,
+                    location,
+                    ed_visit_input_resolution="epiweekly",
+                )
 
             with _status_step(f"Running PyRenew for {disease}, {location}"):
                 run_pyrenew(workspace, disease, location)

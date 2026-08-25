@@ -21,6 +21,30 @@ def _freshness(source: str) -> data_access.DataFreshness:
     )
 
 
+@pytest.mark.parametrize(
+    ("resolution", "expected_step_size"),
+    [("daily", 1), ("epiweekly", 7)],
+)
+def test_forecast_source_data_resolves_step_size(resolution, expected_step_size):
+    source = data_access.NSSPData(
+        data=pl.DataFrame({"resolution": [resolution, resolution]}),
+        freshness=_freshness("nssp"),
+        resolution=resolution,
+    )
+
+    assert source.resolution == resolution
+    assert source.step_size == expected_step_size
+
+
+def test_forecast_source_data_rejects_unsupported_resolution():
+    with pytest.raises(ValueError, match="Unsupported NSSPData resolution"):
+        data_access.NSSPData(
+            data=pl.DataFrame(),
+            freshness=_freshness("nssp"),
+            resolution="monthly",
+        )
+
+
 def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
@@ -144,6 +168,8 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
         }
     )
     assert_frame_equal(result.data, expected)
+    assert result.resolution == "epiweekly"
+    assert result.step_size == 7
     assert result.freshness.selected_version_date == dt.date(2026, 1, 8)
     assert result.freshness.latest_observed_date == dt.date(2026, 1, 10)
     assert not result.freshness.is_stale
@@ -162,6 +188,7 @@ def test_surveillance_inputs_allows_one_source(source_name):
         data_access.NSSPData(
             data=pl.DataFrame(),
             freshness=_freshness("nssp"),
+            resolution="daily",
         )
         if source_name == "nssp"
         else data_access.NHSNData(
@@ -359,6 +386,7 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
             }
         ),
         freshness=freshness("nssp", dt.date(2026, 1, 8)),
+        resolution="daily",
     )
     nhsn = data_access.NHSNData(
         data=pl.DataFrame(
@@ -453,6 +481,52 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     }
 
 
+def test_load_surveillance_inputs_stores_aggregated_nssp_data(monkeypatch):
+    nssp = data_access.NSSPData(
+        data=pl.DataFrame(
+            {
+                "date": [dt.date(2026, 1, 8)],
+                "state_abb": ["CA"],
+                "observed_ed_visits": [10],
+                "other_ed_visits": [90],
+                "data_type": ["eval"],
+                "resolution": ["daily"],
+            }
+        ),
+        freshness=_freshness("nssp"),
+        resolution="daily",
+    )
+    prepared_nssp_data = nssp.data.with_columns(resolution=pl.lit("epiweekly"))
+
+    def aggregate(data):
+        assert data is nssp.data
+        return prepared_nssp_data
+
+    monkeypatch.setattr(data_access, "_load_dataops_nssp", lambda **kwargs: nssp)
+    monkeypatch.setattr(data_access, "aggregate_nssp_to_epiweekly", aggregate)
+    monkeypatch.setattr(
+        data_access,
+        "get_us_loc_pop_tbl",
+        lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
+    )
+
+    surveillance = data_access.load_surveillance_inputs(
+        disease="covid",
+        loc_abb="CA",
+        run_date=dt.date(2026, 1, 8),
+        first_training_date=dt.date(2025, 12, 1),
+        last_training_date=dt.date(2026, 1, 7),
+        sources={"nssp"},
+        ed_visit_input_resolution="epiweekly",
+    )
+
+    assert surveillance.nssp.data is prepared_nssp_data
+    assert surveillance.nssp.resolution == "epiweekly"
+    assert surveillance.nssp.step_size == 7
+    assert surveillance.nssp.freshness is nssp.freshness
+    assert surveillance.nssp is not nssp
+
+
 @pytest.mark.parametrize("requested_source", ["nssp", "nhsn"])
 def test_load_surveillance_inputs_only_loads_requested_source(
     monkeypatch,
@@ -470,6 +544,7 @@ def test_load_surveillance_inputs_only_loads_requested_source(
             }
         ),
         freshness=_freshness("nssp"),
+        resolution="daily",
     )
     nhsn = data_access.NHSNData(
         data=pl.DataFrame(

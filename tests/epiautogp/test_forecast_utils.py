@@ -60,6 +60,7 @@ def test_pipeline_declares_model_name_and_source(
 
     assert pipeline.model_name == expected
     assert pipeline.sources == {target}
+    assert pipeline.ed_visit_input_resolution == frequency
 
 
 def test_pipeline_validates_configuration_before_loading(tmp_path):
@@ -89,21 +90,6 @@ def test_prepare_model_artifacts_resolves_nowcast_without_mutating_state(
         ReportingDelayNowcast,
     )
     assert not hasattr(pipeline, "nowcast_source")
-
-
-@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.write_tabular")
-@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.generate_epiweekly_data")
-def test_epiweekly_pipeline_aggregates_common_inputs(
-    mock_generate, mock_write, tmp_path
-):
-    pipeline = _pipeline(tmp_path, frequency="epiweekly")
-    run = _run(tmp_path)
-
-    pipeline.transform_serialized_data(run)
-
-    data_path = run.data_dir / "combined_data.tsv"
-    mock_generate.assert_called_once_with(data_path)
-    mock_write.assert_called_once_with(mock_generate.return_value, data_path)
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")

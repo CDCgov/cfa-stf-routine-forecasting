@@ -1,10 +1,12 @@
 import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
 import polars.selectors as cs
+from cfa.stf.forecasttools import write_tabular
+
+from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 if TYPE_CHECKING:
     from cfa.stf.routine.forecast_run import ForecastRun
@@ -19,31 +21,19 @@ def combine_surveillance_data(
     source_frames = []
     if nssp_data is not None:
         source_frames.append(
-            nssp_data.rename({"state_abb": "geo_value"})
-            .unpivot(
+            nssp_data.unpivot(
                 on=["observed_ed_visits", "other_ed_visits"],
                 variable_name=".variable",
                 index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
                 value_name=".value",
             )
-            .with_columns(pl.lit(None).alias("lab_site_index"))
         )
 
     if nhsn_data is not None:
         source_frames.append(
-            nhsn_data.rename(
-                {
-                    "state_abb": "geo_value",
-                    "value": "observed_hospital_admissions",
-                }
+            nhsn_data.rename({"value": ".value"}).with_columns(
+                pl.lit("observed_hospital_admissions").alias(".variable"),
             )
-            .unpivot(
-                on="observed_hospital_admissions",
-                index=cs.exclude("observed_hospital_admissions"),
-                variable_name=".variable",
-                value_name=".value",
-            )
-            .with_columns(pl.lit(None).alias("lab_site_index"))
         )
 
     if not source_frames:
@@ -54,7 +44,11 @@ def combine_surveillance_data(
             source_frames,
             how="diagonal_relaxed",
         )
-        .with_columns(pl.lit(disease).alias("disease"))
+        .rename({"state_abb": "geo_value"})
+        .with_columns(
+            pl.lit(disease).alias("disease"),
+            pl.lit(None).alias("lab_site_index"),
+        )
         .sort(["date", "geo_value", ".variable"])
         .select(
             [
@@ -73,20 +67,30 @@ def combine_surveillance_data(
 
 def serialize_data(
     forecast_run: "ForecastRun",
-    save_dir: Path,
     logger: logging.Logger | None = None,
 ) -> None:
     logger = logger or logging.getLogger(__name__)
+    save_dir = forecast_run.data_dir
 
-    Path(save_dir).mkdir(parents=True, exist_ok=True)
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     nssp_training_data = (
         forecast_run.nssp.data.filter(pl.col("data_type") == "train")
+        .drop("resolution", "data_type")
+        .rename({"state_abb": "geo_value"})
         if forecast_run.nssp is not None
         else None
     )
     nhsn_training_data = (
         forecast_run.nhsn.data.filter(pl.col("data_type") == "train")
+        .drop("resolution", "data_type")
+        .rename(
+            {
+                "date": "weekendingdate",
+                "state_abb": "jurisdiction",
+                "value": "hospital_admissions",
+            }
+        )
         if forecast_run.nhsn is not None
         else None
     )
@@ -96,40 +100,35 @@ def serialize_data(
         "right_truncation_offset": forecast_run.right_truncation_offset,
         "nwss_training_data": None,
         "nssp_training_data": (
-            nssp_training_data.drop("resolution", "data_type")
-            .rename({"state_abb": "geo_value"})
-            .to_dict(as_series=False)
+            nssp_training_data.to_dict(as_series=False)
             if nssp_training_data is not None
             else None
         ),
         "nhsn_training_data": (
-            nhsn_training_data.drop("resolution", "data_type")
-            .rename(
-                {
-                    "date": "weekendingdate",
-                    "state_abb": "jurisdiction",
-                    "value": "hospital_admissions",
-                }
-            )
-            .to_dict(as_series=False)
+            nhsn_training_data.to_dict(as_series=False)
             if nhsn_training_data is not None
             else None
         ),
-        "nhsn_step_size": 7,
-        "nssp_step_size": 1,
+        "nhsn_step_size": (
+            forecast_run.nhsn.step_size if forecast_run.nhsn is not None else None
+        ),
+        "nssp_step_size": (
+            forecast_run.nssp.step_size if forecast_run.nssp is not None else None
+        ),
         "nwss_step_size": 1,
     }
 
-    with open(Path(save_dir, "data_for_model_fit.json"), "w") as json_file:
+    with open(save_dir / "data_for_model_fit.json", "w") as json_file:
         json.dump(data_for_model_fit, json_file, default=str)
 
     combined_data = combine_surveillance_data(
         disease=forecast_run.disease,
-        nssp_data=forecast_run.nssp.data if forecast_run.nssp is not None else None,
-        nhsn_data=forecast_run.nhsn.data if forecast_run.nhsn is not None else None,
+        nssp_data=(forecast_run.nssp.data if forecast_run.nssp is not None else None),
+        nhsn_data=(forecast_run.nhsn.data if forecast_run.nhsn is not None else None),
     )
+    if forecast_run.nssp is not None:
+        combined_data = append_prop_ed_data(combined_data)
 
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 
-    combined_data.write_csv(Path(save_dir, "combined_data.tsv"), separator="\t")
-    return None
+    write_tabular(combined_data, save_dir / "combined_data.tsv")

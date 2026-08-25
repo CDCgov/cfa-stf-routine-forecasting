@@ -35,6 +35,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 # Model Code
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
@@ -332,11 +333,9 @@ def _run_fable_e_other(
     context: dg.OpExecutionContext,
     fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
-    epiweekly: bool,
+    ed_visit_input_resolution: DataResolution,
 ) -> str | None:
-    """
-    Helper function to run fable E-other model with optional epiweekly mode.
-    """
+    """Run a Fable E-other model at the requested ED-visit resolution."""
     _throw_if_backfill(context, daily_partitions_def)
 
     disease = model_base_config.diseases.current_value
@@ -362,7 +361,7 @@ def _run_fable_e_other(
         n_forecast_days=28,
         n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
-        epiweekly=epiweekly,
+        ed_visit_input_resolution=ed_visit_input_resolution,
         run_date=run_date,
         fail_on_stale_data=model_base_config.fail_on_stale_data,
     )
@@ -637,7 +636,7 @@ def fable_e_other(
         context,
         fable_e_other_config,
         model_base_config,
-        epiweekly=False,
+        ed_visit_input_resolution="daily",
     )
 
 
@@ -655,7 +654,7 @@ def epiweekly_fable_e_other(
         context,
         fable_e_other_config,
         model_base_config,
-        epiweekly=True,
+        ed_visit_input_resolution="epiweekly",
     )
 
 

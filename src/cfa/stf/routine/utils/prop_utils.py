@@ -100,32 +100,26 @@ def create_prop_fusion_model(
     write_tabular(prop_data, data_dir / "combined_data.tsv")
 
 
-def append_prop_data_to_combined_data(
-    data_path: Path | str,
+def append_prop_ed_data(
+    data: pl.DataFrame,
     observed_var: str = "observed_ed_visits",
     other_var: str = "other_ed_visits",
     prop_var: str = "prop_disease_ed_visits",
-) -> None:
+) -> pl.DataFrame:
     """Append disease ED visit proportion rows when both inputs are available."""
-    path = Path(data_path)
-    data = read_tabular(path)
-
     required_vars = {observed_var, other_var}
     available_vars = set(data.get_column(".variable").unique().to_list())
-    present_required_vars = required_vars & available_vars
-    if not present_required_vars:
-        return
-    if present_required_vars != required_vars:
-        missing_vars = ", ".join(sorted(required_vars - available_vars))
+    missing_vars = required_vars - available_vars
+    if missing_vars:
+        missing_vars_text = ", ".join(sorted(missing_vars))
         raise ValueError(
             "Cannot append ED visit proportions from incomplete NSSP data; "
-            f"missing variable(s): {missing_vars}"
+            f"missing variable(s): {missing_vars_text}"
         )
 
-    data = append_prop_data(
+    return append_prop_data(
         data,
         observed_var=observed_var,
         other_var=other_var,
         prop_var=prop_var,
     )
-    write_tabular(data, path)

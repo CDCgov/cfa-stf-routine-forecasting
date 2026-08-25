@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 
 import polars as pl
+from cfa.stf.forecasttools import read_tabular
 
 from cfa.stf.routine.data.nowcast import NowcastData, NowcastSource
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
@@ -299,8 +300,7 @@ def _read_tsv_data(
 
     logger.info(f"Reading {frequency} data from {tsv_path}")
 
-    # Read TSV file
-    df = pl.read_csv(tsv_path, separator="\t")
+    df = read_tabular(tsv_path)
 
     df = df.filter((pl.col("geo_value") == location) & (pl.col("disease") == disease))
 
@@ -323,8 +323,6 @@ def _read_tsv_data(
         values=".value",
     )
 
-    # Ensure date column is properly typed
-    df_pivot = df_pivot.with_columns(pl.col("date").str.to_date())
     df_pivot = df_pivot.sort("date")
 
     # Apply date exclusions if provided (before extracting to lists)

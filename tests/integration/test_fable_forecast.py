@@ -13,7 +13,12 @@ def test_fable_forecast(pipeline_workspace, monkeypatch, request):
     configure_data_mode(request, monkeypatch)
 
     run_fable(pipeline_workspace, disease, location)
-    run_fable(pipeline_workspace, disease, location, epiweekly=True)
+    run_fable(
+        pipeline_workspace,
+        disease,
+        location,
+        ed_visit_input_resolution="epiweekly",
+    )
 
     assert_model_outputs(
         pipeline_workspace,

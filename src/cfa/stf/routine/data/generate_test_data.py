@@ -278,6 +278,7 @@ def make_surveillance_inputs(
                 .sort("date")
             ),
             freshness=nssp_freshness,
+            resolution="daily",
         )
         if "nssp" in requested_sources
         else None

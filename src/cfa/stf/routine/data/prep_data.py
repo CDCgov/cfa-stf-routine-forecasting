@@ -23,31 +23,25 @@ def combine_surveillance_data(
     source_frames = []
     if nssp_data is not None:
         source_frames.append(
-            nssp_data.rename({"state_abb": "geo_value"})
-            .unpivot(
+            nssp_data.unpivot(
                 on=["observed_ed_visits", "other_ed_visits"],
                 variable_name=".variable",
                 index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
                 value_name=".value",
-            )
-            .with_columns(pl.lit(None).alias("lab_site_index"))
+            ).with_columns(pl.lit(None).alias("lab_site_index"))
         )
 
     if nhsn_data is not None:
         source_frames.append(
-            nhsn_data.rename(
-                {
-                    "state_abb": "geo_value",
-                    "value": "observed_hospital_admissions",
-                }
-            )
-            .unpivot(
-                on="observed_hospital_admissions",
-                index=cs.exclude("observed_hospital_admissions"),
+            nhsn_data.unpivot(
+                on="value",
+                index=cs.exclude("value"),
                 variable_name=".variable",
                 value_name=".value",
+            ).with_columns(
+                pl.lit("observed_hospital_admissions").alias(".variable"),
+                pl.lit(None).alias("lab_site_index"),
             )
-            .with_columns(pl.lit(None).alias("lab_site_index"))
         )
 
     if not source_frames:
@@ -58,6 +52,7 @@ def combine_surveillance_data(
             source_frames,
             how="diagonal_relaxed",
         )
+        .rename({"state_abb": "geo_value"})
         .with_columns(pl.lit(disease).alias("disease"))
         .sort(["date", "geo_value", ".variable"])
         .select(

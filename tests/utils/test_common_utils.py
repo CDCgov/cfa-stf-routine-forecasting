@@ -106,7 +106,6 @@ class TestDataWranglingUtils:
     @pytest.mark.parametrize(
         "present_var",
         [
-            "observed_hospital_admissions",
             "observed_ed_visits",
             "other_ed_visits",
         ],

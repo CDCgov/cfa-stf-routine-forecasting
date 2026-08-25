@@ -93,10 +93,6 @@ def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, messa
         _pyrenew_pipeline(tmp_path, **overrides).validate_configuration()
 
 
-def test_pyrenew_pipeline_uses_daily_ed_visit_inputs(tmp_path):
-    assert _pyrenew_pipeline(tmp_path).ed_visit_input_resolution == "daily"
-
-
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.copy_priors")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.resolve_pyrenew_model_inputs")

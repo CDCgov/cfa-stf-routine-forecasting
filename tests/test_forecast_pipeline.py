@@ -127,7 +127,6 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     pipeline = _pipeline(
         tmp_path,
         events=events,
-        ed_visit_input_resolution="epiweekly",
     )
     run = make_test_forecast_run(
         output_dir=tmp_path,

@@ -141,8 +141,12 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     )
     serialize_kwargs = {}
 
-    def serialize(**kwargs):
-        serialize_kwargs.update(kwargs)
+    def serialize(*, forecast_run, logger, ed_visit_input_resolution):
+        serialize_kwargs.update(
+            forecast_run=forecast_run,
+            logger=logger,
+            ed_visit_input_resolution=ed_visit_input_resolution,
+        )
         events.append("serialize")
 
     monkeypatch.setattr(pipeline_module, "serialize_data", serialize)
@@ -170,7 +174,6 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "hubverse",
     ]
     assert serialize_kwargs["forecast_run"] is run
-    assert "save_dir" not in serialize_kwargs
     assert serialize_kwargs["ed_visit_input_resolution"] == "epiweekly"
     assert run.data_dir.is_dir()
     messages = [record.getMessage() for record in caplog.records]

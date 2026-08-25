@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 import polars.selectors as cs
+from cfa.stf.forecasttools import write_tabular
 
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
@@ -130,4 +131,4 @@ def serialize_data(
 
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 
-    combined_data.write_csv(save_dir / "combined_data.tsv", separator="\t")
+    write_tabular(combined_data, save_dir / "combined_data.tsv")

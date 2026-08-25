@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
+from cfa.stf.forecasttools import write_tabular
 from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.nowcast import NowcastData
@@ -293,7 +294,7 @@ class FakeNowcastSource:
 
 
 def _write_combined_data(path):
-    pl.DataFrame(
+    combined_data = pl.DataFrame(
         [
             {
                 "date": dt.date(2024, 1, 1),
@@ -320,7 +321,8 @@ def _write_combined_data(path):
                 ".value": 999.0,
             },
         ]
-    ).write_csv(path, separator="\t")
+    )
+    write_tabular(combined_data, path)
 
 
 def _epiautogp_run(tmp_path):

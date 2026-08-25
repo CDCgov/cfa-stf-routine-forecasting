@@ -128,6 +128,6 @@ def serialize_data(
     if forecast_run.nssp is not None:
         combined_data = append_prop_ed_data(combined_data)
 
-    logger.info("Saving %s to %s", forecast_run.loc, save_dir)
+    logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 
     combined_data.write_csv(save_dir / "combined_data.tsv", separator="\t")

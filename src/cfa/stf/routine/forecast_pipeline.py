@@ -107,7 +107,6 @@ class ForecastPipeline(ABC):
         self.logger.info("Processing data for %s", run.loc)
         serialize_data(
             forecast_run=run,
-            save_dir=run.data_dir,
             logger=self.logger,
             ed_visit_input_resolution=self.ed_visit_input_resolution,
         )

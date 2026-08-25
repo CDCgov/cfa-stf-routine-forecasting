@@ -148,6 +148,8 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "figures",
         "hubverse",
     ]
+    assert serialize_kwargs["forecast_run"] is run
+    assert "save_dir" not in serialize_kwargs
     assert serialize_kwargs["ed_visit_input_resolution"] == "daily"
     assert run.data_dir.is_dir()
     messages = [record.getMessage() for record in caplog.records]

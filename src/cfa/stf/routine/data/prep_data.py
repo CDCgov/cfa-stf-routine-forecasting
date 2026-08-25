@@ -1,6 +1,5 @@
 import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -71,12 +70,11 @@ def combine_surveillance_data(
 
 def serialize_data(
     forecast_run: "ForecastRun",
-    save_dir: Path,
     logger: logging.Logger | None = None,
     ed_visit_input_resolution: DataResolution = "daily",
 ) -> None:
     logger = logger or logging.getLogger(__name__)
-    save_dir = Path(save_dir)
+    save_dir = forecast_run.data_dir
 
     save_dir.mkdir(parents=True, exist_ok=True)
 

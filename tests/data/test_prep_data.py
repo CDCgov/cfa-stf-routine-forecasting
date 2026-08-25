@@ -54,12 +54,9 @@ def test_serialize_data_handles_present_sources(
         sources=sources,
     )
 
-    serialize_data(
-        forecast_run=forecast_run,
-        save_dir=tmp_path,
-    )
+    serialize_data(forecast_run=forecast_run)
 
-    with open(tmp_path / "data_for_model_fit.json") as file:
+    with open(forecast_run.data_dir / "data_for_model_fit.json") as file:
         model_data = json.load(file)
     assert (model_data["nssp_training_data"] is not None) == ("nssp" in sources)
     assert (model_data["nhsn_training_data"] is not None) == ("nhsn" in sources)
@@ -78,7 +75,9 @@ def test_serialize_data_handles_present_sources(
             "hospital_admissions",
         }
 
-    combined_data = pl.read_csv(tmp_path / "combined_data.tsv", separator="\t")
+    combined_data = pl.read_csv(
+        forecast_run.data_dir / "combined_data.tsv", separator="\t"
+    )
     assert set(combined_data.get_column(".variable")) == expected_variables
 
 
@@ -106,11 +105,10 @@ def test_serialize_data_uses_aggregated_ed_visits_for_both_artifacts(tmp_path):
 
     serialize_data(
         forecast_run=forecast_run,
-        save_dir=tmp_path,
         ed_visit_input_resolution="epiweekly",
     )
 
-    with open(tmp_path / "data_for_model_fit.json") as file:
+    with open(forecast_run.data_dir / "data_for_model_fit.json") as file:
         model_data = json.load(file)
     assert model_data["nssp_step_size"] == 7
     assert model_data["nssp_training_data"] == {
@@ -121,7 +119,7 @@ def test_serialize_data_uses_aggregated_ed_visits_for_both_artifacts(tmp_path):
     }
 
     combined_data = pl.read_csv(
-        tmp_path / "combined_data.tsv",
+        forecast_run.data_dir / "combined_data.tsv",
         separator="\t",
         try_parse_dates=True,
     )

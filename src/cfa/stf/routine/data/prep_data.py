@@ -115,8 +115,8 @@ def serialize_data(
             if nhsn_training_data is not None
             else None
         ),
-        "nhsn_step_size": nhsn.step_size if nhsn is not None else 7,
-        "nssp_step_size": nssp.step_size if nssp is not None else 1,
+        "nhsn_step_size": nhsn.step_size if nhsn is not None else None,
+        "nssp_step_size": nssp.step_size if nssp is not None else None,
         "nwss_step_size": 1,
     }
 

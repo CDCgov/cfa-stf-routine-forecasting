@@ -61,7 +61,8 @@ def test_serialize_data_handles_present_sources(
         model_data = json.load(file)
     assert (model_data["nssp_training_data"] is not None) == ("nssp" in sources)
     assert (model_data["nhsn_training_data"] is not None) == ("nhsn" in sources)
-    assert model_data["nssp_step_size"] == 1
+    assert model_data["nssp_step_size"] == (1 if "nssp" in sources else None)
+    assert model_data["nhsn_step_size"] == (7 if "nhsn" in sources else None)
     if "nssp" in sources:
         assert set(model_data["nssp_training_data"]) == {
             "date",

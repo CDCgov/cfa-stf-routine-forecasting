@@ -8,11 +8,11 @@ list-based implementation to ensure correctness.
 
 import datetime as dt
 import json
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from cfa.stf.forecasttools import write_tabular
 from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.nowcast import NowcastData
@@ -293,48 +293,50 @@ class FakeNowcastSource:
         return NowcastData(dates=[dates[-1]], reports=[[reports[-1] + 1.0]])
 
 
-def _write_combined_data(path):
-    combined_data = pl.DataFrame(
-        [
-            {
-                "date": dt.date(2024, 1, 1),
-                "geo_value": "CA",
-                "disease": "covid",
-                "data_type": "train",
-                ".variable": "observed_ed_visits",
-                ".value": 10.0,
-            },
-            {
-                "date": dt.date(2024, 1, 2),
-                "geo_value": "CA",
-                "disease": "covid",
-                "data_type": "train",
-                ".variable": "observed_ed_visits",
-                ".value": 20.0,
-            },
-            {
-                "date": dt.date(2024, 1, 3),
-                "geo_value": "CA",
-                "disease": "covid",
-                "data_type": "eval",
-                ".variable": "observed_ed_visits",
-                ".value": 999.0,
-            },
-        ]
-    )
-    write_tabular(combined_data, path)
-
-
 def _epiautogp_run(tmp_path):
     report_date = dt.date(2024, 1, 3)
-    return make_test_forecast_run(
+    run = make_test_forecast_run(
         output_dir=tmp_path,
         report_date=report_date,
         n_training_days=2,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
         model_name="test_model",
+        sources=("nssp",),
     )
+    nssp_data = pl.DataFrame(
+        [
+            {
+                "date": dt.date(2024, 1, 1),
+                "state_abb": "CA",
+                "data_type": "train",
+                "resolution": "daily",
+                "observed_ed_visits": 10.0,
+                "other_ed_visits": 90.0,
+            },
+            {
+                "date": dt.date(2024, 1, 2),
+                "state_abb": "CA",
+                "data_type": "train",
+                "resolution": "daily",
+                "observed_ed_visits": 20.0,
+                "other_ed_visits": 80.0,
+            },
+            {
+                "date": dt.date(2024, 1, 3),
+                "state_abb": "CA",
+                "data_type": "eval",
+                "resolution": "daily",
+                "observed_ed_visits": 999.0,
+                "other_ed_visits": 1.0,
+            },
+        ]
+    )
+    surveillance = replace(
+        run.surveillance,
+        nssp=replace(run.nssp, data=nssp_data),
+    )
+    return replace(run, surveillance=surveillance)
 
 
 class TestConvertToEpiAutoGpJson:
@@ -343,9 +345,6 @@ class TestConvertToEpiAutoGpJson:
     def test_only_training_rows_are_serialized_without_nowcast_source(self, tmp_path):
         """Test converter excludes evaluation rows from model input."""
         forecast_run = _epiautogp_run(tmp_path)
-        data_path = forecast_run.data_dir / "combined_data.tsv"
-        data_path.parent.mkdir(parents=True)
-        _write_combined_data(data_path)
 
         output_path = convert_to_epiautogp_json(
             forecast_run=forecast_run,
@@ -357,13 +356,73 @@ class TestConvertToEpiAutoGpJson:
         assert output["reports"] == [10.0, 20.0]
         assert output["nowcast_dates"] == []
         assert output["nowcast_reports"] == []
+        assert not (forecast_run.data_dir / "combined_data.tsv").exists()
+
+    @pytest.mark.parametrize(
+        ("ed_visit_type", "expected"),
+        [
+            ("other", [90.0, 80.0]),
+            ("pct", [10.0, 20.0]),
+        ],
+    )
+    def test_selects_requested_nssp_series(
+        self,
+        tmp_path,
+        ed_visit_type,
+        expected,
+    ):
+        output_path = convert_to_epiautogp_json(
+            forecast_run=_epiautogp_run(tmp_path),
+            config=EpiAutoGPConfig("nssp", "daily", ed_visit_type),
+        )
+
+        assert json.loads(output_path.read_text())["reports"] == expected
+
+    def test_reads_nhsn_series_from_shared_run(self, tmp_path):
+        forecast_run = make_test_forecast_run(
+            output_dir=tmp_path,
+            model_name="epiautogp_nhsn_epiweekly",
+            sources=("nhsn",),
+        )
+
+        output_path = convert_to_epiautogp_json(
+            forecast_run=forecast_run,
+            config=EpiAutoGPConfig("nhsn", "epiweekly", "observed"),
+        )
+
+        output = json.loads(output_path.read_text())
+        assert output["dates"] == [forecast_run.last_training_date.isoformat()]
+        assert output["reports"] == [5.0]
+
+    def test_rejects_mismatched_nssp_resolution(self, tmp_path):
+        with pytest.raises(ValueError, match="does not match EpiAutoGP frequency"):
+            convert_to_epiautogp_json(
+                forecast_run=_epiautogp_run(tmp_path),
+                config=EpiAutoGPConfig("nssp", "epiweekly", "observed"),
+            )
+
+    @pytest.mark.parametrize(
+        ("target", "sources", "message"),
+        [
+            ("nssp", ("nhsn",), "does not contain NSSP"),
+            ("nhsn", ("nssp",), "does not contain NHSN"),
+        ],
+    )
+    def test_rejects_missing_shared_source(self, tmp_path, target, sources, message):
+        forecast_run = make_test_forecast_run(
+            output_dir=tmp_path,
+            sources=sources,
+        )
+
+        with pytest.raises(ValueError, match=message):
+            convert_to_epiautogp_json(
+                forecast_run=forecast_run,
+                config=EpiAutoGPConfig(target, "epiweekly", "observed"),
+            )
 
     def test_nowcast_source_serializes_nowcast_data(self, tmp_path):
         """Test converter writes nowcast data supplied by the context source."""
         forecast_run = _epiautogp_run(tmp_path)
-        data_path = forecast_run.data_dir / "combined_data.tsv"
-        data_path.parent.mkdir(parents=True)
-        _write_combined_data(data_path)
         source = FakeNowcastSource()
 
         output_path = convert_to_epiautogp_json(

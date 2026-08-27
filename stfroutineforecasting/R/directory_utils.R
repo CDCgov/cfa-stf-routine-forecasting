@@ -136,23 +136,6 @@ get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
   return(dirs)
 }
 
-#' Parse PyRenew Model Name
-#'
-#' @param pyrenew_model_name name of a pyrenew model ("pyrenew_h", "pyrenew_he",
-#' "pyrnew_hew", etc)
-#'
-#' @returns a named logical vector indicating which components are present
-#' @export
-#'
-#' @examples parse_pyrenew_model_name("pyrenew_h")
-parse_pyrenew_model_name <- function(pyrenew_model_name) {
-  pyrenew_model_tail <- stringr::str_extract(pyrenew_model_name, "(?<=_).+$") |>
-    stringr::str_split_1("")
-  model_components <- c("h", "e", "w")
-  model_components %in% pyrenew_model_tail |> purrr::set_names(model_components)
-}
-
-
 #' Parse variable name.
 #'
 #' Convert a variable name into a descriptive label for display in plots.
@@ -174,8 +157,6 @@ parse_variable_name <- function(variable_name) {
     stringr::str_detect(variable_name, "ed_visits") ~
       "Emergency Department Visits",
     stringr::str_detect(variable_name, "hospital") ~ "Hospital Admissions",
-    stringr::str_detect(variable_name, "ww_conc") ~
-      "Viral Genomes Concentration",
     TRUE ~ ""
   )
 

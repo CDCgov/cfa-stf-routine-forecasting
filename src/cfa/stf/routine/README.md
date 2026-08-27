@@ -136,7 +136,7 @@ Standard post-processing expects `samples.parquet` in long format with these col
   | `.value`     | Numeric forecast value                               |
   | `resolution` | `daily` or `epiweekly`                               |
 
-Additional identifiers such as `.chain`, `.iteration`, or `lab_site_index` are allowed when relevant.
+Additional identifiers such as `.chain` or `.iteration` are allowed when relevant.
 Draws should form coherent trajectories: the same `.draw` identifies values belonging to one sample across forecast dates.
 See [`fable/fit_fable.R`](fable/fit_fable.R) for an R writer and EpiAutoGP's [`forecast_epiautogp.py`](epiautogp/forecast_epiautogp.py) for a non-R writer.
 

@@ -1,6 +1,6 @@
 import datetime as dt
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, sentinel
 
 import pytest
 
@@ -122,19 +122,23 @@ def test_pyrenew_pipeline_extends_common_data_preparation(
     }
 
 
-@patch(
-    "cfa.stf.routine.pyrenew_hew.forecast_pyrenew.create_samples_from_pyrenew_fit_dir"
-)
+@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.write_tabular")
+@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.format_pyrenew_samples")
+@patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.read_tabular")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.generate_and_save_predictions")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.fit_and_save_model")
 def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     mock_fit,
     mock_predict,
-    mock_create_samples,
+    mock_read,
+    mock_format,
+    mock_write,
     tmp_path,
 ):
     pipeline = _pyrenew_pipeline(tmp_path)
     run = _run(tmp_path, model_name=pipeline.model_name)
+    mock_read.return_value = sentinel.posterior_predictive
+    mock_format.return_value = sentinel.samples
 
     pipeline.run_model(run)
 
@@ -147,4 +151,15 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
         30,
     )
     assert mock_predict.call_args.kwargs["predict_ed_visits"] is True
-    mock_create_samples.assert_called_once_with(run.model_dir)
+    mock_read.assert_called_once_with(
+        run.model_dir / "mcmc_output" / "tidy_posterior_predictive.parquet"
+    )
+    mock_format.assert_called_once_with(
+        sentinel.posterior_predictive,
+        geo_value=run.loc,
+        disease=run.disease,
+    )
+    mock_write.assert_called_once_with(
+        sentinel.samples,
+        run.model_dir / "samples.parquet",
+    )

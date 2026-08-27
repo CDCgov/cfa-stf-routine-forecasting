@@ -28,7 +28,6 @@ Imports:
     scales,
     stringr,
     tibble,
-    tidybayes,
     tidyr,
     tidyselect,
     urca

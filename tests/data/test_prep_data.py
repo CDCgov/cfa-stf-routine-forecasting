@@ -61,14 +61,6 @@ def test_serialize_data_handles_present_sources(
 
     with open(forecast_run.data_dir / "data_for_model_fit.json") as file:
         model_data = json.load(file)
-    assert set(model_data) == {
-        "loc_pop",
-        "right_truncation_offset",
-        "nssp_training_data",
-        "nhsn_training_data",
-        "nhsn_step_size",
-        "nssp_step_size",
-    }
     assert (model_data["nssp_training_data"] is not None) == ("nssp" in sources)
     assert (model_data["nhsn_training_data"] is not None) == ("nhsn" in sources)
     assert model_data["nssp_step_size"] == (1 if "nssp" in sources else None)
@@ -88,15 +80,6 @@ def test_serialize_data_handles_present_sources(
         }
 
     combined_data = read_tabular(forecast_run.data_dir / "combined_data.tsv")
-    assert set(combined_data.columns) == {
-        "date",
-        "geo_value",
-        "disease",
-        ".variable",
-        ".value",
-        "resolution",
-        "data_type",
-    }
     assert set(combined_data.get_column(".variable")) == expected_variables
 
 

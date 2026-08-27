@@ -3,9 +3,10 @@ import logging
 import shutil
 from pathlib import Path
 
+import polars as pl
+from cfa.stf.forecasttools import read_tabular, write_tabular
 from pyrenew_multisignal.hew.utils import pyrenew_model_name_from_flags
 
-from cfa.stf.routine._paths import PYRENEW_HEW_DIR
 from cfa.stf.routine.data.data_access import ForecastSourceName
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
@@ -17,21 +18,66 @@ from cfa.stf.routine.pyrenew_hew.model_inputs import (
     resolve_pyrenew_model_inputs,
     serialize_pyrenew_model_params,
 )
-from cfa.stf.routine.utils.language_utils import run_r_script
+
+VARIABLE_RESOLUTIONS = {
+    "observed_ed_visits": "daily",
+    "other_ed_visits": "daily",
+    "observed_hospital_admissions": "epiweekly",
+}
+
+SAMPLE_COLUMNS = [
+    ".chain",
+    ".iteration",
+    ".draw",
+    "date",
+    "geo_value",
+    "disease",
+    ".variable",
+    ".value",
+    "resolution",
+]
 
 
 def copy_priors(priors_path: Path, model_dir: Path) -> None:
     shutil.copyfile(priors_path, Path(model_dir, "priors.py"))
 
 
-def create_samples_from_pyrenew_fit_dir(model_fit_dir: Path) -> None:
-    """Create samples.parquet from a PyRenew model fit directory using R."""
-    run_r_script(
-        PYRENEW_HEW_DIR / "create_samples_from_pyrenew_fit_dir.R",
-        [str(model_fit_dir)],
-        function_name="create_samples_from_pyrenew_fit_dir",
+def calculate_draw(chain: pl.Expr, iteration: pl.Expr) -> pl.Expr:
+    """Calculate a globally unique draw ID from chain and iteration IDs."""
+    return ((chain - 1) * iteration.max() + iteration).cast(pl.Int32)
+
+
+def format_pyrenew_samples(
+    posterior_predictive: pl.DataFrame,
+    *,
+    geo_value: str,
+    disease: str,
+) -> pl.DataFrame:
+    """Format PyRenew posterior predictive draws as standard forecast samples."""
+    return (
+        posterior_predictive.rename(
+            {
+                "chain": ".chain",
+                "draw": ".iteration",
+                "variable": ".variable",
+                "value": ".value",
+            }
+        )
+        .with_columns(
+            pl.col("date").cast(pl.Date),
+            (pl.col(".chain") + 1).cast(pl.Float64),
+            (pl.col(".iteration") + 1).cast(pl.Float64),
+        )
+        .with_columns(
+            calculate_draw(pl.col(".chain"), pl.col(".iteration")).alias(".draw"),
+            pl.lit(geo_value).alias("geo_value"),
+            pl.lit(disease).alias("disease"),
+            pl.col(".variable")
+            .replace_strict(VARIABLE_RESOLUTIONS, default=None)
+            .alias("resolution"),
+        )
+        .select(SAMPLE_COLUMNS)
     )
-    return None
 
 
 class PyRenewPipeline(ForecastPipeline):
@@ -142,7 +188,15 @@ class PyRenewPipeline(ForecastPipeline):
             predict_wastewater=self.forecast_wastewater,
             rng_key=self.rng_key,
         )
-        create_samples_from_pyrenew_fit_dir(run.model_dir)
+        posterior_predictive = read_tabular(
+            run.model_dir / "mcmc_output" / "tidy_posterior_predictive.parquet"
+        )
+        samples = format_pyrenew_samples(
+            posterior_predictive,
+            geo_value=run.loc,
+            disease=run.disease,
+        )
+        write_tabular(samples, run.model_dir / "samples.parquet")
 
 
 def main(

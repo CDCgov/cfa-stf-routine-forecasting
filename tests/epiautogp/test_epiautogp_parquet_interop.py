@@ -10,9 +10,9 @@ them to `output_type_id`, which is where the CI failure surfaced.
 
 The fixtures build tiny but realistic model-fit directories for each producer
 family: EpiAutoGP samples from the direct NowcastAutoGP Julia runner,
-fable-style samples from R, and PyRenew-style posterior predictive output from
-Python that is converted by the real PyRenew R sample conversion script. The
-final test then runs the same hubverse conversion and batch combine functions
+fable-style samples from R, and PyRenew-style posterior predictive output
+converted by the real Polars sample conversion function. The final test then
+runs the same hubverse conversion and batch combine functions
 used by CI so producer schema drift is caught before postprocessing reaches the
 expensive end-to-end workflow.
 """
@@ -28,11 +28,13 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from cfa.stf.routine._paths import EPIAUTOGP_DIR, PYRENEW_HEW_DIR
+from cfa.stf.routine._paths import EPIAUTOGP_DIR
+from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import (
+    format_pyrenew_samples,
+)
 from cfa.stf.routine.utils.language_utils import (
     run_julia_script,
     run_r_code,
-    run_r_script,
 )
 from cfa.stf.routine.utils.postprocess_forecast_batches import combine_hubverse_tables
 from cfa.stf.routine.utils.r_utils import model_fit_dir_to_hub_tbl
@@ -175,7 +177,7 @@ def _write_pyrenew_reference_model_samples(batch_dir: Path) -> Path:
     pyrenew_model_fit_dir = batch_dir / "model_runs" / "US" / "pyrenew_e"
     mcmc_output_dir = pyrenew_model_fit_dir / "mcmc_output"
     mcmc_output_dir.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame(
+    posterior_predictive = pl.DataFrame(
         {
             "chain": [0, 0, 0, 0],
             "draw": [0, 0, 1, 1],
@@ -183,13 +185,17 @@ def _write_pyrenew_reference_model_samples(batch_dir: Path) -> Path:
             "value": [101.0, 201.0, 102.0, 202.0],
             "date": EXPECTED_DATES,
         }
-    ).write_parquet(mcmc_output_dir / "tidy_posterior_predictive.parquet")
-
-    run_r_script(
-        PYRENEW_HEW_DIR / "create_samples_from_pyrenew_fit_dir.R",
-        [str(pyrenew_model_fit_dir)],
-        function_name="create_samples_from_pyrenew_fit_dir",
     )
+    posterior_predictive.write_parquet(
+        mcmc_output_dir / "tidy_posterior_predictive.parquet"
+    )
+
+    samples = format_pyrenew_samples(
+        posterior_predictive,
+        geo_value="US",
+        disease="covid",
+    )
+    samples.write_parquet(pyrenew_model_fit_dir / "samples.parquet")
     return pyrenew_model_fit_dir
 
 
@@ -256,7 +262,6 @@ def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
         "forecasttools",
         "fs",
         "stfroutineforecasting",
-        "tidybayes",
     )
     try:
         model_fit_dirs = [

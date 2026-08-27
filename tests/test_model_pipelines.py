@@ -89,6 +89,21 @@ def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, messa
         _pyrenew_pipeline(tmp_path, **overrides).validate_configuration()
 
 
+def test_pyrenew_pipeline_accepts_wastewater_model_configuration(tmp_path):
+    pipeline = _pyrenew_pipeline(
+        tmp_path,
+        fit_ed_visits=False,
+        forecast_ed_visits=False,
+        fit_wastewater=True,
+        forecast_wastewater=True,
+    )
+
+    pipeline.validate_configuration()
+
+    assert pipeline.model_name == "pyrenew_w"
+    assert pipeline.sources == set()
+
+
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.copy_priors")
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.resolve_pyrenew_model_inputs")

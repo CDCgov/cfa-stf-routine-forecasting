@@ -10,6 +10,7 @@ def build_pyrenew_hew_model_from_dir(
     model_dir: Path | str,
     fit_ed_visits: bool = False,
     fit_hospital_admissions: bool = False,
+    fit_wastewater: bool = False,
 ):
     """Build a PyRenew HEW model from its saved priors and parameters."""
     model_dir = Path(model_dir)
@@ -20,4 +21,5 @@ def build_pyrenew_hew_model_from_dir(
         model_params,
         fit_ed_visits=fit_ed_visits,
         fit_hospital_admissions=fit_hospital_admissions,
+        fit_wastewater=fit_wastewater,
     )

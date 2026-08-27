@@ -12,6 +12,7 @@ def fit_and_save_model(
     model_dir: str,
     fit_ed_visits: bool = False,
     fit_hospital_admissions: bool = False,
+    fit_wastewater: bool = False,
     n_warmup: int = 1000,
     n_samples: int = 1000,
     n_chains: int = 4,
@@ -30,16 +31,19 @@ def fit_and_save_model(
         json_file_path=Path(model_dir) / "data" / "data_for_model_fit.json",
         fit_ed_visits=fit_ed_visits,
         fit_hospital_admissions=fit_hospital_admissions,
+        fit_wastewater=fit_wastewater,
     )
     my_model = build_pyrenew_hew_model_from_dir(
         model_dir,
         fit_ed_visits=fit_ed_visits,
         fit_hospital_admissions=fit_hospital_admissions,
+        fit_wastewater=fit_wastewater,
     )
     my_model.run(
         data=my_data,
         sample_ed_visits=fit_ed_visits,
         sample_hospital_admissions=fit_hospital_admissions,
+        sample_wastewater=fit_wastewater,
         num_warmup=n_warmup,
         num_samples=n_samples,
         rng_key=rng_key,

@@ -46,8 +46,10 @@ class PyRenewPipeline(ForecastPipeline):
         n_samples: int,
         fit_ed_visits: bool = False,
         fit_hospital_admissions: bool = False,
+        fit_wastewater: bool = False,
         forecast_ed_visits: bool = False,
         forecast_hospital_admissions: bool = False,
+        forecast_wastewater: bool = False,
         rng_key: int | None = None,
         **kwargs,
     ) -> None:
@@ -58,8 +60,10 @@ class PyRenewPipeline(ForecastPipeline):
         self.n_samples = n_samples
         self.fit_ed_visits = fit_ed_visits
         self.fit_hospital_admissions = fit_hospital_admissions
+        self.fit_wastewater = fit_wastewater
         self.forecast_ed_visits = forecast_ed_visits
         self.forecast_hospital_admissions = forecast_hospital_admissions
+        self.forecast_wastewater = forecast_wastewater
         self.rng_key = rng_key
 
     @property
@@ -67,6 +71,7 @@ class PyRenewPipeline(ForecastPipeline):
         return pyrenew_model_name_from_flags(
             fit_ed_visits=self.fit_ed_visits,
             fit_hospital_admissions=self.fit_hospital_admissions,
+            fit_wastewater=self.fit_wastewater,
         )
 
     @property
@@ -79,7 +84,7 @@ class PyRenewPipeline(ForecastPipeline):
         return sources
 
     def validate_configuration(self) -> None:
-        signals = ["ed_visits", "hospital_admissions"]
+        signals = ["ed_visits", "hospital_admissions", "wastewater"]
         for signal in signals:
             fit = getattr(self, f"fit_{signal}")
             forecast = getattr(self, f"forecast_{signal}")
@@ -116,6 +121,7 @@ class PyRenewPipeline(ForecastPipeline):
             n_chains=self.n_chains,
             fit_ed_visits=self.fit_ed_visits,
             fit_hospital_admissions=self.fit_hospital_admissions,
+            fit_wastewater=self.fit_wastewater,
             rng_key=self.rng_key,
         )
         self.logger.info("Model fitting complete")
@@ -128,6 +134,7 @@ class PyRenewPipeline(ForecastPipeline):
             n_days_past_last_training,
             predict_ed_visits=self.forecast_ed_visits,
             predict_hospital_admissions=self.forecast_hospital_admissions,
+            predict_wastewater=self.forecast_wastewater,
             rng_key=self.rng_key,
         )
         create_samples_from_pyrenew_fit_dir(run.model_dir)
@@ -147,8 +154,10 @@ def main(
     exclude_last_n_days: int = 0,
     fit_ed_visits: bool = False,
     fit_hospital_admissions: bool = False,
+    fit_wastewater: bool = False,
     forecast_ed_visits: bool = False,
     forecast_hospital_admissions: bool = False,
+    forecast_wastewater: bool = False,
     rng_key: int | None = None,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
@@ -171,8 +180,10 @@ def main(
         exclude_last_n_days=exclude_last_n_days,
         fit_ed_visits=fit_ed_visits,
         fit_hospital_admissions=fit_hospital_admissions,
+        fit_wastewater=fit_wastewater,
         forecast_ed_visits=forecast_ed_visits,
         forecast_hospital_admissions=forecast_hospital_admissions,
+        forecast_wastewater=forecast_wastewater,
         rng_key=rng_key,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,

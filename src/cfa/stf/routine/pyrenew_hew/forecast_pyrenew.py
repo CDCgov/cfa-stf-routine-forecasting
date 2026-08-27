@@ -84,7 +84,12 @@ class PyRenewPipeline(ForecastPipeline):
         return sources
 
     def validate_configuration(self) -> None:
-        signals = ["ed_visits", "hospital_admissions", "wastewater"]
+        if self.fit_wastewater or self.forecast_wastewater:
+            raise ValueError(
+                "Wastewater data loading is no longer supported in this pipeline."
+            )
+
+        signals = ["ed_visits", "hospital_admissions"]
         for signal in signals:
             fit = getattr(self, f"fit_{signal}")
             forecast = getattr(self, f"forecast_{signal}")

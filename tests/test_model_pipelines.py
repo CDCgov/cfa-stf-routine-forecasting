@@ -75,6 +75,10 @@ def _pyrenew_pipeline(tmp_path, **overrides):
     ("overrides", "message"),
     [
         (
+            {"fit_wastewater": True},
+            "Wastewater data loading is no longer supported",
+        ),
+        (
             {"forecast_ed_visits": False},
             "fitting to but not forecasting",
         ),
@@ -87,21 +91,6 @@ def _pyrenew_pipeline(tmp_path, **overrides):
 def test_pyrenew_pipeline_preserves_signal_validation(tmp_path, overrides, message):
     with pytest.raises(ValueError, match=message):
         _pyrenew_pipeline(tmp_path, **overrides).validate_configuration()
-
-
-def test_pyrenew_pipeline_accepts_wastewater_model_configuration(tmp_path):
-    pipeline = _pyrenew_pipeline(
-        tmp_path,
-        fit_ed_visits=False,
-        forecast_ed_visits=False,
-        fit_wastewater=True,
-        forecast_wastewater=True,
-    )
-
-    pipeline.validate_configuration()
-
-    assert pipeline.model_name == "pyrenew_w"
-    assert pipeline.sources == set()
 
 
 @patch("cfa.stf.routine.pyrenew_hew.forecast_pyrenew.serialize_pyrenew_model_params")

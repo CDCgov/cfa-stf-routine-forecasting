@@ -5,8 +5,7 @@ variable_resolution_key <-
   c(
     "observed_ed_visits" = "daily",
     "other_ed_visits" = "daily",
-    "observed_hospital_admissions" = "epiweekly",
-    "site_level_log_ww_conc" = "daily"
+    "observed_hospital_admissions" = "epiweekly"
   )
 
 # put this list in stfroutineforecasting
@@ -23,15 +22,6 @@ required_columns_e <- c(
 )
 
 create_samples_from_pyrenew_fit_dir <- function(model_fit_dir) {
-  pyrenew_model_name <- fs::path_file(model_fit_dir)
-  pyrenew_model_components <- parse_pyrenew_model_name(pyrenew_model_name)
-
-  if (pyrenew_model_components["w"]) {
-    required_columns <- c(required_columns_e, "lab_site_index")
-  } else {
-    required_columns <- required_columns_e
-  }
-
   model_run_dir <- fs::path_dir(model_fit_dir)
   model_info <- parse_model_run_dir_path(model_run_dir)
 
@@ -57,7 +47,7 @@ create_samples_from_pyrenew_fit_dir <- function(model_fit_dir) {
       disease = model_info$disease,
       resolution = variable_resolution_key[.data$.variable]
     ) |>
-    dplyr::select(tidyselect::all_of(required_columns))
+    dplyr::select(tidyselect::all_of(required_columns_e))
 
   forecasttools::write_tabular(
     pyrenew_posterior_predictive,

@@ -63,11 +63,6 @@ make_forecast_figure <- function(
   title <- glue::glue("{title_prefix} {core_name} in {geo_value}")
 
   tmp_ci <- left_join(for_plotting_tbl, ci)
-  facet_component <- if (n_distinct(tmp_ci[["lab_site_index"]]) > 1) {
-    facet_wrap(~lab_site_index, scales = "free_y")
-  } else {
-    NULL
-  }
   # should bake in dat resolution to dat
   # should bake in disease name to dat
   tmp_dat <- left_join(for_plotting_tbl, dat)
@@ -75,7 +70,6 @@ make_forecast_figure <- function(
   # need to add the variable
   # maybe bake this into the data
   ggplot(mapping = aes(x = date, y = .value)) +
-    facet_component +
     ggdist::geom_lineribbon(
       data = tmp_ci,
       mapping = ggplot2::aes(ymin = .data$.lower, ymax = .data$.upper),
@@ -122,7 +116,6 @@ make_forecast_figure_from_model_fit_dir <- function(
   fig_tbl <- ci |>
     distinct(geo_value, disease, resolution, .variable) |>
     expand_grid(y_transform = c("identity", "log10")) |>
-    filter(!(.variable == "site_level_log_ww_conc" & y_transform == "log10")) |>
     rowwise() |>
     mutate(
       fig = list(make_forecast_figure(

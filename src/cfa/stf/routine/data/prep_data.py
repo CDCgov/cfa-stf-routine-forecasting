@@ -45,10 +45,7 @@ def combine_surveillance_data(
             how="diagonal_relaxed",
         )
         .rename({"state_abb": "geo_value"})
-        .with_columns(
-            pl.lit(disease).alias("disease"),
-            pl.lit(None).alias("lab_site_index"),
-        )
+        .with_columns(pl.lit(disease).alias("disease"))
         .sort(["date", "geo_value", ".variable"])
         .select(
             [
@@ -57,7 +54,6 @@ def combine_surveillance_data(
                 "disease",
                 ".variable",
                 ".value",
-                "lab_site_index",
                 "resolution",
                 "data_type",
             ]
@@ -98,7 +94,6 @@ def serialize_data(
     data_for_model_fit = {
         "loc_pop": forecast_run.loc_pop,
         "right_truncation_offset": forecast_run.right_truncation_offset,
-        "nwss_training_data": None,
         "nssp_training_data": (
             nssp_training_data.to_dict(as_series=False)
             if nssp_training_data is not None
@@ -115,7 +110,6 @@ def serialize_data(
         "nssp_step_size": (
             forecast_run.nssp.step_size if forecast_run.nssp is not None else None
         ),
-        "nwss_step_size": 1,
     }
 
     with open(save_dir / "data_for_model_fit.json", "w") as json_file:

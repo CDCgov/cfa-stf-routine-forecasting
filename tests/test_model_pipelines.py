@@ -75,10 +75,6 @@ def _pyrenew_pipeline(tmp_path, **overrides):
     ("overrides", "message"),
     [
         (
-            {"fit_wastewater": True},
-            "Wastewater data loading is no longer supported",
-        ),
-        (
             {"forecast_ed_visits": False},
             "fitting to but not forecasting",
         ),

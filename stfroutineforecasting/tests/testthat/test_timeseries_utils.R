@@ -27,7 +27,6 @@ test_that("load_training_data returns training rows without data_type", {
       data_type = rep(c("train", "train", "eval"), each = 2),
       .variable = rep(c("observed_ed_visits", "other_ed_visits"), 3),
       .value = c(10, 90, 11, 99, 12, 108),
-      lab_site_index = NA_integer_,
       resolution = "daily"
     )
     readr::write_tsv(

@@ -143,6 +143,7 @@ jobs:
 
     end-to-end-test:
         needs: acr-import
+        if: github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-latest
         permissions:
           id-token: write # This is required for requesting the JWT
@@ -230,6 +231,11 @@ jobs:
 
     check_and_deploy_dagster_code:
       needs: [ build-pipeline-image, acr-import, end-to-end-test ]
+      if: |-
+        always() &&
+        needs.build-pipeline-image.result == 'success' &&
+        needs.acr-import.result == 'success' &&
+        (needs.end-to-end-test.result == 'success' || needs.end-to-end-test.result == 'skipped')
       # Conditional step execution that runs only when:
       # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
       # OR

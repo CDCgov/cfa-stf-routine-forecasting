@@ -598,6 +598,12 @@ weekly_forecast_fusion_asset_args = {
     "automation_condition": dg.AutomationCondition.eager(),
 }
 
+# Dagster tag keys cannot contain spaces. These tags make it easy to select all
+# assets that need rerunning after their corresponding source data changes.
+E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
+H_DATA_RERUN_TAGS = {"h-data-rerun": ""}
+HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
+
 # ============================================================================
 # ASSET DEFINITIONS
 # ============================================================================
@@ -626,6 +632,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+    tags=E_DATA_RERUN_TAGS,
 )
 def fable_e_other(
     context: dg.OpExecutionContext,
@@ -644,6 +651,7 @@ def fable_e_other(
 @dynamic_graph_asset(
     **weekly_forecast_initial_asset_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+    tags=E_DATA_RERUN_TAGS,
 )
 def epiweekly_fable_e_other(
     context: dg.OpExecutionContext,
@@ -664,6 +672,7 @@ def epiweekly_fable_e_other(
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
+    tags=E_DATA_RERUN_TAGS,
 )
 def pyrenew_e(
     context: dg.OpExecutionContext,
@@ -680,6 +689,7 @@ def pyrenew_e(
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
+    tags=H_DATA_RERUN_TAGS,
 )
 def pyrenew_h(
     context: dg.OpExecutionContext,
@@ -696,6 +706,7 @@ def pyrenew_h(
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
+    tags=HE_DATA_RERUN_TAGS,
 )
 def pyrenew_he(
     context: dg.OpExecutionContext,
@@ -712,6 +723,7 @@ def pyrenew_he(
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
+    tags=E_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_e_ts(
     context: dg.OpExecutionContext,
@@ -732,6 +744,7 @@ def fuse_pyrenew_e_ts(
         "pyrenew_e": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
     },
+    tags=E_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_e_ts_epiweekly(
     context: dg.OpExecutionContext,
@@ -749,6 +762,7 @@ def fuse_pyrenew_e_ts_epiweekly(
 @dynamic_graph_asset(
     **weekly_forecast_fusion_asset_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
+    tags=HE_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_he_ts(
     context: dg.OpExecutionContext,
@@ -769,6 +783,7 @@ def fuse_pyrenew_he_ts(
         "pyrenew_he": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
     },
+    tags=HE_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_he_ts_epiweekly(
     context: dg.OpExecutionContext,
@@ -807,6 +822,7 @@ def fuse_pyrenew_he_ts_epiweekly(
     ).with_label("postprocess_custom_eager"),
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     group_name="WeeklyForecastFusion",
+    tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,

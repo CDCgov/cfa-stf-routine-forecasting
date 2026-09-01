@@ -52,9 +52,12 @@ REPORTING_DELAY_PMF = np.diff(np.insert(REPORTING_FRACTIONS, 0, 0.0))
 
 HUBVERSE_NOWCAST_DIR_NAME = "hubverse_nowcasts"
 HUBVERSE_N_SAMPLES = 40
-HUBVERSE_LOGNORMAL_SIGMA = 0.05
+HUBVERSE_LOGNORMAL_SIGMA = 0.01
 HUBVERSE_RANDOM_SEED = 12345
 HUBVERSE_MIN_STABLE_OBSERVATIONS = 2
+HUBVERSE_MAX_NOWCAST_DATES = 4
+HUBVERSE_MIN_REVISION = 0.05
+HUBVERSE_MAX_REVISION = 0.10
 
 _SOURCE_DATA_COLS = [
     "date",
@@ -319,18 +322,24 @@ def _make_location_hubverse_nowcasts(
     *,
     location: LocationData,
     disease: str,
-    disease_index: int,
-    nhsn_observation_dates: Collection[dt.date],
+    nhsn_observations: pl.DataFrame,
     rng: np.random.Generator,
 ) -> list[dict]:
     """Make noisy Hubverse sample nowcasts for one disease and location."""
-    selected_reports = _make_nhsn(
-        location=location,
-        disease=disease,
-        disease_index=disease_index,
-    ).filter(pl.col("date").is_in(nhsn_observation_dates))
+    selected_reports = nhsn_observations.select(
+        pl.col("date").cast(pl.Date),
+        pl.col("value").cast(pl.Float64),
+    ).sort("date")
+    if selected_reports.select(
+        (
+            pl.col("value").is_null()
+            | (~pl.col("value").is_finite())
+            | (pl.col("value") < 0)
+        ).any()
+    ).item():
+        raise ValueError("Selected NHSN reports must be finite and non-negative.")
     n_nowcast_dates = min(
-        len(REPORTING_FRACTIONS) - 1,
+        HUBVERSE_MAX_NOWCAST_DATES,
         selected_reports.height - HUBVERSE_MIN_STABLE_OBSERVATIONS,
     )
     if n_nowcast_dates < 1:
@@ -348,13 +357,21 @@ def _make_location_hubverse_nowcasts(
         (target_end_date - REPORT_DATE).days // DAYS_PER_WEEK
         for target_end_date in dates
     ]
-    fractions = np.array([REPORTING_FRACTIONS[-horizon - 1] for horizon in horizons])
-    expected_final_counts = reports / fractions
-    log_means = np.log(expected_final_counts) - HUBVERSE_LOGNORMAL_SIGMA**2 / 2
-    samples = rng.lognormal(
+    revision_rates = np.linspace(
+        HUBVERSE_MIN_REVISION,
+        HUBVERSE_MAX_REVISION,
+        n_nowcast_dates,
+    )
+    expected_final_counts = reports * (1 + revision_rates)
+    samples = np.zeros((HUBVERSE_N_SAMPLES, n_nowcast_dates))
+    positive_counts = expected_final_counts > 0
+    log_means = (
+        np.log(expected_final_counts[positive_counts]) - HUBVERSE_LOGNORMAL_SIGMA**2 / 2
+    )
+    samples[:, positive_counts] = rng.lognormal(
         mean=log_means,
         sigma=HUBVERSE_LOGNORMAL_SIGMA,
-        size=(HUBVERSE_N_SAMPLES, n_nowcast_dates),
+        size=(HUBVERSE_N_SAMPLES, positive_counts.sum()),
     )
     disease_id = disease
 
@@ -379,7 +396,7 @@ def _make_disease_hubverse_nowcasts(
     locations: list[LocationData],
     disease: str,
     disease_index: int,
-    nhsn_observation_dates: Collection[dt.date],
+    nhsn_observations: pl.DataFrame,
 ) -> pl.DataFrame:
     """Make noisy Hubverse sample nowcasts for one disease."""
     rng = np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index)
@@ -389,8 +406,7 @@ def _make_disease_hubverse_nowcasts(
             _make_location_hubverse_nowcasts(
                 location=location,
                 disease=disease,
-                disease_index=disease_index,
-                nhsn_observation_dates=nhsn_observation_dates,
+                nhsn_observations=nhsn_observations,
                 rng=rng,
             )
         )
@@ -422,16 +438,16 @@ def _write_disease_hubverse_nowcasts(
 def write_hubverse_nowcasts(
     base_dir: Path,
     *,
-    nhsn_observation_dates: Collection[dt.date],
+    nhsn_observations: pl.DataFrame,
     locations: list[str] | None = None,
     diseases: list[str] | None = None,
 ) -> None:
     """
     Write noisy sample nowcasts in the production Hubverse schema.
 
-    This reuses `_make_nhsn` to generate the underlying "true" counts for the
-    most recent selected NHSN observation dates, then adds fixed-sigma
-    lognormal noise to simulate the nowcast process.
+    The expected nowcast is a 5--10% upward revision of each selected NHSN
+    report, with larger revisions for more recent dates. Fixed-sigma lognormal
+    noise simulates uncertainty around those expectations.
     """
     locations = locations or DEFAULT_LOCATIONS
     diseases = diseases or DEFAULT_DISEASES
@@ -446,7 +462,7 @@ def write_hubverse_nowcasts(
             locations=location_data,
             disease=disease,
             disease_index=disease_index,
-            nhsn_observation_dates=nhsn_observation_dates,
+            nhsn_observations=nhsn_observations,
         )
         _write_disease_hubverse_nowcasts(
             base_dir=base_dir,

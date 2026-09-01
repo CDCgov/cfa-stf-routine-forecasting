@@ -1,4 +1,3 @@
-import datetime as dt
 import logging
 from dataclasses import replace
 from math import isclose
@@ -125,11 +124,11 @@ def configure_data_mode(request, monkeypatch) -> str:
     return data_mode
 
 
-def selected_nhsn_observation_dates(
+def selected_nhsn_observations(
     disease: str,
     location: str,
-) -> list[dt.date]:
-    """Load the NHSN training dates selected for a model integration run."""
+) -> pl.DataFrame:
+    """Load the NHSN training observations selected for an integration run."""
     logger = logging.getLogger(__name__)
     first_training_date, last_training_date = calculate_training_dates(
         REPORT_DATE,
@@ -152,11 +151,13 @@ def selected_nhsn_observation_dates(
             "Expected selected surveillance inputs to contain NHSN data"
         )
     return (
-        surveillance.nhsn.data.filter(pl.col("data_type") == "train")
-        .get_column("date")
-        .unique()
-        .sort()
-        .to_list()
+        surveillance.nhsn.data.filter(
+            (pl.col("data_type") == "train")
+            & pl.col("value").is_not_null()
+            & pl.col("value").is_finite()
+        )
+        .select("date", "value")
+        .sort("date")
     )
 
 

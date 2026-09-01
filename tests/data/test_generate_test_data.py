@@ -4,6 +4,8 @@ import pytest
 
 from cfa.stf.routine.data.generate_test_data import (
     FIRST_OBS_DATE,
+    HUBVERSE_MAX_REVISION,
+    HUBVERSE_MIN_REVISION,
     LAST_OBS_DATE,
     LocationData,
     _make_location_hubverse_nowcasts,
@@ -56,15 +58,35 @@ def test_hubverse_nowcast_dates_come_from_selected_nhsn_observations(
     n_selected, n_nowcast
 ):
     selected_dates = _weekending_dates()[-(n_selected + 1) : -1]
+    selected_observations = pl.DataFrame(
+        {"date": selected_dates, "value": [100.0] * n_selected}
+    )
 
     rows = _make_location_hubverse_nowcasts(
         location=LocationData(abbr="CA", population=100_000),
         disease="covid",
-        disease_index=0,
-        nhsn_observation_dates=selected_dates,
+        nhsn_observations=selected_observations,
         rng=np.random.default_rng(12345),
     )
 
+    nowcasts = pl.DataFrame(rows)
     assert (
-        sorted({row["target_end_date"] for row in rows}) == selected_dates[-n_nowcast:]
+        nowcasts.get_column("target_end_date").unique().sort().to_list()
+        == (selected_dates[-n_nowcast:])
     )
+    mean_nowcasts = (
+        nowcasts.group_by("target_end_date")
+        .agg(pl.col("value").mean())
+        .sort("target_end_date")
+        .get_column("value")
+        .to_numpy()
+    )
+    expected_means = 100 * (
+        1
+        + np.linspace(
+            HUBVERSE_MIN_REVISION,
+            HUBVERSE_MAX_REVISION,
+            n_nowcast,
+        )
+    )
+    np.testing.assert_allclose(mean_nowcasts, expected_means, rtol=0.01)

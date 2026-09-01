@@ -119,7 +119,7 @@ def _normalize_nssp_data(
         )
 
     index_columns = ["date", "state_abb"]
-    observed = source_data.filter(pl.col("disease") == observed_diseases[0]).select(
+    observed = source_data.filter(pl.col("disease") != "total").select(
         *index_columns,
         pl.col("value").alias("observed_ed_visits"),
     )

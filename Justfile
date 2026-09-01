@@ -25,36 +25,26 @@ e2e data_mode="auto":
       --e2e-force \
       --e2e-data-mode "{{data_mode}}"
 
-# Test Fable for one disease and location and retain its output.
+# Test Fable for one disease and location with mock or real DataOps data.
 test-fable data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
       tests/integration/test_fable_forecast.py \
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
-      --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/fable-{{disease}}-{{location}}" \
-      --e2e-force
+      --model-test-disease "{{disease}}"
 
-# Test PyRenew for one disease and location and retain its output.
+# Test PyRenew for one disease and location with mock or real DataOps data.
 test-pyrenew data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
       tests/integration/test_pyrenew_forecast.py \
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
-      --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/pyrenew-{{disease}}-{{location}}" \
-      --e2e-force
+      --model-test-disease "{{disease}}"
 
-# Test EpiAutoGP for one disease and location and retain its output.
+# Test EpiAutoGP for one disease and location with mock or real DataOps data.
 test-epiautogp data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
       tests/integration/test_epiautogp_forecast.py \
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
-      --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/epiautogp-{{disease}}-{{location}}" \
-      --e2e-force
-
-# Remove all retained end-to-end and single-model test outputs.
-clean-outputs:
-    rm -rf -- "{{e2e_output_dir}}"
+      --model-test-disease "{{disease}}"

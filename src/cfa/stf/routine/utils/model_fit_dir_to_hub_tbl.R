@@ -24,7 +24,7 @@ p <- arg_parser(
 ) |>
   add_argument(
     "model-fit-dir",
-    help = "Directory containing the model data and output.",
+    help = "Directory containing the model data and output."
   ) |>
   add_argument(
     "--output-type",

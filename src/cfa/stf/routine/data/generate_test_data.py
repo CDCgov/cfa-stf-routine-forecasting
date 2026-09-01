@@ -54,6 +54,7 @@ HUBVERSE_NOWCAST_DIR_NAME = "hubverse_nowcasts"
 HUBVERSE_N_SAMPLES = 40
 HUBVERSE_LOGNORMAL_SIGMA = 0.05
 HUBVERSE_RANDOM_SEED = 12345
+HUBVERSE_MIN_STABLE_OBSERVATIONS = 2
 
 _SOURCE_DATA_COLS = [
     "date",
@@ -319,24 +320,27 @@ def _make_location_hubverse_nowcasts(
     location: LocationData,
     disease: str,
     disease_index: int,
+    nhsn_observation_dates: Collection[dt.date],
     rng: np.random.Generator,
 ) -> list[dict]:
     """Make noisy Hubverse sample nowcasts for one disease and location."""
-    n_nowcast_dates = len(REPORTING_FRACTIONS) - 1
-    recent_reports = (
-        _make_nhsn(
-            location=location,
-            disease=disease,
-            disease_index=disease_index,
-        )
-        .filter(pl.col("date") < REPORT_DATE)
-        .tail(n_nowcast_dates)
+    selected_reports = _make_nhsn(
+        location=location,
+        disease=disease,
+        disease_index=disease_index,
+    ).filter(pl.col("date").is_in(nhsn_observation_dates))
+    n_nowcast_dates = min(
+        len(REPORTING_FRACTIONS) - 1,
+        selected_reports.height - HUBVERSE_MIN_STABLE_OBSERVATIONS,
     )
-    if recent_reports.height != n_nowcast_dates:
+    if n_nowcast_dates < 1:
         raise ValueError(
-            f"Expected {n_nowcast_dates} NHSN reports for "
-            f"{disease}, {location.abbr}; found {recent_reports.height}"
+            "Expected at least one NHSN nowcast date and "
+            f"{HUBVERSE_MIN_STABLE_OBSERVATIONS} stable observations for "
+            f"{disease}, {location.abbr}; found {selected_reports.height} "
+            "selected reports."
         )
+    recent_reports = selected_reports.tail(n_nowcast_dates)
 
     dates = recent_reports.get_column("date").to_list()
     reports = recent_reports.get_column("value").to_numpy()
@@ -375,6 +379,7 @@ def _make_disease_hubverse_nowcasts(
     locations: list[LocationData],
     disease: str,
     disease_index: int,
+    nhsn_observation_dates: Collection[dt.date],
 ) -> pl.DataFrame:
     """Make noisy Hubverse sample nowcasts for one disease."""
     rng = np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index)
@@ -385,6 +390,7 @@ def _make_disease_hubverse_nowcasts(
                 location=location,
                 disease=disease,
                 disease_index=disease_index,
+                nhsn_observation_dates=nhsn_observation_dates,
                 rng=rng,
             )
         )
@@ -415,6 +421,8 @@ def _write_disease_hubverse_nowcasts(
 
 def write_hubverse_nowcasts(
     base_dir: Path,
+    *,
+    nhsn_observation_dates: Collection[dt.date],
     locations: list[str] | None = None,
     diseases: list[str] | None = None,
 ) -> None:
@@ -422,8 +430,8 @@ def write_hubverse_nowcasts(
     Write noisy sample nowcasts in the production Hubverse schema.
 
     This reuses `_make_nhsn` to generate the underlying "true" counts for the
-    most recent weeks, then adds fixed-sigma lognormal noise to simulate the
-    nowcast process.
+    most recent selected NHSN observation dates, then adds fixed-sigma
+    lognormal noise to simulate the nowcast process.
     """
     locations = locations or DEFAULT_LOCATIONS
     diseases = diseases or DEFAULT_DISEASES
@@ -438,6 +446,7 @@ def write_hubverse_nowcasts(
             locations=location_data,
             disease=disease,
             disease_index=disease_index,
+            nhsn_observation_dates=nhsn_observation_dates,
         )
         _write_disease_hubverse_nowcasts(
             base_dir=base_dir,

@@ -3,6 +3,7 @@ from tests.integration.model_test_utils import (
     assert_model_outputs,
     configure_data_mode,
     run_epiautogp,
+    selected_nhsn_observation_dates,
 )
 
 from cfa.stf.routine.data.generate_test_data import (
@@ -38,6 +39,7 @@ def test_epiautogp_forecast(pipeline_workspace, monkeypatch, request):
     configure_data_mode(request, monkeypatch)
     write_hubverse_nowcasts(
         pipeline_workspace,
+        nhsn_observation_dates=selected_nhsn_observation_dates(disease, location),
         locations=[location],
         diseases=[disease],
     )

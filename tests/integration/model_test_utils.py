@@ -1,7 +1,10 @@
+import datetime as dt
+import logging
 from dataclasses import replace
 from math import isclose
 from pathlib import Path
 
+import polars as pl
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
@@ -17,6 +20,7 @@ from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
 from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
+from cfa.stf.routine.utils.date_utils import calculate_training_dates
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_TRAINING_DAYS = 42
@@ -119,6 +123,41 @@ def configure_data_mode(request, monkeypatch) -> str:
     if data_mode == MOCK_DATA_MODE:
         patch_dataops_with_mock_data(monkeypatch)
     return data_mode
+
+
+def selected_nhsn_observation_dates(
+    disease: str,
+    location: str,
+) -> list[dt.date]:
+    """Load the NHSN training dates selected for a model integration run."""
+    logger = logging.getLogger(__name__)
+    first_training_date, last_training_date = calculate_training_dates(
+        REPORT_DATE,
+        N_TRAINING_DAYS,
+        EXCLUDE_LAST_N_DAYS,
+        logger,
+    )
+    surveillance = forecast_pipeline_module.load_surveillance_inputs(
+        disease=disease,
+        loc_abb=location,
+        run_date=REPORT_DATE,
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+        sources={"nhsn"},
+        ed_visit_input_resolution="epiweekly",
+        logger=logger,
+    )
+    if surveillance.nhsn is None:
+        raise AssertionError(
+            "Expected selected surveillance inputs to contain NHSN data"
+        )
+    return (
+        surveillance.nhsn.data.filter(pl.col("data_type") == "train")
+        .get_column("date")
+        .unique()
+        .sort()
+        .to_list()
+    )
 
 
 def run_fable(

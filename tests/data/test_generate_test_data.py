@@ -1,10 +1,14 @@
+import numpy as np
 import polars as pl
+import pytest
 
 from cfa.stf.routine.data.generate_test_data import (
     FIRST_OBS_DATE,
     LAST_OBS_DATE,
     LocationData,
+    _make_location_hubverse_nowcasts,
     _make_nssp,
+    _weekending_dates,
 )
 
 
@@ -44,4 +48,23 @@ def test_make_nssp_returns_location_level_cfa_stf_data_schema():
         .select(pl.col("total") > pl.col("disease_sum"))
         .to_series()
         .all()
+    )
+
+
+@pytest.mark.parametrize(("n_selected", "n_nowcast"), [(5, 3), (6, 4)])
+def test_hubverse_nowcast_dates_come_from_selected_nhsn_observations(
+    n_selected, n_nowcast
+):
+    selected_dates = _weekending_dates()[-(n_selected + 1) : -1]
+
+    rows = _make_location_hubverse_nowcasts(
+        location=LocationData(abbr="CA", population=100_000),
+        disease="covid",
+        disease_index=0,
+        nhsn_observation_dates=selected_dates,
+        rng=np.random.default_rng(12345),
+    )
+
+    assert (
+        sorted({row["target_end_date"] for row in rows}) == selected_dates[-n_nowcast:]
     )

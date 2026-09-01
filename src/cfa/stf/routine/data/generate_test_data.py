@@ -264,7 +264,6 @@ def make_surveillance_inputs(
         NSSPData(
             data=_normalize_nssp_data(
                 nssp_data,
-                disease=disease,
                 last_training_date=last_training_date,
             ),
             freshness=nssp_freshness,

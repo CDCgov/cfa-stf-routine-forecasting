@@ -54,18 +54,16 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 7),
                 dt.date(2026, 1, 7),
-                dt.date(2026, 1, 7),
             ],
-            "state_abb": ["CA"] * 5,
+            "state_abb": ["CA"] * 4,
             "disease": [
                 "covid",
                 "total",
                 "total",
-                "flu",
                 "covid",
             ],
-            "target_type": ["inc ed visits"] * 5,
-            "value": [12, 120, 100, 8, 10],
+            "target_type": ["inc ed visits"] * 4,
+            "value": [12, 120, 100, 10],
         }
     )
     monkeypatch.setattr(
@@ -116,6 +114,23 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
         "start_date": dt.date(2025, 12, 1),
         "lazy": False,
     }
+
+
+def test_normalize_nssp_data_requires_one_non_total_disease():
+    source_data = pl.DataFrame(
+        {
+            "date": [dt.date(2026, 1, 7)] * 3,
+            "state_abb": ["CA"] * 3,
+            "disease": ["covid", "flu", "total"],
+            "value": [10, 8, 100],
+        }
+    )
+
+    with pytest.raises(ValueError, match="exactly one non-total NSSP disease"):
+        data_access._normalize_nssp_data(
+            source_data,
+            last_training_date=dt.date(2026, 1, 7),
+        )
 
 
 def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):

@@ -103,12 +103,23 @@ def resolve_nssp_report_date() -> dt.date:
 def _normalize_nssp_data(
     source_data: pl.DataFrame,
     *,
-    disease: str,
     last_training_date: dt.date,
 ) -> pl.DataFrame:
     """Normalize disease and total ED visits without a wide-format round trip."""
+    observed_diseases = (
+        source_data.filter(pl.col("disease") != "total")
+        .get_column("disease")
+        .unique()
+        .sort()
+        .to_list()
+    )
+    if len(observed_diseases) != 1:
+        raise ValueError(
+            f"Expected exactly one non-total NSSP disease; found {observed_diseases}"
+        )
+
     index_columns = ["date", "state_abb"]
-    observed = source_data.filter(pl.col("disease") == disease).select(
+    observed = source_data.filter(pl.col("disease") == observed_diseases[0]).select(
         *index_columns,
         pl.col("value").alias("observed_ed_visits"),
     )
@@ -174,7 +185,6 @@ def _load_dataops_nssp(
     )
     data = _normalize_nssp_data(
         source_data,
-        disease=disease,
         last_training_date=last_training_date,
     )
     return NSSPData(data=data, freshness=freshness, resolution="daily")

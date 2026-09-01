@@ -16,6 +16,7 @@ from cfa.stf.routine.data.data_access import (
     NHSNData,
     NSSPData,
     SurveillanceInputs,
+    _normalize_nssp_data,
 )
 from cfa.stf.routine.data.hubverse_nowcast import (
     HUBVERSE_MODEL_OUTPUT_SUBDIR,
@@ -261,21 +262,10 @@ def make_surveillance_inputs(
 
     nssp = (
         NSSPData(
-            data=(
-                nssp_data.pivot(
-                    on="disease",
-                    values="value",
-                )
-                .rename({disease: "observed_ed_visits"})
-                .with_columns(
-                    other_ed_visits=pl.col("total") - pl.col("observed_ed_visits"),
-                    data_type=pl.when(pl.col("date") <= last_training_date)
-                    .then(pl.lit("train"))
-                    .otherwise(pl.lit("eval")),
-                    resolution=pl.lit("daily"),
-                )
-                .drop("total", "target_type")
-                .sort("date")
+            data=_normalize_nssp_data(
+                nssp_data,
+                disease=disease,
+                last_training_date=last_training_date,
             ),
             freshness=nssp_freshness,
             resolution="daily",

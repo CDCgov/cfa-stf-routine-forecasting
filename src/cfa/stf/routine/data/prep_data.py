@@ -3,7 +3,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import polars as pl
-import polars.selectors as cs
 from cfa.stf.forecasttools import write_tabular
 
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
@@ -20,14 +19,7 @@ def combine_surveillance_data(
 ) -> pl.DataFrame:
     source_frames = []
     if nssp_data is not None:
-        source_frames.append(
-            nssp_data.unpivot(
-                on=["observed_ed_visits", "other_ed_visits"],
-                variable_name=".variable",
-                index=cs.exclude(["observed_ed_visits", "other_ed_visits"]),
-                value_name=".value",
-            )
-        )
+        source_frames.append(nssp_data)
 
     if nhsn_data is not None:
         source_frames.append(
@@ -72,6 +64,11 @@ def serialize_data(
 
     nssp_training_data = (
         forecast_run.nssp.data.filter(pl.col("data_type") == "train")
+        .pivot(
+            on=".variable",
+            index=["date", "state_abb", "data_type", "resolution"],
+            values=".value",
+        )
         .drop("resolution", "data_type")
         .rename({"state_abb": "geo_value"})
         if forecast_run.nssp is not None

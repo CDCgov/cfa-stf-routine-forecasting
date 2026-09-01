@@ -42,29 +42,41 @@ def test_aggregate_long_to_epiweekly_accepts_date_and_value_columns():
     )
 
 
-def test_aggregate_nssp_to_epiweekly_preserves_wide_source_schema():
+def test_aggregate_nssp_to_epiweekly_preserves_long_source_schema():
+    dates = pl.date_range(dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True)
+    variables = ("observed_ed_visits", "other_ed_visits")
+    observed_ed_visits = range(1, len(dates) + 1)
+    other_ed_visits = 9
     data = pl.DataFrame(
         {
-            "date": pl.date_range(
-                dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True
-            ),
-            "state_abb": ["CA"] * 14,
-            "observed_ed_visits": pl.int_range(1, 15, eager=True),
-            "other_ed_visits": [9] * 14,
-            "data_type": ["train"] * 14,
-            "resolution": ["daily"] * 14,
+            "date": date,
+            "state_abb": "CA",
+            ".variable": variable,
+            ".value": value,
+            "data_type": "train",
+            "resolution": "daily",
         }
+        for date, observed in zip(dates, observed_ed_visits, strict=True)
+        for variable, value in zip(
+            variables,
+            (observed, other_ed_visits),
+            strict=True,
+        )
     )
 
     result = aggregate_nssp_to_epiweekly(data)
+    week_end_dates = (dt.date(2025, 1, 11), dt.date(2025, 1, 18))
+    weekly_values = ((28, 63), (77, 63))
     expected = pl.DataFrame(
         {
-            "date": [dt.date(2025, 1, 11), dt.date(2025, 1, 18)],
-            "state_abb": ["CA", "CA"],
-            "observed_ed_visits": [28, 77],
-            "other_ed_visits": [63, 63],
-            "data_type": ["train", "train"],
-            "resolution": ["epiweekly", "epiweekly"],
+            "date": date,
+            "state_abb": "CA",
+            ".variable": variable,
+            ".value": value,
+            "data_type": "train",
+            "resolution": "epiweekly",
         }
+        for date, values in zip(week_end_dates, weekly_values, strict=True)
+        for variable, value in zip(variables, values, strict=True)
     )
     assert_frame_equal(result, expected)

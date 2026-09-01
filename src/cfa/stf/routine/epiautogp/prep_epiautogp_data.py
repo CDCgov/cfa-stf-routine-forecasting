@@ -10,6 +10,7 @@ import polars as pl
 from cfa.stf.routine.data.nowcast import NowcastData, NowcastSource
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 
 def _validate_epiautogp_parameters(
@@ -78,19 +79,21 @@ def _extract_model_series(
                 f"NSSP data resolution {source.resolution!r} does not match "
                 f"EpiAutoGP frequency {config.frequency!r}"
             )
-        value = {
-            "observed": pl.col("observed_ed_visits"),
-            "other": pl.col("other_ed_visits"),
-            "pct": (
-                pl.col("observed_ed_visits")
-                / (pl.col("observed_ed_visits") + pl.col("other_ed_visits"))
-                * 100
-            ),
+        variable = {
+            "observed": "observed_ed_visits",
+            "other": "other_ed_visits",
+            "pct": "prop_disease_ed_visits",
         }[config.ed_visit_type]
-        data = source.data.select(
+        source_data = (
+            append_prop_ed_data(source.data)
+            if config.ed_visit_type == "pct"
+            else source.data
+        )
+        scale = 100 if config.ed_visit_type == "pct" else 1
+        data = source_data.filter(pl.col(".variable") == variable).select(
             "date",
             "data_type",
-            value.cast(pl.Float64).alias("value"),
+            (pl.col(".value") * scale).cast(pl.Float64).alias("value"),
         )
     else:
         source = forecast_run.nhsn

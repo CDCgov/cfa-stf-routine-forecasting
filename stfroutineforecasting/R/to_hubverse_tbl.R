@@ -3,7 +3,7 @@ var_to_target <- function(variable, disease) {
     variable,
     "observed_hospital_admissions" ~ glue::glue("inc {disease} hosp"),
     "observed_ed_visits" ~ glue::glue("inc {disease} ed visits"),
-    "other_ed_visits" ~ glue::glue("inc other ed visits"),
+    "other_ed_visits" ~ "inc other ed visits",
     "prop_disease_ed_visits" ~ glue::glue(
       "inc {disease} prop ed visits"
     )

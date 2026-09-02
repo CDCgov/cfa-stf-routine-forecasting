@@ -56,7 +56,7 @@ HUBVERSE_LOGNORMAL_SIGMA = 0.01
 HUBVERSE_RANDOM_SEED = 12345
 HUBVERSE_MIN_STABLE_OBSERVATIONS = 2
 HUBVERSE_MAX_NOWCAST_DATES = 4
-HUBVERSE_MIN_REVISION = 0.05
+HUBVERSE_MIN_REVISION = 0.01
 HUBVERSE_MAX_REVISION = 0.10
 
 _SOURCE_DATA_COLS = [
@@ -464,7 +464,7 @@ def write_hubverse_nowcast(
     """
     Write one noisy sample nowcast artifact in the production Hubverse schema.
 
-    The expected nowcast is a 5--10% upward revision of each selected NHSN
+    The expected nowcast is a 1--10% upward revision of each selected NHSN
     report, with larger revisions for more recent dates. Fixed-sigma lognormal
     noise simulates uncertainty around those expectations.
     """

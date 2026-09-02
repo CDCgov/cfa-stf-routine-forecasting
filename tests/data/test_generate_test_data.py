@@ -86,7 +86,7 @@ def test_hubverse_nowcasts_use_selected_nhsn_observations(n_selected, n_nowcast)
         .get_column("value")
         .to_numpy()
     )
-    expected_means = np.linspace(105.0, 110.0, n_nowcast)
+    expected_means = np.linspace(101.0, 110.0, n_nowcast)
     np.testing.assert_allclose(mean_nowcasts, expected_means, rtol=0.01)
 
 

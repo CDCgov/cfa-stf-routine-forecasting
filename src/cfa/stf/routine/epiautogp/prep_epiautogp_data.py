@@ -85,15 +85,14 @@ def _extract_model_series(
             "pct": "prop_disease_ed_visits",
         }[config.ed_visit_type]
         source_data = (
-            append_prop_ed_data(source.data)
+            append_prop_ed_data(source.data).with_columns(pl.col(".value") * 100)
             if config.ed_visit_type == "pct"
             else source.data
         )
-        scale = 100 if config.ed_visit_type == "pct" else 1
         data = source_data.filter(pl.col(".variable") == variable).select(
             "date",
             "data_type",
-            (pl.col(".value") * scale).cast(pl.Float64).alias("value"),
+            pl.col(".value").cast(pl.Float64).alias("value"),
         )
     else:
         source = forecast_run.nhsn

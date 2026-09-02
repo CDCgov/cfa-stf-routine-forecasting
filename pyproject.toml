@@ -106,7 +106,7 @@ show_missing = true
 skip_covered = true
 
 [tool.uv.sources]
-cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.4.3" }
+cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.5.0" }
 cfa-cloudops = { git = "https://github.com/CDCgov/cfa-cloudops.git" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "1c9fa48"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "main" }

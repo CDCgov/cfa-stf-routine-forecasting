@@ -70,9 +70,10 @@ dagster-config-editor = [
     "rich",
 ]
 test = [
+    "matplotlib>=3.11.1",
     "pytest>=8.3.2",
     "pytest-cov>=5.0.0",
-    "pytest-mpl>=0.17.0"
+    "pytest-mpl>=0.17.0",
 ]
 
 

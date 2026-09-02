@@ -752,6 +752,7 @@ dev = [
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyter" },
+    { name = "matplotlib" },
     { name = "pre-commit" },
     { name = "py-yaml12" },
     { name = "pytest" },
@@ -760,6 +761,7 @@ dev = [
     { name = "rich" },
 ]
 test = [
+    { name = "matplotlib" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mpl" },
@@ -794,6 +796,7 @@ dev = [
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyter", specifier = ">=1.0.0" },
+    { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "py-yaml12" },
     { name = "pytest", specifier = ">=8.3.2" },
@@ -802,6 +805,7 @@ dev = [
     { name = "rich" },
 ]
 test = [
+    { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "pytest", specifier = ">=8.3.2" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-mpl", specifier = ">=0.17.0" },

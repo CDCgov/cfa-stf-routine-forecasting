@@ -392,6 +392,68 @@ def _make_hubverse_nowcast_rows(
     )
 
 
+def _write_hubverse_nowcast_figure(
+    *,
+    nowcasts: pl.DataFrame,
+    nhsn_observations: pl.DataFrame,
+    output_path: Path,
+    disease: str,
+    location: str,
+) -> None:
+    """Plot simulated nowcast trajectories over the selected NHSN reports."""
+    from matplotlib import pyplot as plt
+
+    observations = nhsn_observations.select(
+        pl.col("date").cast(pl.Date),
+        pl.col("value").cast(pl.Float64),
+    ).sort("date")
+    trajectories = nowcasts.sort("output_type_id", "target_end_date").partition_by(
+        "output_type_id", maintain_order=True
+    )
+    mean_nowcast = (
+        nowcasts.group_by("target_end_date")
+        .agg(pl.col("value").mean())
+        .sort("target_end_date")
+    )
+
+    figure, axis = plt.subplots(figsize=(9, 5))
+    for index, trajectory in enumerate(trajectories):
+        axis.plot(
+            trajectory.get_column("target_end_date"),
+            trajectory.get_column("value"),
+            color="tab:blue",
+            alpha=0.12,
+            linewidth=1,
+            label="Simulated nowcast trajectories" if index == 0 else None,
+        )
+    axis.plot(
+        mean_nowcast.get_column("target_end_date"),
+        mean_nowcast.get_column("value"),
+        color="tab:blue",
+        linewidth=2,
+        label="Mean simulated nowcast",
+    )
+    axis.plot(
+        observations.get_column("date"),
+        observations.get_column("value"),
+        color="black",
+        marker="o",
+        linewidth=1.5,
+        label="Selected NHSN observations",
+    )
+    axis.set(
+        title=f"Simulated Hubverse nowcasts: {disease}, {location}",
+        xlabel="Target end date",
+        ylabel="Weekly incident hospital admissions",
+    )
+    axis.grid(alpha=0.2)
+    axis.legend()
+    figure.autofmt_xdate()
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
 def write_hubverse_nowcast(
     base_dir: Path,
     *,
@@ -424,3 +486,10 @@ def write_hubverse_nowcast(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     nowcasts.write_parquet(output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet")
+    _write_hubverse_nowcast_figure(
+        nowcasts=nowcasts,
+        nhsn_observations=nhsn_observations,
+        output_path=output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.png",
+        disease=disease,
+        location=location,
+    )

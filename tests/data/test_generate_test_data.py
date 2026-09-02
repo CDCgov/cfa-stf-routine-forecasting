@@ -6,10 +6,16 @@ import pytest
 
 from cfa.stf.routine.data.generate_test_data import (
     FIRST_OBS_DATE,
+    HUBVERSE_NOWCAST_DIR_NAME,
     LAST_OBS_DATE,
+    REPORT_DATE,
     LocationData,
     _make_hubverse_nowcast_rows,
     _make_nssp,
+    write_hubverse_nowcast,
+)
+from cfa.stf.routine.data.hubverse_nowcast import (
+    HUBVERSE_MODEL_OUTPUT_SUBDIR,
 )
 
 
@@ -82,3 +88,32 @@ def test_hubverse_nowcasts_use_selected_nhsn_observations(n_selected, n_nowcast)
     )
     expected_means = np.linspace(105.0, 110.0, n_nowcast)
     np.testing.assert_allclose(mean_nowcasts, expected_means, rtol=0.01)
+
+
+def test_write_hubverse_nowcast_writes_data_and_figure(tmp_path):
+    observations = pl.DataFrame(
+        {
+            "date": [
+                dt.date(2026, 7, 4) + dt.timedelta(weeks=index) for index in range(6)
+            ],
+            "value": [100.0] * 6,
+        }
+    )
+
+    write_hubverse_nowcast(
+        tmp_path,
+        disease="covid",
+        location="CA",
+        nhsn_observations=observations,
+    )
+
+    output_dir = (
+        tmp_path
+        / "private_data"
+        / HUBVERSE_NOWCAST_DIR_NAME
+        / "covid"
+        / HUBVERSE_MODEL_OUTPUT_SUBDIR
+    )
+    artifact_stem = f"{REPORT_DATE}-CFA-nowcastNHSN"
+    assert (output_dir / f"{artifact_stem}.parquet").is_file()
+    assert (output_dir / f"{artifact_stem}.png").is_file()

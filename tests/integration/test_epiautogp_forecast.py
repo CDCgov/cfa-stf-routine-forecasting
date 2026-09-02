@@ -21,12 +21,18 @@ EPIAUTOGP_CONFIGURATIONS = (
         "epiautogp_nhsn_epiweekly",
     ),
     ("nssp", "epiweekly", "pct", "none", "epiautogp_nssp_epiweekly_pct"),
-    ("nssp", "daily", "observed", "none", "epiautogp_nssp_daily"),
+    (
+        "nssp",
+        "daily",
+        "observed",
+        "reporting-delay",
+        "epiautogp_nssp_daily",
+    ),
     (
         "nssp",
         "daily",
         "other",
-        "reporting-delay",
+        "none",
         "epiautogp_nssp_daily_other",
     ),
 )

@@ -9,7 +9,7 @@ from tests.integration.model_test_utils import (
 from cfa.stf.routine.data.generate_test_data import (
     HUBVERSE_N_SAMPLES,
     HUBVERSE_NOWCAST_DIR_NAME,
-    write_hubverse_nowcasts,
+    write_hubverse_nowcast,
 )
 
 EPIAUTOGP_CONFIGURATIONS = (
@@ -43,11 +43,11 @@ def test_epiautogp_forecast(pipeline_workspace, monkeypatch, request):
     disease = request.config.getoption("--model-test-disease")
     location = request.config.getoption("--model-test-location")
     configure_data_mode(request, monkeypatch)
-    write_hubverse_nowcasts(
+    write_hubverse_nowcast(
         pipeline_workspace,
+        disease=disease,
+        location=location,
         nhsn_observations=selected_nhsn_observations(disease, location),
-        locations=[location],
-        diseases=[disease],
     )
     hubverse_nowcast_dir = (
         pipeline_workspace / "private_data" / HUBVERSE_NOWCAST_DIR_NAME / disease

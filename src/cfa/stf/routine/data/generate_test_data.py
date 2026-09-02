@@ -318,9 +318,9 @@ def make_surveillance_inputs(
     )
 
 
-def _make_location_hubverse_nowcasts(
+def _make_hubverse_nowcast_rows(
     *,
-    location: LocationData,
+    location: str,
     disease: str,
     nhsn_observations: pl.DataFrame,
     rng: np.random.Generator,
@@ -346,7 +346,7 @@ def _make_location_hubverse_nowcasts(
         raise ValueError(
             "Expected at least one NHSN nowcast date and "
             f"{HUBVERSE_MIN_STABLE_OBSERVATIONS} stable observations for "
-            f"{disease}, {location.abbr}; found {selected_reports.height} "
+            f"{disease}, {location}; found {selected_reports.height} "
             "selected reports."
         )
     recent_reports = selected_reports.tail(n_nowcast_dates)
@@ -363,17 +363,13 @@ def _make_location_hubverse_nowcasts(
         n_nowcast_dates,
     )
     expected_final_counts = reports * (1 + revision_rates)
-    samples = np.zeros((HUBVERSE_N_SAMPLES, n_nowcast_dates))
-    positive_counts = expected_final_counts > 0
-    log_means = (
-        np.log(expected_final_counts[positive_counts]) - HUBVERSE_LOGNORMAL_SIGMA**2 / 2
-    )
-    samples[:, positive_counts] = rng.lognormal(
-        mean=log_means,
+    noise = rng.lognormal(
+        mean=-(HUBVERSE_LOGNORMAL_SIGMA**2) / 2,
         sigma=HUBVERSE_LOGNORMAL_SIGMA,
-        size=(HUBVERSE_N_SAMPLES, positive_counts.sum()),
+        size=(HUBVERSE_N_SAMPLES, n_nowcast_dates),
     )
-    disease_id = disease
+    samples = expected_final_counts * noise
+    location_id = location.lower()
 
     return [
         {
@@ -381,9 +377,9 @@ def _make_location_hubverse_nowcasts(
             "target_end_date": target_end_date,
             "horizon": horizon,
             "target": HUBVERSE_TARGETS[disease],
-            "location": location.abbr.lower(),
+            "location": location_id,
             "output_type": "sample",
-            "output_type_id": (f"{disease_id}_{location.abbr.lower()}_{sample_index}"),
+            "output_type_id": f"{disease}_{location_id}_{sample_index}",
             "value": value,
         }
         for sample_index, trajectory in enumerate(samples, start=1)
@@ -391,39 +387,34 @@ def _make_location_hubverse_nowcasts(
     ]
 
 
-def _make_disease_hubverse_nowcasts(
+def write_hubverse_nowcast(
+    base_dir: Path,
     *,
-    locations: list[LocationData],
     disease: str,
-    disease_index: int,
+    location: str,
     nhsn_observations: pl.DataFrame,
-) -> pl.DataFrame:
-    """Make noisy Hubverse sample nowcasts for one disease."""
-    rng = np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index)
-    rows = []
-    for location in locations:
-        rows.extend(
-            _make_location_hubverse_nowcasts(
-                location=location,
-                disease=disease,
-                nhsn_observations=nhsn_observations,
-                rng=rng,
-            )
-        )
+) -> None:
+    """
+    Write one noisy sample nowcast artifact in the production Hubverse schema.
 
-    return pl.DataFrame(rows).with_columns(
+    The expected nowcast is a 5--10% upward revision of each selected NHSN
+    report, with larger revisions for more recent dates. Fixed-sigma lognormal
+    noise simulates uncertainty around those expectations.
+    """
+    if disease not in HUBVERSE_TARGETS:
+        raise ValueError(f"No Hubverse target mapping for {disease!r}")
+    disease_index = sorted(HUBVERSE_TARGETS).index(disease)
+    nowcasts = pl.DataFrame(
+        _make_hubverse_nowcast_rows(
+            location=location,
+            disease=disease,
+            nhsn_observations=nhsn_observations,
+            rng=np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index),
+        )
+    ).with_columns(
         pl.col("horizon").cast(pl.Int32),
         pl.col("value").cast(pl.Float64),
     )
-
-
-def _write_disease_hubverse_nowcasts(
-    *,
-    base_dir: Path,
-    disease: str,
-    nowcasts: pl.DataFrame,
-) -> None:
-    """Write one disease's Hubverse nowcasts to its production-style path."""
     output_dir = (
         base_dir
         / "private_data"
@@ -433,39 +424,3 @@ def _write_disease_hubverse_nowcasts(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     nowcasts.write_parquet(output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet")
-
-
-def write_hubverse_nowcasts(
-    base_dir: Path,
-    *,
-    nhsn_observations: pl.DataFrame,
-    locations: list[str] | None = None,
-    diseases: list[str] | None = None,
-) -> None:
-    """
-    Write noisy sample nowcasts in the production Hubverse schema.
-
-    The expected nowcast is a 5--10% upward revision of each selected NHSN
-    report, with larger revisions for more recent dates. Fixed-sigma lognormal
-    noise simulates uncertainty around those expectations.
-    """
-    locations = locations or DEFAULT_LOCATIONS
-    diseases = diseases or DEFAULT_DISEASES
-    all_diseases = sorted(set(DEFAULT_DISEASES + diseases))
-    location_data = _location_data(locations)
-
-    for disease in diseases:
-        if disease not in HUBVERSE_TARGETS:
-            raise ValueError(f"No Hubverse target mapping for {disease!r}")
-        disease_index = all_diseases.index(disease)
-        nowcasts = _make_disease_hubverse_nowcasts(
-            locations=location_data,
-            disease=disease,
-            disease_index=disease_index,
-            nhsn_observations=nhsn_observations,
-        )
-        _write_disease_hubverse_nowcasts(
-            base_dir=base_dir,
-            disease=disease,
-            nowcasts=nowcasts,
-        )

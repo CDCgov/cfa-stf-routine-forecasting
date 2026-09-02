@@ -1,16 +1,15 @@
+import datetime as dt
+
 import numpy as np
 import polars as pl
 import pytest
 
 from cfa.stf.routine.data.generate_test_data import (
     FIRST_OBS_DATE,
-    HUBVERSE_MAX_REVISION,
-    HUBVERSE_MIN_REVISION,
     LAST_OBS_DATE,
     LocationData,
-    _make_location_hubverse_nowcasts,
+    _make_hubverse_nowcast_rows,
     _make_nssp,
-    _weekending_dates,
 )
 
 
@@ -54,16 +53,17 @@ def test_make_nssp_returns_location_level_cfa_stf_data_schema():
 
 
 @pytest.mark.parametrize(("n_selected", "n_nowcast"), [(5, 3), (6, 4)])
-def test_hubverse_nowcast_dates_come_from_selected_nhsn_observations(
-    n_selected, n_nowcast
-):
-    selected_dates = _weekending_dates()[-(n_selected + 1) : -1]
+def test_hubverse_nowcasts_use_selected_nhsn_observations(n_selected, n_nowcast):
+    first_date = dt.date(2026, 7, 4)
+    selected_dates = [
+        first_date + dt.timedelta(weeks=index) for index in range(n_selected)
+    ]
     selected_observations = pl.DataFrame(
         {"date": selected_dates, "value": [100.0] * n_selected}
     )
 
-    rows = _make_location_hubverse_nowcasts(
-        location=LocationData(abbr="CA", population=100_000),
+    rows = _make_hubverse_nowcast_rows(
+        location="CA",
         disease="covid",
         nhsn_observations=selected_observations,
         rng=np.random.default_rng(12345),
@@ -81,12 +81,5 @@ def test_hubverse_nowcast_dates_come_from_selected_nhsn_observations(
         .get_column("value")
         .to_numpy()
     )
-    expected_means = 100 * (
-        1
-        + np.linspace(
-            HUBVERSE_MIN_REVISION,
-            HUBVERSE_MAX_REVISION,
-            n_nowcast,
-        )
-    )
+    expected_means = np.linspace(105.0, 110.0, n_nowcast)
     np.testing.assert_allclose(mean_nowcasts, expected_means, rtol=0.01)

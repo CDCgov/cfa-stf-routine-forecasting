@@ -62,14 +62,13 @@ def test_hubverse_nowcasts_use_selected_nhsn_observations(n_selected, n_nowcast)
         {"date": selected_dates, "value": [100.0] * n_selected}
     )
 
-    rows = _make_hubverse_nowcast_rows(
+    nowcasts = _make_hubverse_nowcast_rows(
         location="CA",
         disease="covid",
         nhsn_observations=selected_observations,
         rng=np.random.default_rng(12345),
     )
 
-    nowcasts = pl.DataFrame(rows)
     assert (
         nowcasts.get_column("target_end_date").unique().sort().to_list()
         == (selected_dates[-n_nowcast:])

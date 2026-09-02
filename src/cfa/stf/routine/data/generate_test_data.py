@@ -324,7 +324,7 @@ def _make_hubverse_nowcast_rows(
     disease: str,
     nhsn_observations: pl.DataFrame,
     rng: np.random.Generator,
-) -> list[dict]:
+) -> pl.DataFrame:
     """Make noisy Hubverse sample nowcasts for one disease and location."""
     selected_reports = nhsn_observations.select(
         pl.col("date").cast(pl.Date),
@@ -371,20 +371,25 @@ def _make_hubverse_nowcast_rows(
     samples = expected_final_counts * noise
     location_id = location.lower()
 
-    return [
-        {
-            "origin_date": REPORT_DATE,
-            "target_end_date": target_end_date,
-            "horizon": horizon,
-            "target": HUBVERSE_TARGETS[disease],
-            "location": location_id,
-            "output_type": "sample",
-            "output_type_id": f"{disease}_{location_id}_{sample_index}",
-            "value": value,
-        }
-        for sample_index, trajectory in enumerate(samples, start=1)
-        for target_end_date, horizon, value in zip(dates, horizons, trajectory)
-    ]
+    return pl.DataFrame(
+        [
+            {
+                "origin_date": REPORT_DATE,
+                "target_end_date": target_end_date,
+                "horizon": horizon,
+                "target": HUBVERSE_TARGETS[disease],
+                "location": location_id,
+                "output_type": "sample",
+                "output_type_id": f"{disease}_{location_id}_{sample_index}",
+                "value": value,
+            }
+            for sample_index, trajectory in enumerate(samples, start=1)
+            for target_end_date, horizon, value in zip(dates, horizons, trajectory)
+        ]
+    ).with_columns(
+        pl.col("horizon").cast(pl.Int32),
+        pl.col("value").cast(pl.Float64),
+    )
 
 
 def write_hubverse_nowcast(
@@ -404,16 +409,11 @@ def write_hubverse_nowcast(
     if disease not in HUBVERSE_TARGETS:
         raise ValueError(f"No Hubverse target mapping for {disease!r}")
     disease_index = sorted(HUBVERSE_TARGETS).index(disease)
-    nowcasts = pl.DataFrame(
-        _make_hubverse_nowcast_rows(
-            location=location,
-            disease=disease,
-            nhsn_observations=nhsn_observations,
-            rng=np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index),
-        )
-    ).with_columns(
-        pl.col("horizon").cast(pl.Int32),
-        pl.col("value").cast(pl.Float64),
+    nowcasts = _make_hubverse_nowcast_rows(
+        location=location,
+        disease=disease,
+        nhsn_observations=nhsn_observations,
+        rng=np.random.default_rng(HUBVERSE_RANDOM_SEED + disease_index),
     )
     output_dir = (
         base_dir

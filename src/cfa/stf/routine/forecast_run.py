@@ -20,6 +20,8 @@ class ForecastRun:
     disease: str
     loc: str
     report_date: dt.date
+    batch_first_training_date: dt.date
+    batch_last_training_date: dt.date
     first_training_date: dt.date
     last_training_date: dt.date
     n_forecast_days: int
@@ -36,8 +38,8 @@ class ForecastRun:
         return self.output_dir / get_model_batch_dir_name(
             disease=self.disease,
             report_date=self.report_date,
-            first_training_date=self.first_training_date,
-            last_training_date=self.last_training_date,
+            first_training_date=self.batch_first_training_date,
+            last_training_date=self.batch_last_training_date,
         )
 
     @property

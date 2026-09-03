@@ -11,10 +11,18 @@ from tests.factories import make_test_forecast_run, make_test_surveillance_input
 class TestPipeline(ForecastPipeline):
     __test__ = False
 
-    def __init__(self, *, events=None, ed_visit_input_resolution="daily", **kwargs):
+    def __init__(
+        self,
+        *,
+        events=None,
+        ed_visit_input_resolution="daily",
+        minimum_exclude_last_n_days=0,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.events = events if events is not None else []
         self._ed_visit_input_resolution = ed_visit_input_resolution
+        self._minimum_exclude_last_n_days = minimum_exclude_last_n_days
 
     @property
     def model_name(self):
@@ -27,6 +35,10 @@ class TestPipeline(ForecastPipeline):
     @property
     def ed_visit_input_resolution(self):
         return self._ed_visit_input_resolution
+
+    @property
+    def minimum_exclude_last_n_days(self):
+        return self._minimum_exclude_last_n_days
 
     def validate_configuration(self):
         self.events.append("validate")
@@ -44,6 +56,8 @@ def _pipeline(
     events=None,
     fail_on_stale_data=False,
     ed_visit_input_resolution="daily",
+    minimum_exclude_last_n_days=0,
+    exclude_last_n_days=1,
 ):
     return TestPipeline(
         disease="covid",
@@ -52,11 +66,12 @@ def _pipeline(
         n_training_days=90,
         n_forecast_days=28,
         run_date=dt.date(2024, 12, 20),
-        exclude_last_n_days=1,
+        exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
         logger=logging.getLogger("test-forecast-pipeline"),
         events=events,
         ed_visit_input_resolution=ed_visit_input_resolution,
+        minimum_exclude_last_n_days=minimum_exclude_last_n_days,
     )
 
 
@@ -93,6 +108,8 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         disease="covid",
         loc="CA",
         report_date=dt.date(2024, 12, 20),
+        batch_first_training_date=dt.date(2024, 9, 20),
+        batch_last_training_date=dt.date(2024, 12, 18),
         first_training_date=dt.date(2024, 9, 20),
         last_training_date=dt.date(2024, 12, 18),
         n_forecast_days=28,
@@ -118,6 +135,106 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run.nssp is surveillance.nssp
     assert run.freshness == surveillance.freshness
     assert run.right_truncation_offset == 1
+
+
+@pytest.mark.parametrize(
+    (
+        "requested_exclusion",
+        "expected_exclusion",
+        "expected_batch_first",
+        "expected_batch_last",
+        "expected_first",
+        "expected_last",
+    ),
+    [
+        (
+            1,
+            4,
+            dt.date(2024, 9, 20),
+            dt.date(2024, 12, 18),
+            dt.date(2024, 9, 17),
+            dt.date(2024, 12, 15),
+        ),
+        (
+            4,
+            4,
+            dt.date(2024, 9, 17),
+            dt.date(2024, 12, 15),
+            dt.date(2024, 9, 17),
+            dt.date(2024, 12, 15),
+        ),
+        (
+            6,
+            6,
+            dt.date(2024, 9, 15),
+            dt.date(2024, 12, 13),
+            dt.date(2024, 9, 15),
+            dt.date(2024, 12, 13),
+        ),
+    ],
+)
+def test_build_forecast_run_applies_minimum_exclusion(
+    monkeypatch,
+    tmp_path,
+    requested_exclusion,
+    expected_exclusion,
+    expected_batch_first,
+    expected_batch_last,
+    expected_first,
+    expected_last,
+):
+    from cfa.stf.routine import forecast_pipeline as pipeline_module
+
+    calls = {}
+
+    def load(**kwargs):
+        calls["load"] = kwargs
+        return make_test_surveillance_inputs(
+            last_training_date=kwargs["last_training_date"],
+            sources={"nssp"},
+        )
+
+    monkeypatch.setattr(pipeline_module, "load_surveillance_inputs", load)
+    pipeline = _pipeline(
+        tmp_path,
+        minimum_exclude_last_n_days=4,
+        exclude_last_n_days=requested_exclusion,
+    )
+
+    run = pipeline.build_forecast_run()
+
+    assert run.batch_first_training_date == expected_batch_first
+    assert run.batch_last_training_date == expected_batch_last
+    assert run.first_training_date == expected_first
+    assert run.last_training_date == expected_last
+    assert run.exclude_last_n_days == expected_exclusion
+    assert calls["load"]["first_training_date"] == expected_first
+    assert calls["load"]["last_training_date"] == expected_last
+    assert run.model_batch_dir == tmp_path / (
+        f"covid_r_2024-12-20_f_{expected_batch_first}_t_{expected_batch_last}"
+    )
+    assert run.right_truncation_offset == expected_exclusion
+
+
+def test_model_minimum_does_not_change_batch_directory(monkeypatch, tmp_path):
+    from cfa.stf.routine import forecast_pipeline as pipeline_module
+
+    def load(**kwargs):
+        return make_test_surveillance_inputs(
+            last_training_date=kwargs["last_training_date"],
+            sources={"nssp"},
+        )
+
+    monkeypatch.setattr(pipeline_module, "load_surveillance_inputs", load)
+
+    baseline_run = _pipeline(tmp_path).build_forecast_run()
+    constrained_run = _pipeline(
+        tmp_path,
+        minimum_exclude_last_n_days=4,
+    ).build_forecast_run()
+
+    assert baseline_run.last_training_date != constrained_run.last_training_date
+    assert baseline_run.model_batch_dir == constrained_run.model_batch_dir
 
 
 def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):

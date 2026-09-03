@@ -61,17 +61,42 @@ class ForecastPipeline(ABC):
         """Resolution to use for serialized ED-visit inputs."""
         return "daily"
 
+    @property
+    def minimum_exclude_last_n_days(self) -> int:
+        """Minimum recent calendar days to exclude from model training."""
+        return 0
+
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        first_training_date, last_training_date = calculate_training_dates(
+        batch_first_training_date, batch_last_training_date = calculate_training_dates(
             self.run_date,
             self.n_training_days,
             self.exclude_last_n_days,
             self.logger,
         )
+        effective_exclude_last_n_days = max(
+            self.exclude_last_n_days,
+            self.minimum_exclude_last_n_days,
+        )
+        if effective_exclude_last_n_days == self.exclude_last_n_days:
+            first_training_date = batch_first_training_date
+            last_training_date = batch_last_training_date
+        else:
+            first_training_date, last_training_date = calculate_training_dates(
+                self.run_date,
+                self.n_training_days,
+                effective_exclude_last_n_days,
+                self.logger,
+            )
+            self.logger.info(
+                "Increasing excluded training tail from %s to %s days for model %s.",
+                self.exclude_last_n_days,
+                effective_exclude_last_n_days,
+                self.model_name,
+            )
         surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
@@ -87,10 +112,12 @@ class ForecastPipeline(ABC):
             disease=self.disease,
             loc=self.loc,
             report_date=self.run_date,
+            batch_first_training_date=batch_first_training_date,
+            batch_last_training_date=batch_last_training_date,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
             n_forecast_days=self.n_forecast_days,
-            exclude_last_n_days=self.exclude_last_n_days,
+            exclude_last_n_days=effective_exclude_last_n_days,
             model_name=self.model_name,
             output_dir=self.output_dir,
             surveillance=surveillance,

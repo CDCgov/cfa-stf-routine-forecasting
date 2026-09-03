@@ -106,6 +106,9 @@ Every subclass must implement:
 
 `ForecastRun` is the source of truth for dates, surveillance data, population, and output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
+Its `batch_first_training_date` and `batch_last_training_date` identify the caller-requested baseline window used in the shared directory name.
+Its `first_training_date`, `last_training_date`, and `exclude_last_n_days` describe the effective model window.
+These can differ when a model enforces a minimum excluded tail; `combined_data.tsv` uses the effective boundary for its `data_type` labels.
 The resulting layout is:
 
 ```text
@@ -152,6 +155,7 @@ The base class also provides optional hooks for model-specific preparation:
   | ------------------------------ | -------------------------------------------------------- |
   | `validate_configuration()`     | Reject invalid option combinations before loading data   |
   | `prepare_model_artifacts(run)` | Create model-specific inputs, such as JSON or parameters |
+  | `minimum_exclude_last_n_days`  | Require a longer recent-data omission for this model     |
 
 Do not override `execute()`, `build_forecast_run()`, `prepare_input_artifacts()`, or `publish_outputs()` unless the shared lifecycle itself must change.
 Keeping those methods common preserves data freshness checks and compatible outputs.
@@ -159,6 +163,9 @@ Keeping those methods common preserves data freshness checks and compatible outp
 
 When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
 For daily models this often means generating `run.n_forecast_days + run.exclude_last_n_days` days from the last training date; see the Fable and PyRenew implementations.
+Fable requires at least four omitted calendar days.
+EpiAutoGP also requires at least four when it runs without a nowcast source.
+The requested baseline window continues to identify their shared batch, while the effective value controls model fitting and forecast length.
 
 ## 4. Add orchestration explicitly
 

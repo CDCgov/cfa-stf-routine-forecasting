@@ -1,5 +1,6 @@
 """Utilities for creating and appending disease proportion data."""
 
+import datetime as dt
 from pathlib import Path
 
 import polars as pl
@@ -12,6 +13,37 @@ from cfa.stf.forecasttools import (
 )
 
 from cfa.stf.routine.utils.data_utils import aggregate_long_to_epiweekly
+
+
+def _latest_training_date(data: pl.DataFrame, *, model_name: str) -> dt.date:
+    if "data_type" not in data.columns:
+        raise ValueError(f"{model_name} data is missing required column: data_type")
+    latest_training_date = (
+        data.filter(pl.col("data_type") == "train").get_column("date").max()
+    )
+    if latest_training_date is None:
+        raise ValueError(f"{model_name} data contains no training observations")
+    return latest_training_date
+
+
+def _drop_nonpreferred_data_type(
+    *,
+    num_data: pl.DataFrame,
+    other_data: pl.DataFrame,
+    num_model_name: str,
+    other_model_name: str,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    num_last_training_date = _latest_training_date(
+        num_data,
+        model_name=num_model_name,
+    )
+    other_last_training_date = _latest_training_date(
+        other_data,
+        model_name=other_model_name,
+    )
+    if num_last_training_date >= other_last_training_date:
+        return num_data, other_data.drop("data_type")
+    return num_data.drop("data_type"), other_data
 
 
 def create_prop_fusion_model(
@@ -46,19 +78,27 @@ def create_prop_fusion_model(
         ]
         return data.select(populated_columns)
 
-    num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
+    num_samples = read_model_output(
+        num_model_name, num_var_name, "samples.parquet"
+    ).drop("data_type", strict=False)
     other_samples = read_model_output(
         other_model_name, other_var_name, "samples.parquet"
-    )
+    ).drop("data_type", strict=False)
     num_data = read_model_output(num_model_name, num_var_name, "data/combined_data.tsv")
     other_data = read_model_output(
         other_model_name, other_var_name, "data/combined_data.tsv"
     )
 
     if augment_num_with_obs:
-        num_samples = augment_samples_with_observations(num_samples, num_data)
+        num_samples = augment_samples_with_observations(
+            num_samples,
+            num_data.drop("data_type"),
+        )
     if augment_other_with_obs:
-        other_samples = augment_samples_with_observations(other_samples, other_data)
+        other_samples = augment_samples_with_observations(
+            other_samples,
+            other_data.drop("data_type"),
+        )
     if aggregate_num:
         num_samples = aggregate_long_to_epiweekly(num_samples, value_col=num_var_name)
         num_data = aggregate_long_to_epiweekly(num_data, value_col=num_var_name)
@@ -69,15 +109,21 @@ def create_prop_fusion_model(
         other_data = aggregate_long_to_epiweekly(other_data, value_col=other_var_name)
 
     prop_samples = create_proportions(
-        numerator_df=num_samples,
-        other_df=other_samples,
+        numerator_df=num_samples.drop("data_type", strict=False),
+        other_df=other_samples.drop("data_type", strict=False),
         num_val_col=num_var_name,
         other_val_col=other_var_name,
         prop_var=prop_var_name,
     ).sort("date", ".draw")
+    num_prop_data, other_prop_data = _drop_nonpreferred_data_type(
+        num_data=num_data,
+        other_data=other_data,
+        num_model_name=num_model_name,
+        other_model_name=other_model_name,
+    )
     prop_data = create_proportions(
-        numerator_df=num_data,
-        other_df=other_data,
+        numerator_df=num_prop_data,
+        other_df=other_prop_data,
         num_val_col=num_var_name,
         other_val_col=other_var_name,
         prop_var=prop_var_name,

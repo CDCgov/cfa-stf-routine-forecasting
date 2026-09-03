@@ -30,12 +30,12 @@ def make_test_surveillance_inputs(
 
     nssp_data = pl.DataFrame(
         {
-            "date": [last_training_date],
-            "state_abb": [loc_abb],
-            "observed_ed_visits": [10],
-            "other_ed_visits": [90],
-            "data_type": ["train"],
-            "resolution": ["daily"],
+            "date": [last_training_date] * 2,
+            "state_abb": [loc_abb] * 2,
+            ".variable": ["observed_ed_visits", "other_ed_visits"],
+            ".value": [10, 90],
+            "data_type": ["train"] * 2,
+            "resolution": ["daily"] * 2,
         }
     )
     nhsn_data = pl.DataFrame(

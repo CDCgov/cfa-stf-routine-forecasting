@@ -4,6 +4,10 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+from tests.integration.generate_test_data import (
+    DEFAULT_DISEASES,
+    DEFAULT_LOCATIONS,
+)
 from tests.integration.model_test_utils import (
     EXCLUDE_LAST_N_DAYS,
     FORECAST_DIR_NAME,
@@ -16,10 +20,6 @@ from tests.integration.model_test_utils import (
     run_pyrenew,
 )
 
-from cfa.stf.routine.data.generate_test_data import (
-    DEFAULT_DISEASES,
-    DEFAULT_LOCATIONS,
-)
 from cfa.stf.routine.utils.directory_utils import parse_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     main as postprocess_batches,

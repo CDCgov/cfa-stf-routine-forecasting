@@ -30,18 +30,9 @@ def aggregate_long_to_epiweekly(
 
 
 def aggregate_nssp_to_epiweekly(data: pl.DataFrame) -> pl.DataFrame:
-    """Aggregate wide daily NSSP data to complete MMWR weeks."""
-    value_columns = ["observed_ed_visits", "other_ed_visits"]
-    id_columns = [column for column in data.columns if column not in value_columns]
-    long_data = data.unpivot(
-        on=value_columns,
-        index=id_columns,
-        variable_name=".variable",
-        value_name=".value",
-    )
+    """Aggregate long daily NSSP data to complete MMWR weeks."""
     return (
-        aggregate_long_to_epiweekly(long_data)
-        .pivot(on=".variable", index=id_columns, values=".value")
+        aggregate_long_to_epiweekly(data)
         .select(data.columns)
-        .sort("date", "state_abb")
+        .sort("date", "state_abb", ".variable")
     )

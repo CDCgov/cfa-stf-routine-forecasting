@@ -10,17 +10,17 @@ disease_names <- c("covid", "flu", "rsv")
 #'
 #' Parse the name of a model batch directory
 #' (i.e. a directory representing a single
-#' report date and disease pair, but potentially
+#' disease, lookback, and omission configuration, but potentially
 #' with fits for multiple locations), returning
 #' a named list of quantities of interest.
 #'
 #' @param model_batch_dir_path Path to the model batch
 #' directory to parse. Will parse only the basename.
-#' @return A one-row tibble containing canonical `disease`, `report_date`,
-#' `first_training_date`, and `last_training_date` values.
+#' @return A one-row tibble containing canonical `disease`, `n_training_days`,
+#' and `exclude_last_n_days` values.
 #' @export
 parse_model_batch_dir_path <- function(model_batch_dir_path) {
-  pattern <- "(.+)_r_(.+)_f_(.+)_t_(.+)"
+  pattern <- "^(.+)_lookback-([0-9]+)_omit-([0-9]+)$"
   model_batch_dir_name <- fs::path_file(model_batch_dir_path)
   matches <- stringr::str_match(
     model_batch_dir_name,
@@ -31,8 +31,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
     stop(
       "Invalid format for model batch directory name; ",
       "could not parse. Expected ",
-      "'<disease>_r_<report_date>_f_<first_training_date>_t_",
-      "<last_training_date>'."
+      "'<disease>_lookback-<n_training_days>_omit-",
+      "<exclude_last_n_days>'."
     )
   }
 
@@ -41,9 +41,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
     tibble::as_tibble(.name_repair = \(x) {
       c(
         "disease",
-        "report_date",
-        "first_training_date",
-        "last_training_date"
+        "n_training_days",
+        "exclude_last_n_days"
       )
     }) |>
     dplyr::mutate(
@@ -52,32 +51,57 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
         .data$disease,
         NA_character_
       ),
-      report_date = lubridate::ymd(.data$report_date, quiet = TRUE),
-      first_training_date = lubridate::ymd(
-        .data$first_training_date,
-        quiet = TRUE
-      ),
-      last_training_date = lubridate::ymd(
-        .data$last_training_date,
-        quiet = TRUE
-      )
+      n_training_days = as.integer(.data$n_training_days),
+      exclude_last_n_days = as.integer(.data$exclude_last_n_days)
     )
 
   if (anyNA(result)) {
     stop(
-      "Could not parse extracted disease and/or date ",
+      "Could not parse extracted disease and/or integer ",
       "values expected 'disease' to be one of 'covid', 'flu', ",
-      "or 'rsv' and all dates to be valid dates in ",
-      "YYYY-MM-DD format. Got: ",
+      "or 'rsv'. Got: ",
       glue::glue(
         "disease: {matches[2]}, ",
-        "report_date: {matches[3]}, ",
-        "first_training_date: {matches[4]}, ",
-        "last_training_date: {matches[5]}."
+        "n_training_days: {matches[3]}, ",
+        "exclude_last_n_days: {matches[4]}."
       )
     )
   }
 
+  return(result)
+}
+
+#' Parse forecast output directory name.
+#'
+#' Parse the report date from a directory named `<report_date>_forecasts`.
+#'
+#' @param forecast_output_dir_path Path to the forecast output directory.
+#' Will parse only the basename.
+#' @return A one-row tibble containing `report_date`.
+#' @export
+parse_forecast_output_dir_path <- function(forecast_output_dir_path) {
+  pattern <- "^(.+)_forecasts$"
+  forecast_output_dir_name <- fs::path_file(forecast_output_dir_path)
+  matches <- stringr::str_match(forecast_output_dir_name, pattern)
+
+  if (anyNA(matches)) {
+    stop(
+      "Invalid format for forecast output directory name; ",
+      "could not parse. Expected '<report_date>_forecasts'."
+    )
+  }
+
+  result <- tibble::tibble(
+    report_date = lubridate::ymd(matches[, 2], quiet = TRUE)
+  )
+  if (anyNA(result)) {
+    stop(
+      "Could not parse report date from forecast output directory name. ",
+      "Expected a valid date in YYYY-MM-DD format. Got: ",
+      matches[, 2],
+      "."
+    )
+  }
   return(result)
 }
 
@@ -90,18 +114,22 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #'
 #' @param model_run_dir_path Path to parse.
 #' @return A one-row tibble containing `location`, canonical `disease`,
-#' `report_date`, `first_training_date`, and `last_training_date` values.
+#' `report_date`, `n_training_days`, and `exclude_last_n_days` values.
 #'
 #' @export
 parse_model_run_dir_path <- function(model_run_dir_path) {
   batch_dir <- model_run_dir_path |>
     fs::path_dir() |>
-    fs::path_dir() |>
-    fs::path_file()
+    fs::path_dir()
 
-  batch_dir |>
+  batch_params <- batch_dir |>
     parse_model_batch_dir_path() |>
     dplyr::mutate(location = fs::path_file(model_run_dir_path))
+  forecast_params <- batch_dir |>
+    fs::path_dir() |>
+    parse_forecast_output_dir_path()
+
+  dplyr::bind_cols(batch_params, forecast_params)
 }
 
 
@@ -119,7 +147,11 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
 #' @return A vector of paths to the forecast subdirectories.
 #' @export
 get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
-  match_patterns <- stringr::str_c(diseases, "_r", collapse = "|")
+  match_pattern <- stringr::str_c(
+    "^(?:",
+    stringr::str_c(diseases, collapse = "|"),
+    ")_lookback-[0-9]+_omit-[0-9]+$"
+  )
 
   dirs <- tibble::tibble(
     dir_path = fs::dir_ls(
@@ -127,9 +159,9 @@ get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
       type = "directory"
     )
   ) |>
-    dplyr::filter(stringr::str_starts(
+    dplyr::filter(stringr::str_detect(
       fs::path_file(.data$dir_path),
-      !!match_patterns
+      !!match_pattern
     )) |>
     dplyr::pull(.data$dir_path)
 

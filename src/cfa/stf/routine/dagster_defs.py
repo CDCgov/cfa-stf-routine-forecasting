@@ -38,7 +38,6 @@ from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.utils.date_utils import calculate_training_dates
 from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
@@ -427,19 +426,10 @@ def get_model_loc_dir(
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
 
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
-    first_training_date, last_training_date = calculate_training_dates(
-        report_date=run_date,
-        n_training_days=model_base_config.n_training_days,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
-        logger=context.log,
-    )
-
     model_batch_dir_name = get_model_batch_dir_name(
         disease=disease,
-        report_date=run_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
+        n_training_days=model_base_config.n_training_days,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
     )
 
     model_loc_dir = Path(

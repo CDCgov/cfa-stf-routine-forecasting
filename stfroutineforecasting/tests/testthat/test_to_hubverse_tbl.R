@@ -17,7 +17,8 @@ raw_samples_fixture <- tibble::tibble(
 
 withr::with_tempdir({
   model_dir <- fs::path(
-    "covid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
+    "2024-02-03_forecasts",
+    "covid_lookback-150_omit-10",
     "model_runs",
     "US",
     "pyrenew_e"

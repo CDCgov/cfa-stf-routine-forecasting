@@ -87,6 +87,7 @@ class ForecastPipeline(ABC):
             disease=self.disease,
             loc=self.loc,
             report_date=self.run_date,
+            n_training_days=self.n_training_days,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
             n_forecast_days=self.n_forecast_days,

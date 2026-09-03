@@ -11,13 +11,13 @@ parse_model_batch_dir_path(model_batch_dir_path)
 directory to parse. Will parse only the basename.}
 }
 \value{
-A one-row tibble containing canonical \code{disease}, \code{report_date},
-\code{first_training_date}, and \code{last_training_date} values.
+A one-row tibble containing canonical \code{disease}, \code{n_training_days},
+and \code{exclude_last_n_days} values.
 }
 \description{
 Parse the name of a model batch directory
 (i.e. a directory representing a single
-report date and disease pair, but potentially
+disease, lookback, and omission configuration, but potentially
 with fits for multiple locations), returning
 a named list of quantities of interest.
 }

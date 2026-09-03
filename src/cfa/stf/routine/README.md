@@ -109,7 +109,7 @@ In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rath
 The resulting layout is:
 
 ```text
-<output_dir>/<disease>_r_<report>_f_<first-training>_t_<last-training>/
+<output_dir>/<disease>_lookback-<training-days>_omit-<excluded-days>/
   model_runs/<location>/<model_name>/
     data/
       combined_data.tsv
@@ -118,6 +118,9 @@ The resulting layout is:
     ci.parquet
     hubverse_table.parquet
 ```
+
+For routine runs, `<output_dir>` is named `<report-date>_forecasts`; the report date is intentionally stored at that level rather than repeated in every model batch name.
+Batch postprocessing copies collated plots to `lookback-<training-days>-omit-<excluded-days>-figures/<disease>/`.
 
 The base pipeline creates `data/`, `combined_data.tsv`, and `data_for_model_fit.json`.
 The model creates `samples.parquet`; common post-processing creates `ci.parquet`, figures, and `hubverse_table.parquet`.

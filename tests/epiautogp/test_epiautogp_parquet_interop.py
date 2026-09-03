@@ -99,7 +99,7 @@ def _write_epiautogp_input(path: Path) -> None:
 def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]:
     tmp_dir = tmp_path_factory.mktemp("epiautogp-parquet-interop")
     try:
-        batch_dir = tmp_dir / "covid_r_2024-02-03_f_2024-01-01_t_2024-02-01"
+        batch_dir = tmp_dir / "2024-02-03_forecasts" / "covid_lookback-32_omit-1"
         model_fit_dir = batch_dir / "model_runs" / "US" / "epiautogp_nssp_daily_pct"
         input_path = tmp_dir / "epiautogp-input.json"
         _write_epiautogp_input(input_path)

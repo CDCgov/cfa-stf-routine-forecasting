@@ -11,7 +11,7 @@ parse_model_run_dir_path(model_run_dir_path)
 }
 \value{
 A one-row tibble containing \code{location}, canonical \code{disease},
-\code{report_date}, \code{first_training_date}, and \code{last_training_date} values.
+\code{report_date}, \code{n_training_days}, and \code{exclude_last_n_days} values.
 }
 \description{
 Parse path to a model run directory

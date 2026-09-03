@@ -7,6 +7,7 @@ import pytest
 from tests.integration.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
+    REPORT_DATE,
 )
 from tests.integration.model_test_utils import (
     EXCLUDE_LAST_N_DAYS,
@@ -20,7 +21,6 @@ from tests.integration.model_test_utils import (
     run_pyrenew,
 )
 
-from cfa.stf.routine.utils.directory_utils import parse_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     main as postprocess_batches,
 )
@@ -144,10 +144,8 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
     for disease in DEFAULT_DISEASES:
         with _status_step(f"Checking postprocessed outputs for {disease}"):
             batch_dir = model_batch_dir(workspace, disease)
-            batch_info = parse_model_batch_dir_name(batch_dir.name)
             postprocessed_path = (
-                batch_dir
-                / f"{batch_info['report_date']}-{disease}-hubverse-table.parquet"
+                batch_dir / f"{REPORT_DATE}-{disease}-hubverse-table.parquet"
             )
             assert postprocessed_path.is_file(), (
                 f"Missing postprocessed hubverse table: {postprocessed_path}"
@@ -161,7 +159,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             copied_figures_dir = (
                 workspace
                 / FORECAST_DIR_NAME
-                / f"lookback-{N_TRAINING_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}"
+                / (f"lookback-{N_TRAINING_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}-figures")
                 / disease
             )
             assert copied_figures_dir.is_dir(), (

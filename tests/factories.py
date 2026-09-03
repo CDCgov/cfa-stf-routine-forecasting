@@ -132,6 +132,7 @@ def make_test_forecast_run(
         disease=disease,
         loc=loc,
         report_date=report_date,
+        n_training_days=n_training_days,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         n_forecast_days=n_forecast_days,

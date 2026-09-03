@@ -3,6 +3,7 @@
 export(format_timeseries_output)
 export(get_all_model_batch_dirs)
 export(load_training_data)
+export(parse_forecast_output_dir_path)
 export(parse_model_batch_dir_path)
 export(parse_model_run_dir_path)
 export(parse_variable_name)

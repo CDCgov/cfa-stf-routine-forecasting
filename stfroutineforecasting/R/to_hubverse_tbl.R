@@ -26,12 +26,13 @@ raw_samples_to_prelim <- function(samples_path) {
     prudence = "lavish"
   )
 
-  batch_params <- samples_path |>
+  forecast_params <- samples_path |>
     path_up_to("model_runs") |>
     fs::path_dir() |>
-    parse_model_batch_dir_path()
+    fs::path_dir() |>
+    parse_forecast_output_dir_path()
 
-  report_date <- batch_params$report_date
+  report_date <- forecast_params$report_date
 
   model_id <- samples_path |>
     fs::path_dir() |>

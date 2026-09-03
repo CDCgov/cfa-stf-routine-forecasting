@@ -9,6 +9,7 @@ import pytest
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     _hubverse_table_filename,
     combine_hubverse_tables,
+    model_batch_dir_to_target_path,
 )
 
 
@@ -44,8 +45,8 @@ class TestCombineHubverseTables:
 
     def _make_batch_dir(self, tmp_path: Path) -> Path:
         """Create a model batch directory with a valid name."""
-        batch_dir = tmp_path / "covid_r_2024-12-21_f_2024-09-22_t_2024-12-20"
-        batch_dir.mkdir()
+        batch_dir = tmp_path / "2024-12-21_forecasts" / "covid_lookback-90_omit-0"
+        batch_dir.mkdir(parents=True)
         return batch_dir
 
     def _write_hubverse_table(self, parent: Path, df: pl.DataFrame) -> Path:
@@ -103,3 +104,13 @@ class TestCombineHubverseTables:
         result = pl.read_parquet(output)
         assert result.shape[0] == 1
         assert result["location"][0] == "WA"
+
+
+def test_model_batch_dir_to_target_path_uses_named_parameters(tmp_path):
+    assert (
+        model_batch_dir_to_target_path(
+            "covid_lookback-150_omit-4",
+            tmp_path,
+        )
+        == tmp_path / "lookback-150-omit-4-figures" / "covid"
+    )

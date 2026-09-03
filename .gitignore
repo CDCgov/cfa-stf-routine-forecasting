@@ -395,7 +395,7 @@ private_data/*
 .vscode/settings.json
 
 # Ignore end to end test output
-/tests/end_to_end_test_output/
+/test_output/
 
 # Azure configuration files
 azureconfig.env

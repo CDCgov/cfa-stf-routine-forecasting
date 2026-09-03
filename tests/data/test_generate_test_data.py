@@ -1,10 +1,21 @@
-import polars as pl
+import datetime as dt
 
-from cfa.stf.routine.data.generate_test_data import (
+import numpy as np
+import polars as pl
+import pytest
+from tests.integration.generate_test_data import (
     FIRST_OBS_DATE,
+    HUBVERSE_NOWCAST_DIR_NAME,
     LAST_OBS_DATE,
+    REPORT_DATE,
     LocationData,
+    _make_hubverse_nowcast_rows,
     _make_nssp,
+    write_hubverse_nowcast,
+)
+
+from cfa.stf.routine.data.hubverse_nowcast import (
+    HUBVERSE_MODEL_OUTPUT_SUBDIR,
 )
 
 
@@ -45,3 +56,64 @@ def test_make_nssp_returns_location_level_cfa_stf_data_schema():
         .to_series()
         .all()
     )
+
+
+@pytest.mark.parametrize(("n_selected", "n_nowcast"), [(5, 3), (6, 4)])
+def test_hubverse_nowcasts_use_selected_nhsn_observations(n_selected, n_nowcast):
+    first_date = dt.date(2026, 7, 4)
+    selected_dates = [
+        first_date + dt.timedelta(weeks=index) for index in range(n_selected)
+    ]
+    selected_observations = pl.DataFrame(
+        {"date": selected_dates, "value": [100.0] * n_selected}
+    )
+
+    nowcasts = _make_hubverse_nowcast_rows(
+        location="CA",
+        disease="covid",
+        nhsn_observations=selected_observations,
+        rng=np.random.default_rng(12345),
+    )
+
+    assert (
+        nowcasts.get_column("target_end_date").unique().sort().to_list()
+        == (selected_dates[-n_nowcast:])
+    )
+    mean_nowcasts = (
+        nowcasts.group_by("target_end_date")
+        .agg(pl.col("value").mean())
+        .sort("target_end_date")
+        .get_column("value")
+        .to_numpy()
+    )
+    expected_means = np.linspace(101.0, 110.0, n_nowcast)
+    np.testing.assert_allclose(mean_nowcasts, expected_means, rtol=0.01)
+
+
+def test_write_hubverse_nowcast_writes_data_and_figure(tmp_path):
+    observations = pl.DataFrame(
+        {
+            "date": [
+                dt.date(2026, 7, 4) + dt.timedelta(weeks=index) for index in range(6)
+            ],
+            "value": [100.0] * 6,
+        }
+    )
+
+    write_hubverse_nowcast(
+        tmp_path,
+        disease="covid",
+        location="CA",
+        nhsn_observations=observations,
+    )
+
+    output_dir = (
+        tmp_path
+        / "private_data"
+        / HUBVERSE_NOWCAST_DIR_NAME
+        / "covid"
+        / HUBVERSE_MODEL_OUTPUT_SUBDIR
+    )
+    artifact_stem = f"{REPORT_DATE}-CFA-nowcastNHSN"
+    assert (output_dir / f"{artifact_stem}.parquet").is_file()
+    assert (output_dir / f"{artifact_stem}.png").is_file()

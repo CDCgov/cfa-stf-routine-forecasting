@@ -9,7 +9,17 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
-from matplotlib import pyplot as plt
+from plotnine import (
+    aes,
+    element_text,
+    geom_line,
+    geom_point,
+    ggplot,
+    labs,
+    scale_color_manual,
+    theme,
+    theme_minimal,
+)
 
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
@@ -402,55 +412,72 @@ def _write_hubverse_nowcast_figure(
     location: str,
 ) -> None:
     """Plot simulated nowcast trajectories over the selected NHSN reports."""
+    trajectory_label = "Simulated nowcast trajectories"
+    mean_label = "Mean simulated nowcast"
+    observation_label = "Selected NHSN observations"
     observations = nhsn_observations.select(
-        pl.col("date").cast(pl.Date),
+        pl.col("date").cast(pl.Date).alias("target_end_date"),
         pl.col("value").cast(pl.Float64),
-    ).sort("date")
-    trajectories = nowcasts.sort("output_type_id", "target_end_date").partition_by(
-        "output_type_id", maintain_order=True
-    )
+        pl.lit(observation_label).alias("series"),
+    ).sort("target_end_date")
+    trajectories = nowcasts.with_columns(pl.lit(trajectory_label).alias("series"))
     mean_nowcast = (
         nowcasts.group_by("target_end_date")
         .agg(pl.col("value").mean())
         .sort("target_end_date")
+        .with_columns(pl.lit(mean_label).alias("series"))
     )
 
-    figure, axis = plt.subplots(figsize=(9, 5))
-    for index, trajectory in enumerate(trajectories):
-        axis.plot(
-            trajectory.get_column("target_end_date"),
-            trajectory.get_column("value"),
-            color="tab:blue",
+    plot = (
+        ggplot()
+        + geom_line(
+            trajectories,
+            aes(
+                x="target_end_date",
+                y="value",
+                group="output_type_id",
+                color="series",
+            ),
             alpha=0.12,
-            linewidth=1,
-            label="Simulated nowcast trajectories" if index == 0 else None,
+            size=0.5,
         )
-    axis.plot(
-        mean_nowcast.get_column("target_end_date"),
-        mean_nowcast.get_column("value"),
-        color="tab:blue",
-        linewidth=2,
-        label="Mean simulated nowcast",
+        + geom_line(
+            mean_nowcast,
+            aes(x="target_end_date", y="value", color="series"),
+            size=1.2,
+        )
+        + geom_line(
+            observations,
+            aes(x="target_end_date", y="value", color="series"),
+            size=0.8,
+        )
+        + geom_point(
+            observations,
+            aes(x="target_end_date", y="value", color="series"),
+            size=2,
+        )
+        + scale_color_manual(
+            name=None,
+            breaks=[trajectory_label, mean_label, observation_label],
+            values={
+                trajectory_label: "tab:blue",
+                mean_label: "tab:blue",
+                observation_label: "black",
+            },
+        )
+        + labs(
+            title=f"Simulated Hubverse nowcasts: {disease}, {location}",
+            x="Target end date",
+            y="Weekly incident hospital admissions",
+        )
+        + theme_minimal()
+        + theme(
+            axis_text_x=element_text(rotation=30, ha="right"),
+            figure_size=(9, 5),
+            legend_position="bottom",
+        )
     )
-    axis.plot(
-        observations.get_column("date"),
-        observations.get_column("value"),
-        color="black",
-        marker="o",
-        linewidth=1.5,
-        label="Selected NHSN observations",
-    )
-    axis.set(
-        title=f"Simulated Hubverse nowcasts: {disease}, {location}",
-        xlabel="Target end date",
-        ylabel="Weekly incident hospital admissions",
-    )
-    axis.grid(alpha=0.2)
-    axis.legend()
-    figure.autofmt_xdate()
-    figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
-    plt.close(figure)
+    plot.save(filename=output_path, dpi=150, verbose=False)
 
 
 def write_hubverse_nowcast(

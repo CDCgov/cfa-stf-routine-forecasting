@@ -25,6 +25,7 @@ from cfa_dagster import (
     docker_executor,
     dynamic_executor,
     dynamic_graph_asset,
+    start_dev_env,
 )
 from cfa_dagster import (
     is_production as is_prod,
@@ -63,6 +64,8 @@ warnings.filterwarnings(
 user = os.getenv("DAGSTER_USER")
 
 is_production = is_prod()
+
+start_dev_env(__name__)
 
 # ============================================================================
 # RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS

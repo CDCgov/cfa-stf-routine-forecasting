@@ -10,7 +10,6 @@ from cfa.stf.routine.data.data_access import (
     NSSPData,
     SurveillanceInputs,
 )
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 
 @dataclass(frozen=True)
@@ -20,27 +19,16 @@ class ForecastRun:
     disease: str
     loc: str
     report_date: dt.date
-    batch_first_training_date: dt.date
-    batch_last_training_date: dt.date
     first_training_date: dt.date
     last_training_date: dt.date
     n_forecast_days: int
     exclude_last_n_days: int
     model_name: str
-    output_dir: Path
+    model_batch_dir: Path
     surveillance: SurveillanceInputs
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "output_dir", Path(self.output_dir))
-
-    @property
-    def model_batch_dir(self) -> Path:
-        return self.output_dir / get_model_batch_dir_name(
-            disease=self.disease,
-            report_date=self.report_date,
-            first_training_date=self.batch_first_training_date,
-            last_training_date=self.batch_last_training_date,
-        )
+        object.__setattr__(self, "model_batch_dir", Path(self.model_batch_dir))
 
     @property
     def model_run_dir(self) -> Path:

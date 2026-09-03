@@ -14,6 +14,7 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -112,14 +113,18 @@ class ForecastPipeline(ABC):
             disease=self.disease,
             loc=self.loc,
             report_date=self.run_date,
-            batch_first_training_date=batch_first_training_date,
-            batch_last_training_date=batch_last_training_date,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
             n_forecast_days=self.n_forecast_days,
             exclude_last_n_days=effective_exclude_last_n_days,
             model_name=self.model_name,
-            output_dir=self.output_dir,
+            model_batch_dir=self.output_dir
+            / get_model_batch_dir_name(
+                disease=self.disease,
+                report_date=self.run_date,
+                first_training_date=batch_first_training_date,
+                last_training_date=batch_last_training_date,
+            ),
             surveillance=surveillance,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)

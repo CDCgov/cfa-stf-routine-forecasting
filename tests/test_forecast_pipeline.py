@@ -108,14 +108,12 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         disease="covid",
         loc="CA",
         report_date=dt.date(2024, 12, 20),
-        batch_first_training_date=dt.date(2024, 9, 20),
-        batch_last_training_date=dt.date(2024, 12, 18),
         first_training_date=dt.date(2024, 9, 20),
         last_training_date=dt.date(2024, 12, 18),
         n_forecast_days=28,
         exclude_last_n_days=1,
         model_name="test_model",
-        output_dir=tmp_path,
+        model_batch_dir=(tmp_path / "covid_r_2024-12-20_f_2024-09-20_t_2024-12-18"),
         surveillance=surveillance,
     )
     assert calls["calculate"][:3] == (
@@ -203,8 +201,6 @@ def test_build_forecast_run_applies_minimum_exclusion(
 
     run = pipeline.build_forecast_run()
 
-    assert run.batch_first_training_date == expected_batch_first
-    assert run.batch_last_training_date == expected_batch_last
     assert run.first_training_date == expected_first
     assert run.last_training_date == expected_last
     assert run.exclude_last_n_days == expected_exclusion

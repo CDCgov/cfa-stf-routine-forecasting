@@ -106,8 +106,7 @@ Every subclass must implement:
 
 `ForecastRun` is the source of truth for dates, surveillance data, population, and output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
-Its `batch_first_training_date` and `batch_last_training_date` identify the caller-requested baseline window used in the shared directory name.
-Its `first_training_date`, `last_training_date`, and `exclude_last_n_days` describe the effective model window.
+Its `model_batch_dir` is based on the caller-requested baseline window, while `first_training_date`, `last_training_date`, and `exclude_last_n_days` describe the effective model window.
 These can differ when a model enforces a minimum excluded tail; `combined_data.tsv` uses the effective boundary for its `data_type` labels.
 The resulting layout is:
 

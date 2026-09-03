@@ -12,6 +12,7 @@ from cfa.stf.routine.data.data_access import (
     SurveillanceInputs,
 )
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 
@@ -141,13 +142,17 @@ def make_test_forecast_run(
         disease=disease,
         loc=loc,
         report_date=report_date,
-        batch_first_training_date=batch_first_training_date,
-        batch_last_training_date=batch_last_training_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         n_forecast_days=n_forecast_days,
         exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
-        output_dir=Path(output_dir),
+        model_batch_dir=Path(output_dir)
+        / get_model_batch_dir_name(
+            disease=disease,
+            report_date=report_date,
+            first_training_date=batch_first_training_date,
+            last_training_date=batch_last_training_date,
+        ),
         surveillance=surveillance,
     )

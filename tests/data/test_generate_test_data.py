@@ -3,8 +3,7 @@ import datetime as dt
 import numpy as np
 import polars as pl
 import pytest
-
-from cfa.stf.routine.data.generate_test_data import (
+from tests.integration.generate_test_data import (
     FIRST_OBS_DATE,
     HUBVERSE_NOWCAST_DIR_NAME,
     LAST_OBS_DATE,
@@ -14,6 +13,7 @@ from cfa.stf.routine.data.generate_test_data import (
     _make_nssp,
     write_hubverse_nowcast,
 )
+
 from cfa.stf.routine.data.hubverse_nowcast import (
     HUBVERSE_MODEL_OUTPUT_SUBDIR,
 )

@@ -9,6 +9,7 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 from cfa.stf.forecasttools import get_us_loc_pop_tbl
+from matplotlib import pyplot as plt
 
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
@@ -401,8 +402,6 @@ def _write_hubverse_nowcast_figure(
     location: str,
 ) -> None:
     """Plot simulated nowcast trajectories over the selected NHSN reports."""
-    from matplotlib import pyplot as plt
-
     observations = nhsn_observations.select(
         pl.col("date").cast(pl.Date),
         pl.col("value").cast(pl.Float64),

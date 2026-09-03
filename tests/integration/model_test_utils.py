@@ -5,15 +5,15 @@ from pathlib import Path
 
 import polars as pl
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
-
-from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
-from cfa.stf.routine._paths import PRODUCTION_PRIORS
-from cfa.stf.routine.data.data_access import DataResolution
-from cfa.stf.routine.data.generate_test_data import (
+from tests.integration.generate_test_data import (
     REPORT_DATE,
     REPORTING_DELAY_PMF,
     make_surveillance_inputs,
 )
+
+from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
+from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module

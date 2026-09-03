@@ -1,15 +1,14 @@
 import pytest
+from tests.integration.generate_test_data import (
+    HUBVERSE_N_SAMPLES,
+    HUBVERSE_NOWCAST_DIR_NAME,
+    write_hubverse_nowcast,
+)
 from tests.integration.model_test_utils import (
     assert_model_outputs,
     configure_data_mode,
     run_epiautogp,
     selected_nhsn_observations,
-)
-
-from cfa.stf.routine.data.generate_test_data import (
-    HUBVERSE_N_SAMPLES,
-    HUBVERSE_NOWCAST_DIR_NAME,
-    write_hubverse_nowcast,
 )
 
 EPIAUTOGP_CONFIGURATIONS = (

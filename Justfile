@@ -1,6 +1,6 @@
 set shell := ["bash", "-uc"]
 
-e2e_output_dir := "tests/end_to_end_test_output"
+e2e_output_dir := "test_output"
 
 default:
     @just --list
@@ -32,7 +32,7 @@ test-fable data_mode="auto" location="CA" disease="covid":
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
       --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/fable-{{disease}}-{{location}}" \
+      --e2e-output-dir "{{e2e_output_dir}}/fable" \
       --e2e-force
 
 # Test PyRenew for one disease and location and retain its output.
@@ -42,7 +42,7 @@ test-pyrenew data_mode="auto" location="CA" disease="covid":
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
       --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/pyrenew-{{disease}}-{{location}}" \
+      --e2e-output-dir "{{e2e_output_dir}}/pyrenew" \
       --e2e-force
 
 # Test EpiAutoGP for one disease and location and retain its output.
@@ -52,7 +52,7 @@ test-epiautogp data_mode="auto" location="CA" disease="covid":
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
       --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/epiautogp-{{disease}}-{{location}}" \
+      --e2e-output-dir "{{e2e_output_dir}}/epiautogp" \
       --e2e-force
 
 # Remove all retained end-to-end and single-model test outputs.

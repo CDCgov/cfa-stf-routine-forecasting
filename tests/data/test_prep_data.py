@@ -89,14 +89,26 @@ def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
         sources=("nssp",),
     )
     dates = pl.date_range(dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True)
+    variables = ("observed_ed_visits", "other_ed_visits")
+    last_training_date = dt.date(2025, 1, 11)
+    observed_ed_visits = range(1, len(dates) + 1)
+    other_ed_visits = 9
     nssp_data = pl.DataFrame(
         {
-            "date": dates,
-            "state_abb": ["CA"] * 14,
-            "observed_ed_visits": list(range(1, 15)),
-            "other_ed_visits": [9] * 14,
-            "data_type": ["train"] * 7 + ["eval"] * 7,
-            "resolution": ["daily"] * 14,
+            "date": [date for date in dates for _variable in variables],
+            "state_abb": [forecast_run.loc for _date in dates for _ in variables],
+            ".variable": list(variables) * len(dates),
+            ".value": [
+                value
+                for observed in observed_ed_visits
+                for value in (observed, other_ed_visits)
+            ],
+            "data_type": [
+                "train" if date <= last_training_date else "eval"
+                for date in dates
+                for _variable in variables
+            ],
+            "resolution": ["daily" for _date in dates for _ in variables],
         }
     )
     nssp_data = aggregate_nssp_to_epiweekly(nssp_data)

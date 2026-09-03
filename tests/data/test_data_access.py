@@ -54,18 +54,16 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
                 dt.date(2026, 1, 8),
                 dt.date(2026, 1, 7),
                 dt.date(2026, 1, 7),
-                dt.date(2026, 1, 7),
             ],
-            "state_abb": ["CA"] * 5,
+            "state_abb": ["CA"] * 4,
             "disease": [
                 "covid",
                 "total",
                 "total",
-                "flu",
                 "covid",
             ],
-            "target_type": ["inc ed visits"] * 5,
-            "value": [12, 120, 100, 8, 10],
+            "target_type": ["inc ed visits"] * 4,
+            "value": [12, 120, 100, 10],
         }
     )
     monkeypatch.setattr(
@@ -89,18 +87,18 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
 
     expected = pl.DataFrame(
         {
-            "date": [dt.date(2026, 1, 7), dt.date(2026, 1, 8)],
-            "observed_ed_visits": [10, 12],
-            "other_ed_visits": [90, 108],
-            "data_type": ["train", "eval"],
-            "resolution": ["daily", "daily"],
+            "date": [dt.date(2026, 1, 7)] * 2 + [dt.date(2026, 1, 8)] * 2,
+            ".variable": ["observed_ed_visits", "other_ed_visits"] * 2,
+            ".value": [10, 90, 12, 108],
+            "data_type": ["train"] * 2 + ["eval"] * 2,
+            "resolution": ["daily"] * 4,
         }
     )
     assert_frame_equal(
         result.data.select(
             "date",
-            "observed_ed_visits",
-            "other_ed_visits",
+            ".variable",
+            ".value",
             "data_type",
             "resolution",
         ),
@@ -116,6 +114,23 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
         "start_date": dt.date(2025, 12, 1),
         "lazy": False,
     }
+
+
+def test_normalize_nssp_data_requires_one_non_total_disease():
+    source_data = pl.DataFrame(
+        {
+            "date": [dt.date(2026, 1, 7)] * 3,
+            "state_abb": ["CA"] * 3,
+            "disease": ["covid", "flu", "total"],
+            "value": [10, 8, 100],
+        }
+    )
+
+    with pytest.raises(ValueError, match="exactly one non-total NSSP disease"):
+        data_access._normalize_nssp_data(
+            source_data,
+            last_training_date=dt.date(2026, 1, 7),
+        )
 
 
 def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
@@ -377,12 +392,12 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     nssp = data_access.NSSPData(
         data=pl.DataFrame(
             {
-                "date": [dt.date(2026, 1, 8)],
-                "state_abb": ["CA"],
-                "observed_ed_visits": [10],
-                "other_ed_visits": [90],
-                "data_type": ["eval"],
-                "resolution": ["daily"],
+                "date": [dt.date(2026, 1, 8)] * 2,
+                "state_abb": ["CA"] * 2,
+                ".variable": ["observed_ed_visits", "other_ed_visits"],
+                ".value": [10, 90],
+                "data_type": ["eval"] * 2,
+                "resolution": ["daily"] * 2,
             }
         ),
         freshness=freshness("nssp", dt.date(2026, 1, 8)),
@@ -430,16 +445,16 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     assert surveillance.loc_pop == 39_000_000
     expected_nssp = pl.DataFrame(
         {
-            "observed_ed_visits": [10],
-            "other_ed_visits": [90],
-            "data_type": ["eval"],
-            "resolution": ["daily"],
+            ".variable": ["observed_ed_visits", "other_ed_visits"],
+            ".value": [10, 90],
+            "data_type": ["eval"] * 2,
+            "resolution": ["daily"] * 2,
         }
     )
     assert_frame_equal(
         surveillance.nssp.data.select(
-            "observed_ed_visits",
-            "other_ed_visits",
+            ".variable",
+            ".value",
             "data_type",
             "resolution",
         ),
@@ -485,12 +500,12 @@ def test_load_surveillance_inputs_stores_aggregated_nssp_data(monkeypatch):
     nssp = data_access.NSSPData(
         data=pl.DataFrame(
             {
-                "date": [dt.date(2026, 1, 8)],
-                "state_abb": ["CA"],
-                "observed_ed_visits": [10],
-                "other_ed_visits": [90],
-                "data_type": ["eval"],
-                "resolution": ["daily"],
+                "date": [dt.date(2026, 1, 8)] * 2,
+                "state_abb": ["CA"] * 2,
+                ".variable": ["observed_ed_visits", "other_ed_visits"],
+                ".value": [10, 90],
+                "data_type": ["eval"] * 2,
+                "resolution": ["daily"] * 2,
             }
         ),
         freshness=_freshness("nssp"),
@@ -535,12 +550,12 @@ def test_load_surveillance_inputs_only_loads_requested_source(
     nssp = data_access.NSSPData(
         data=pl.DataFrame(
             {
-                "date": [dt.date(2026, 1, 8)],
-                "state_abb": ["CA"],
-                "observed_ed_visits": [10],
-                "other_ed_visits": [90],
-                "data_type": ["eval"],
-                "resolution": ["daily"],
+                "date": [dt.date(2026, 1, 8)] * 2,
+                "state_abb": ["CA"] * 2,
+                ".variable": ["observed_ed_visits", "other_ed_visits"],
+                ".value": [10, 90],
+                "data_type": ["eval"] * 2,
+                "resolution": ["daily"] * 2,
             }
         ),
         freshness=_freshness("nssp"),

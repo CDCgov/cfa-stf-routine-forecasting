@@ -304,33 +304,20 @@ def _epiautogp_run(tmp_path):
         model_name="test_model",
         sources=("nssp",),
     )
+    dates = pl.date_range(run.first_training_date, report_date, eager=True)
+    variables = ("observed_ed_visits", "other_ed_visits")
+    values_by_date = ((10.0, 90.0), (20.0, 80.0), (999.0, 1.0))
     nssp_data = pl.DataFrame(
-        [
-            {
-                "date": dt.date(2024, 1, 1),
-                "state_abb": "CA",
-                "data_type": "train",
-                "resolution": "daily",
-                "observed_ed_visits": 10.0,
-                "other_ed_visits": 90.0,
-            },
-            {
-                "date": dt.date(2024, 1, 2),
-                "state_abb": "CA",
-                "data_type": "train",
-                "resolution": "daily",
-                "observed_ed_visits": 20.0,
-                "other_ed_visits": 80.0,
-            },
-            {
-                "date": dt.date(2024, 1, 3),
-                "state_abb": "CA",
-                "data_type": "eval",
-                "resolution": "daily",
-                "observed_ed_visits": 999.0,
-                "other_ed_visits": 1.0,
-            },
-        ]
+        {
+            "date": date,
+            "state_abb": run.loc,
+            "data_type": "train" if date <= run.last_training_date else "eval",
+            "resolution": run.nssp.resolution,
+            ".variable": variable,
+            ".value": value,
+        }
+        for date, daily_values in zip(dates, values_by_date, strict=True)
+        for variable, value in zip(variables, daily_values, strict=True)
     )
     surveillance = replace(
         run.surveillance,

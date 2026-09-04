@@ -165,6 +165,7 @@ For daily models this often means generating `run.n_forecast_days + run.exclude_
 Fable requires at least four omitted calendar days.
 EpiAutoGP also requires at least four when it runs without a nowcast source.
 The requested baseline window continues to identify their shared batch, while the effective value controls model fitting and forecast length.
+When two model outputs are fused, a row is labeled `eval` only when both source rows are labeled `eval`; otherwise it is labeled `train`.
 
 ## 4. Add orchestration explicitly
 

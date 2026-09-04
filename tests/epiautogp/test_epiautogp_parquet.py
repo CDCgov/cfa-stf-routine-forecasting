@@ -16,14 +16,13 @@ def _write_synthetic_input(path: Path) -> None:
     dates = [start_date + dt.timedelta(days=i) for i in range(36)]
     reports = [12.0 + (i % 7) * 0.4 + i * 0.05 for i in range(len(dates))]
     input_data = {
-        "dates": [date.isoformat() for date in dates],
+        "training_dates": [date.isoformat() for date in dates],
         "reports": reports,
         "pathogen": "covid",
         "location": "US",
         "target": "nssp",
         "frequency": "daily",
         "ed_visit_type": "pct",
-        "forecast_date": dt.date(2024, 2, 6).isoformat(),
         "nowcast_dates": [],
         "nowcast_reports": [],
     }
@@ -65,18 +64,14 @@ def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
     assert samples["date"].to_list() == [
         dt.date(2024, 2, 6),
         dt.date(2024, 2, 7),
-        dt.date(2024, 2, 8),
         dt.date(2024, 2, 6),
         dt.date(2024, 2, 7),
-        dt.date(2024, 2, 8),
         dt.date(2024, 2, 6),
         dt.date(2024, 2, 7),
-        dt.date(2024, 2, 8),
         dt.date(2024, 2, 6),
         dt.date(2024, 2, 7),
-        dt.date(2024, 2, 8),
     ]
-    assert samples[".draw"].to_list() == [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]
+    assert samples[".draw"].to_list() == [1, 1, 2, 2, 3, 3, 4, 4]
     assert samples[".variable"].unique().to_list() == ["prop_disease_ed_visits"]
     assert samples["resolution"].unique().to_list() == ["daily"]
     assert samples["geo_value"].unique().to_list() == ["US"]

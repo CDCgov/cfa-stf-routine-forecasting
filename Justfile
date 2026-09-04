@@ -13,6 +13,10 @@ dagster:
 test:
     uv run pytest -m "not pipeline_e2e and not model_integration"
 
+# Update the installed R package from the local source.
+update-r-package:
+    Rscript -e 'pak::local_install("stfroutineforecasting", ask = FALSE, upgrade = FALSE)'
+
 # Run the reduced pipeline end-to-end test and retain its output in the repo.
 e2e data_mode="auto":
     #!/usr/bin/env bash

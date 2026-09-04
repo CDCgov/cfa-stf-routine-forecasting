@@ -149,7 +149,7 @@ def convert_to_epiautogp_json(
         config.frequency,
         config.ed_visit_type,
     )
-    dates, reports = _extract_model_series(
+    training_dates, training_reports = _extract_model_series(
         forecast_run=forecast_run,
         config=config,
         logger=logger,
@@ -157,17 +157,19 @@ def convert_to_epiautogp_json(
     nowcast_data = (
         NowcastData()
         if nowcast_source is None
-        else nowcast_source.get_nowcast_data(dates=dates, reports=reports)
+        else nowcast_source.get_nowcast_data(
+            dates=training_dates,
+            reports=training_reports,
+        )
     )
     model_input = {
-        "dates": [date.isoformat() for date in dates],
-        "reports": reports,
+        "training_dates": [date.isoformat() for date in training_dates],
+        "reports": training_reports,
         "pathogen": forecast_run.disease,
         "location": forecast_run.loc,
         "target": config.target,
         "frequency": config.frequency,
         "ed_visit_type": config.ed_visit_type,
-        "forecast_date": forecast_run.report_date.isoformat(),
         "nowcast_dates": [date.isoformat() for date in nowcast_data.dates],
         "nowcast_reports": nowcast_data.reports,
     }

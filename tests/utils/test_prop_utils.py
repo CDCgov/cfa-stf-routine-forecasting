@@ -217,3 +217,69 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
         }
     )
     assert_frame_equal(samples.select(expected.columns), expected, check_exact=False)
+
+
+@pytest.mark.parametrize(
+    ("other_data_type", "expected_data_type"),
+    [
+        (
+            ["train", "eval", "eval", "eval"],
+            ["train", "train", "train", "eval"],
+        ),
+        (
+            ["eval", "train", "train", "eval"],
+            ["train", "train", "train", "eval"],
+        ),
+        (
+            ["train", "train", "train", "train"],
+            ["train", "train", "train", "train"],
+        ),
+    ],
+    ids=["other-earlier", "disagreement", "other-later"],
+)
+def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
+    tmp_path,
+    other_data_type,
+    expected_data_type,
+):
+    dates = pl.date_range(dt.date(2025, 1, 1), dt.date(2025, 1, 4), eager=True)
+    num_data_type = ["train", "train", "train", "eval"]
+    num_samples = _model_frame(
+        dates,
+        [2, 3, 4, 5],
+        variable="observed_ed_visits",
+        draws=[1] * 4,
+        data_type=num_data_type,
+    )
+    other_samples = _model_frame(
+        dates,
+        [8, 7, 6, 5],
+        variable="other_ed_visits",
+        draws=[1] * 4,
+        data_type=other_data_type,
+    )
+    _write_model_outputs(
+        tmp_path / "num_model",
+        num_samples,
+        num_samples.drop(".draw"),
+    )
+    _write_model_outputs(
+        tmp_path / "other_model",
+        other_samples,
+        other_samples.drop(".draw"),
+    )
+
+    create_prop_fusion_model(
+        model_run_dir=tmp_path,
+        num_model_name="num_model",
+        other_model_name="other_model",
+        augment_other_with_obs=False,
+    )
+
+    output_dir = tmp_path / "prop_num_model_other_model"
+    samples = read_tabular(output_dir / "samples.parquet").sort("date")
+    data = read_tabular(output_dir / "data" / "combined_data.tsv").sort("date")
+    assert samples.height == 4
+    assert "data_type" not in samples.columns
+    assert data.height == 4
+    assert data.get_column("data_type").to_list() == expected_data_type

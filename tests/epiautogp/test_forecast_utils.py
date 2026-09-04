@@ -70,6 +70,18 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
         pipeline.validate_configuration()
 
 
+@pytest.mark.parametrize(
+    ("nowcast_source_name", "expected"),
+    [("none", 4), ("reporting-delay", 0), ("hubverse", 0)],
+)
+def test_pipeline_sets_minimum_exclusion_from_nowcast_mode(
+    tmp_path, nowcast_source_name, expected
+):
+    pipeline = _pipeline(tmp_path, nowcast_source_name=nowcast_source_name)
+
+    assert pipeline.minimum_exclude_last_n_days == expected
+
+
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.convert_to_epiautogp_json")
 def test_prepare_model_artifacts_resolves_nowcast_without_mutating_state(
     mock_convert,
@@ -125,6 +137,29 @@ def test_run_model_passes_prepared_input_and_model_options(
         "smc_data_proportion": 0.2,
         "n_threads": 6,
     }
+
+
+@pytest.mark.parametrize(
+    ("frequency", "expected_n_ahead"),
+    [("daily", 32), ("epiweekly", 5)],
+)
+@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")
+def test_run_model_forecasts_through_excluded_tail(
+    mock_forecast,
+    tmp_path,
+    frequency,
+    expected_n_ahead,
+):
+    pipeline = _pipeline(tmp_path, frequency=frequency)
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        model_name=pipeline.model_name,
+        exclude_last_n_days=4,
+    )
+
+    pipeline.run_model(run)
+
+    assert mock_forecast.call_args.kwargs["n_ahead"] == expected_n_ahead
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_julia_script")

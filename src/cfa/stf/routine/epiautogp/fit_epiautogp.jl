@@ -16,14 +16,13 @@ Input data structure for EpiAutoGP pipeline,
 representing the JSON input format expected by the pipeline.
 """
 struct EpiAutoGPInput
-    dates::Vector{Date}
+    training_dates::Vector{Date}
     reports::Vector{Float64}
     pathogen::String
     location::String
     target::String
     frequency::String
     ed_visit_type::String
-    forecast_date::Date
     nowcast_dates::Vector{Date}
     nowcast_reports::Vector{Vector{Float64}}
 end
@@ -138,8 +137,8 @@ end
 
 function _validate_observations(data::EpiAutoGPInput)
     _require(
-        !isempty(data.dates) && !isempty(data.reports),
-        "Empty data: dates and reports cannot be empty",
+        !isempty(data.training_dates) && !isempty(data.reports),
+        "Empty data: training_dates and reports cannot be empty",
     )
     _validate_nonnegative_finite_values(data.reports; label = "reports")
     return nothing
@@ -198,8 +197,8 @@ function prepare_for_modelling(
         n_ahead::Int,
         n_forecasts::Int,
     )
-    stable_data_idxs = findall(date -> !(date in input.nowcast_dates), input.dates)
-    stable_data_dates = input.dates[stable_data_idxs]
+    stable_data_idxs = findall(date -> !(date in input.nowcast_dates), input.training_dates)
+    stable_data_dates = input.training_dates[stable_data_idxs]
     stable_data_values = input.reports[stable_data_idxs]
 
     transformation, inv_transformation =
@@ -210,7 +209,8 @@ function prepare_for_modelling(
         create_nowcast_data(input.nowcast_reports, input.nowcast_dates; transformation)
 
     time_step = input.frequency == "epiweekly" ? Week(1) : Day(1)
-    forecast_dates = [input.forecast_date + i * time_step for i in 0:n_ahead]
+    last_training_date = input.training_dates[end]
+    forecast_dates = [last_training_date + i * time_step for i in 1:n_ahead]
 
     n_forecasts_per_nowcast = isnothing(nowcast_data) ?
         n_forecasts :

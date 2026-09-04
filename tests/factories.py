@@ -12,6 +12,7 @@ from cfa.stf.routine.data.data_access import (
     SurveillanceInputs,
 )
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 
@@ -94,6 +95,7 @@ def make_test_forecast_run(
     last_training_date: dt.date | None = None,
     n_forecast_days: int = 28,
     exclude_last_n_days: int = 0,
+    batch_exclude_last_n_days: int | None = None,
     model_name: str = "test_model",
     loc_pop: int = 1,
     nhsn_prelim: bool = False,
@@ -128,6 +130,14 @@ def make_test_forecast_run(
         nhsn_prelim=nhsn_prelim,
         sources=sources,
     )
+    if batch_exclude_last_n_days is None:
+        batch_exclude_last_n_days = exclude_last_n_days
+    batch_last_training_date = report_date - dt.timedelta(
+        days=batch_exclude_last_n_days + 1
+    )
+    batch_first_training_date = batch_last_training_date - dt.timedelta(
+        days=n_training_days - 1
+    )
     return ForecastRun(
         disease=disease,
         loc=loc,
@@ -137,6 +147,12 @@ def make_test_forecast_run(
         n_forecast_days=n_forecast_days,
         exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
-        output_dir=Path(output_dir),
+        model_batch_dir=Path(output_dir)
+        / get_model_batch_dir_name(
+            disease=disease,
+            report_date=report_date,
+            first_training_date=batch_first_training_date,
+            last_training_date=batch_last_training_date,
+        ),
         surveillance=surveillance,
     )

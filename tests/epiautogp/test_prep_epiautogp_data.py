@@ -339,7 +339,7 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
-        assert output["dates"] == ["2024-01-01", "2024-01-02"]
+        assert output["training_dates"] == ["2024-01-01", "2024-01-02"]
         assert output["reports"] == [10.0, 20.0]
         assert output["nowcast_dates"] == []
         assert output["nowcast_reports"] == []
@@ -378,7 +378,7 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
-        assert output["dates"] == [forecast_run.last_training_date.isoformat()]
+        assert output["training_dates"] == [forecast_run.last_training_date.isoformat()]
         assert output["reports"] == [5.0]
 
     def test_rejects_mismatched_nssp_resolution(self, tmp_path):

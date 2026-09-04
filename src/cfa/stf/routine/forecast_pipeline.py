@@ -14,6 +14,7 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -61,17 +62,42 @@ class ForecastPipeline(ABC):
         """Resolution to use for serialized ED-visit inputs."""
         return "daily"
 
+    @property
+    def minimum_exclude_last_n_days(self) -> int:
+        """Minimum recent calendar days to exclude from model training."""
+        return 0
+
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        first_training_date, last_training_date = calculate_training_dates(
+        batch_first_training_date, batch_last_training_date = calculate_training_dates(
             self.run_date,
             self.n_training_days,
             self.exclude_last_n_days,
             self.logger,
         )
+        effective_exclude_last_n_days = max(
+            self.exclude_last_n_days,
+            self.minimum_exclude_last_n_days,
+        )
+        if effective_exclude_last_n_days == self.exclude_last_n_days:
+            first_training_date = batch_first_training_date
+            last_training_date = batch_last_training_date
+        else:
+            first_training_date, last_training_date = calculate_training_dates(
+                self.run_date,
+                self.n_training_days,
+                effective_exclude_last_n_days,
+                self.logger,
+            )
+            self.logger.info(
+                "Increasing excluded training tail from %s to %s days for model %s.",
+                self.exclude_last_n_days,
+                effective_exclude_last_n_days,
+                self.model_name,
+            )
         surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
@@ -90,9 +116,15 @@ class ForecastPipeline(ABC):
             first_training_date=first_training_date,
             last_training_date=last_training_date,
             n_forecast_days=self.n_forecast_days,
-            exclude_last_n_days=self.exclude_last_n_days,
+            exclude_last_n_days=effective_exclude_last_n_days,
             model_name=self.model_name,
-            output_dir=self.output_dir,
+            model_batch_dir=self.output_dir
+            / get_model_batch_dir_name(
+                disease=self.disease,
+                report_date=self.run_date,
+                first_training_date=batch_first_training_date,
+                last_training_date=batch_last_training_date,
+            ),
             surveillance=surveillance,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)

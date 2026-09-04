@@ -46,19 +46,27 @@ def create_prop_fusion_model(
         ]
         return data.select(populated_columns)
 
-    num_samples = read_model_output(num_model_name, num_var_name, "samples.parquet")
+    num_samples = read_model_output(
+        num_model_name, num_var_name, "samples.parquet"
+    ).drop("data_type", strict=False)
     other_samples = read_model_output(
         other_model_name, other_var_name, "samples.parquet"
-    )
+    ).drop("data_type", strict=False)
     num_data = read_model_output(num_model_name, num_var_name, "data/combined_data.tsv")
     other_data = read_model_output(
         other_model_name, other_var_name, "data/combined_data.tsv"
     )
 
     if augment_num_with_obs:
-        num_samples = augment_samples_with_observations(num_samples, num_data)
+        num_samples = augment_samples_with_observations(
+            num_samples,
+            num_data.drop("data_type"),
+        )
     if augment_other_with_obs:
-        other_samples = augment_samples_with_observations(other_samples, other_data)
+        other_samples = augment_samples_with_observations(
+            other_samples,
+            other_data.drop("data_type"),
+        )
     if aggregate_num:
         num_samples = aggregate_long_to_epiweekly(num_samples, value_col=num_var_name)
         num_data = aggregate_long_to_epiweekly(num_data, value_col=num_var_name)
@@ -75,12 +83,27 @@ def create_prop_fusion_model(
         other_val_col=other_var_name,
         prop_var=prop_var_name,
     ).sort("date", ".draw")
-    prop_data = create_proportions(
-        numerator_df=num_data,
-        other_df=other_data,
-        num_val_col=num_var_name,
-        other_val_col=other_var_name,
-        prop_var=prop_var_name,
+    prop_data = (
+        create_proportions(
+            numerator_df=num_data.rename({"data_type": "num_data_type"}),
+            other_df=other_data.rename({"data_type": "other_data_type"}),
+            num_val_col=num_var_name,
+            other_val_col=other_var_name,
+            prop_var=prop_var_name,
+        )
+        .with_columns(
+            pl.when(
+                (pl.col("num_data_type") == "eval")
+                & (pl.col("other_data_type") == "eval")
+            )
+            .then(pl.lit("eval"))
+            .otherwise(pl.lit("train"))
+            .alias("data_type")
+        )
+        .drop(
+            "num_data_type",
+            "other_data_type",
+        )
     )
 
     def aggregated_model_name(model_name: str, aggregate: bool) -> str:

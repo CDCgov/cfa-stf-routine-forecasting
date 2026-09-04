@@ -60,9 +60,10 @@ class FablePipeline(ForecastPipeline):
         return 4
 
     def run_model(self, run: ForecastRun) -> None:
-        n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days
-        if self.ed_visit_input_resolution == "epiweekly":
-            n_days_past_last_training = (n_days_past_last_training // 7) * 7
+        forecast_step_days = 7 if self.ed_visit_input_resolution == "epiweekly" else 1
+        n_days_past_last_training = (
+            (run.n_forecast_days + run.exclude_last_n_days) // forecast_step_days
+        ) * forecast_step_days
         self.logger.info("Performing fable E-other forecasting")
         fable_e_other_forecasts(
             run.model_dir,

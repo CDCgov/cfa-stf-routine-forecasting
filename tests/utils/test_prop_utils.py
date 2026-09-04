@@ -235,9 +235,9 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
             ["train", "train", "train", "train"],
         ),
     ],
-    ids=["numerator-latest", "numerator-tie-break", "other-latest"],
+    ids=["other-earlier", "disagreement", "other-later"],
 )
-def test_create_prop_fusion_model_uses_most_recent_training_boundary(
+def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
     tmp_path,
     other_data_type,
     expected_data_type,

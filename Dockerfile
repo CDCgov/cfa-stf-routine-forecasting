@@ -87,7 +87,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Project files
 COPY src ./src
 COPY README.md ./README.md
-COPY dagster_defs.py ./dagster_defs.py
 
 # Install the local project now that its sources are present
 RUN --mount=type=cache,target=/root/.cache/uv \

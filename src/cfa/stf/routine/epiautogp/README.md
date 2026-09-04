@@ -38,6 +38,8 @@ Nowcast modes are:
 - `reporting-delay`: inflate the recent tail of a count series using a reporting-delay PMF;
 - `hubverse`: read probabilistic NHSN trajectories from one materialized `model-output/CFA-nowcastNHSN/*.parquet` artifact.
 
+Forecasts begin at the next model time point after the final training observation: the next calendar day for daily inputs or the next epiweek for epiweekly inputs.
+
 ## Files
 
 - `forecast_epiautogp.py`: pipeline subclass, nowcast-source resolution, and Julia invocation.

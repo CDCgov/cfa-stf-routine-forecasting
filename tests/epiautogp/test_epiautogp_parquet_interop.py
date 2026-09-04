@@ -81,14 +81,14 @@ def _write_epiautogp_input(path: Path) -> None:
     dates = [start_date + dt.timedelta(days=i) for i in range(36)]
     reports = [12.0 + (i % 7) * 0.4 + i * 0.05 for i in range(len(dates))]
     input_data = {
-        "dates": [date.isoformat() for date in dates],
+        "training_dates": [date.isoformat() for date in dates],
         "reports": reports,
         "pathogen": "covid",
         "location": "US",
         "target": "nssp",
         "frequency": "daily",
         "ed_visit_type": "pct",
-        "forecast_date": FORECAST_DATES[0].isoformat(),
+        "first_forecast_date": FORECAST_DATES[0].isoformat(),
         "nowcast_dates": [],
         "nowcast_reports": [],
     }

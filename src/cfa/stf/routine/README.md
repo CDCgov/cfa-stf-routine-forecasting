@@ -161,7 +161,7 @@ Keeping those methods common preserves data freshness checks and compatible outp
 `run_model()` is responsible for any native-output conversion needed to leave a standardized `samples.parquet` for publishing.
 
 When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
-For daily models this often means generating `run.n_forecast_days + run.exclude_last_n_days` days from the last training date; see the Fable and PyRenew implementations.
+For daily models this often means generating `run.n_forecast_days + run.exclude_last_n_days` days from the last training date; see the Fable, PyRenew, and EpiAutoGP implementations.
 Fable requires at least four omitted calendar days.
 EpiAutoGP also requires at least four when it runs without a nowcast source.
 The requested baseline window continues to identify their shared batch, while the effective value controls model fitting and forecast length.

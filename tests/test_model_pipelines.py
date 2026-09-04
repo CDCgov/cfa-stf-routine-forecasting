@@ -10,9 +10,16 @@ from cfa.stf.routine.pyrenew_hew.model_inputs import PyRenewModelInputs
 from tests.factories import make_test_forecast_run
 
 
-def _run(tmp_path, *, model_name="test_model", exclude_last_n_days=2):
+def _run(
+    tmp_path,
+    *,
+    model_name="test_model",
+    n_forecast_days=28,
+    exclude_last_n_days=2,
+):
     return make_test_forecast_run(
         output_dir=tmp_path,
+        n_forecast_days=n_forecast_days,
         exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
     )
@@ -45,16 +52,42 @@ def test_fable_pipeline_declares_ed_visit_input_resolution(tmp_path, resolution)
 
 
 @patch("cfa.stf.routine.fable.forecast_fable.fable_e_other_forecasts")
-def test_fable_pipeline_forecasts_through_excluded_tail(mock_forecast, tmp_path):
+@pytest.mark.parametrize(
+    (
+        "resolution",
+        "n_forecast_days",
+        "exclude_last_n_days",
+        "expected_forecast_days",
+    ),
+    [("daily", 28, 2, 30), ("epiweekly", 14, 4, 14)],
+)
+def test_fable_pipeline_forecasts_through_excluded_tail(
+    mock_forecast,
+    tmp_path,
+    resolution,
+    n_forecast_days,
+    exclude_last_n_days,
+    expected_forecast_days,
+):
     pipeline = FablePipeline(
         **_common_kwargs(tmp_path),
         n_samples=10,
+        ed_visit_input_resolution=resolution,
     )
-    run = _run(tmp_path, model_name=pipeline.model_name)
+    run = _run(
+        tmp_path,
+        model_name=pipeline.model_name,
+        n_forecast_days=n_forecast_days,
+        exclude_last_n_days=exclude_last_n_days,
+    )
 
     pipeline.run_model(run)
 
-    mock_forecast.assert_called_once_with(run.model_dir, 30, 10)
+    mock_forecast.assert_called_once_with(
+        run.model_dir,
+        expected_forecast_days,
+        10,
+    )
 
 
 def _pyrenew_pipeline(tmp_path, **overrides):

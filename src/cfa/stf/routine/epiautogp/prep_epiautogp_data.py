@@ -162,8 +162,6 @@ def convert_to_epiautogp_json(
             reports=training_reports,
         )
     )
-    forecast_step_days = 7 if config.frequency == "epiweekly" else 1
-    first_forecast_date = training_dates[-1] + dt.timedelta(days=forecast_step_days)
     model_input = {
         "training_dates": [date.isoformat() for date in training_dates],
         "reports": training_reports,
@@ -172,7 +170,6 @@ def convert_to_epiautogp_json(
         "target": config.target,
         "frequency": config.frequency,
         "ed_visit_type": config.ed_visit_type,
-        "first_forecast_date": first_forecast_date.isoformat(),
         "nowcast_dates": [date.isoformat() for date in nowcast_data.dates],
         "nowcast_reports": nowcast_data.reports,
     }

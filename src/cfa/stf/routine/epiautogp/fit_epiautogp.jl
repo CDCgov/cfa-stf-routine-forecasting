@@ -23,7 +23,6 @@ struct EpiAutoGPInput
     target::String
     frequency::String
     ed_visit_type::String
-    first_forecast_date::Date
     nowcast_dates::Vector{Date}
     nowcast_reports::Vector{Vector{Float64}}
 end
@@ -210,7 +209,8 @@ function prepare_for_modelling(
         create_nowcast_data(input.nowcast_reports, input.nowcast_dates; transformation)
 
     time_step = input.frequency == "epiweekly" ? Week(1) : Day(1)
-    forecast_dates = [input.first_forecast_date + i * time_step for i in 0:n_ahead]
+    last_training_date = input.training_dates[end]
+    forecast_dates = [last_training_date + i * time_step for i in 1:n_ahead]
 
     n_forecasts_per_nowcast = isnothing(nowcast_data) ?
         n_forecasts :

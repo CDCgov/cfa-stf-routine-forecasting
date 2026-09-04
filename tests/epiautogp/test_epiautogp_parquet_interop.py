@@ -78,7 +78,7 @@ def _skip_if_r_packages_missing(*packages: str) -> None:
 
 def _write_epiautogp_input(path: Path) -> None:
     start_date = dt.date(2024, 1, 1)
-    dates = [start_date + dt.timedelta(days=i) for i in range(36)]
+    dates = [start_date + dt.timedelta(days=i) for i in range(34)]
     reports = [12.0 + (i % 7) * 0.4 + i * 0.05 for i in range(len(dates))]
     input_data = {
         "training_dates": [date.isoformat() for date in dates],
@@ -88,7 +88,6 @@ def _write_epiautogp_input(path: Path) -> None:
         "target": "nssp",
         "frequency": "daily",
         "ed_visit_type": "pct",
-        "first_forecast_date": FORECAST_DATES[0].isoformat(),
         "nowcast_dates": [],
         "nowcast_reports": [],
     }
@@ -110,7 +109,7 @@ def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]
                 [
                     f"--json-input={input_path}",
                     f"--output-dir={model_fit_dir}",
-                    "--n-ahead=1",
+                    "--n-ahead=2",
                     "--n-particles=2",
                     "--n-mcmc=1",
                     "--n-hmc=1",

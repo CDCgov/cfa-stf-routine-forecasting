@@ -600,7 +600,7 @@ epiautogp_64cpu_sensor = dg.AutomationConditionSensorDefinition(
 
 
 @dg.asset(group_name="EpiAutoGP", partitions_def=daily_partitions_def)
-def upstream_to_64():
+def upstream_to_epiautogp():
     return
 
 
@@ -609,7 +609,7 @@ def upstream_to_64():
     automation_condition=dg.AutomationCondition.eager(),
     partitions_def=daily_partitions_def,
 )
-def downstream_64(upstream_to_64):
+def downstream_epiautogp_64(upstream_to_epiautogp):
     return
 
 

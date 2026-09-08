@@ -595,13 +595,21 @@ epiautogp_64cpu_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=True,
 )
 
+# Dummy assets for testing the new sensor and azure batch config
+# that submit jobs to a 64cpu pool
+
+
+@dg.asset(group_name="EpiAutoGP", partitions_def=daily_partitions_def)
+def upstream_to_64():
+    return
+
 
 @dg.asset(
     group_name="EpiAutoGP",
-    automation_condition=dg.AutomationCondition.on_missing(),
+    automation_condition=dg.AutomationCondition.eager(),
     partitions_def=daily_partitions_def,
 )
-def dummy_64():
+def downstream_64(upstream_to_64):
     return
 
 

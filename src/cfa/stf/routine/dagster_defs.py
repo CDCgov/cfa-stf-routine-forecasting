@@ -181,7 +181,17 @@ _azure_batch_shared_config = {
     },
 }
 
-azure_batch_execution_config = ExecutionConfig(
+azure_batch_2cpu_execution_config = ExecutionConfig(
+    executor=SelectorConfig(
+        class_name=azure_batch_executor.__name__,
+        config={
+            "pool_name": "stf-routine-forecasting-pool-2-cpu",
+            **_azure_batch_shared_config,
+        },
+    ),
+)
+
+azure_batch_4cpu_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
@@ -575,42 +585,35 @@ class IsWeekday(dg.AutomationCondition):
         return f"is_{days[self.weekday].lower()}"
 
 
-weekly_forecast_initial_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastInitial",
-    target=dg.AssetSelection.groups("WeeklyForecastInitial"),
+weekly_fable_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyFable",
+    target=dg.AssetSelection.groups("WeeklyFable"),
+    run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
-weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastFusion",
-    target=dg.AssetSelection.groups("WeeklyForecastFusion"),
+weekly_pyrenew_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyPyrenew",
+    target=dg.AssetSelection.groups("WeeklyPyrenew"),
+    run_tags=azure_batch_4cpu_execution_config.to_run_tags(),
+    use_user_code_server=True,  # allows for custom automation conditions
+)
+
+weekly_fusion_sensor = dg.AutomationConditionSensorDefinition(
+    name="WeeklyFusion",
+    target=dg.AssetSelection.groups("WeeklyFusion"),
+    run_tags=azure_batch_4cpu_execution_config.to_run_tags(),
     use_user_code_server=False,  # does NOT allow custom conditions
 )
 
 epiautogp_64cpu_sensor = dg.AutomationConditionSensorDefinition(
     name="EpiAutoGP_64cpu",
+    # add a group_name="EpiAutoGP" to an epiautogp asset to include it
+    # in the rules and configuration this sensor provides
     target=dg.AssetSelection.groups("EpiAutoGP"),
     run_tags=azure_batch_64cpu_execution_config.to_run_tags(),
-    default_condition=dg.AutomationCondition.eager(),
     use_user_code_server=True,
 )
-
-# Dummy assets for testing the new sensor and azure batch config
-# that submit jobs to a 64cpu pool
-
-
-@dg.asset(group_name="EpiAutoGP", partitions_def=daily_partitions_def)
-def upstream_to_epiautogp():
-    return
-
-
-@dg.asset(
-    group_name="EpiAutoGP",
-    automation_condition=dg.AutomationCondition.eager(),
-    partitions_def=daily_partitions_def,
-)
-def downstream_epiautogp_64(upstream_to_epiautogp):
-    return
 
 
 # ---------- Shared Asset Decorator Arguments ----------
@@ -619,14 +622,14 @@ def downstream_epiautogp_64(upstream_to_epiautogp):
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
 
-weekly_forecast_base_asset_args = {
+weekly_base_args = {
     "partitions_def": daily_partitions_def,
     "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
 }
 
-weekly_forecast_initial_asset_args = {
-    **weekly_forecast_base_asset_args,
-    "group_name": "WeeklyForecastInitial",
+weekly_fable_args = {
+    **weekly_base_args,
+    "group_name": "WeeklyFable",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
         # 0=monday,1=tuesday,2=wednesday,etc.
@@ -635,9 +638,20 @@ weekly_forecast_initial_asset_args = {
     ).with_label("eager_on_wed"),
 }
 
-weekly_forecast_fusion_asset_args = {
-    **weekly_forecast_base_asset_args,
-    "group_name": "WeeklyForecastFusion",
+weekly_pyrenew_args = {
+    **weekly_base_args,
+    "group_name": "WeeklyPyrenew",
+    "automation_condition": (
+        # We specifically don't want these to run unless it's Wednesday
+        # 0=monday,1=tuesday,2=wednesday,etc.
+        # Note this is different from cron which is 1-indexed
+        dg.AutomationCondition.eager() & IsWeekday(2)
+    ).with_label("eager_on_wed"),
+}
+
+weekly_fusion_args = {
+    **weekly_base_args,
+    "group_name": "WeeklyFusion",
     # we want vanilla eager for the fusion assets
     "automation_condition": dg.AutomationCondition.eager(),
 }
@@ -674,7 +688,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 
 # Fable E Other
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_fable_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -693,7 +707,7 @@ def fable_e_other(
 
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_fable_args,
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -712,7 +726,7 @@ def epiweekly_fable_e_other(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_pyrenew_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -729,7 +743,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_pyrenew_args,
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -745,7 +759,7 @@ def pyrenew_h(
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **weekly_pyrenew_args,
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -765,7 +779,7 @@ def pyrenew_he(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **weekly_fusion_args,
     ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -783,7 +797,7 @@ def fuse_pyrenew_e_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **weekly_fusion_args,
     ins={
         "pyrenew_e": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
@@ -804,7 +818,7 @@ def fuse_pyrenew_e_ts_epiweekly(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **weekly_fusion_args,
     ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=HE_DATA_RERUN_TAGS,
 )
@@ -822,7 +836,7 @@ def fuse_pyrenew_he_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **weekly_fusion_args,
     ins={
         "pyrenew_he": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
@@ -865,7 +879,7 @@ def fuse_pyrenew_he_ts_epiweekly(
         )
     ).with_label("postprocess_custom_eager"),
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
-    group_name="WeeklyForecastFusion",
+    group_name="WeeklyFusion",  # included with the fusion assets
     tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(
@@ -962,7 +976,7 @@ def e2e_config() -> dg.RunConfig:
                 locations=GraphDimension(E2E_LOCATIONS)
             ),
         },
-        execution=azure_batch_execution_config.to_run_config(),
+        execution=azure_batch_4cpu_execution_config.to_run_config(),
     )
 
 
@@ -972,7 +986,7 @@ def e2e_json() -> str:
 
 end_to_end = dg.define_asset_job(
     name="end_to_end",
-    selection=dg.AssetSelection.groups("WeeklyForecastInitial", "WeeklyForecastFusion"),
+    selection=dg.AssetSelection.groups("WeeklyFable", "WeeklyPyrenew", "WeeklyFusion"),
     config=e2e_config(),
 )
 
@@ -1123,13 +1137,15 @@ defs = dg.Definitions(
         "w_model_exclusions": WModelExclusions(),
     },
     executor=dynamic_executor(
-        default_config=azure_batch_execution_config,
+        default_config=azure_batch_4cpu_execution_config,
         # default_config=basic_execution_config,
         # default_config=docker_execution_config,
         alternate_configs=[
             basic_execution_config,
             docker_execution_config,
-            azure_batch_execution_config,
+            azure_batch_2cpu_execution_config,
+            azure_batch_4cpu_execution_config,
+            azure_batch_64cpu_execution_config,
         ],
     ),
 )

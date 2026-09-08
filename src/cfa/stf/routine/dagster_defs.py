@@ -161,27 +161,42 @@ docker_execution_config = ExecutionConfig(
 )
 
 # Cloud execution. This is what we want for any model run.
+# Shared config for all Azure Batch pools; only pool_name differs between them.
+_azure_batch_shared_config = {
+    **(
+        {}
+        if is_production  # image will come from the code location in prod
+        else {"image": image}
+    ),
+    "container_kwargs": {
+        "volumes": [
+            # bind the ~/.azure folder for optional cli login
+            # f"/home/{user}/.azure:/root/.azure",
+            # bind current file so we don't have to rebuild
+            # the container image for workflow changes
+            # Azure blob output mounts
+        ]
+        + azure_blob_mounts,
+        "working_dir": f"{container_workdir}",
+    },
+}
+
 azure_batch_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
             "pool_name": "stf-routine-forecasting-pool",
-            **(
-                {}
-                if is_production  # image will come from the code location in prod
-                else {"image": image}
-            ),
-            "container_kwargs": {
-                "volumes": [
-                    # bind the ~/.azure folder for optional cli login
-                    # f"/home/{user}/.azure:/root/.azure",
-                    # bind current file so we don't have to rebuild
-                    # the container image for workflow changes
-                    # Azure blob output mounts
-                ]
-                + azure_blob_mounts,
-                "working_dir": f"{container_workdir}",
-            },
+            **_azure_batch_shared_config,
+        },
+    ),
+)
+
+azure_batch_64cpu_execution_config = ExecutionConfig(
+    executor=SelectorConfig(
+        class_name=azure_batch_executor.__name__,
+        config={
+            "pool_name": "stf-routine-forecasting-pool-64-cpu",
+            **_azure_batch_shared_config,
         },
     ),
 )
@@ -571,6 +586,24 @@ weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
     target=dg.AssetSelection.groups("WeeklyForecastFusion"),
     use_user_code_server=False,  # does NOT allow custom conditions
 )
+
+epiautogp_64cpu_sensor = dg.AutomationConditionSensorDefinition(
+    name="EpiAutoGP_64cpu",
+    target=dg.AssetSelection.groups("EpiAutoGP"),
+    run_tags=azure_batch_64cpu_execution_config.to_run_tags(),
+    default_condition=dg.AutomationCondition.eager(),
+    use_user_code_server=True,
+)
+
+
+@dg.asset(
+    group_name="EpiAutoGP",
+    automation_condition=dg.AutomationCondition.on_missing(),
+    partitions_def=daily_partitions_def,
+)
+def dummy_64():
+    return
+
 
 # ---------- Shared Asset Decorator Arguments ----------
 

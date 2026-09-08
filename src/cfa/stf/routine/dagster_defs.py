@@ -192,7 +192,7 @@ azure_batch_execution_config = ExecutionConfig(
 # ============================================================================
 
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
-SUPPORTED_DISEASES = ["covid"]
+SUPPORTED_DISEASES = ["covid", "flu", "rsv"]
 
 # Disease dimensions
 DISEASES = SUPPORTED_DISEASES
@@ -314,7 +314,7 @@ class PostProcessConfig(dg.Config):
     skip_existing: bool = False
     save_local_copy: bool = False
     local_copy_dir: str = ""  # "stf_forecast_fig_share"
-    postprocess_diseases: list[str] = ["covid"]
+    postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
 
 
 # ============================================================================

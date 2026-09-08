@@ -602,7 +602,7 @@ weekly_pyrenew_sensor = dg.AutomationConditionSensorDefinition(
 weekly_fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="WeeklyFusion",
     target=dg.AssetSelection.groups("WeeklyFusion"),
-    run_tags=azure_batch_4cpu_execution_config.to_run_tags(),
+    run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=False,  # does NOT allow custom conditions
 )
 

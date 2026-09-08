@@ -622,7 +622,7 @@ epiautogp_64cpu_sensor = dg.AutomationConditionSensorDefinition(
 # partitions, graph_dimensions, automation conditions, and asset groups
 # The only thing that differs between them are their dependencies
 
-weekly_base_args = {
+weekly_common_args = {
     "partitions_def": daily_partitions_def,
     "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
     "automation_condition": (
@@ -634,7 +634,7 @@ weekly_base_args = {
 }
 
 weekly_fusion_args = {
-    **weekly_base_args,
+    **weekly_common_args,
     "group_name": "WeeklyFusion",
     # we want vanilla eager for the fusion assets
     "automation_condition": dg.AutomationCondition.eager(),
@@ -672,7 +672,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 
 # Fable E Other
 @dynamic_graph_asset(
-    **weekly_base_args,
+    **weekly_common_args,
     group_name="WeeklyFable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -692,7 +692,7 @@ def fable_e_other(
 
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
-    **weekly_base_args,
+    **weekly_common_args,
     group_name="WeeklyFable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -712,7 +712,7 @@ def epiweekly_fable_e_other(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_base_args,
+    **weekly_common_args,
     group_name="WeeklyPyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
@@ -730,7 +730,7 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_base_args,
+    **weekly_common_args,
     group_name="WeeklyPyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -747,7 +747,7 @@ def pyrenew_h(
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_base_args,
+    **weekly_common_args,
     group_name="WeeklyPyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),

@@ -625,22 +625,6 @@ epiautogp_64cpu_sensor = dg.AutomationConditionSensorDefinition(
 weekly_base_args = {
     "partitions_def": daily_partitions_def,
     "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
-}
-
-weekly_fable_args = {
-    **weekly_base_args,
-    "group_name": "WeeklyFable",
-    "automation_condition": (
-        # We specifically don't want these to run unless it's Wednesday
-        # 0=monday,1=tuesday,2=wednesday,etc.
-        # Note this is different from cron which is 1-indexed
-        dg.AutomationCondition.eager() & IsWeekday(2)
-    ).with_label("eager_on_wed"),
-}
-
-weekly_pyrenew_args = {
-    **weekly_base_args,
-    "group_name": "WeeklyPyrenew",
     "automation_condition": (
         # We specifically don't want these to run unless it's Wednesday
         # 0=monday,1=tuesday,2=wednesday,etc.
@@ -688,7 +672,8 @@ nhsn_hrd_prelim = dg.AssetSpec(
 
 # Fable E Other
 @dynamic_graph_asset(
-    **weekly_fable_args,
+    **weekly_base_args,
+    group_name="WeeklyFable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -707,7 +692,8 @@ def fable_e_other(
 
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
-    **weekly_fable_args,
+    **weekly_base_args,
+    group_name="WeeklyFable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -726,7 +712,8 @@ def epiweekly_fable_e_other(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_pyrenew_args,
+    **weekly_base_args,
+    group_name="WeeklyPyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -743,7 +730,8 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_pyrenew_args,
+    **weekly_base_args,
+    group_name="WeeklyPyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -759,7 +747,8 @@ def pyrenew_h(
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_pyrenew_args,
+    **weekly_base_args,
+    group_name="WeeklyPyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),

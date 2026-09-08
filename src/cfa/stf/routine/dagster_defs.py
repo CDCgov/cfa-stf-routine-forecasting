@@ -185,7 +185,7 @@ azure_batch_2cpu_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "stf-routine-forecasting-pool-2-cpu",
+            "pool_name": "stf-routine-2cpu",
             **_azure_batch_shared_config,
         },
     ),
@@ -195,7 +195,7 @@ azure_batch_4cpu_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "stf-routine-forecasting-pool",
+            "pool_name": "stf-routine-4cpu",
             **_azure_batch_shared_config,
         },
     ),
@@ -205,7 +205,7 @@ azure_batch_64cpu_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "stf-routine-forecasting-pool-64-cpu",
+            "pool_name": "stf-routine-64cpu",
             **_azure_batch_shared_config,
         },
     ),

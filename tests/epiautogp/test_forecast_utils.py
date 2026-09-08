@@ -31,8 +31,7 @@ def _pipeline(tmp_path, **overrides):
         "frequency": "daily",
         "ed_visit_type": "observed",
         "output_dir": tmp_path,
-        "n_training_days": 90,
-        "n_forecast_days": 28,
+        "n_lookback_days": 90,
         "run_date": dt.date(2024, 12, 20),
         "logger": logging.getLogger("test-epiautogp-pipeline"),
     }

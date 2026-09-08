@@ -22,8 +22,7 @@ from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
-N_TRAINING_DAYS = 42
-N_FORECAST_DAYS = 14
+N_LOOKBACK_DAYS = 42
 EXCLUDE_LAST_N_DAYS = 1
 MOCK_DATA_MODE = "mock"
 REAL_DATA_MODE = "real"
@@ -132,7 +131,7 @@ def selected_nhsn_observations(
     logger = logging.getLogger(__name__)
     first_training_date, last_training_date = calculate_training_dates(
         REPORT_DATE,
-        N_TRAINING_DAYS,
+        N_LOOKBACK_DAYS,
         EXCLUDE_LAST_N_DAYS,
         logger,
     )
@@ -172,8 +171,7 @@ def run_fable(
         disease=disease,
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
-        n_training_days=N_TRAINING_DAYS,
-        n_forecast_days=N_FORECAST_DAYS,
+        n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
         run_date=REPORT_DATE,
@@ -194,8 +192,7 @@ def run_pyrenew(
         loc=location,
         priors_path=PRODUCTION_PRIORS,
         output_dir=workspace / FORECAST_DIR_NAME,
-        n_training_days=N_TRAINING_DAYS,
-        n_forecast_days=N_FORECAST_DAYS,
+        n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_chains=1,
         n_samples=40,
@@ -224,8 +221,7 @@ def run_epiautogp(
         run_date=REPORT_DATE,
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
-        n_training_days=N_TRAINING_DAYS,
-        n_forecast_days=N_FORECAST_DAYS,
+        n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         target=target,
         frequency=frequency,
@@ -242,7 +238,9 @@ def run_epiautogp(
 
 
 def model_batch_dir(workspace: Path, disease: str) -> Path:
-    candidates = list((workspace / FORECAST_DIR_NAME).glob(f"{disease}_r_*"))
+    candidates = list(
+        (workspace / FORECAST_DIR_NAME).glob(f"{disease}_lookback-*_omit-*")
+    )
     assert len(candidates) == 1, (
         f"Expected one batch directory for {disease}, "
         f"found {len(candidates)} in {workspace / FORECAST_DIR_NAME}"

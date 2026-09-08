@@ -3,6 +3,8 @@
 import datetime as dt
 import logging
 
+from cfa.stf.forecasttools import ceiling_mmwr_epiweek
+
 
 def _parse_single_date(date_str: str) -> tuple[dt.date, dt.date]:
     """Parse a single date string into a one-day date range."""
@@ -63,23 +65,28 @@ def parse_exclude_date_ranges(
 
 def calculate_training_dates(
     report_date: dt.date,
-    n_training_days: int,
+    n_lookback_days: int,
     exclude_last_n_days: int,
     logger: logging.Logger,
 ) -> tuple[dt.date, dt.date]:
-    """Calculate the inclusive first and last dates in a training window."""
+    """Calculate training dates within a report-date-anchored lookback window."""
+    if n_lookback_days <= 0:
+        raise ValueError("n_lookback_days must be positive.")
+    if exclude_last_n_days < 0:
+        raise ValueError("exclude_last_n_days must be nonnegative.")
+    if exclude_last_n_days >= n_lookback_days:
+        raise ValueError("exclude_last_n_days must be less than n_lookback_days.")
+
+    first_training_date = report_date - dt.timedelta(days=n_lookback_days)
     # Add one because the maximum date in the dataset is report_date - 1.
     last_training_date = report_date - dt.timedelta(days=exclude_last_n_days + 1)
 
-    if last_training_date >= report_date:
-        raise ValueError(
-            "Last training date must be before the report date. "
-            f"Got a last training date of {last_training_date} "
-            f"with a report date of {report_date}."
-        )
-
-    logger.info(f"last training date: {last_training_date}")
-    first_training_date = last_training_date - dt.timedelta(days=n_training_days - 1)
-    logger.info(f"First training date {first_training_date}")
+    logger.info("First training date: %s", first_training_date)
+    logger.info("Last training date: %s", last_training_date)
 
     return first_training_date, last_training_date
+
+
+def calculate_forecast_through(report_date: dt.date) -> dt.date:
+    """Return the MMWR week end three epiweeks beyond the report date."""
+    return ceiling_mmwr_epiweek(report_date + dt.timedelta(weeks=3))

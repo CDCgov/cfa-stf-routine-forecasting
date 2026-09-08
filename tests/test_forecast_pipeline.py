@@ -49,8 +49,7 @@ def _pipeline(
         disease="covid",
         loc="CA",
         output_dir=tmp_path,
-        n_training_days=90,
-        n_forecast_days=28,
+        n_lookback_days=90,
         run_date=dt.date(2024, 12, 20),
         exclude_last_n_days=1,
         fail_on_stale_data=fail_on_stale_data,
@@ -95,7 +94,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         report_date=dt.date(2024, 12, 20),
         first_training_date=dt.date(2024, 9, 20),
         last_training_date=dt.date(2024, 12, 18),
-        n_forecast_days=28,
+        n_lookback_days=90,
         exclude_last_n_days=1,
         model_name="test_model",
         output_dir=tmp_path,
@@ -109,15 +108,15 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert calls["load"]["sources"] == {"nssp"}
     assert calls["load"]["ed_visit_input_resolution"] == "epiweekly"
     assert calls["load"]["fail_on_stale_data"] is True
-    assert run.model_batch_dir == (
-        tmp_path / "covid_r_2024-12-20_f_2024-09-20_t_2024-12-18"
-    )
+    assert run.model_batch_dir == (tmp_path / "covid_lookback-90_omit-1")
     assert run.model_run_dir == run.model_batch_dir / "model_runs" / "CA"
     assert run.model_dir == run.model_run_dir / "test_model"
     assert run.data_dir == run.model_dir / "data"
     assert run.nssp is surveillance.nssp
     assert run.freshness == surveillance.freshness
     assert run.right_truncation_offset == 1
+    assert run.forecast_through == dt.date(2025, 1, 11)
+    assert run.n_forecast_days == 22
 
 
 def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
@@ -156,7 +155,7 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(
         pipeline_module,
         "model_fit_dir_to_hub_tbl",
-        lambda *args: events.append("hubverse"),
+        lambda *args, **kwargs: events.append("hubverse"),
     )
 
     with caplog.at_level(logging.INFO, logger="test-forecast-pipeline"):

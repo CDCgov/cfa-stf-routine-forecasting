@@ -10,6 +10,7 @@ from cfa.stf.routine.data.data_access import (
     NSSPData,
     SurveillanceInputs,
 )
+from cfa.stf.routine.utils.date_utils import calculate_forecast_through
 from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 
@@ -22,7 +23,7 @@ class ForecastRun:
     report_date: dt.date
     first_training_date: dt.date
     last_training_date: dt.date
-    n_forecast_days: int
+    n_lookback_days: int
     exclude_last_n_days: int
     model_name: str
     output_dir: Path
@@ -35,10 +36,19 @@ class ForecastRun:
     def model_batch_dir(self) -> Path:
         return self.output_dir / get_model_batch_dir_name(
             disease=self.disease,
-            report_date=self.report_date,
-            first_training_date=self.first_training_date,
-            last_training_date=self.last_training_date,
+            n_lookback_days=self.n_lookback_days,
+            exclude_last_n_days=self.exclude_last_n_days,
         )
+
+    @property
+    def forecast_through(self) -> dt.date:
+        """Last target date, three MMWR epiweeks beyond the report date."""
+        return calculate_forecast_through(self.report_date)
+
+    @property
+    def n_forecast_days(self) -> int:
+        """Number of days from the report date through the last target date."""
+        return (self.forecast_through - self.report_date).days
 
     @property
     def model_run_dir(self) -> Path:

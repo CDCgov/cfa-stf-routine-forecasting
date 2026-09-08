@@ -43,6 +43,7 @@ FORECAST_DATES = [
     dt.date(2024, 2, 4),
     dt.date(2024, 2, 5),
 ]
+REPORT_DATE = dt.date(2024, 2, 3)
 EXPECTED_DATES = FORECAST_DATES * 2
 EXPECTED_DRAWS = [1, 1, 2, 2]
 
@@ -99,7 +100,7 @@ def _write_epiautogp_input(path: Path) -> None:
 def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]:
     tmp_dir = tmp_path_factory.mktemp("epiautogp-parquet-interop")
     try:
-        batch_dir = tmp_dir / "covid_r_2024-02-03_f_2024-01-01_t_2024-02-01"
+        batch_dir = tmp_dir / "covid_lookback-33_omit-1"
         model_fit_dir = batch_dir / "model_runs" / "US" / "epiautogp_nssp_daily_pct"
         input_path = tmp_dir / "epiautogp-input.json"
         _write_epiautogp_input(input_path)
@@ -270,7 +271,7 @@ def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
             _write_pyrenew_reference_model_samples(epiautogp_interop_paths.batch_dir),
         ]
         for model_fit_dir in model_fit_dirs:
-            model_fit_dir_to_hub_tbl(model_fit_dir)
+            model_fit_dir_to_hub_tbl(model_fit_dir, report_date=REPORT_DATE)
             hubverse_table_path = model_fit_dir / "hubverse_table.parquet"
             assert hubverse_table_path.is_file()
             hubverse_table = pl.read_parquet(hubverse_table_path)

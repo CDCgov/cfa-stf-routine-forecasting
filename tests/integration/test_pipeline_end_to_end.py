@@ -7,11 +7,12 @@ import pytest
 from tests.integration.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
+    REPORT_DATE,
 )
 from tests.integration.model_test_utils import (
     EXCLUDE_LAST_N_DAYS,
     FORECAST_DIR_NAME,
-    N_TRAINING_DAYS,
+    N_LOOKBACK_DAYS,
     assert_model_outputs,
     configure_data_mode,
     model_batch_dir,
@@ -92,7 +93,7 @@ def _run_fusions(model_run_dir: Path) -> None:
             save_figs=True,
             save_ci=True,
         )
-        model_fit_dir_to_hub_tbl(fusion_model_dir)
+        model_fit_dir_to_hub_tbl(fusion_model_dir, report_date=REPORT_DATE)
 
 
 @pytest.mark.pipeline_e2e
@@ -161,7 +162,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             copied_figures_dir = (
                 workspace
                 / FORECAST_DIR_NAME
-                / f"lookback-{N_TRAINING_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}"
+                / f"lookback-{N_LOOKBACK_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}-figures"
                 / disease
             )
             assert copied_figures_dir.is_dir(), (

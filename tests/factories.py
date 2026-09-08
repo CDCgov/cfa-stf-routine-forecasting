@@ -89,10 +89,9 @@ def make_test_forecast_run(
     disease: str = "covid",
     loc: str = "CA",
     report_date: dt.date = DEFAULT_REPORT_DATE,
-    n_training_days: int = 90,
+    n_lookback_days: int = 90,
     first_training_date: dt.date | None = None,
     last_training_date: dt.date | None = None,
-    n_forecast_days: int = 28,
     exclude_last_n_days: int = 0,
     model_name: str = "test_model",
     loc_pop: int = 1,
@@ -110,14 +109,12 @@ def make_test_forecast_run(
             "last_training_date must agree with report_date and exclude_last_n_days"
         )
 
-    expected_first_training_date = last_training_date - dt.timedelta(
-        days=n_training_days - 1
-    )
+    expected_first_training_date = report_date - dt.timedelta(days=n_lookback_days)
     if first_training_date is None:
         first_training_date = expected_first_training_date
     elif first_training_date != expected_first_training_date:
         raise ValueError(
-            "first_training_date must agree with last_training_date and n_training_days"
+            "first_training_date must agree with report_date and n_lookback_days"
         )
 
     surveillance = make_test_surveillance_inputs(
@@ -134,7 +131,7 @@ def make_test_forecast_run(
         report_date=report_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
-        n_forecast_days=n_forecast_days,
+        n_lookback_days=n_lookback_days,
         exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
         output_dir=Path(output_dir),

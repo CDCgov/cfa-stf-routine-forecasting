@@ -298,7 +298,7 @@ def _epiautogp_run(tmp_path):
     run = make_test_forecast_run(
         output_dir=tmp_path,
         report_date=report_date,
-        n_training_days=2,
+        n_lookback_days=2,
         first_training_date=dt.date(2024, 1, 1),
         last_training_date=dt.date(2024, 1, 2),
         model_name="test_model",

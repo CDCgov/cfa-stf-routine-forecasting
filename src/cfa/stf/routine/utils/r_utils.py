@@ -1,5 +1,6 @@
 """R-backed forecast postprocessing utilities."""
 
+import datetime as dt
 from pathlib import Path
 
 from cfa.stf.routine._paths import UTILS_DIR
@@ -34,11 +35,18 @@ def py_scalar_to_r_scalar(py_scalar):
 
 def model_fit_dir_to_hub_tbl(
     model_fit_dir: Path | str,
+    report_date: dt.date,
     output_type: str = "samples",
 ) -> None:
     """Create a hubverse table from a model fit directory."""
     run_r_script(
         UTILS_DIR / "model_fit_dir_to_hub_tbl.R",
-        [str(model_fit_dir), "--output-type", output_type],
+        [
+            str(model_fit_dir),
+            "--report-date",
+            report_date.isoformat(),
+            "--output-type",
+            output_type,
+        ],
         function_name="model_fit_dir_to_hub_tbl",
     )

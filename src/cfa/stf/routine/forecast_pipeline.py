@@ -29,8 +29,7 @@ class ForecastPipeline(ABC):
         disease: str,
         loc: str,
         output_dir: Path | str,
-        n_training_days: int,
-        n_forecast_days: int,
+        n_lookback_days: int,
         run_date: dt.date,
         exclude_last_n_days: int = 0,
         fail_on_stale_data: bool = False,
@@ -39,8 +38,7 @@ class ForecastPipeline(ABC):
         self.disease = disease
         self.loc = loc
         self.output_dir = Path(output_dir)
-        self.n_training_days = n_training_days
-        self.n_forecast_days = n_forecast_days
+        self.n_lookback_days = n_lookback_days
         self.run_date = run_date
         self.exclude_last_n_days = exclude_last_n_days
         self.fail_on_stale_data = fail_on_stale_data
@@ -68,7 +66,7 @@ class ForecastPipeline(ABC):
         """Calculate shared run state and load the requested forecast inputs."""
         first_training_date, last_training_date = calculate_training_dates(
             self.run_date,
-            self.n_training_days,
+            self.n_lookback_days,
             self.exclude_last_n_days,
             self.logger,
         )
@@ -89,7 +87,7 @@ class ForecastPipeline(ABC):
             report_date=self.run_date,
             first_training_date=first_training_date,
             last_training_date=last_training_date,
-            n_forecast_days=self.n_forecast_days,
+            n_lookback_days=self.n_lookback_days,
             exclude_last_n_days=self.exclude_last_n_days,
             model_name=self.model_name,
             output_dir=self.output_dir,
@@ -124,7 +122,7 @@ class ForecastPipeline(ABC):
             save_figs=True,
             save_ci=True,
         )
-        model_fit_dir_to_hub_tbl(run.model_dir)
+        model_fit_dir_to_hub_tbl(run.model_dir, report_date=run.report_date)
         self.logger.info("Postprocessing complete.")
 
     def execute(self) -> None:

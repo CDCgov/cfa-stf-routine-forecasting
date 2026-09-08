@@ -150,11 +150,11 @@ The declared resolution applies consistently to both `combined_data.tsv` and `da
 
 The base class also provides optional hooks for model-specific preparation:
 
-  | Hook                           | Use it to                                                |
-  | ------------------------------ | -------------------------------------------------------- |
-  | `validate_configuration()`     | Reject invalid option combinations before loading data   |
-  | `prepare_model_artifacts(run)` | Create model-specific inputs, such as JSON or parameters |
-  | `minimum_exclude_last_n_days`  | Require a longer recent-data omission for this model     |
+  | Hook                           | Use it to                                                                                              |
+  | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+  | `validate_configuration()`     | Reject invalid option combinations before loading data                                                 |
+  | `prepare_model_artifacts(run)` | Create model-specific inputs, such as JSON or parameters                                               |
+  | `minimum_exclude_last_n_days`  | Require a longer recent-data omission for this model.Useful for models that do not perform nowcasting. |
 
 Do not override `execute()`, `build_forecast_run()`, `prepare_input_artifacts()`, or `publish_outputs()` unless the shared lifecycle itself must change.
 Keeping those methods common preserves data freshness checks and compatible outputs.

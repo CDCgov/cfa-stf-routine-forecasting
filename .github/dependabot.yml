@@ -1,5 +1,3 @@
-# Set update schedule for GitHub Actions
-
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -10,10 +8,23 @@ updates:
     pull-request-branch-name:
       separator: "-"
   - package-ecosystem: "uv"
-    versioning-strategy: "lockfile-only"
     directory: "/"
     schedule:
       interval: "weekly"
-    # Custom branch naming strategy for Docker tags compatibility
     pull-request-branch-name:
       separator: "-"
+    versioning-strategy: "lockfile-only"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      uv-minor-patch:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

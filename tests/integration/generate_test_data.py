@@ -251,6 +251,7 @@ def make_surveillance_inputs(
     ).filter(
         pl.col("state_abb") == location,
         pl.col("disease").is_in([disease, "total"]),
+        pl.col("date") >= first_training_date,
     )
     nhsn_data = _make_nhsn(
         location=location_by_abbr[location],

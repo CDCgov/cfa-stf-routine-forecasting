@@ -11,6 +11,7 @@ from tests.integration.generate_test_data import (
     LocationData,
     _make_hubverse_nowcast_rows,
     _make_nssp,
+    make_surveillance_inputs,
     write_hubverse_nowcast,
 )
 
@@ -56,6 +57,32 @@ def test_make_nssp_returns_location_level_cfa_stf_data_schema():
         .to_series()
         .all()
     )
+
+
+def test_make_surveillance_inputs_respects_nssp_training_window():
+    first_training_date = REPORT_DATE - dt.timedelta(days=42)
+    last_training_date = REPORT_DATE - dt.timedelta(days=4)
+
+    result = make_surveillance_inputs(
+        location="CA",
+        disease="covid",
+        sources={"nssp"},
+        first_training_date=first_training_date,
+        last_training_date=last_training_date,
+    )
+
+    assert result.nssp is not None
+    nssp_data = result.nssp.data
+    training_dates = nssp_data.filter(pl.col("data_type") == "train").get_column("date")
+    evaluation_dates = nssp_data.filter(pl.col("data_type") == "eval").get_column(
+        "date"
+    )
+
+    assert nssp_data.get_column("date").min() == first_training_date
+    assert training_dates.min() == first_training_date
+    assert training_dates.max() == last_training_date
+    assert evaluation_dates.min() == last_training_date + dt.timedelta(days=1)
+    assert evaluation_dates.max() == LAST_OBS_DATE
 
 
 @pytest.mark.parametrize(("n_selected", "n_nowcast"), [(5, 3), (6, 4)])

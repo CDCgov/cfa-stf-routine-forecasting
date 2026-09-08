@@ -112,14 +112,19 @@ def make_test_forecast_run(
             "last_training_date must agree with report_date and exclude_last_n_days"
         )
 
-    expected_first_training_date = last_training_date - dt.timedelta(
+    if batch_exclude_last_n_days is None:
+        batch_exclude_last_n_days = exclude_last_n_days
+    batch_last_training_date = report_date - dt.timedelta(
+        days=batch_exclude_last_n_days + 1
+    )
+    batch_first_training_date = batch_last_training_date - dt.timedelta(
         days=n_training_days - 1
     )
     if first_training_date is None:
-        first_training_date = expected_first_training_date
-    elif first_training_date != expected_first_training_date:
+        first_training_date = batch_first_training_date
+    elif first_training_date != batch_first_training_date:
         raise ValueError(
-            "first_training_date must agree with last_training_date and n_training_days"
+            "first_training_date must agree with the batch window and n_training_days"
         )
 
     surveillance = make_test_surveillance_inputs(
@@ -129,14 +134,6 @@ def make_test_forecast_run(
         loc_pop=loc_pop,
         nhsn_prelim=nhsn_prelim,
         sources=sources,
-    )
-    if batch_exclude_last_n_days is None:
-        batch_exclude_last_n_days = exclude_last_n_days
-    batch_last_training_date = report_date - dt.timedelta(
-        days=batch_exclude_last_n_days + 1
-    )
-    batch_first_training_date = batch_last_training_date - dt.timedelta(
-        days=n_training_days - 1
     )
     return ForecastRun(
         disease=disease,

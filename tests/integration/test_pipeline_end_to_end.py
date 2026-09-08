@@ -98,20 +98,17 @@ def _run_fusions(model_run_dir: Path) -> None:
         model_fit_dir_to_hub_tbl(fusion_model_dir)
 
 
-def _last_training_date(
+def _training_date_range(
     model_run_dir: Path,
     *,
     model_name: str,
     variable: str,
-) -> dt.date:
+) -> tuple[dt.date, dt.date]:
     data = read_tabular(model_run_dir / model_name / "data" / "combined_data.tsv")
-    return (
-        data.filter(
-            (pl.col(".variable") == variable) & (pl.col("data_type") == "train")
-        )
-        .get_column("date")
-        .max()
-    )
+    dates = data.filter(
+        (pl.col(".variable") == variable) & (pl.col("data_type") == "train")
+    ).get_column("date")
+    return dates.min(), dates.max()
 
 
 @pytest.mark.pipeline_e2e
@@ -154,37 +151,34 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
                 baseline_last_training_date = REPORT_DATE - dt.timedelta(
                     days=EXCLUDE_LAST_N_DAYS + 1
                 )
+                baseline_first_training_date = baseline_last_training_date - (
+                    dt.timedelta(days=N_TRAINING_DAYS - 1)
+                )
                 conservative_last_training_date = REPORT_DATE - dt.timedelta(days=5)
+                assert _training_date_range(
+                    model_run_dir,
+                    model_name="daily_fable_e_other",
+                    variable="other_ed_visits",
+                ) == (baseline_first_training_date, conservative_last_training_date)
+                assert _training_date_range(
+                    model_run_dir,
+                    model_name="epiautogp_nssp_daily_other",
+                    variable="other_ed_visits",
+                ) == (baseline_first_training_date, conservative_last_training_date)
                 assert (
-                    _last_training_date(
-                        model_run_dir,
-                        model_name="daily_fable_e_other",
-                        variable="other_ed_visits",
-                    )
-                    == conservative_last_training_date
-                )
-                assert (
-                    _last_training_date(
-                        model_run_dir,
-                        model_name="epiautogp_nssp_daily_other",
-                        variable="other_ed_visits",
-                    )
-                    == conservative_last_training_date
-                )
-                assert (
-                    _last_training_date(
+                    _training_date_range(
                         model_run_dir,
                         model_name="pyrenew_e",
                         variable="observed_ed_visits",
-                    )
+                    )[1]
                     == baseline_last_training_date
                 )
                 assert (
-                    _last_training_date(
+                    _training_date_range(
                         model_run_dir,
                         model_name="prop_pyrenew_e_daily_fable_e_other",
                         variable="prop_disease_ed_visits",
-                    )
+                    )[1]
                     == baseline_last_training_date
                 )
 

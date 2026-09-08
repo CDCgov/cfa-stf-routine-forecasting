@@ -150,7 +150,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
             4,
             dt.date(2024, 9, 20),
             dt.date(2024, 12, 18),
-            dt.date(2024, 9, 17),
+            dt.date(2024, 9, 20),
             dt.date(2024, 12, 15),
         ),
         (
@@ -229,6 +229,7 @@ def test_model_minimum_does_not_change_batch_directory(monkeypatch, tmp_path):
         minimum_exclude_last_n_days=4,
     ).build_forecast_run()
 
+    assert baseline_run.first_training_date == constrained_run.first_training_date
     assert baseline_run.last_training_date != constrained_run.last_training_date
     assert baseline_run.model_batch_dir == constrained_run.model_batch_dir
 

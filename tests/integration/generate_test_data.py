@@ -280,7 +280,7 @@ def make_surveillance_inputs(
             data=_normalize_nssp_data(
                 nssp_data,
                 last_training_date=last_training_date,
-            ),
+            ).filter(pl.col("date") >= first_training_date),
             freshness=nssp_freshness,
             resolution="daily",
         )

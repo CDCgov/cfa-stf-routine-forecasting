@@ -86,14 +86,13 @@ class ForecastPipeline(ABC):
             first_training_date = batch_first_training_date
             last_training_date = batch_last_training_date
         else:
-            first_training_date, last_training_date = calculate_training_dates(
-                self.run_date,
-                self.n_training_days,
-                effective_exclude_last_n_days,
-                self.logger,
+            first_training_date = batch_first_training_date
+            last_training_date = batch_last_training_date + dt.timedelta(
+                days=self.exclude_last_n_days - effective_exclude_last_n_days
             )
             self.logger.info(
-                "Increasing excluded training tail from %s to %s days for model %s.",
+                "Increasing excluded training tail from %s to %s days for model %s "
+                "without changing the first training date.",
                 self.exclude_last_n_days,
                 effective_exclude_last_n_days,
                 self.model_name,

@@ -4,13 +4,14 @@ import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
 
+from cfa.stf.forecasttools import ceiling_mmwr_epiweek
+
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
     NHSNData,
     NSSPData,
     SurveillanceInputs,
 )
-from cfa.stf.routine.utils.date_utils import calculate_forecast_through
 from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 
@@ -43,7 +44,7 @@ class ForecastRun:
     @property
     def forecast_through(self) -> dt.date:
         """Last target date, three MMWR epiweeks beyond the report date."""
-        return calculate_forecast_through(self.report_date)
+        return ceiling_mmwr_epiweek(self.report_date + dt.timedelta(weeks=3))
 
     @property
     def n_forecast_days(self) -> int:

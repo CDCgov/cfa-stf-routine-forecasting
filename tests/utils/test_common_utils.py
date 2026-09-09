@@ -9,7 +9,6 @@ import pytest
 from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
 from cfa.stf.routine.utils.date_utils import (
-    calculate_forecast_through,
     calculate_training_dates,
     parse_exclude_date_ranges,
 )
@@ -45,24 +44,6 @@ class TestValidationUtils:
         assert first_date == expected_first
         assert last_date == expected_last
         assert (report_date - first_date).days == n_lookback_days
-
-    @pytest.mark.parametrize(
-        ("report_date", "expected", "expected_days"),
-        [
-            (dt.date(2026, 9, 2), dt.date(2026, 9, 26), 24),
-            (dt.date(2026, 9, 3), dt.date(2026, 9, 26), 23),
-            (dt.date(2026, 9, 4), dt.date(2026, 9, 26), 22),
-            (dt.date(2026, 9, 5), dt.date(2026, 9, 26), 21),
-            (dt.date(2026, 9, 6), dt.date(2026, 10, 3), 27),
-            (dt.date(2026, 9, 7), dt.date(2026, 10, 3), 26),
-            (dt.date(2026, 9, 8), dt.date(2026, 10, 3), 25),
-            (dt.date(2026, 9, 9), dt.date(2026, 10, 3), 24),
-        ],
-    )
-    def test_calculate_forecast_through(self, report_date, expected, expected_days):
-        forecast_through = calculate_forecast_through(report_date)
-        assert forecast_through == expected
-        assert (forecast_through - report_date).days == expected_days
 
     @pytest.mark.parametrize(
         ("n_lookback_days", "exclude_last_n_days", "message"),

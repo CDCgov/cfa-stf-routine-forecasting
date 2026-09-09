@@ -119,6 +119,26 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run.n_forecast_days == 22
 
 
+@pytest.mark.parametrize(
+    ("report_date", "expected", "expected_days"),
+    [
+        (dt.date(2026, 9, 2), dt.date(2026, 9, 26), 24),
+        (dt.date(2026, 9, 3), dt.date(2026, 9, 26), 23),
+        (dt.date(2026, 9, 4), dt.date(2026, 9, 26), 22),
+        (dt.date(2026, 9, 5), dt.date(2026, 9, 26), 21),
+        (dt.date(2026, 9, 6), dt.date(2026, 10, 3), 27),
+        (dt.date(2026, 9, 7), dt.date(2026, 10, 3), 26),
+        (dt.date(2026, 9, 8), dt.date(2026, 10, 3), 25),
+        (dt.date(2026, 9, 9), dt.date(2026, 10, 3), 24),
+    ],
+)
+def test_forecast_run_forecast_through(tmp_path, report_date, expected, expected_days):
+    run = make_test_forecast_run(output_dir=tmp_path, report_date=report_date)
+
+    assert run.forecast_through == expected
+    assert run.n_forecast_days == expected_days
+
+
 def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 

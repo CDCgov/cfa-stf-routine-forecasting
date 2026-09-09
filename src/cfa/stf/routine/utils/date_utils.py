@@ -3,8 +3,6 @@
 import datetime as dt
 import logging
 
-from cfa.stf.forecasttools import ceiling_mmwr_epiweek
-
 
 def _parse_single_date(date_str: str) -> tuple[dt.date, dt.date]:
     """Parse a single date string into a one-day date range."""
@@ -85,8 +83,3 @@ def calculate_training_dates(
     logger.info("Last training date: %s", last_training_date)
 
     return first_training_date, last_training_date
-
-
-def calculate_forecast_through(report_date: dt.date) -> dt.date:
-    """Return the MMWR week end three epiweeks beyond the report date."""
-    return ceiling_mmwr_epiweek(report_date + dt.timedelta(weeks=3))

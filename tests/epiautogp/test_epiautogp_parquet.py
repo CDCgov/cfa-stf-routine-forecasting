@@ -23,7 +23,7 @@ def _write_synthetic_input(path: Path) -> None:
         "target": "nssp",
         "frequency": "daily",
         "ed_visit_type": "pct",
-        "forecast_date": dt.date(2024, 2, 6).isoformat(),
+        "forecast_through": dt.date(2024, 2, 7).isoformat(),
         "nowcast_dates": [],
         "nowcast_reports": [],
     }
@@ -41,7 +41,6 @@ def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
             [
                 f"--json-input={input_path}",
                 f"--output-dir={output_dir}",
-                "--n-ahead=2",
                 "--n-particles=2",
                 "--n-mcmc=1",
                 "--n-hmc=1",
@@ -79,3 +78,28 @@ def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
     assert samples["disease"].unique().to_list() == ["covid"]
     assert samples[".value"].min() >= 0.0
     assert samples[".value"].max() <= 1.0
+
+
+def test_direct_runner_rejects_partial_epiweekly_horizon(tmp_path) -> None:
+    input_path = tmp_path / "epiautogp-input.json"
+    output_dir = tmp_path / "model-fit"
+    _write_synthetic_input(input_path)
+    input_data = json.loads(input_path.read_text())
+    input_data["frequency"] = "epiweekly"
+    input_data["forecast_through"] = dt.date(2024, 2, 10).isoformat()
+    input_path.write_text(json.dumps(input_data), encoding="utf-8")
+
+    try:
+        with pytest.raises(RuntimeError, match="whole number of model steps"):
+            run_julia_script(
+                EPIAUTOGP_DIR / "fit_epiautogp.jl",
+                [
+                    f"--json-input={input_path}",
+                    f"--output-dir={output_dir}",
+                ],
+                executor_flags=[f"--project={EPIAUTOGP_DIR}", "--startup-file=no"],
+                function_name="test_direct_runner_rejects_partial_epiweekly_horizon",
+                text=True,
+            )
+    except FileNotFoundError:
+        pytest.skip("julia is not available")

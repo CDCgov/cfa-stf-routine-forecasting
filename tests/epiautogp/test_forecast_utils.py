@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import logging
 from dataclasses import replace
 from unittest.mock import patch
@@ -116,7 +117,6 @@ def test_run_model_passes_prepared_input_and_model_options(
     assert mock_forecast.call_args.kwargs == {
         "json_input_path": run.model_dir / f"{run.model_name}_input.json",
         "model_dir": run.model_dir,
-        "n_ahead": 23,
         "n_particles": 2,
         "n_mcmc": 3,
         "n_hmc": 4,
@@ -127,8 +127,7 @@ def test_run_model_passes_prepared_input_and_model_options(
     }
 
 
-@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")
-def test_epiweekly_horizon_uses_final_training_observation(mock_forecast, tmp_path):
+def test_epiweekly_input_includes_forecast_through(tmp_path):
     pipeline = _pipeline(tmp_path, frequency="epiweekly")
     run = make_test_forecast_run(
         output_dir=tmp_path,
@@ -149,35 +148,12 @@ def test_epiweekly_horizon_uses_final_training_observation(mock_forecast, tmp_pa
         ),
     )
 
-    pipeline.run_model(run)
+    pipeline.prepare_model_artifacts(run)
 
     assert run.last_training_date == dt.date(2026, 8, 29)
     assert run.forecast_through == dt.date(2026, 10, 3)
-    assert mock_forecast.call_args.kwargs["n_ahead"] == 5
-
-
-def test_epiweekly_horizon_requires_aligned_weekdays(tmp_path):
-    pipeline = _pipeline(tmp_path, frequency="epiweekly")
-    run = make_test_forecast_run(
-        output_dir=tmp_path,
-        report_date=dt.date(2026, 9, 8),
-        model_name=pipeline.model_name,
-        sources=("nssp",),
-    )
-    run = replace(
-        run,
-        surveillance=replace(
-            run.surveillance,
-            nssp=replace(
-                run.nssp,
-                data=run.nssp.data.with_columns(resolution=pl.lit("epiweekly")),
-                resolution="epiweekly",
-            ),
-        ),
-    )
-
-    with pytest.raises(ValueError, match="must be a whole number of model steps"):
-        pipeline.run_model(run)
+    input_path = run.model_dir / f"{run.model_name}_input.json"
+    assert json.loads(input_path.read_text())["forecast_through"] == "2026-10-03"
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_julia_script")
@@ -188,7 +164,6 @@ def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
     run_epiautogp_forecast(
         input_path,
         model_dir,
-        n_ahead=4,
         n_particles=2,
         n_mcmc=3,
         n_hmc=4,
@@ -202,7 +177,6 @@ def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
     assert mock_run_julia.call_args.args[1] == [
         f"--json-input={input_path}",
         f"--output-dir={model_dir}",
-        "--n-ahead=4",
         "--n-particles=2",
         "--n-mcmc=3",
         "--n-hmc=4",

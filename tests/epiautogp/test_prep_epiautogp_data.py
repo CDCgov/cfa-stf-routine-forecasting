@@ -341,6 +341,7 @@ class TestConvertToEpiAutoGpJson:
         output = json.loads(output_path.read_text())
         assert output["dates"] == ["2024-01-01", "2024-01-02"]
         assert output["reports"] == [10.0, 20.0]
+        assert output["forecast_through"] == forecast_run.forecast_through.isoformat()
         assert output["nowcast_dates"] == []
         assert output["nowcast_reports"] == []
         assert not (forecast_run.data_dir / "combined_data.tsv").exists()

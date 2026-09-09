@@ -89,7 +89,7 @@ def _write_epiautogp_input(path: Path) -> None:
         "target": "nssp",
         "frequency": "daily",
         "ed_visit_type": "pct",
-        "forecast_date": FORECAST_DATES[0].isoformat(),
+        "forecast_through": FORECAST_DATES[-1].isoformat(),
         "nowcast_dates": [],
         "nowcast_reports": [],
     }
@@ -111,7 +111,6 @@ def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]
                 [
                     f"--json-input={input_path}",
                     f"--output-dir={model_fit_dir}",
-                    "--n-ahead=2",
                     "--n-particles=2",
                     "--n-mcmc=1",
                     "--n-hmc=1",

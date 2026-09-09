@@ -167,7 +167,7 @@ def convert_to_epiautogp_json(
         "target": config.target,
         "frequency": config.frequency,
         "ed_visit_type": config.ed_visit_type,
-        "forecast_date": forecast_run.report_date.isoformat(),
+        "forecast_through": forecast_run.forecast_through.isoformat(),
         "nowcast_dates": [date.isoformat() for date in nowcast_data.dates],
         "nowcast_reports": nowcast_data.reports,
     }

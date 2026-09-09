@@ -23,7 +23,7 @@ struct EpiAutoGPInput
     target::String
     frequency::String
     ed_visit_type::String
-    forecast_date::Date
+    forecast_through::Date
     nowcast_dates::Vector{Date}
     nowcast_reports::Vector{Vector{Float64}}
 end
@@ -31,7 +31,6 @@ end
 StructType(::Type{EpiAutoGPInput}) = Struct()
 
 const DEFAULT_ARGS = Dict{String, Any}(
-    "n-ahead" => 8,
     "n-particles" => 24,
     "n-mcmc" => 100,
     "n-hmc" => 50,
@@ -42,7 +41,6 @@ const DEFAULT_ARGS = Dict{String, Any}(
 const REQUIRED_ARGS = Set(["json-input", "output-dir"])
 const INT_ARGS = Set(
     [
-        "n-ahead",
         "n-particles",
         "n-mcmc",
         "n-hmc",
@@ -189,13 +187,12 @@ end
 Prepares the input data for modelling by:
     - Excluding nowcast dates from the stable data used to fit the base model
     - Creating nowcast data structures if nowcast reports are provided
-    - Generating forecast dates based on the forecast date and frequency
+    - Generating forecast dates through the final target date
     - Determine the data forwards and inverse transformations
 """
 function prepare_for_modelling(
         input::EpiAutoGPInput,
         transformation_name::String,
-        n_ahead::Int,
         n_forecasts::Int,
     )
     stable_data_idxs = findall(date -> !(date in input.nowcast_dates), input.dates)
@@ -211,6 +208,20 @@ function prepare_for_modelling(
 
     time_step = input.frequency == "epiweekly" ? Week(1) : Day(1)
     last_training_date = input.dates[end]
+    horizon_days = Dates.value(input.forecast_through - last_training_date)
+    step_days = input.frequency == "epiweekly" ? 7 : 1
+    _require(
+        horizon_days > 0,
+        "forecast_through must be after the final training date; got " *
+            "$last_training_date and $(input.forecast_through)",
+    )
+    n_ahead, extra_days = divrem(horizon_days, step_days)
+    _require(
+        iszero(extra_days),
+        "The distance from the final $(input.frequency) training date to " *
+            "forecast_through must be a whole number of model steps; got " *
+            "$last_training_date and $(input.forecast_through)",
+    )
     forecast_dates = [last_training_date + i * time_step for i in 1:n_ahead]
 
     n_forecasts_per_nowcast = isnothing(nowcast_data) ?
@@ -290,7 +301,6 @@ function forecast_with_nowcastautogp(input::EpiAutoGPInput, args::Dict{String, A
     model_info = prepare_for_modelling(
         input,
         args["transformation"],
-        args["n-ahead"],
         args["n-forecast-draws"],
     )
     base_model = fit_base_model(

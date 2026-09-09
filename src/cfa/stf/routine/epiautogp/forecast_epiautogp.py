@@ -29,7 +29,6 @@ def run_epiautogp_forecast(
     json_input_path: Path,
     model_dir: Path,
     *,
-    n_ahead: int,
     n_particles: int,
     n_mcmc: int,
     n_hmc: int,
@@ -43,7 +42,6 @@ def run_epiautogp_forecast(
     args = [
         f"--json-input={json_input_path}",
         f"--output-dir={model_dir}",
-        f"--n-ahead={n_ahead}",
         f"--n-particles={n_particles}",
         f"--n-mcmc={n_mcmc}",
         f"--n-hmc={n_hmc}",
@@ -200,15 +198,6 @@ class EpiAutoGPPipeline(ForecastPipeline):
         )
 
     def run_model(self, run: ForecastRun) -> None:
-        step_days = 7 if self.config.frequency == "epiweekly" else 1
-        days_ahead = (run.forecast_through - run.last_training_date).days
-        n_ahead, extra_days = divmod(days_ahead, step_days)
-        if extra_days:
-            raise ValueError(
-                f"The distance from the final {self.config.frequency} training "
-                "date to forecast_through must be a whole number of model steps; "
-                f"got {run.last_training_date} and {run.forecast_through}."
-            )
         transformation = (
             "percentage" if self.config.ed_visit_type == "pct" else "boxcox"
         )
@@ -216,7 +205,6 @@ class EpiAutoGPPipeline(ForecastPipeline):
         run_epiautogp_forecast(
             json_input_path=run.model_dir / f"{run.model_name}_input.json",
             model_dir=run.model_dir,
-            n_ahead=n_ahead,
             n_particles=self.n_particles,
             n_mcmc=self.n_mcmc,
             n_hmc=self.n_hmc,

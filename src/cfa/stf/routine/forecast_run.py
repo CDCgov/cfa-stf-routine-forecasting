@@ -50,7 +50,7 @@ class ForecastRun:
     @property
     def n_forecast_days(self) -> int:
         """Number of days after the last training date through the last target date."""
-        return self.forecast_window.n_forecast_days_after(self.last_training_date)
+        return (self.forecast_through - self.last_training_date).days
 
     @property
     def model_batch_dir(self) -> Path:

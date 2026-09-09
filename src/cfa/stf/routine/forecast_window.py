@@ -38,10 +38,6 @@ class ForecastWindow:
         """Last target date, three MMWR epiweeks beyond the report date."""
         return ceiling_mmwr_epiweek(self.report_date + dt.timedelta(weeks=3))
 
-    def n_forecast_days_after(self, date: dt.date) -> int:
-        """Number of days after ``date`` through the last target date."""
-        return (self.forecast_through - date).days
-
     def model_batch_dir_name(self, disease: str) -> str:
         """Return the batch directory name for this window and disease."""
         return (

@@ -78,7 +78,6 @@ class TestValidationUtils:
         )
 
         assert window.forecast_through == dt.date(2026, 10, 3)
-        assert window.n_forecast_days_after(dt.date(2026, 8, 29)) == 35
         assert window.model_batch_dir_name("covid") == ("covid_lookback-150_omit-3")
 
     @pytest.mark.parametrize(

@@ -4,14 +4,13 @@ import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
 
-from cfa.stf.forecasttools import ceiling_mmwr_epiweek
-
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
     NHSNData,
     NSSPData,
     SurveillanceInputs,
 )
+from cfa.stf.routine.forecast_window import ForecastWindow
 
 
 @dataclass(frozen=True)
@@ -20,18 +19,23 @@ class ForecastRun:
 
     disease: str
     loc: str
-    report_date: dt.date
+    forecast_window: ForecastWindow
     model_name: str
-    model_batch_dir: Path
+    output_dir: Path
     surveillance: SurveillanceInputs
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "model_batch_dir", Path(self.model_batch_dir))
+        object.__setattr__(self, "output_dir", Path(self.output_dir))
+
+    @property
+    def report_date(self) -> dt.date:
+        """Date on which the forecast is issued."""
+        return self.forecast_window.report_date
 
     @property
     def forecast_through(self) -> dt.date:
-        """Last target date, three MMWR epiweeks beyond the report date."""
-        return ceiling_mmwr_epiweek(self.report_date + dt.timedelta(weeks=3))
+        """Last target date in the configured forecast window."""
+        return self.forecast_window.forecast_through
 
     @property
     def first_training_date(self) -> dt.date:
@@ -46,7 +50,11 @@ class ForecastRun:
     @property
     def n_forecast_days(self) -> int:
         """Number of days after the last training date through the last target date."""
-        return (self.forecast_through - self.last_training_date).days
+        return self.forecast_window.n_forecast_days_after(self.last_training_date)
+
+    @property
+    def model_batch_dir(self) -> Path:
+        return self.output_dir / self.forecast_window.model_batch_dir_name(self.disease)
 
     @property
     def model_run_dir(self) -> Path:

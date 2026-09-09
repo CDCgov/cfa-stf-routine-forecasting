@@ -6,6 +6,7 @@ import pytest
 
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.forecast_window import ForecastWindow
 from tests.factories import make_test_forecast_run, make_test_surveillance_inputs
 
 
@@ -72,15 +73,10 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     )
     calls = {}
 
-    def calculate(*args):
-        calls["calculate"] = args
-        return dt.date(2024, 9, 20), dt.date(2024, 12, 18)
-
     def load(**kwargs):
         calls["load"] = kwargs
         return surveillance
 
-    monkeypatch.setattr(pipeline_module, "calculate_training_dates", calculate)
     monkeypatch.setattr(pipeline_module, "load_surveillance_inputs", load)
 
     pipeline = _pipeline(
@@ -93,18 +89,18 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run == ForecastRun(
         disease="covid",
         loc="CA",
-        report_date=dt.date(2024, 12, 20),
+        forecast_window=ForecastWindow(
+            report_date=dt.date(2024, 12, 20),
+            n_lookback_days=90,
+            exclude_last_n_days=1,
+        ),
         model_name="test_model",
-        model_batch_dir=tmp_path / "covid_lookback-90_omit-1",
+        output_dir=tmp_path,
         surveillance=surveillance,
     )
-    assert calls["calculate"][:3] == (
-        dt.date(2024, 12, 20),
-        90,
-        1,
-    )
     assert calls["load"]["sources"] == {"nssp"}
-    assert calls["load"]["min_allowed_training_date"] == dt.date(2024, 9, 20)
+    assert calls["load"]["min_allowed_training_date"] == dt.date(2024, 9, 21)
+    assert calls["load"]["max_allowed_training_date"] == dt.date(2024, 12, 18)
     assert calls["load"]["ed_visit_input_resolution"] == "epiweekly"
     assert calls["load"]["fail_on_stale_data"] is True
     assert run.model_batch_dir == (tmp_path / "covid_lookback-90_omit-1")

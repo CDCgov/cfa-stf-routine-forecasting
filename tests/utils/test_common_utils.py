@@ -1,20 +1,16 @@
 """Unit tests for shared utility functions."""
 
 import datetime as dt
-import logging
 import sys
 
 import pytest
 
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
-from cfa.stf.routine.utils.date_utils import (
-    calculate_training_dates,
-    parse_exclude_date_ranges,
-)
+from cfa.stf.routine.utils.date_utils import parse_exclude_date_ranges
 from cfa.stf.routine.utils.directory_utils import (
     get_all_forecast_dirs,
-    get_model_batch_dir_name,
     parse_model_batch_dir_name,
 )
 from cfa.stf.routine.utils.language_utils import run_julia_script, run_r_script
@@ -35,7 +31,7 @@ class TestValidationUtils:
             (90, 5, dt.date(2024, 9, 22), dt.date(2024, 12, 15)),
         ],
     )
-    def test_calculate_training_dates(
+    def test_forecast_window_boundaries(
         self,
         n_lookback_days,
         exclude_last_n_days,
@@ -44,15 +40,17 @@ class TestValidationUtils:
     ):
         """Test training date calculation with various parameters."""
         report_date = dt.date(2024, 12, 21)
-        logger = logging.getLogger(__name__)
-
-        min_allowed_date, max_allowed_date = calculate_training_dates(
-            report_date, n_lookback_days, exclude_last_n_days, logger
+        window = ForecastWindow(
+            report_date=report_date,
+            n_lookback_days=n_lookback_days,
+            exclude_last_n_days=exclude_last_n_days,
         )
 
-        assert min_allowed_date == expected_min_allowed
-        assert max_allowed_date == expected_max_allowed
-        assert (report_date - min_allowed_date).days == n_lookback_days
+        assert window.min_allowed_training_date == expected_min_allowed
+        assert window.max_allowed_training_date == expected_max_allowed
+        assert (report_date - window.min_allowed_training_date).days == (
+            n_lookback_days
+        )
 
     @pytest.mark.parametrize(
         ("n_lookback_days", "exclude_last_n_days", "message"),
@@ -62,16 +60,26 @@ class TestValidationUtils:
             (7, 7, "exclude_last_n_days must be less than n_lookback_days"),
         ],
     )
-    def test_calculate_training_dates_rejects_invalid_windows(
+    def test_forecast_window_rejects_invalid_configuration(
         self, n_lookback_days, exclude_last_n_days, message
     ):
         with pytest.raises(ValueError, match=message):
-            calculate_training_dates(
-                dt.date(2024, 12, 21),
-                n_lookback_days,
-                exclude_last_n_days,
-                logging.getLogger(__name__),
+            ForecastWindow(
+                report_date=dt.date(2024, 12, 21),
+                n_lookback_days=n_lookback_days,
+                exclude_last_n_days=exclude_last_n_days,
             )
+
+    def test_forecast_window_owns_horizon_and_batch_name(self):
+        window = ForecastWindow(
+            report_date=dt.date(2026, 9, 8),
+            n_lookback_days=150,
+            exclude_last_n_days=3,
+        )
+
+        assert window.forecast_through == dt.date(2026, 10, 3)
+        assert window.n_forecast_days_after(dt.date(2026, 8, 29)) == 35
+        assert window.model_batch_dir_name("covid") == ("covid_lookback-150_omit-3")
 
     @pytest.mark.parametrize(
         "input_str,expected",
@@ -132,11 +140,12 @@ class TestValidationUtils:
 
 class TestDirectoryUtils:
     def test_model_batch_directory_round_trip(self):
-        name = get_model_batch_dir_name(
-            disease="covid",
+        window = ForecastWindow(
+            report_date=dt.date(2026, 9, 8),
             n_lookback_days=150,
             exclude_last_n_days=3,
         )
+        name = window.model_batch_dir_name("covid")
 
         assert name == "covid_lookback-150_omit-3"
         assert parse_model_batch_dir_name(name) == {

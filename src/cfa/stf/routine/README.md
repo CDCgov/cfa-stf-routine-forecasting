@@ -102,7 +102,8 @@ Every subclass must implement:
   Supporting a new source also requires changes to [`data/data_access.py`](data/data_access.py) and [`data/prep_data.py`](data/prep_data.py).
 - `run_model(run)`: run the model and create a standardized `run.model_dir / "samples.parquet"`.
 
-`ForecastRun` is the source of truth for dates, surveillance data, population, and output paths.
+`ForecastWindow` is the source of truth for the report-anchored training bounds, final forecast date, and model-batch directory name.
+`ForecastRun` combines that configured window with the surveillance observations that were actually retained, the population, and the model output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
 The resulting layout is:
 
@@ -156,7 +157,7 @@ Keeping those methods common preserves data freshness checks and compatible outp
 `run_model()` is responsible for any native-output conversion needed to leave a standardized `samples.parquet` for publishing.
 
 When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
-`min_allowed_training_date` and `max_allowed_training_date` are the temporary inclusive bounds used while loading and labeling observations for training; they are not stored in the run state.
+`run.forecast_window.min_allowed_training_date` and `run.forecast_window.max_allowed_training_date` are the inclusive bounds used while loading and labeling observations for training.
 `run.first_training_date` and `run.last_training_date` are instead derived from the observations actually retained.
 For daily models, forecasting often means generating `run.n_forecast_days` days from that observed last training date through `run.forecast_through`.
 See the Fable and PyRenew implementations.

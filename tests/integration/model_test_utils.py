@@ -18,10 +18,10 @@ from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
 from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
-from cfa.stf.routine.utils.date_utils import calculate_training_dates
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_LOOKBACK_DAYS = 42
@@ -131,18 +131,17 @@ def selected_nhsn_observations(
 ) -> pl.DataFrame:
     """Load the NHSN training observations selected for an integration run."""
     logger = logging.getLogger(__name__)
-    min_allowed_training_date, max_allowed_training_date = calculate_training_dates(
-        REPORT_DATE,
-        N_LOOKBACK_DAYS,
-        EXCLUDE_LAST_N_DAYS,
-        logger,
+    forecast_window = ForecastWindow(
+        report_date=REPORT_DATE,
+        n_lookback_days=N_LOOKBACK_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
     )
     surveillance = forecast_pipeline_module.load_surveillance_inputs(
         disease=disease,
         loc_abb=location,
         run_date=REPORT_DATE,
-        min_allowed_training_date=min_allowed_training_date,
-        max_allowed_training_date=max_allowed_training_date,
+        min_allowed_training_date=forecast_window.min_allowed_training_date,
+        max_allowed_training_date=forecast_window.max_allowed_training_date,
         sources={"nhsn"},
         ed_visit_input_resolution="epiweekly",
         logger=logger,

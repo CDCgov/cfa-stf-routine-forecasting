@@ -38,8 +38,8 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 from cfa.stf.routine.utils.r_utils import (
@@ -427,11 +427,13 @@ def get_model_loc_dir(
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
 
-    model_batch_dir_name = get_model_batch_dir_name(
-        disease=disease,
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    forecast_window = ForecastWindow(
+        report_date=run_date,
         n_lookback_days=loc_config.n_lookback_days,
         exclude_last_n_days=loc_config.exclude_last_n_days,
     )
+    model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
 
     model_loc_dir = Path(
         model_base_config.output_basedir,

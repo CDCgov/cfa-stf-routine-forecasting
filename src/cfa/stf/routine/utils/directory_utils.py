@@ -11,15 +11,6 @@ DISEASE_NAMES = frozenset({"covid", "flu", "rsv"})
 loc_abbrs_ = LOCATION_LIST
 
 
-def get_model_batch_dir_name(
-    disease: str,
-    n_lookback_days: int,
-    exclude_last_n_days: int,
-) -> str:
-    """Build the standard model batch directory name."""
-    return f"{disease}_lookback-{n_lookback_days}_omit-{exclude_last_n_days}"
-
-
 def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
     """Parse a standard model batch directory name."""
     regex_match = re.fullmatch(r"(.+)_lookback-(\d+)_omit-(\d+)", model_batch_dir_name)

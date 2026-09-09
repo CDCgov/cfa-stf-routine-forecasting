@@ -13,8 +13,7 @@ from cfa.stf.routine.data.data_access import (
 )
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
-from cfa.stf.routine.utils.date_utils import calculate_training_dates
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -39,9 +38,11 @@ class ForecastPipeline(ABC):
         self.disease = disease
         self.loc = loc
         self.output_dir = Path(output_dir)
-        self.n_lookback_days = n_lookback_days
-        self.run_date = run_date
-        self.exclude_last_n_days = exclude_last_n_days
+        self.forecast_window = ForecastWindow(
+            report_date=run_date,
+            n_lookback_days=n_lookback_days,
+            exclude_last_n_days=exclude_last_n_days,
+        )
         self.fail_on_stale_data = fail_on_stale_data
         self.logger = logger or logging.getLogger(type(self).__module__)
 
@@ -65,18 +66,21 @@ class ForecastPipeline(ABC):
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        min_allowed_training_date, max_allowed_training_date = calculate_training_dates(
-            self.run_date,
-            self.n_lookback_days,
-            self.exclude_last_n_days,
-            self.logger,
+        window = self.forecast_window
+        self.logger.info(
+            "Minimum allowed training date: %s",
+            window.min_allowed_training_date,
+        )
+        self.logger.info(
+            "Maximum allowed training date: %s",
+            window.max_allowed_training_date,
         )
         surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
-            run_date=self.run_date,
-            min_allowed_training_date=min_allowed_training_date,
-            max_allowed_training_date=max_allowed_training_date,
+            run_date=window.report_date,
+            min_allowed_training_date=window.min_allowed_training_date,
+            max_allowed_training_date=window.max_allowed_training_date,
             sources=self.sources,
             ed_visit_input_resolution=self.ed_visit_input_resolution,
             fail_on_stale_data=self.fail_on_stale_data,
@@ -85,14 +89,9 @@ class ForecastPipeline(ABC):
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,
-            report_date=self.run_date,
+            forecast_window=window,
             model_name=self.model_name,
-            model_batch_dir=self.output_dir
-            / get_model_batch_dir_name(
-                disease=self.disease,
-                n_lookback_days=self.n_lookback_days,
-                exclude_last_n_days=self.exclude_last_n_days,
-            ),
+            output_dir=self.output_dir,
             surveillance=surveillance,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)
@@ -134,7 +133,7 @@ class ForecastPipeline(ABC):
             "date %s.",
             self.model_name,
             self.loc,
-            self.run_date,
+            self.forecast_window.report_date,
         )
         self.validate_configuration()
         run = self.build_forecast_run()

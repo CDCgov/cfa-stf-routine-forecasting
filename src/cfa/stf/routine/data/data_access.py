@@ -48,15 +48,23 @@ class ForecastSourceData:
         """Number of days represented by one observation."""
         return 7 if self.resolution == "epiweekly" else 1
 
-    @property
-    def last_training_date(self) -> dt.date:
-        """Final observed date among rows retained for training."""
+    def _training_dates(self) -> pl.Series:
         training_dates = self.data.filter(pl.col("data_type") == "train").get_column(
             "date"
         )
         if training_dates.is_empty():
             raise ValueError(f"{type(self).__name__} has no training observations")
-        return training_dates.max()
+        return training_dates
+
+    @property
+    def first_training_date(self) -> dt.date:
+        """First observed date among rows retained for training."""
+        return self._training_dates().min()
+
+    @property
+    def last_training_date(self) -> dt.date:
+        """Final observed date among rows retained for training."""
+        return self._training_dates().max()
 
 
 @dataclass(frozen=True)
@@ -176,7 +184,7 @@ def _load_dataops_nssp(
     *,
     loc_abb: str,
     disease: str,
-    first_training_date: dt.date,
+    min_allowed_training_date: dt.date,
     max_allowed_training_date: dt.date,
     run_date: dt.date,
 ) -> NSSPData:
@@ -185,7 +193,7 @@ def _load_dataops_nssp(
         disease=[disease, "total"],
         state_abb=loc_abb,
         dataset="gold",
-        start_date=first_training_date,
+        start_date=min_allowed_training_date,
         lazy=False,
     )
     freshness = nssp_freshness(
@@ -218,7 +226,7 @@ def _load_dataops_nhsn(
     *,
     disease: str,
     loc_abb: str,
-    first_training_date: dt.date,
+    min_allowed_training_date: dt.date,
     max_allowed_training_date: dt.date,
     run_date: dt.date,
 ) -> NHSNData:
@@ -227,7 +235,7 @@ def _load_dataops_nhsn(
         disease=disease,
         state_abb=loc_abb,
         prelim=prelim,
-        start_date=first_training_date,
+        start_date=min_allowed_training_date,
         lazy=False,
     )
     freshness = nhsn_freshness(
@@ -236,7 +244,7 @@ def _load_dataops_nhsn(
         run_date=run_date,
     )
     data = (
-        source_data.filter(pl.col("date") >= first_training_date)
+        source_data.filter(pl.col("date") >= min_allowed_training_date)
         .with_columns(
             data_type=pl.when(pl.col("date") <= max_allowed_training_date)
             .then(pl.lit("train"))
@@ -349,7 +357,7 @@ def load_surveillance_inputs(
     disease: str,
     loc_abb: str,
     run_date: dt.date,
-    first_training_date: dt.date,
+    min_allowed_training_date: dt.date,
     max_allowed_training_date: dt.date,
     sources: Collection[ForecastSourceName],
     ed_visit_input_resolution: DataResolution = "daily",
@@ -371,7 +379,7 @@ def load_surveillance_inputs(
         nssp = _load_dataops_nssp(
             loc_abb=loc_abb,
             disease=disease,
-            first_training_date=first_training_date,
+            min_allowed_training_date=min_allowed_training_date,
             max_allowed_training_date=max_allowed_training_date,
             run_date=run_date,
         )
@@ -388,7 +396,7 @@ def load_surveillance_inputs(
         nhsn = _load_dataops_nhsn(
             disease=disease,
             loc_abb=loc_abb,
-            first_training_date=first_training_date,
+            min_allowed_training_date=min_allowed_training_date,
             max_allowed_training_date=max_allowed_training_date,
             run_date=run_date,
         )

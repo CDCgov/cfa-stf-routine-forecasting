@@ -64,7 +64,7 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         disease,
         loc_abb,
         run_date,
-        first_training_date,
+        min_allowed_training_date,
         max_allowed_training_date,
         sources,
         ed_visit_input_resolution="daily",
@@ -74,7 +74,7 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
             location=loc_abb,
             disease=disease,
             sources=sources,
-            first_training_date=first_training_date,
+            min_allowed_training_date=min_allowed_training_date,
             max_allowed_training_date=max_allowed_training_date,
         )
         if surveillance.nssp is not None and ed_visit_input_resolution == "epiweekly":
@@ -129,7 +129,7 @@ def selected_nhsn_observations(
 ) -> pl.DataFrame:
     """Load the NHSN training observations selected for an integration run."""
     logger = logging.getLogger(__name__)
-    first_training_date, max_allowed_training_date = calculate_training_dates(
+    min_allowed_training_date, max_allowed_training_date = calculate_training_dates(
         REPORT_DATE,
         N_LOOKBACK_DAYS,
         EXCLUDE_LAST_N_DAYS,
@@ -139,7 +139,7 @@ def selected_nhsn_observations(
         disease=disease,
         loc_abb=location,
         run_date=REPORT_DATE,
-        first_training_date=first_training_date,
+        min_allowed_training_date=min_allowed_training_date,
         max_allowed_training_date=max_allowed_training_date,
         sources={"nhsn"},
         ed_visit_input_resolution="epiweekly",

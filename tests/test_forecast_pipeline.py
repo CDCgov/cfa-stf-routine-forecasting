@@ -65,6 +65,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     surveillance = make_test_surveillance_inputs(
+        first_training_date=dt.date(2024, 9, 22),
         last_training_date=dt.date(2024, 12, 18),
         sources={"nssp"},
     )
@@ -92,7 +93,6 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         disease="covid",
         loc="CA",
         report_date=dt.date(2024, 12, 20),
-        first_training_date=dt.date(2024, 9, 20),
         model_name="test_model",
         model_batch_dir=tmp_path / "covid_lookback-90_omit-1",
         surveillance=surveillance,
@@ -103,12 +103,14 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         1,
     )
     assert calls["load"]["sources"] == {"nssp"}
+    assert calls["load"]["min_allowed_training_date"] == dt.date(2024, 9, 20)
     assert calls["load"]["ed_visit_input_resolution"] == "epiweekly"
     assert calls["load"]["fail_on_stale_data"] is True
     assert run.model_batch_dir == (tmp_path / "covid_lookback-90_omit-1")
     assert run.model_run_dir == run.model_batch_dir / "model_runs" / "CA"
     assert run.model_dir == run.model_run_dir / "test_model"
     assert run.data_dir == run.model_dir / "data"
+    assert run.first_training_date == dt.date(2024, 9, 22)
     assert run.nssp is surveillance.nssp
     assert run.freshness == surveillance.freshness
     assert run.right_truncation_offset == 1

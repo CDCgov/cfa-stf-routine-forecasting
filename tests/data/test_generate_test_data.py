@@ -60,14 +60,14 @@ def test_make_nssp_returns_location_level_cfa_stf_data_schema():
 
 
 def test_make_surveillance_inputs_respects_nssp_training_window():
-    first_training_date = REPORT_DATE - dt.timedelta(days=42)
+    min_allowed_training_date = REPORT_DATE - dt.timedelta(days=42)
     max_allowed_training_date = REPORT_DATE - dt.timedelta(days=4)
 
     result = make_surveillance_inputs(
         location="CA",
         disease="covid",
         sources={"nssp"},
-        first_training_date=first_training_date,
+        min_allowed_training_date=min_allowed_training_date,
         max_allowed_training_date=max_allowed_training_date,
     )
 
@@ -78,8 +78,8 @@ def test_make_surveillance_inputs_respects_nssp_training_window():
         "date"
     )
 
-    assert nssp_data.get_column("date").min() == first_training_date
-    assert training_dates.min() == first_training_date
+    assert nssp_data.get_column("date").min() == min_allowed_training_date
+    assert training_dates.min() == min_allowed_training_date
     assert training_dates.max() == max_allowed_training_date
     assert evaluation_dates.min() == max_allowed_training_date + dt.timedelta(days=1)
     assert evaluation_dates.max() == LAST_OBS_DATE

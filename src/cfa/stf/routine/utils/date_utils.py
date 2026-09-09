@@ -75,11 +75,11 @@ def calculate_training_dates(
     if exclude_last_n_days >= n_lookback_days:
         raise ValueError("exclude_last_n_days must be less than n_lookback_days.")
 
-    first_training_date = report_date - dt.timedelta(days=n_lookback_days)
+    min_allowed_training_date = report_date - dt.timedelta(days=n_lookback_days)
     # Add one because the maximum date in the dataset is report_date - 1.
     max_allowed_training_date = report_date - dt.timedelta(days=exclude_last_n_days + 1)
 
-    logger.info("First training date: %s", first_training_date)
+    logger.info("Minimum allowed training date: %s", min_allowed_training_date)
     logger.info("Maximum allowed training date: %s", max_allowed_training_date)
 
-    return first_training_date, max_allowed_training_date
+    return min_allowed_training_date, max_allowed_training_date

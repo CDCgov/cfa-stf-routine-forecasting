@@ -379,8 +379,11 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
-        assert output["dates"] == [forecast_run.last_training_date.isoformat()]
-        assert output["reports"] == [5.0]
+        assert output["dates"] == [
+            forecast_run.first_training_date.isoformat(),
+            forecast_run.last_training_date.isoformat(),
+        ]
+        assert output["reports"] == [5.0, 5.0]
 
     def test_rejects_mismatched_nssp_resolution(self, tmp_path):
         with pytest.raises(ValueError, match="does not match EpiAutoGP frequency"):

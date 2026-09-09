@@ -36,7 +36,7 @@ def test_forecast_source_data_resolves_step_size(resolution, expected_step_size)
     assert source.step_size == expected_step_size
 
 
-def test_forecast_source_data_derives_last_training_date_from_observations():
+def test_forecast_source_data_derives_training_dates_from_observations():
     source = data_access.NSSPData(
         data=pl.DataFrame(
             {
@@ -52,6 +52,7 @@ def test_forecast_source_data_derives_last_training_date_from_observations():
         resolution="daily",
     )
 
+    assert source.first_training_date == dt.date(2026, 1, 3)
     assert source.last_training_date == dt.date(2026, 1, 4)
 
 
@@ -99,7 +100,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     result = data_access._load_dataops_nssp(
         loc_abb="CA",
         disease="covid",
-        first_training_date=dt.date(2025, 12, 1),
+        min_allowed_training_date=dt.date(2025, 12, 1),
         max_allowed_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
     )
@@ -125,6 +126,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     )
     assert result.freshness.selected_version_date == dt.date(2026, 1, 8)
     assert result.freshness.latest_observed_date == dt.date(2026, 1, 8)
+    assert result.first_training_date == dt.date(2026, 1, 7)
     assert not result.freshness.is_stale
     assert calls == {
         "disease": ["covid", "total"],
@@ -182,7 +184,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     result = data_access._load_dataops_nhsn(
         disease="covid",
         loc_abb="CA",
-        first_training_date=dt.date(2026, 1, 1),
+        min_allowed_training_date=dt.date(2026, 1, 1),
         max_allowed_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
     )
@@ -456,7 +458,7 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
         disease="covid",
         loc_abb="CA",
         run_date=report_date,
-        first_training_date=dt.date(2025, 12, 1),
+        min_allowed_training_date=dt.date(2025, 12, 1),
         max_allowed_training_date=dt.date(2026, 1, 7),
         sources={"nssp", "nhsn"},
     )
@@ -502,14 +504,14 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     assert calls["nssp"] == {
         "loc_abb": "CA",
         "disease": "covid",
-        "first_training_date": dt.date(2025, 12, 1),
+        "min_allowed_training_date": dt.date(2025, 12, 1),
         "max_allowed_training_date": dt.date(2026, 1, 7),
         "run_date": report_date,
     }
     assert calls["nhsn"] == {
         "disease": "covid",
         "loc_abb": "CA",
-        "first_training_date": dt.date(2025, 12, 1),
+        "min_allowed_training_date": dt.date(2025, 12, 1),
         "max_allowed_training_date": dt.date(2026, 1, 7),
         "run_date": report_date,
     }
@@ -548,7 +550,7 @@ def test_load_surveillance_inputs_stores_aggregated_nssp_data(monkeypatch):
         disease="covid",
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
-        first_training_date=dt.date(2025, 12, 1),
+        min_allowed_training_date=dt.date(2025, 12, 1),
         max_allowed_training_date=dt.date(2026, 1, 7),
         sources={"nssp"},
         ed_visit_input_resolution="epiweekly",
@@ -621,7 +623,7 @@ def test_load_surveillance_inputs_only_loads_requested_source(
         disease="covid",
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
-        first_training_date=dt.date(2025, 12, 1),
+        min_allowed_training_date=dt.date(2025, 12, 1),
         max_allowed_training_date=dt.date(2026, 1, 7),
         sources={requested_source},
         fail_on_stale_data=True,
@@ -647,7 +649,7 @@ def test_load_surveillance_inputs_rejects_invalid_sources(sources, message):
             disease="covid",
             loc_abb="CA",
             run_date=dt.date(2026, 1, 8),
-            first_training_date=dt.date(2025, 12, 1),
+            min_allowed_training_date=dt.date(2025, 12, 1),
             max_allowed_training_date=dt.date(2026, 1, 7),
             sources=sources,
         )

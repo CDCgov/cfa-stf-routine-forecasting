@@ -156,8 +156,8 @@ Keeping those methods common preserves data freshness checks and compatible outp
 `run_model()` is responsible for any native-output conversion needed to leave a standardized `samples.parquet` for publishing.
 
 When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
-`max_allowed_training_date` is the temporary inclusive cutoff used while labeling observations for training; it is not stored in the run state.
-`run.last_training_date` is instead derived from the observations actually retained.
+`min_allowed_training_date` and `max_allowed_training_date` are the temporary inclusive bounds used while loading and labeling observations for training; they are not stored in the run state.
+`run.first_training_date` and `run.last_training_date` are instead derived from the observations actually retained.
 For daily models, forecasting often means generating `run.n_forecast_days` days from that observed last training date through `run.forecast_through`.
 See the Fable and PyRenew implementations.
 

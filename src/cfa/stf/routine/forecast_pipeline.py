@@ -65,7 +65,7 @@ class ForecastPipeline(ABC):
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        first_training_date, max_allowed_training_date = calculate_training_dates(
+        min_allowed_training_date, max_allowed_training_date = calculate_training_dates(
             self.run_date,
             self.n_lookback_days,
             self.exclude_last_n_days,
@@ -75,7 +75,7 @@ class ForecastPipeline(ABC):
             disease=self.disease,
             loc_abb=self.loc,
             run_date=self.run_date,
-            first_training_date=first_training_date,
+            min_allowed_training_date=min_allowed_training_date,
             max_allowed_training_date=max_allowed_training_date,
             sources=self.sources,
             ed_visit_input_resolution=self.ed_visit_input_resolution,
@@ -86,7 +86,6 @@ class ForecastPipeline(ABC):
             disease=self.disease,
             loc=self.loc,
             report_date=self.run_date,
-            first_training_date=first_training_date,
             model_name=self.model_name,
             model_batch_dir=self.output_dir
             / get_model_batch_dir_name(

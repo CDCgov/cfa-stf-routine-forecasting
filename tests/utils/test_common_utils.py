@@ -24,26 +24,35 @@ class TestValidationUtils:
     """Tests for validation and configuration utilities."""
 
     @pytest.mark.parametrize(
-        "n_lookback_days,exclude_last_n_days,expected_first,expected_last",
+        (
+            "n_lookback_days",
+            "exclude_last_n_days",
+            "expected_min_allowed",
+            "expected_max_allowed",
+        ),
         [
             (90, 0, dt.date(2024, 9, 22), dt.date(2024, 12, 20)),
             (90, 5, dt.date(2024, 9, 22), dt.date(2024, 12, 15)),
         ],
     )
     def test_calculate_training_dates(
-        self, n_lookback_days, exclude_last_n_days, expected_first, expected_last
+        self,
+        n_lookback_days,
+        exclude_last_n_days,
+        expected_min_allowed,
+        expected_max_allowed,
     ):
         """Test training date calculation with various parameters."""
         report_date = dt.date(2024, 12, 21)
         logger = logging.getLogger(__name__)
 
-        first_date, last_date = calculate_training_dates(
+        min_allowed_date, max_allowed_date = calculate_training_dates(
             report_date, n_lookback_days, exclude_last_n_days, logger
         )
 
-        assert first_date == expected_first
-        assert last_date == expected_last
-        assert (report_date - first_date).days == n_lookback_days
+        assert min_allowed_date == expected_min_allowed
+        assert max_allowed_date == expected_max_allowed
+        assert (report_date - min_allowed_date).days == n_lookback_days
 
     @pytest.mark.parametrize(
         ("n_lookback_days", "exclude_last_n_days", "message"),

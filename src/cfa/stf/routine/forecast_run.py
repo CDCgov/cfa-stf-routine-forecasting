@@ -21,7 +21,6 @@ class ForecastRun:
     disease: str
     loc: str
     report_date: dt.date
-    first_training_date: dt.date
     model_name: str
     model_batch_dir: Path
     surveillance: SurveillanceInputs
@@ -33,6 +32,11 @@ class ForecastRun:
     def forecast_through(self) -> dt.date:
         """Last target date, three MMWR epiweeks beyond the report date."""
         return ceiling_mmwr_epiweek(self.report_date + dt.timedelta(weeks=3))
+
+    @property
+    def first_training_date(self) -> dt.date:
+        """Earliest observed training date across the run's data sources."""
+        return min(source.first_training_date for source in self.surveillance.sources)
 
     @property
     def last_training_date(self) -> dt.date:

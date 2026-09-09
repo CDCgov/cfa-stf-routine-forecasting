@@ -632,7 +632,6 @@ epiautogp_sensor = dg.AutomationConditionSensorDefinition(
 common_asset_args = {
     "partitions_def": daily_partitions_def,  # every asset uses this partitions def
     "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
-    "automation_condition": eager_on_wed,  # overriden where needed on assets themselves
 }
 
 # Dagster tag keys cannot contain spaces. These tags make it easy to select all
@@ -668,6 +667,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Fable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -688,6 +688,7 @@ def fable_e_other(
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Fable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -708,6 +709,7 @@ def epiweekly_fable_e_other(
 # Pyrenew E
 @dynamic_graph_asset(
     **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Pyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
@@ -726,6 +728,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -743,6 +746,7 @@ def pyrenew_h(
 # Pyrenew HE
 @dynamic_graph_asset(
     **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Pyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
@@ -764,8 +768,8 @@ def pyrenew_he(
 
 @dynamic_graph_asset(
     **common_asset_args,
-    group_name="Fusion",
     automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -784,8 +788,8 @@ def fuse_pyrenew_e_ts(
 
 @dynamic_graph_asset(
     **common_asset_args,
-    group_name="Fusion",
     automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={
         "pyrenew_e": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
@@ -807,8 +811,8 @@ def fuse_pyrenew_e_ts_epiweekly(
 
 @dynamic_graph_asset(
     **common_asset_args,
-    group_name="Fusion",
     automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=HE_DATA_RERUN_TAGS,
 )
@@ -827,8 +831,8 @@ def fuse_pyrenew_he_ts(
 
 @dynamic_graph_asset(
     **common_asset_args,
-    group_name="Fusion",
     automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={
         "pyrenew_he": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
@@ -870,8 +874,8 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     group_name="Fusion",  # included with the fusion assets
+    retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(

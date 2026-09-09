@@ -262,7 +262,6 @@ def make_surveillance_inputs(
     nssp_freshness = DataFreshness(
         source="nssp",
         selected_version_date=REPORT_DATE,
-        latest_observed_date=nssp_data.get_column("date").max(),
         run_date=REPORT_DATE,
         is_stale=False,
         reason="Synthetic NSSP data",
@@ -270,7 +269,6 @@ def make_surveillance_inputs(
     nhsn_freshness = DataFreshness(
         source="nhsn",
         selected_version_date=REPORT_DATE,
-        latest_observed_date=nhsn_data.get_column("date").max(),
         run_date=REPORT_DATE,
         is_stale=False,
         reason="Synthetic NHSN data",

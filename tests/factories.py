@@ -57,7 +57,6 @@ def make_test_surveillance_inputs(
         return DataFreshness(
             source=source,
             selected_version_date=report_date,
-            latest_observed_date=last_training_date,
             run_date=report_date,
             is_stale=False,
             reason=f"Test {source.upper()} data",

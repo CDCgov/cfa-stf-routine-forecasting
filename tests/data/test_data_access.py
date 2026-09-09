@@ -14,7 +14,6 @@ def _freshness(source: str) -> data_access.DataFreshness:
     return data_access.DataFreshness(
         source=source,
         selected_version_date=report_date,
-        latest_observed_date=report_date,
         run_date=report_date,
         is_stale=False,
         reason="Test data",
@@ -125,7 +124,6 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
         expected,
     )
     assert result.freshness.selected_version_date == dt.date(2026, 1, 8)
-    assert result.freshness.latest_observed_date == dt.date(2026, 1, 8)
     assert result.first_training_date == dt.date(2026, 1, 7)
     assert not result.freshness.is_stale
     assert calls == {
@@ -207,7 +205,6 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     assert result.resolution == "epiweekly"
     assert result.step_size == 7
     assert result.freshness.selected_version_date == dt.date(2026, 1, 8)
-    assert result.freshness.latest_observed_date == dt.date(2026, 1, 10)
     assert not result.freshness.is_stale
     assert calls == {
         "disease": "covid",
@@ -254,12 +251,10 @@ def test_surveillance_inputs_requires_at_least_one_source():
 def test_nssp_freshness_requires_run_date_match():
     fresh = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 7),
-        latest_observed_date=dt.date(2026, 1, 6),
         run_date=dt.date(2026, 1, 7),
     )
     stale = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 6),
-        latest_observed_date=dt.date(2026, 1, 5),
         run_date=dt.date(2026, 1, 7),
     )
 
@@ -291,12 +286,10 @@ def test_nhsn_freshness_is_strict_on_wednesday_and_friday(
 
     stale = data_access.nhsn_freshness(
         selected_version_date=run_date - dt.timedelta(days=1),
-        latest_observed_date=dt.date(2026, 1, 3),
         run_date=run_date,
     )
     fresh = data_access.nhsn_freshness(
         selected_version_date=run_date,
-        latest_observed_date=dt.date(2026, 1, 3),
         run_date=run_date,
     )
 
@@ -307,12 +300,10 @@ def test_nhsn_freshness_is_strict_on_wednesday_and_friday(
 def test_nhsn_freshness_allows_less_than_one_week_on_other_days():
     fresh = data_access.nhsn_freshness(
         selected_version_date=dt.date(2026, 1, 5),
-        latest_observed_date=dt.date(2026, 1, 3),
         run_date=dt.date(2026, 1, 8),
     )
     stale = data_access.nhsn_freshness(
         selected_version_date=dt.date(2026, 1, 1),
-        latest_observed_date=dt.date(2025, 12, 27),
         run_date=dt.date(2026, 1, 8),
     )
 
@@ -323,12 +314,10 @@ def test_nhsn_freshness_allows_less_than_one_week_on_other_days():
 def test_apply_freshness_policy_logs_versions_and_warns_or_raises(caplog):
     stale = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 6),
-        latest_observed_date=dt.date(2026, 1, 5),
         run_date=dt.date(2026, 1, 7),
     )
     fresh = data_access.nhsn_freshness(
         selected_version_date=dt.date(2026, 1, 7),
-        latest_observed_date=dt.date(2026, 1, 3),
         run_date=dt.date(2026, 1, 7),
     )
     logger = logging.getLogger("test-data-access")
@@ -339,14 +328,12 @@ def test_apply_freshness_policy_logs_versions_and_warns_or_raises(caplog):
             fail_on_stale_data=False,
             logger=logger,
         )
-    assert (
-        "source=nssp version=2026-01-06 latest_observed_date=2026-01-05 "
-        "run_date=2026-01-07 status=stale"
-    ) in caplog.text
-    assert (
-        "source=nhsn version=2026-01-07 latest_observed_date=2026-01-03 "
-        "run_date=2026-01-07 status=fresh"
-    ) in caplog.text
+    assert "source=nssp version=2026-01-06 run_date=2026-01-07 status=stale" in (
+        caplog.text
+    )
+    assert "source=nhsn version=2026-01-07 run_date=2026-01-07 status=fresh" in (
+        caplog.text
+    )
     assert "Stale input data" in caplog.text
 
     with pytest.raises(RuntimeError, match="Stale input data"):
@@ -400,11 +387,10 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
     calls = {}
     report_date = dt.date(2026, 1, 8)
 
-    def freshness(source, latest_observed_date):
+    def freshness(source):
         return data_access.DataFreshness(
             source=source,
             selected_version_date=report_date,
-            latest_observed_date=latest_observed_date,
             run_date=report_date,
             is_stale=False,
             reason="Test data",
@@ -421,7 +407,7 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
                 "resolution": ["daily"] * 2,
             }
         ),
-        freshness=freshness("nssp", dt.date(2026, 1, 8)),
+        freshness=freshness("nssp"),
         resolution="daily",
     )
     nhsn = data_access.NHSNData(
@@ -434,7 +420,7 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
                 "resolution": ["epiweekly"],
             }
         ),
-        freshness=freshness("nhsn", dt.date(2026, 1, 3)),
+        freshness=freshness("nhsn"),
         prelim=True,
     )
 

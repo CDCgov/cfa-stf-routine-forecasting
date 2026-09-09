@@ -147,7 +147,7 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     assert mock_predict.call_args.args[:3] == (
         run.model_run_dir,
         run.model_name,
-        25,
+        run.forecast_through,
     )
     assert mock_predict.call_args.kwargs["predict_ed_visits"] is True
     mock_read.assert_called_once_with(

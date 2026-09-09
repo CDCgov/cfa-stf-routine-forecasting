@@ -1,5 +1,6 @@
 import datetime as dt
 import logging
+from dataclasses import replace
 
 import pytest
 
@@ -226,3 +227,39 @@ def test_forecast_run_calculates_training_date_offsets(
 
     assert run.right_truncation_offset == expected_offset
     assert run.n_forecast_days == expected_forecast_days
+
+
+def test_right_truncation_offset_uses_overall_last_date_with_multiple_sources(
+    tmp_path,
+):
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        report_date=dt.date(2026, 9, 9),
+        n_lookback_days=30,
+        max_allowed_training_date=dt.date(2026, 9, 7),
+        last_training_date=dt.date(2026, 9, 4),
+        exclude_last_n_days=1,
+    )
+    later_nhsn = replace(
+        run.nhsn,
+        data=run.nhsn.data.with_columns(date=dt.date(2026, 9, 5)),
+    )
+    run = replace(
+        run,
+        surveillance=replace(run.surveillance, nhsn=later_nhsn),
+    )
+
+    assert run.nssp is not None
+    assert run.nhsn is not None
+    assert run.nssp.last_training_date == dt.date(2026, 9, 4)
+    assert run.nhsn.last_training_date == dt.date(2026, 9, 5)
+    assert run.last_training_date == dt.date(2026, 9, 5)
+    expected_offset = (run.report_date - run.last_training_date).days - 1
+    assert expected_offset == 3
+    assert run.right_truncation_offset == expected_offset
+
+
+def test_right_truncation_offset_uses_nhsn_date_without_nssp(tmp_path):
+    run = make_test_forecast_run(output_dir=tmp_path, sources=("nhsn",))
+
+    assert run.right_truncation_offset == 0

@@ -1,9 +1,11 @@
+import datetime as dt
 import logging
 from dataclasses import replace
 from math import isclose
 from pathlib import Path
 
 import polars as pl
+from cfa.stf.forecasttools import ceiling_mmwr_epiweek
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from tests.integration.generate_test_data import (
     REPORT_DATE,
@@ -252,6 +254,9 @@ def assert_model_outputs(
     workspace: Path, disease: str, location: str, model_names: list[str]
 ) -> None:
     model_run_dir = model_batch_dir(workspace, disease) / "model_runs" / location
+    expected_forecast_through = ceiling_mmwr_epiweek(
+        REPORT_DATE + dt.timedelta(weeks=3)
+    )
     for model_name in model_names:
         model_dir = model_run_dir / model_name
         assert model_dir.is_dir(), f"Missing model directory: {model_dir}"
@@ -260,4 +265,8 @@ def assert_model_outputs(
         )
         assert (model_dir / "hubverse_table.parquet").is_file(), (
             f"Missing hubverse table: {model_dir}"
+        )
+        samples = pl.read_parquet(model_dir / "samples.parquet")
+        assert samples.get_column("date").max() == expected_forecast_through, (
+            f"{model_name} forecasts do not end on {expected_forecast_through}"
         )

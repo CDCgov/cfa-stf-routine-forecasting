@@ -98,6 +98,7 @@ def make_test_forecast_run(
     min_allowed_training_date: dt.date | None = None,
     first_training_date: dt.date | None = None,
     max_allowed_training_date: dt.date | None = None,
+    last_training_date: dt.date | None = None,
     exclude_last_n_days: int = 0,
     model_name: str = "test_model",
     loc_pop: int = 1,
@@ -126,18 +127,20 @@ def make_test_forecast_run(
             "min_allowed_training_date must agree with report_date and n_lookback_days"
         )
     first_training_date = first_training_date or min_allowed_training_date
+    last_training_date = last_training_date or max_allowed_training_date
     if (
         not min_allowed_training_date
         <= first_training_date
+        <= last_training_date
         <= max_allowed_training_date
     ):
-        raise ValueError("first_training_date must fall within the allowed window")
+        raise ValueError("observed training dates must fall within the allowed window")
 
     surveillance = make_test_surveillance_inputs(
         loc_abb=loc,
         report_date=report_date,
         first_training_date=first_training_date,
-        last_training_date=max_allowed_training_date,
+        last_training_date=last_training_date,
         loc_pop=loc_pop,
         nhsn_prelim=nhsn_prelim,
         sources=sources,

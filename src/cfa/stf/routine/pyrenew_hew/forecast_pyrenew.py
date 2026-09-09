@@ -181,7 +181,7 @@ class PyRenewPipeline(ForecastPipeline):
         generate_and_save_predictions(
             run.model_run_dir,
             run.model_name,
-            run.n_forecast_days,
+            run.forecast_through,
             predict_ed_visits=self.forecast_ed_visits,
             predict_hospital_admissions=self.forecast_hospital_admissions,
             predict_wastewater=self.forecast_wastewater,

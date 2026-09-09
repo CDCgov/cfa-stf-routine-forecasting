@@ -1139,9 +1139,6 @@ defs = dg.Definitions(
         alternate_configs=[
             basic_execution_config,
             docker_execution_config,
-            azure_batch_2cpu_execution_config,
-            azure_batch_4cpu_execution_config,
-            azure_batch_64cpu_execution_config,
         ],
     ),
 )

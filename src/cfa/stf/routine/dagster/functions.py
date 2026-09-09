@@ -5,6 +5,12 @@ import dagster as dg
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.dagster.config import (
+    FableEOtherConfig,
+    ModelBaseConfig,
+    PyrenewConfig,
+    daily_partitions_def,
+)
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
@@ -14,13 +20,6 @@ from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
-)
-
-from cfa.stf.routine.dagster.config import (
-    FableEOtherConfig,
-    ModelBaseConfig,
-    PyrenewConfig,
-    daily_partitions_def,
 )
 
 

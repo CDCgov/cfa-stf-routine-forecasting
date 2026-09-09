@@ -3,8 +3,6 @@ from pathlib import Path
 import dagster as dg
 from cfa_dagster import dynamic_graph_asset
 
-from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
-
 from cfa.stf.routine.dagster.automation import eager_on_wed
 from cfa.stf.routine.dagster.config import (
     EModelExclusions,
@@ -20,6 +18,7 @@ from cfa.stf.routine.dagster.functions import (
     _run_pyrenew_model,
     _throw_if_backfill,
 )
+from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
 common_asset_args = {
     "partitions_def": daily_partitions_def,

@@ -38,9 +38,8 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.utils.date_utils import calculate_training_dates
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 from cfa.stf.routine.utils.r_utils import (
@@ -220,7 +219,7 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # using default_factory to prevent ConfigOverrides from populating fields in the Launchpad
 class _ModelTrainingFields(BaseModel):
     output_basedir: str = Field(default_factory=lambda: "")
-    n_training_days: int = Field(default_factory=lambda: 0)
+    n_lookback_days: int = Field(default_factory=lambda: 0)
     exclude_last_n_days: int = Field(default_factory=lambda: 0)
     fail_on_stale_data: bool = Field(default_factory=lambda: is_production)
 
@@ -239,7 +238,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     """
 
     output_basedir: str = "output" if is_production else "test-output"
-    n_training_days: int = 150
+    n_lookback_days: int = 150
     exclude_last_n_days: int = 1
     fail_on_stale_data: bool = is_production
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
@@ -360,8 +359,7 @@ def _run_fable_e_other(
         disease=disease,
         loc=location,
         output_dir=daily_forecast_output_dir,
-        n_training_days=model_base_config.n_training_days,
-        n_forecast_days=28,
+        n_lookback_days=loc_config.n_lookback_days,
         n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         ed_visit_input_resolution=ed_visit_input_resolution,
@@ -406,8 +404,7 @@ def _run_pyrenew_model(
         loc=location,
         priors_path=PRODUCTION_PRIORS,
         output_dir=daily_forecast_output_dir,
-        n_training_days=model_base_config.n_training_days,
-        n_forecast_days=28,
+        n_lookback_days=loc_config.n_lookback_days,
         n_chains=pyrenew_config.n_chains,
         n_warmup=pyrenew_config.n_warmup,
         n_samples=pyrenew_config.n_samples,
@@ -431,19 +428,12 @@ def get_model_loc_dir(
     context.log.debug(f"loc_config: '{loc_config}'")
 
     run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
-    first_training_date, last_training_date = calculate_training_dates(
+    forecast_window = ForecastWindow(
         report_date=run_date,
-        n_training_days=model_base_config.n_training_days,
+        n_lookback_days=loc_config.n_lookback_days,
         exclude_last_n_days=loc_config.exclude_last_n_days,
-        logger=context.log,
     )
-
-    model_batch_dir_name = get_model_batch_dir_name(
-        disease=disease,
-        report_date=run_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-    )
+    model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
 
     model_loc_dir = Path(
         model_base_config.output_basedir,
@@ -486,7 +476,8 @@ def _run_fusion_model(
         save_figs=True,
         save_ci=True,
     )
-    model_fit_dir_to_hub_tbl(fusion_model_fit_dir)
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    model_fit_dir_to_hub_tbl(fusion_model_fit_dir, report_date=run_date)
 
     context.log.debug(f"config: '{model_base_config}'")
 

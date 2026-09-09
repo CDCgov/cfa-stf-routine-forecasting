@@ -1,23 +1,21 @@
 valid_model_batch <- dplyr::bind_rows(
   tibble::tibble(
-    dirname = "covid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
+    dirname = "covid_lookback-150_omit-1",
     disease = "covid",
-    report_date = lubridate::ymd("2024-02-03"),
-    first_training_date = lubridate::ymd("2021-04-1"),
-    last_training_date = lubridate::ymd("2024-01-23")
+    n_lookback_days = 150L,
+    exclude_last_n_days = 1L
   ),
   tibble::tibble(
-    dirname = "flu_r_2022-12-11_f_2021-02-05_t_2027-12-30",
+    dirname = "flu_lookback-90_omit-5",
     disease = "flu",
-    report_date = lubridate::ymd("2022-12-11"),
-    first_training_date = lubridate::ymd("2021-02-5"),
-    last_training_date = lubridate::ymd("2027-12-30")
+    n_lookback_days = 90L,
+    exclude_last_n_days = 5L
   )
 )
 
 invalid_model_batch_dirs <- c(
-  "qcovid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
-  "flu_r_2022-12-33_f_2021-02-05_t_2027-12-30"
+  "qcovid_lookback-150_omit-1",
+  "flu_lookback-many_omit-2"
 )
 
 target_locations <- c("ME", "US")
@@ -59,7 +57,7 @@ test_that("parse_model_batch_dir_path() works as expected.", {
   ## should error if entries cannot be parsed as what is expected
   expect_error(
     parse_model_batch_dir_path(invalid_model_batch_dirs),
-    regex = "Could not parse extracted disease and/or date values"
+    regex = "Invalid format for model batch directory name|Could not parse extracted values"
   )
 })
 
@@ -93,16 +91,16 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
   withr::with_tempdir({
     ## create some directories
     valid_covid <- c(
-      "covid_r_2024-02-01_f_2021-01-01_t_2024-01-31",
-      "covid_r"
+      "covid_lookback-150_omit-1",
+      "covid_lookback-"
     )
     valid_flu <- c(
-      "flu_r_2022-11-12_f_2022-11-01_t_2022_11_10",
-      "flu_r"
+      "flu_lookback-90_omit-3",
+      "flu_lookback-"
     )
     valid_rsv <- c(
-      "rsv_r_2022-11-12_f_2022-11-01_t_2022_11_10",
-      "rsv_r"
+      "rsv_lookback-60_omit-5",
+      "rsv_lookback-"
     )
     valid_dirs <- c(valid_flu, valid_covid, valid_rsv)
 
@@ -117,9 +115,9 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
     )
 
     invalid_files <- c(
-      "covid_r.txt",
-      "flu_r.txt",
-      "rsv_r.txt"
+      "covid_lookback-.txt",
+      "flu_lookback-.txt",
+      "rsv_lookback-.txt"
     )
     fs::dir_create(c(valid_dirs, invalid_dirs))
     fs::file_create(invalid_files)

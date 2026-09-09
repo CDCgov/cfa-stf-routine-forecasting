@@ -36,7 +36,7 @@ def _run(
         disease=disease,
         loc=loc,
         report_date=report_date,
-        last_training_date=report_date - dt.timedelta(days=1),
+        max_allowed_training_date=report_date - dt.timedelta(days=1),
         model_name="epiautogp_nhsn_epiweekly",
         sources={"nhsn"},
     )

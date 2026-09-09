@@ -9,7 +9,7 @@ get_all_model_batch_dirs(dir_of_batch_dirs, diseases)
 \arguments{
 \item{dir_of_batch_dirs}{Directory in which to look for
 "model batch" directories, each of which represents an
-individual forecast date / pathogen / dataset combination.}
+individual lookback/omission / pathogen configuration.}
 
 \item{diseases}{Canonical disease identifiers to match (\code{"covid"}, \code{"flu"},
 or \code{"rsv"}), supplied as a character vector.}
@@ -20,5 +20,5 @@ A vector of paths to the forecast subdirectories.
 \description{
 Get all the subdirectories within a parent directory
 that match the pattern for a forecast run for a
-given disease and optionally a given report date.
+given disease.
 }

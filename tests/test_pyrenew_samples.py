@@ -2,8 +2,67 @@ import datetime as dt
 
 import polars as pl
 from polars.testing import assert_frame_equal
+from pyrenew_multisignal.hew import PyrenewHEWData
 
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import format_pyrenew_samples
+from cfa.stf.routine.pyrenew_hew.generate_predictive import (
+    _build_forecast_data_through,
+)
+
+
+def test_build_forecast_data_reaches_final_epiweek():
+    training_dates = [
+        dt.date(2026, 8, 1) + dt.timedelta(weeks=week) for week in range(5)
+    ]
+    data = PyrenewHEWData(
+        nhsn_training_data=pl.DataFrame(
+            {
+                "weekendingdate": training_dates,
+                "jurisdiction": ["CA"] * len(training_dates),
+                "hospital_admissions": [1.0] * len(training_dates),
+            }
+        ),
+        nhsn_step_size=7,
+    )
+    forecast_through = dt.date(2026, 9, 26)
+
+    forecast_data = _build_forecast_data_through(
+        data,
+        forecast_through,
+        include_epiweekly=True,
+    )
+
+    assert forecast_data.last_hospital_admissions_date.astype(dt.date) == (
+        forecast_through
+    )
+
+
+def test_build_forecast_data_ends_daily_spine_on_requested_date():
+    training_dates = pl.date_range(
+        dt.date(2026, 8, 1),
+        dt.date(2026, 8, 29),
+        eager=True,
+    )
+    data = PyrenewHEWData(
+        nssp_training_data=pl.DataFrame(
+            {
+                "date": training_dates,
+                "geo_value": ["CA"] * len(training_dates),
+                "observed_ed_visits": [1.0] * len(training_dates),
+                "other_ed_visits": [2.0] * len(training_dates),
+            }
+        ),
+        nssp_step_size=1,
+    )
+    forecast_through = dt.date(2026, 9, 26)
+
+    forecast_data = _build_forecast_data_through(
+        data,
+        forecast_through,
+        include_epiweekly=False,
+    )
+
+    assert forecast_data.last_ed_visits_date.astype(dt.date) == forecast_through
 
 
 def test_format_pyrenew_samples_matches_previous_r_output():

@@ -23,8 +23,7 @@ def _common_kwargs(tmp_path):
         "disease": "covid",
         "loc": "CA",
         "output_dir": tmp_path,
-        "n_training_days": 90,
-        "n_forecast_days": 28,
+        "n_lookback_days": 90,
         "run_date": dt.date(2024, 12, 20),
     }
 
@@ -53,7 +52,7 @@ def test_fable_pipeline_forecasts_through_excluded_tail(mock_forecast, tmp_path)
 
     pipeline.run_model(run)
 
-    mock_forecast.assert_called_once_with(run.model_dir, 30, 10)
+    mock_forecast.assert_called_once_with(run.model_dir, 25, 10)
 
 
 def _pyrenew_pipeline(tmp_path, **overrides):
@@ -148,7 +147,7 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     assert mock_predict.call_args.args[:3] == (
         run.model_run_dir,
         run.model_name,
-        30,
+        run.forecast_through,
     )
     assert mock_predict.call_args.kwargs["predict_ed_visits"] is True
     mock_read.assert_called_once_with(

@@ -40,8 +40,8 @@ from cfa.stf.routine.utils.postprocess_forecast_batches import combine_hubverse_
 from cfa.stf.routine.utils.r_utils import model_fit_dir_to_hub_tbl
 
 FORECAST_DATES = [
-    dt.date(2024, 2, 4),
-    dt.date(2024, 2, 5),
+    dt.date(2024, 2, 6),
+    dt.date(2024, 2, 7),
 ]
 REPORT_DATE = dt.date(2024, 2, 3)
 EXPECTED_DATES = FORECAST_DATES * 2
@@ -111,7 +111,7 @@ def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]
                 [
                     f"--json-input={input_path}",
                     f"--output-dir={model_fit_dir}",
-                    "--n-ahead=1",
+                    "--n-ahead=2",
                     "--n-particles=2",
                     "--n-mcmc=1",
                     "--n-hmc=1",

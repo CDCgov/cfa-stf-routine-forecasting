@@ -210,7 +210,8 @@ function prepare_for_modelling(
         create_nowcast_data(input.nowcast_reports, input.nowcast_dates; transformation)
 
     time_step = input.frequency == "epiweekly" ? Week(1) : Day(1)
-    forecast_dates = [input.forecast_date + i * time_step for i in 0:n_ahead]
+    last_training_date = input.dates[end]
+    forecast_dates = [last_training_date + i * time_step for i in 1:n_ahead]
 
     n_forecasts_per_nowcast = isnothing(nowcast_data) ?
         n_forecasts :

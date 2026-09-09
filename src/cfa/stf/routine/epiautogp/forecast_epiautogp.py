@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-import math
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -12,6 +11,7 @@ from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.nowcast import NowcastSource
 from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.epiautogp.prep_epiautogp_data import (
+    _extract_model_series,
     _validate_epiautogp_parameters,
     convert_to_epiautogp_json,
 )
@@ -201,8 +201,20 @@ class EpiAutoGPPipeline(ForecastPipeline):
         )
 
     def run_model(self, run: ForecastRun) -> None:
-        step_size = 7 if self.config.frequency == "epiweekly" else 1
-        n_ahead = math.ceil((run.forecast_through - run.report_date).days / step_size)
+        training_dates, _ = _extract_model_series(
+            forecast_run=run,
+            config=self.config,
+            logger=self.logger,
+        )
+        step_days = 7 if self.config.frequency == "epiweekly" else 1
+        days_ahead = (run.forecast_through - training_dates[-1]).days
+        n_ahead, extra_days = divmod(days_ahead, step_days)
+        if extra_days:
+            raise ValueError(
+                f"The distance from the final {self.config.frequency} training "
+                "date to forecast_through must be a whole number of model steps; "
+                f"got {training_dates[-1]} and {run.forecast_through}."
+            )
         transformation = (
             "percentage" if self.config.ed_visit_type == "pct" else "boxcox"
         )

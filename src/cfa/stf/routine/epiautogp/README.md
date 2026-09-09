@@ -30,6 +30,7 @@ The model input is built directly from the loaded NSSP or NHSN frame.
   | NHSN   | epiweekly          | `observed`                    |
 
 For epiweekly NSSP forecasts, the shared loader retains only complete MMWR weeks.
+For both frequencies, the forecast horizon starts one model time step after the final selected training observation and ends on `forecast_through`.
 Percentage inputs are calculated from the aggregated disease and other-visit counts.
 
 Nowcast modes are:

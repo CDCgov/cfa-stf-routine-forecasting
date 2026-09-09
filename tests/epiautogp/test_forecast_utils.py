@@ -1,7 +1,9 @@
 import datetime as dt
 import logging
+from dataclasses import replace
 from unittest.mock import patch
 
+import polars as pl
 import pytest
 from tests.factories import make_test_forecast_run
 
@@ -93,19 +95,12 @@ def test_prepare_model_artifacts_resolves_nowcast_without_mutating_state(
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")
-@pytest.mark.parametrize(
-    ("frequency", "expected_n_ahead"),
-    [("daily", 22), ("epiweekly", 4)],
-)
 def test_run_model_passes_prepared_input_and_model_options(
     mock_forecast,
     tmp_path,
-    frequency,
-    expected_n_ahead,
 ):
     pipeline = _pipeline(
         tmp_path,
-        frequency=frequency,
         ed_visit_type="pct",
         n_particles=2,
         n_mcmc=3,
@@ -121,7 +116,7 @@ def test_run_model_passes_prepared_input_and_model_options(
     assert mock_forecast.call_args.kwargs == {
         "json_input_path": run.model_dir / f"{run.model_name}_input.json",
         "model_dir": run.model_dir,
-        "n_ahead": expected_n_ahead,
+        "n_ahead": 23,
         "n_particles": 2,
         "n_mcmc": 3,
         "n_hmc": 4,
@@ -130,6 +125,59 @@ def test_run_model_passes_prepared_input_and_model_options(
         "smc_data_proportion": 0.2,
         "n_threads": 6,
     }
+
+
+@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")
+def test_epiweekly_horizon_uses_final_training_observation(mock_forecast, tmp_path):
+    pipeline = _pipeline(tmp_path, frequency="epiweekly")
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        report_date=dt.date(2026, 9, 8),
+        exclude_last_n_days=2,
+        model_name=pipeline.model_name,
+        sources=("nssp",),
+    )
+    weekly_data = run.nssp.data.with_columns(
+        date=pl.lit(dt.date(2026, 8, 29)),
+        resolution=pl.lit("epiweekly"),
+    )
+    run = replace(
+        run,
+        surveillance=replace(
+            run.surveillance,
+            nssp=replace(run.nssp, data=weekly_data, resolution="epiweekly"),
+        ),
+    )
+
+    pipeline.run_model(run)
+
+    assert run.last_training_date == dt.date(2026, 9, 5)
+    assert run.forecast_through == dt.date(2026, 10, 3)
+    assert mock_forecast.call_args.kwargs["n_ahead"] == 5
+
+
+def test_epiweekly_horizon_requires_aligned_weekdays(tmp_path):
+    pipeline = _pipeline(tmp_path, frequency="epiweekly")
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        report_date=dt.date(2026, 9, 8),
+        model_name=pipeline.model_name,
+        sources=("nssp",),
+    )
+    run = replace(
+        run,
+        surveillance=replace(
+            run.surveillance,
+            nssp=replace(
+                run.nssp,
+                data=run.nssp.data.with_columns(resolution=pl.lit("epiweekly")),
+                resolution="epiweekly",
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="must be a whole number of model steps"):
+        pipeline.run_model(run)
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_julia_script")

@@ -156,8 +156,8 @@ Keeping those methods common preserves data freshness checks and compatible outp
 `run_model()` is responsible for any native-output conversion needed to leave a standardized `samples.parquet` for publishing.
 
 When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
-For daily models this often means generating `run.n_forecast_days + run.exclude_last_n_days + 1` days from the last training date; see the Fable and PyRenew implementations.
-`run.n_forecast_days` is derived from the report date so forecasts end three MMWR epiweeks ahead.
+For daily models this often means generating `run.n_forecast_days` days; it is the number of days after `run.last_training_date` through `run.forecast_through`.
+See the Fable and PyRenew implementations.
 
 ## 4. Add orchestration explicitly
 

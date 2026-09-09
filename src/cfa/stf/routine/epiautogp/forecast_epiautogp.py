@@ -1,5 +1,6 @@
 import datetime as dt
 import logging
+import math
 from pathlib import Path
 from typing import Literal, get_args
 
@@ -200,11 +201,8 @@ class EpiAutoGPPipeline(ForecastPipeline):
         )
 
     def run_model(self, run: ForecastRun) -> None:
-        n_ahead = (
-            (run.n_forecast_days + 6) // 7
-            if self.config.frequency == "epiweekly"
-            else run.n_forecast_days
-        )
+        step_size = 7 if self.config.frequency == "epiweekly" else 1
+        n_ahead = math.ceil((run.forecast_through - run.report_date).days / step_size)
         transformation = (
             "percentage" if self.config.ed_visit_type == "pct" else "boxcox"
         )

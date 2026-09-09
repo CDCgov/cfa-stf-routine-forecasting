@@ -48,8 +48,8 @@ class ForecastRun:
 
     @property
     def n_forecast_days(self) -> int:
-        """Number of days from the report date through the last target date."""
-        return (self.forecast_through - self.report_date).days
+        """Number of days after the last training date through the last target date."""
+        return (self.forecast_through - self.last_training_date).days
 
     @property
     def model_run_dir(self) -> Path:

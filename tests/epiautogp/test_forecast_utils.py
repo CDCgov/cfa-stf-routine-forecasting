@@ -93,13 +93,19 @@ def test_prepare_model_artifacts_resolves_nowcast_without_mutating_state(
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")
+@pytest.mark.parametrize(
+    ("frequency", "expected_n_ahead"),
+    [("daily", 22), ("epiweekly", 4)],
+)
 def test_run_model_passes_prepared_input_and_model_options(
     mock_forecast,
     tmp_path,
+    frequency,
+    expected_n_ahead,
 ):
     pipeline = _pipeline(
         tmp_path,
-        frequency="epiweekly",
+        frequency=frequency,
         ed_visit_type="pct",
         n_particles=2,
         n_mcmc=3,
@@ -115,7 +121,7 @@ def test_run_model_passes_prepared_input_and_model_options(
     assert mock_forecast.call_args.kwargs == {
         "json_input_path": run.model_dir / f"{run.model_name}_input.json",
         "model_dir": run.model_dir,
-        "n_ahead": 4,
+        "n_ahead": expected_n_ahead,
         "n_particles": 2,
         "n_mcmc": 3,
         "n_hmc": 4,

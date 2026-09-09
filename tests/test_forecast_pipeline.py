@@ -116,20 +116,20 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run.freshness == surveillance.freshness
     assert run.right_truncation_offset == 1
     assert run.forecast_through == dt.date(2025, 1, 11)
-    assert run.n_forecast_days == 22
+    assert run.n_forecast_days == 24
 
 
 @pytest.mark.parametrize(
     ("report_date", "expected", "expected_days"),
     [
-        (dt.date(2026, 9, 2), dt.date(2026, 9, 26), 24),
-        (dt.date(2026, 9, 3), dt.date(2026, 9, 26), 23),
-        (dt.date(2026, 9, 4), dt.date(2026, 9, 26), 22),
-        (dt.date(2026, 9, 5), dt.date(2026, 9, 26), 21),
-        (dt.date(2026, 9, 6), dt.date(2026, 10, 3), 27),
-        (dt.date(2026, 9, 7), dt.date(2026, 10, 3), 26),
-        (dt.date(2026, 9, 8), dt.date(2026, 10, 3), 25),
-        (dt.date(2026, 9, 9), dt.date(2026, 10, 3), 24),
+        (dt.date(2026, 9, 2), dt.date(2026, 9, 26), 25),
+        (dt.date(2026, 9, 3), dt.date(2026, 9, 26), 24),
+        (dt.date(2026, 9, 4), dt.date(2026, 9, 26), 23),
+        (dt.date(2026, 9, 5), dt.date(2026, 9, 26), 22),
+        (dt.date(2026, 9, 6), dt.date(2026, 10, 3), 28),
+        (dt.date(2026, 9, 7), dt.date(2026, 10, 3), 27),
+        (dt.date(2026, 9, 8), dt.date(2026, 10, 3), 26),
+        (dt.date(2026, 9, 9), dt.date(2026, 10, 3), 25),
     ],
 )
 def test_forecast_run_forecast_through(tmp_path, report_date, expected, expected_days):
@@ -200,17 +200,23 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
 
 
 @pytest.mark.parametrize(
-    ("last_training_date", "exclude_last_n_days", "expected_offset"),
+    (
+        "last_training_date",
+        "exclude_last_n_days",
+        "expected_offset",
+        "expected_forecast_days",
+    ),
     [
-        (dt.date(2024, 12, 19), 0, 0),
-        (dt.date(2024, 12, 14), 5, 5),
+        (dt.date(2024, 12, 19), 0, 0, 23),
+        (dt.date(2024, 12, 14), 5, 5, 28),
     ],
 )
-def test_forecast_run_calculates_right_truncation_offset(
+def test_forecast_run_calculates_training_date_offsets(
     tmp_path,
     last_training_date,
     exclude_last_n_days,
     expected_offset,
+    expected_forecast_days,
 ):
     run = make_test_forecast_run(
         output_dir=tmp_path,
@@ -220,3 +226,4 @@ def test_forecast_run_calculates_right_truncation_offset(
     )
 
     assert run.right_truncation_offset == expected_offset
+    assert run.n_forecast_days == expected_forecast_days

@@ -178,11 +178,10 @@ class PyRenewPipeline(ForecastPipeline):
         self.logger.info("Model fitting complete")
 
         self.logger.info("Performing posterior prediction / forecasting...")
-        n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days + 1
         generate_and_save_predictions(
             run.model_run_dir,
             run.model_name,
-            n_days_past_last_training,
+            run.n_forecast_days,
             predict_ed_visits=self.forecast_ed_visits,
             predict_hospital_admissions=self.forecast_hospital_admissions,
             predict_wastewater=self.forecast_wastewater,

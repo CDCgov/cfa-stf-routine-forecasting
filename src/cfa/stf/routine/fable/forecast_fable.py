@@ -56,11 +56,10 @@ class FablePipeline(ForecastPipeline):
         return self._ed_visit_input_resolution
 
     def run_model(self, run: ForecastRun) -> None:
-        n_days_past_last_training = run.n_forecast_days + run.exclude_last_n_days + 1
         self.logger.info("Performing fable E-other forecasting")
         fable_e_other_forecasts(
             run.model_dir,
-            n_days_past_last_training,
+            run.n_forecast_days,
             self.n_samples,
         )
 

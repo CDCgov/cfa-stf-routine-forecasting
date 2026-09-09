@@ -2460,7 +2460,7 @@ wheels = [
 
 [[package]]
 name = "mizani"
-version = "0.14.4"
+version = "0.14.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -2468,9 +2468,9 @@ dependencies = [
     { name = "scipy" },
     { name = "tzdata", marker = "sys_platform == 'emscripten' or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/02/43fcf763c70e8aa8edc28ac65713daca2c18d3bc2b998af4647966b5bafb/mizani-0.14.4.tar.gz", hash = "sha256:28934d91516d922d7cb0382c82a6c513692abc0174c42a50294ae571520633f9", size = 772490, upload-time = "2026-01-28T14:42:18.108Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/df/74/e03c87e8884a486909f9f254a9d0d6b34395a7379e6bf2331bbc8453b1d4/mizani-0.14.6.tar.gz", hash = "sha256:5b37ec00adb30420f18272844688b91137297068c707f18d6fd32673aed58a23", size = 774581, upload-time = "2026-09-07T16:14:38.634Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/30/b6617c74a8234ff60265373ef730eb6378ccdda74042f51f9ac936191664/mizani-0.14.4-py3-none-any.whl", hash = "sha256:ed72bf249e2a18b5dcc65cd54c7eaa5444b2cb09c7e18aafa2ab6f05f1b78620", size = 133471, upload-time = "2026-01-28T14:42:16.328Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/a8/4463130becffe3e091feed0f459008aeebc806998dff53166cc12063f6b0/mizani-0.14.6-py3-none-any.whl", hash = "sha256:a3d3ec364018efaa0e259d530303576156bac7741faa66167c9b50aaf19c3d73", size = 134163, upload-time = "2026-09-07T16:14:36.791Z" },
 ]
 
 [[package]]

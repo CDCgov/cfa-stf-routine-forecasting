@@ -151,7 +151,7 @@ def test_epiweekly_horizon_uses_final_training_observation(mock_forecast, tmp_pa
 
     pipeline.run_model(run)
 
-    assert run.last_training_date == dt.date(2026, 9, 5)
+    assert run.last_training_date == dt.date(2026, 8, 29)
     assert run.forecast_through == dt.date(2026, 10, 3)
     assert mock_forecast.call_args.kwargs["n_ahead"] == 5
 

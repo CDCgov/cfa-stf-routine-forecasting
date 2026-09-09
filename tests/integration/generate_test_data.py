@@ -237,7 +237,7 @@ def make_surveillance_inputs(
     disease: str,
     sources: Collection[ForecastSourceName],
     first_training_date: dt.date = FIRST_OBS_DATE,
-    last_training_date: dt.date = REPORT_DATE,
+    max_allowed_training_date: dt.date = REPORT_DATE,
 ) -> SurveillanceInputs:
     requested_sources = frozenset(sources)
     locations = sorted(set(DEFAULT_LOCATIONS + [location]))
@@ -280,7 +280,7 @@ def make_surveillance_inputs(
         NSSPData(
             data=_normalize_nssp_data(
                 nssp_data,
-                last_training_date=last_training_date,
+                max_allowed_training_date=max_allowed_training_date,
             ),
             freshness=nssp_freshness,
             resolution="daily",
@@ -293,7 +293,7 @@ def make_surveillance_inputs(
             data=(
                 nhsn_data.filter(pl.col("date") >= first_training_date)
                 .with_columns(
-                    data_type=pl.when(pl.col("date") <= last_training_date)
+                    data_type=pl.when(pl.col("date") <= max_allowed_training_date)
                     .then(pl.lit("train"))
                     .otherwise(pl.lit("eval")),
                     resolution=pl.lit("epiweekly"),

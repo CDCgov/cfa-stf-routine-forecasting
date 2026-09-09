@@ -67,7 +67,7 @@ def calculate_training_dates(
     exclude_last_n_days: int,
     logger: logging.Logger,
 ) -> tuple[dt.date, dt.date]:
-    """Calculate training dates within a report-date-anchored lookback window."""
+    """Calculate allowed training-date bounds for a report-anchored window."""
     if n_lookback_days <= 0:
         raise ValueError("n_lookback_days must be positive.")
     if exclude_last_n_days < 0:
@@ -77,9 +77,9 @@ def calculate_training_dates(
 
     first_training_date = report_date - dt.timedelta(days=n_lookback_days)
     # Add one because the maximum date in the dataset is report_date - 1.
-    last_training_date = report_date - dt.timedelta(days=exclude_last_n_days + 1)
+    max_allowed_training_date = report_date - dt.timedelta(days=exclude_last_n_days + 1)
 
     logger.info("First training date: %s", first_training_date)
-    logger.info("Last training date: %s", last_training_date)
+    logger.info("Maximum allowed training date: %s", max_allowed_training_date)
 
-    return first_training_date, last_training_date
+    return first_training_date, max_allowed_training_date

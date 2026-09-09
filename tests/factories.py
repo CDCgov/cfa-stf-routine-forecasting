@@ -12,6 +12,7 @@ from cfa.stf.routine.data.data_access import (
     SurveillanceInputs,
 )
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 
@@ -91,7 +92,7 @@ def make_test_forecast_run(
     report_date: dt.date = DEFAULT_REPORT_DATE,
     n_lookback_days: int = 90,
     first_training_date: dt.date | None = None,
-    last_training_date: dt.date | None = None,
+    max_allowed_training_date: dt.date | None = None,
     exclude_last_n_days: int = 0,
     model_name: str = "test_model",
     loc_pop: int = 1,
@@ -99,14 +100,15 @@ def make_test_forecast_run(
     sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
 ) -> ForecastRun:
     """Build internally consistent state for one test forecast run."""
-    expected_last_training_date = report_date - dt.timedelta(
+    expected_max_allowed_training_date = report_date - dt.timedelta(
         days=exclude_last_n_days + 1
     )
-    if last_training_date is None:
-        last_training_date = expected_last_training_date
-    elif last_training_date != expected_last_training_date:
+    if max_allowed_training_date is None:
+        max_allowed_training_date = expected_max_allowed_training_date
+    elif max_allowed_training_date != expected_max_allowed_training_date:
         raise ValueError(
-            "last_training_date must agree with report_date and exclude_last_n_days"
+            "max_allowed_training_date must agree with report_date and "
+            "exclude_last_n_days"
         )
 
     expected_first_training_date = report_date - dt.timedelta(days=n_lookback_days)
@@ -120,7 +122,7 @@ def make_test_forecast_run(
     surveillance = make_test_surveillance_inputs(
         loc_abb=loc,
         report_date=report_date,
-        last_training_date=last_training_date,
+        last_training_date=max_allowed_training_date,
         loc_pop=loc_pop,
         nhsn_prelim=nhsn_prelim,
         sources=sources,
@@ -130,10 +132,12 @@ def make_test_forecast_run(
         loc=loc,
         report_date=report_date,
         first_training_date=first_training_date,
-        last_training_date=last_training_date,
-        n_lookback_days=n_lookback_days,
-        exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
-        output_dir=Path(output_dir),
+        model_batch_dir=Path(output_dir)
+        / get_model_batch_dir_name(
+            disease=disease,
+            n_lookback_days=n_lookback_days,
+            exclude_last_n_days=exclude_last_n_days,
+        ),
         surveillance=surveillance,
     )

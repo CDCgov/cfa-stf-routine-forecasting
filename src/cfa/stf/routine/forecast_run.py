@@ -12,7 +12,6 @@ from cfa.stf.routine.data.data_access import (
     NSSPData,
     SurveillanceInputs,
 )
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 
 
 @dataclass(frozen=True)
@@ -23,28 +22,22 @@ class ForecastRun:
     loc: str
     report_date: dt.date
     first_training_date: dt.date
-    last_training_date: dt.date
-    n_lookback_days: int
-    exclude_last_n_days: int
     model_name: str
-    output_dir: Path
+    model_batch_dir: Path
     surveillance: SurveillanceInputs
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "output_dir", Path(self.output_dir))
-
-    @property
-    def model_batch_dir(self) -> Path:
-        return self.output_dir / get_model_batch_dir_name(
-            disease=self.disease,
-            n_lookback_days=self.n_lookback_days,
-            exclude_last_n_days=self.exclude_last_n_days,
-        )
+        object.__setattr__(self, "model_batch_dir", Path(self.model_batch_dir))
 
     @property
     def forecast_through(self) -> dt.date:
         """Last target date, three MMWR epiweeks beyond the report date."""
         return ceiling_mmwr_epiweek(self.report_date + dt.timedelta(weeks=3))
+
+    @property
+    def last_training_date(self) -> dt.date:
+        """Latest observed training date across the run's data sources."""
+        return max(source.last_training_date for source in self.surveillance.sources)
 
     @property
     def n_forecast_days(self) -> int:

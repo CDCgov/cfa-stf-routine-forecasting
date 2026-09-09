@@ -36,6 +36,25 @@ def test_forecast_source_data_resolves_step_size(resolution, expected_step_size)
     assert source.step_size == expected_step_size
 
 
+def test_forecast_source_data_derives_last_training_date_from_observations():
+    source = data_access.NSSPData(
+        data=pl.DataFrame(
+            {
+                "date": [
+                    dt.date(2026, 1, 3),
+                    dt.date(2026, 1, 4),
+                    dt.date(2026, 1, 5),
+                ],
+                "data_type": ["train", "train", "eval"],
+            }
+        ),
+        freshness=_freshness("nssp"),
+        resolution="daily",
+    )
+
+    assert source.last_training_date == dt.date(2026, 1, 4)
+
+
 def test_forecast_source_data_rejects_unsupported_resolution():
     with pytest.raises(ValueError, match="Unsupported NSSPData resolution"):
         data_access.NSSPData(
@@ -81,7 +100,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
         loc_abb="CA",
         disease="covid",
         first_training_date=dt.date(2025, 12, 1),
-        last_training_date=dt.date(2026, 1, 7),
+        max_allowed_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
     )
 
@@ -129,7 +148,7 @@ def test_normalize_nssp_data_requires_one_non_total_disease():
     with pytest.raises(ValueError, match="exactly one non-total NSSP disease"):
         data_access._normalize_nssp_data(
             source_data,
-            last_training_date=dt.date(2026, 1, 7),
+            max_allowed_training_date=dt.date(2026, 1, 7),
         )
 
 
@@ -164,7 +183,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
         disease="covid",
         loc_abb="CA",
         first_training_date=dt.date(2026, 1, 1),
-        last_training_date=dt.date(2026, 1, 7),
+        max_allowed_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
     )
 
@@ -438,7 +457,7 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
         loc_abb="CA",
         run_date=report_date,
         first_training_date=dt.date(2025, 12, 1),
-        last_training_date=dt.date(2026, 1, 7),
+        max_allowed_training_date=dt.date(2026, 1, 7),
         sources={"nssp", "nhsn"},
     )
 
@@ -484,14 +503,14 @@ def test_load_surveillance_inputs_uses_dataops_loaders(monkeypatch):
         "loc_abb": "CA",
         "disease": "covid",
         "first_training_date": dt.date(2025, 12, 1),
-        "last_training_date": dt.date(2026, 1, 7),
+        "max_allowed_training_date": dt.date(2026, 1, 7),
         "run_date": report_date,
     }
     assert calls["nhsn"] == {
         "disease": "covid",
         "loc_abb": "CA",
         "first_training_date": dt.date(2025, 12, 1),
-        "last_training_date": dt.date(2026, 1, 7),
+        "max_allowed_training_date": dt.date(2026, 1, 7),
         "run_date": report_date,
     }
 
@@ -530,7 +549,7 @@ def test_load_surveillance_inputs_stores_aggregated_nssp_data(monkeypatch):
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
         first_training_date=dt.date(2025, 12, 1),
-        last_training_date=dt.date(2026, 1, 7),
+        max_allowed_training_date=dt.date(2026, 1, 7),
         sources={"nssp"},
         ed_visit_input_resolution="epiweekly",
     )
@@ -603,7 +622,7 @@ def test_load_surveillance_inputs_only_loads_requested_source(
         loc_abb="CA",
         run_date=dt.date(2026, 1, 8),
         first_training_date=dt.date(2025, 12, 1),
-        last_training_date=dt.date(2026, 1, 7),
+        max_allowed_training_date=dt.date(2026, 1, 7),
         sources={requested_source},
         fail_on_stale_data=True,
     )
@@ -629,6 +648,6 @@ def test_load_surveillance_inputs_rejects_invalid_sources(sources, message):
             loc_abb="CA",
             run_date=dt.date(2026, 1, 8),
             first_training_date=dt.date(2025, 12, 1),
-            last_training_date=dt.date(2026, 1, 7),
+            max_allowed_training_date=dt.date(2026, 1, 7),
             sources=sources,
         )

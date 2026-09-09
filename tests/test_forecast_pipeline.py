@@ -93,11 +93,8 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         loc="CA",
         report_date=dt.date(2024, 12, 20),
         first_training_date=dt.date(2024, 9, 20),
-        last_training_date=dt.date(2024, 12, 18),
-        n_lookback_days=90,
-        exclude_last_n_days=1,
         model_name="test_model",
-        output_dir=tmp_path,
+        model_batch_dir=tmp_path / "covid_lookback-90_omit-1",
         surveillance=surveillance,
     )
     assert calls["calculate"][:3] == (
@@ -201,7 +198,7 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
 
 @pytest.mark.parametrize(
     (
-        "last_training_date",
+        "max_allowed_training_date",
         "exclude_last_n_days",
         "expected_offset",
         "expected_forecast_days",
@@ -213,7 +210,7 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
 )
 def test_forecast_run_calculates_training_date_offsets(
     tmp_path,
-    last_training_date,
+    max_allowed_training_date,
     exclude_last_n_days,
     expected_offset,
     expected_forecast_days,
@@ -221,7 +218,7 @@ def test_forecast_run_calculates_training_date_offsets(
     run = make_test_forecast_run(
         output_dir=tmp_path,
         report_date=dt.date(2024, 12, 20),
-        last_training_date=last_training_date,
+        max_allowed_training_date=max_allowed_training_date,
         exclude_last_n_days=exclude_last_n_days,
     )
 

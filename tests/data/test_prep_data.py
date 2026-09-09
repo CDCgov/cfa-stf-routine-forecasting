@@ -90,7 +90,7 @@ def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
     )
     dates = pl.date_range(dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True)
     variables = ("observed_ed_visits", "other_ed_visits")
-    last_training_date = dt.date(2025, 1, 11)
+    max_allowed_training_date = dt.date(2025, 1, 11)
     observed_ed_visits = range(1, len(dates) + 1)
     other_ed_visits = 9
     nssp_data = pl.DataFrame(
@@ -104,7 +104,7 @@ def test_serialize_data_uses_run_ed_visits_for_both_artifacts(tmp_path):
                 for value in (observed, other_ed_visits)
             ],
             "data_type": [
-                "train" if date <= last_training_date else "eval"
+                "train" if date <= max_allowed_training_date else "eval"
                 for date in dates
                 for _variable in variables
             ],

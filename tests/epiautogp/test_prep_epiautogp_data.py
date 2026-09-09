@@ -300,7 +300,7 @@ def _epiautogp_run(tmp_path):
         report_date=report_date,
         n_lookback_days=2,
         first_training_date=dt.date(2024, 1, 1),
-        last_training_date=dt.date(2024, 1, 2),
+        max_allowed_training_date=dt.date(2024, 1, 2),
         model_name="test_model",
         sources=("nssp",),
     )

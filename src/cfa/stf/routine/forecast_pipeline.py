@@ -14,6 +14,7 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.utils.date_utils import calculate_training_dates
+from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -64,7 +65,7 @@ class ForecastPipeline(ABC):
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        first_training_date, last_training_date = calculate_training_dates(
+        first_training_date, max_allowed_training_date = calculate_training_dates(
             self.run_date,
             self.n_lookback_days,
             self.exclude_last_n_days,
@@ -75,7 +76,7 @@ class ForecastPipeline(ABC):
             loc_abb=self.loc,
             run_date=self.run_date,
             first_training_date=first_training_date,
-            last_training_date=last_training_date,
+            max_allowed_training_date=max_allowed_training_date,
             sources=self.sources,
             ed_visit_input_resolution=self.ed_visit_input_resolution,
             fail_on_stale_data=self.fail_on_stale_data,
@@ -86,11 +87,13 @@ class ForecastPipeline(ABC):
             loc=self.loc,
             report_date=self.run_date,
             first_training_date=first_training_date,
-            last_training_date=last_training_date,
-            n_lookback_days=self.n_lookback_days,
-            exclude_last_n_days=self.exclude_last_n_days,
             model_name=self.model_name,
-            output_dir=self.output_dir,
+            model_batch_dir=self.output_dir
+            / get_model_batch_dir_name(
+                disease=self.disease,
+                n_lookback_days=self.n_lookback_days,
+                exclude_last_n_days=self.exclude_last_n_days,
+            ),
             surveillance=surveillance,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)

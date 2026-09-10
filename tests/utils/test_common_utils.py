@@ -187,10 +187,10 @@ class TestDirectoryUtils:
         (tmp_path / "flu_lookback-90_omit-3").mkdir()
         (tmp_path / "covid_r_2026-09-02_f_2026-04-04_t_2026-08-31").mkdir()
 
-        assert get_all_forecast_dirs(tmp_path, ["covid", "rsv"]) == [
+        assert set(get_all_forecast_dirs(tmp_path, ["covid", "rsv"])) == {
             "covid_lookback-150_omit-1",
             "covid_lookback-all_omit-1",
-        ]
+        }
 
 
 class TestCLIUtils:

@@ -39,7 +39,7 @@ class ForecastPipeline(ABC):
         self.disease = disease
         self.loc = loc
         self.output_dir = Path(output_dir)
-        self.forecast_window = ForecastWindow(
+        self.requested_window = ForecastWindow(
             report_date=run_date,
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=exclude_last_n_days,
@@ -73,17 +73,17 @@ class ForecastPipeline(ABC):
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
         effective_exclusion = max(
-            self.forecast_window.exclude_last_n_days,
+            self.requested_window.exclude_last_n_days,
             self.minimum_exclude_last_n_days,
         )
         effective_window = replace(
-            self.forecast_window,
+            self.requested_window,
             exclude_last_n_days=effective_exclusion,
         )
-        if effective_window != self.forecast_window:
+        if effective_window != self.requested_window:
             self.logger.info(
                 "Increasing excluded training tail from %s to %s days for model %s.",
-                self.forecast_window.exclude_last_n_days,
+                self.requested_window.exclude_last_n_days,
                 effective_window.exclude_last_n_days,
                 self.model_name,
             )
@@ -113,7 +113,7 @@ class ForecastPipeline(ABC):
             model_name=self.model_name,
             output_dir=self.output_dir,
             surveillance=surveillance,
-            model_batch_dir_name=self.forecast_window.model_batch_dir_name(
+            model_batch_dir_name=self.requested_window.model_batch_dir_name(
                 self.disease
             ),
         )
@@ -156,7 +156,7 @@ class ForecastPipeline(ABC):
             "date %s.",
             self.model_name,
             self.loc,
-            self.forecast_window.report_date,
+            self.requested_window.report_date,
         )
         self.validate_configuration()
         run = self.build_forecast_run()

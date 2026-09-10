@@ -101,6 +101,11 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     )
     run = pipeline.build_forecast_run()
 
+    assert pipeline.requested_window == ForecastWindow(
+        report_date=dt.date(2024, 12, 20),
+        n_lookback_days=90,
+        exclude_last_n_days=1,
+    )
     assert run == ForecastRun(
         disease="covid",
         loc="CA",

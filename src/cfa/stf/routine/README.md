@@ -106,7 +106,7 @@ Every subclass must implement:
 `ForecastRun` combines that configured window with the surveillance observations that were actually retained, the population, and the model output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
 Models can override `minimum_exclude_last_n_days` when they require a longer omitted tail than the caller requested.
-The run's `forecast_window` records that effective omission, while `model_batch_dir_name` is captured from the caller-requested window so all models remain in the same batch directory.
+The pipeline's `requested_window` preserves that caller configuration; the run's `forecast_window` records the effective omission, while `model_batch_dir_name` is captured from the requested window so all models remain in the same batch directory.
 The resulting layout is:
 
 ```text

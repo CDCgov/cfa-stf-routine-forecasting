@@ -298,9 +298,9 @@ def _epiautogp_run(tmp_path):
     run = make_test_forecast_run(
         output_dir=tmp_path,
         report_date=report_date,
-        n_training_days=2,
+        n_lookback_days=2,
         first_training_date=dt.date(2024, 1, 1),
-        last_training_date=dt.date(2024, 1, 2),
+        max_allowed_training_date=dt.date(2024, 1, 2),
         model_name="test_model",
         sources=("nssp",),
     )
@@ -339,8 +339,9 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
-        assert output["training_dates"] == ["2024-01-01", "2024-01-02"]
+        assert output["dates"] == ["2024-01-01", "2024-01-02"]
         assert output["reports"] == [10.0, 20.0]
+        assert output["forecast_through"] == forecast_run.forecast_through.isoformat()
         assert output["nowcast_dates"] == []
         assert output["nowcast_reports"] == []
         assert not (forecast_run.data_dir / "combined_data.tsv").exists()
@@ -378,8 +379,11 @@ class TestConvertToEpiAutoGpJson:
         )
 
         output = json.loads(output_path.read_text())
-        assert output["training_dates"] == [forecast_run.last_training_date.isoformat()]
-        assert output["reports"] == [5.0]
+        assert output["dates"] == [
+            forecast_run.first_training_date.isoformat(),
+            forecast_run.last_training_date.isoformat(),
+        ]
+        assert output["reports"] == [5.0, 5.0]
 
     def test_rejects_mismatched_nssp_resolution(self, tmp_path):
         with pytest.raises(ValueError, match="does not match EpiAutoGP frequency"):

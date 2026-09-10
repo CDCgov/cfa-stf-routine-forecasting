@@ -19,7 +19,7 @@ def _run(tmp_path):
         loc="CA",
         report_date=dt.date(2026, 7, 28),
         first_training_date=dt.date(2026, 4, 29),
-        last_training_date=dt.date(2026, 7, 27),
+        max_allowed_training_date=dt.date(2026, 7, 27),
         model_name="pyrenew_e",
         loc_pop=39_000_000,
     )

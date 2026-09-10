@@ -10,17 +10,17 @@ disease_names <- c("covid", "flu", "rsv")
 #'
 #' Parse the name of a model batch directory
 #' (i.e. a directory representing a single
-#' report date and disease pair, but potentially
+#' lookback/omission configuration and disease, but potentially
 #' with fits for multiple locations), returning
 #' a named list of quantities of interest.
 #'
 #' @param model_batch_dir_path Path to the model batch
 #' directory to parse. Will parse only the basename.
-#' @return A one-row tibble containing canonical `disease`, `report_date`,
-#' `first_training_date`, and `last_training_date` values.
+#' @return A one-row tibble containing canonical `disease`, `n_lookback_days`,
+#' and `exclude_last_n_days` values.
 #' @export
 parse_model_batch_dir_path <- function(model_batch_dir_path) {
-  pattern <- "(.+)_r_(.+)_f_(.+)_t_(.+)"
+  pattern <- "^(.+)_lookback-([0-9]+)_omit-([0-9]+)$"
   model_batch_dir_name <- fs::path_file(model_batch_dir_path)
   matches <- stringr::str_match(
     model_batch_dir_name,
@@ -31,8 +31,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
     stop(
       "Invalid format for model batch directory name; ",
       "could not parse. Expected ",
-      "'<disease>_r_<report_date>_f_<first_training_date>_t_",
-      "<last_training_date>'."
+      "'<disease>_lookback-<n_lookback_days>_omit-",
+      "<exclude_last_n_days>'."
     )
   }
 
@@ -41,9 +41,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
     tibble::as_tibble(.name_repair = \(x) {
       c(
         "disease",
-        "report_date",
-        "first_training_date",
-        "last_training_date"
+        "n_lookback_days",
+        "exclude_last_n_days"
       )
     }) |>
     dplyr::mutate(
@@ -52,28 +51,18 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
         .data$disease,
         NA_character_
       ),
-      report_date = lubridate::ymd(.data$report_date, quiet = TRUE),
-      first_training_date = lubridate::ymd(
-        .data$first_training_date,
-        quiet = TRUE
-      ),
-      last_training_date = lubridate::ymd(
-        .data$last_training_date,
-        quiet = TRUE
-      )
+      n_lookback_days = as.integer(.data$n_lookback_days),
+      exclude_last_n_days = as.integer(.data$exclude_last_n_days)
     )
 
   if (anyNA(result)) {
     stop(
-      "Could not parse extracted disease and/or date ",
-      "values expected 'disease' to be one of 'covid', 'flu', ",
-      "or 'rsv' and all dates to be valid dates in ",
-      "YYYY-MM-DD format. Got: ",
+      "Could not parse extracted values; expected 'disease' to be one of ",
+      "'covid', 'flu', or 'rsv' and day counts to be integers. Got: ",
       glue::glue(
         "disease: {matches[2]}, ",
-        "report_date: {matches[3]}, ",
-        "first_training_date: {matches[4]}, ",
-        "last_training_date: {matches[5]}."
+        "n_lookback_days: {matches[3]}, ",
+        "exclude_last_n_days: {matches[4]}."
       )
     )
   }
@@ -90,7 +79,7 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #'
 #' @param model_run_dir_path Path to parse.
 #' @return A one-row tibble containing `location`, canonical `disease`,
-#' `report_date`, `first_training_date`, and `last_training_date` values.
+#' `n_lookback_days`, and `exclude_last_n_days` values.
 #'
 #' @export
 parse_model_run_dir_path <- function(model_run_dir_path) {
@@ -109,17 +98,17 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
 #'
 #' Get all the subdirectories within a parent directory
 #' that match the pattern for a forecast run for a
-#' given disease and optionally a given report date.
+#' given disease.
 #'
 #' @param dir_of_batch_dirs Directory in which to look for
 #' "model batch" directories, each of which represents an
-#' individual forecast date / pathogen / dataset combination.
+#' individual lookback/omission / pathogen configuration.
 #' @param diseases Canonical disease identifiers to match (`"covid"`, `"flu"`,
 #' or `"rsv"`), supplied as a character vector.
 #' @return A vector of paths to the forecast subdirectories.
 #' @export
 get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
-  match_patterns <- stringr::str_c(diseases, "_r", collapse = "|")
+  match_patterns <- stringr::str_c(diseases, "_lookback-", collapse = "|")
 
   dirs <- tibble::tibble(
     dir_path = fs::dir_ls(

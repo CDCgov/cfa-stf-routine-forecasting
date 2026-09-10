@@ -1,7 +1,6 @@
-"""Date parsing and training-window utilities."""
+"""Date parsing utilities."""
 
 import datetime as dt
-import logging
 
 
 def _parse_single_date(date_str: str) -> tuple[dt.date, dt.date]:
@@ -59,27 +58,3 @@ def parse_exclude_date_ranges(
         parsed_ranges.append(date_range)
 
     return parsed_ranges
-
-
-def calculate_training_dates(
-    report_date: dt.date,
-    n_training_days: int,
-    exclude_last_n_days: int,
-    logger: logging.Logger,
-) -> tuple[dt.date, dt.date]:
-    """Calculate the inclusive first and last dates in a training window."""
-    # Add one because the maximum date in the dataset is report_date - 1.
-    last_training_date = report_date - dt.timedelta(days=exclude_last_n_days + 1)
-
-    if last_training_date >= report_date:
-        raise ValueError(
-            "Last training date must be before the report date. "
-            f"Got a last training date of {last_training_date} "
-            f"with a report date of {report_date}."
-        )
-
-    logger.info(f"last training date: {last_training_date}")
-    first_training_date = last_training_date - dt.timedelta(days=n_training_days - 1)
-    logger.info(f"First training date {first_training_date}")
-
-    return first_training_date, last_training_date

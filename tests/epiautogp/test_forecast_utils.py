@@ -1,7 +1,10 @@
 import datetime as dt
+import json
 import logging
+from dataclasses import replace
 from unittest.mock import patch
 
+import polars as pl
 import pytest
 from tests.factories import make_test_forecast_run
 
@@ -31,8 +34,7 @@ def _pipeline(tmp_path, **overrides):
         "frequency": "daily",
         "ed_visit_type": "observed",
         "output_dir": tmp_path,
-        "n_training_days": 90,
-        "n_forecast_days": 28,
+        "n_lookback_days": 90,
         "run_date": dt.date(2024, 12, 20),
         "logger": logging.getLogger("test-epiautogp-pipeline"),
     }
@@ -74,9 +76,7 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
     ("nowcast_source_name", "expected"),
     [("none", 4), ("reporting-delay", 0), ("hubverse", 0)],
 )
-def test_pipeline_sets_minimum_exclusion_from_nowcast_mode(
-    tmp_path, nowcast_source_name, expected
-):
+def test_pipeline_declares_minimum_exclusion(tmp_path, nowcast_source_name, expected):
     pipeline = _pipeline(tmp_path, nowcast_source_name=nowcast_source_name)
 
     assert pipeline.minimum_exclude_last_n_days == expected
@@ -112,7 +112,6 @@ def test_run_model_passes_prepared_input_and_model_options(
 ):
     pipeline = _pipeline(
         tmp_path,
-        frequency="epiweekly",
         ed_visit_type="pct",
         n_particles=2,
         n_mcmc=3,
@@ -128,7 +127,6 @@ def test_run_model_passes_prepared_input_and_model_options(
     assert mock_forecast.call_args.kwargs == {
         "json_input_path": run.model_dir / f"{run.model_name}_input.json",
         "model_dir": run.model_dir,
-        "n_ahead": 4,
         "n_particles": 2,
         "n_mcmc": 3,
         "n_hmc": 4,
@@ -139,27 +137,33 @@ def test_run_model_passes_prepared_input_and_model_options(
     }
 
 
-@pytest.mark.parametrize(
-    ("frequency", "expected_n_ahead"),
-    [("daily", 32), ("epiweekly", 5)],
-)
-@patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_epiautogp_forecast")
-def test_run_model_forecasts_through_excluded_tail(
-    mock_forecast,
-    tmp_path,
-    frequency,
-    expected_n_ahead,
-):
-    pipeline = _pipeline(tmp_path, frequency=frequency)
+def test_epiweekly_input_includes_forecast_through(tmp_path):
+    pipeline = _pipeline(tmp_path, frequency="epiweekly")
     run = make_test_forecast_run(
         output_dir=tmp_path,
+        report_date=dt.date(2026, 9, 8),
+        exclude_last_n_days=2,
         model_name=pipeline.model_name,
-        exclude_last_n_days=4,
+        sources=("nssp",),
+    )
+    weekly_data = run.nssp.data.with_columns(
+        date=pl.lit(dt.date(2026, 8, 29)),
+        resolution=pl.lit("epiweekly"),
+    )
+    run = replace(
+        run,
+        surveillance=replace(
+            run.surveillance,
+            nssp=replace(run.nssp, data=weekly_data, resolution="epiweekly"),
+        ),
     )
 
-    pipeline.run_model(run)
+    pipeline.prepare_model_artifacts(run)
 
-    assert mock_forecast.call_args.kwargs["n_ahead"] == expected_n_ahead
+    assert run.last_training_date == dt.date(2026, 8, 29)
+    assert run.forecast_through == dt.date(2026, 10, 3)
+    input_path = run.model_dir / f"{run.model_name}_input.json"
+    assert json.loads(input_path.read_text())["forecast_through"] == "2026-10-03"
 
 
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.run_julia_script")
@@ -170,7 +174,6 @@ def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
     run_epiautogp_forecast(
         input_path,
         model_dir,
-        n_ahead=4,
         n_particles=2,
         n_mcmc=3,
         n_hmc=4,
@@ -184,7 +187,6 @@ def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
     assert mock_run_julia.call_args.args[1] == [
         f"--json-input={input_path}",
         f"--output-dir={model_dir}",
-        "--n-ahead=4",
         "--n-particles=2",
         "--n-mcmc=3",
         "--n-hmc=4",

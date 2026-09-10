@@ -60,14 +60,10 @@ class FablePipeline(ForecastPipeline):
         return 4
 
     def run_model(self, run: ForecastRun) -> None:
-        forecast_step_days = 7 if self.ed_visit_input_resolution == "epiweekly" else 1
-        n_days_past_last_training = (
-            (run.n_forecast_days + run.exclude_last_n_days) // forecast_step_days
-        ) * forecast_step_days
         self.logger.info("Performing fable E-other forecasting")
         fable_e_other_forecasts(
             run.model_dir,
-            n_days_past_last_training,
+            run.n_forecast_days,
             self.n_samples,
         )
 
@@ -76,8 +72,7 @@ def main(
     disease: str,
     loc: str,
     output_dir: Path | str,
-    n_training_days: int,
-    n_forecast_days: int,
+    n_lookback_days: int,
     n_samples: int,
     run_date: dt.date,
     exclude_last_n_days: int = 0,
@@ -93,8 +88,7 @@ def main(
         disease=disease,
         loc=loc,
         output_dir=output_dir,
-        n_training_days=n_training_days,
-        n_forecast_days=n_forecast_days,
+        n_lookback_days=n_lookback_days,
         run_date=run_date,
         exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,

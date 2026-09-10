@@ -10,6 +10,7 @@ from cfa.stf.routine.data.data_access import (
     NSSPData,
     SurveillanceInputs,
 )
+from cfa.stf.routine.forecast_window import ForecastWindow
 
 
 @dataclass(frozen=True)
@@ -18,17 +19,53 @@ class ForecastRun:
 
     disease: str
     loc: str
-    report_date: dt.date
-    first_training_date: dt.date
-    last_training_date: dt.date
-    n_forecast_days: int
-    exclude_last_n_days: int
+    forecast_window: ForecastWindow
     model_name: str
-    model_batch_dir: Path
+    output_dir: Path
     surveillance: SurveillanceInputs
+    batch_forecast_window: ForecastWindow | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "model_batch_dir", Path(self.model_batch_dir))
+        object.__setattr__(self, "output_dir", Path(self.output_dir))
+        if self.batch_forecast_window is None:
+            object.__setattr__(self, "batch_forecast_window", self.forecast_window)
+
+    @property
+    def report_date(self) -> dt.date:
+        """Date on which the forecast is issued."""
+        return self.forecast_window.report_date
+
+    @property
+    def forecast_through(self) -> dt.date:
+        """Last target date in the configured forecast window."""
+        return self.forecast_window.forecast_through
+
+    @property
+    def first_training_date(self) -> dt.date:
+        """Earliest observed training date across the run's data sources."""
+        return min(source.first_training_date for source in self.surveillance.sources)
+
+    @property
+    def last_training_date(self) -> dt.date:
+        """Latest observed training date across the run's data sources."""
+        return max(source.last_training_date for source in self.surveillance.sources)
+
+    @property
+    def n_forecast_days(self) -> int:
+        """Number of days after the last training date through the last target date."""
+        return (self.forecast_through - self.last_training_date).days
+
+    @property
+    def exclude_last_n_days(self) -> int:
+        """Effective recent-data omission applied to this model run."""
+        return self.forecast_window.exclude_last_n_days
+
+    @property
+    def model_batch_dir(self) -> Path:
+        assert self.batch_forecast_window is not None
+        return self.output_dir / self.batch_forecast_window.model_batch_dir_name(
+            self.disease
+        )
 
     @property
     def model_run_dir(self) -> Path:

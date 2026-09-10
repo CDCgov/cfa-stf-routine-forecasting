@@ -236,8 +236,8 @@ def make_surveillance_inputs(
     location: str,
     disease: str,
     sources: Collection[ForecastSourceName],
-    first_training_date: dt.date = FIRST_OBS_DATE,
-    last_training_date: dt.date = REPORT_DATE,
+    min_allowed_training_date: dt.date = FIRST_OBS_DATE,
+    max_allowed_training_date: dt.date = REPORT_DATE,
 ) -> SurveillanceInputs:
     requested_sources = frozenset(sources)
     locations = sorted(set(DEFAULT_LOCATIONS + [location]))
@@ -251,6 +251,7 @@ def make_surveillance_inputs(
     ).filter(
         pl.col("state_abb") == location,
         pl.col("disease").is_in([disease, "total"]),
+        pl.col("date") >= min_allowed_training_date,
     )
     nhsn_data = _make_nhsn(
         location=location_by_abbr[location],
@@ -261,7 +262,6 @@ def make_surveillance_inputs(
     nssp_freshness = DataFreshness(
         source="nssp",
         selected_version_date=REPORT_DATE,
-        latest_observed_date=nssp_data.get_column("date").max(),
         run_date=REPORT_DATE,
         is_stale=False,
         reason="Synthetic NSSP data",
@@ -269,7 +269,6 @@ def make_surveillance_inputs(
     nhsn_freshness = DataFreshness(
         source="nhsn",
         selected_version_date=REPORT_DATE,
-        latest_observed_date=nhsn_data.get_column("date").max(),
         run_date=REPORT_DATE,
         is_stale=False,
         reason="Synthetic NHSN data",
@@ -279,8 +278,8 @@ def make_surveillance_inputs(
         NSSPData(
             data=_normalize_nssp_data(
                 nssp_data,
-                last_training_date=last_training_date,
-            ).filter(pl.col("date") >= first_training_date),
+                max_allowed_training_date=max_allowed_training_date,
+            ),
             freshness=nssp_freshness,
             resolution="daily",
         )
@@ -290,9 +289,9 @@ def make_surveillance_inputs(
     nhsn = (
         NHSNData(
             data=(
-                nhsn_data.filter(pl.col("date") >= first_training_date)
+                nhsn_data.filter(pl.col("date") >= min_allowed_training_date)
                 .with_columns(
-                    data_type=pl.when(pl.col("date") <= last_training_date)
+                    data_type=pl.when(pl.col("date") <= max_allowed_training_date)
                     .then(pl.lit("train"))
                     .otherwise(pl.lit("eval")),
                     resolution=pl.lit("epiweekly"),

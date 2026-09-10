@@ -16,10 +16,39 @@ from pyrenew_multisignal.hew import (
 from cfa.stf.routine.pyrenew_hew.utils import build_pyrenew_hew_model_from_dir
 
 
+def _build_forecast_data_through(
+    data: PyrenewHEWData,
+    forecast_through: dt.date,
+    *,
+    include_epiweekly: bool,
+) -> PyrenewHEWData:
+    """Extend model data far enough to include the requested final target date."""
+    last_data_date = data.last_data_date_overall.astype(dt.date)
+    n_forecast_points = (forecast_through - last_data_date).days
+    if n_forecast_points <= 0:
+        raise ValueError(
+            "forecast_through must be after the final training date; got "
+            f"{forecast_through} and {last_data_date}"
+        )
+
+    if include_epiweekly:
+        if forecast_through.weekday() != 5:
+            raise ValueError(
+                "forecast_through must be an MMWR week-ending Saturday when "
+                "forecasting hospital admissions"
+            )
+        # PyrenewHEWData derives the number of weekly points by flooring the
+        # inclusive daily spine length. Six padding days ensure its final weekly
+        # point reaches the requested Saturday for every possible spine start day.
+        n_forecast_points += 6
+
+    return data.to_forecast_data(n_forecast_points)
+
+
 def generate_and_save_predictions(
     model_run_dir: str | Path,
     model_name: str,
-    n_forecast_points: int,
+    forecast_through: dt.date,
     predict_ed_visits: bool = False,
     predict_hospital_admissions: bool = False,
     predict_wastewater: bool = False,
@@ -60,7 +89,11 @@ def generate_and_save_predictions(
         my_model.mcmc = pickle.load(file)
 
     my_model.mcmc.sampler = fresh_sampler
-    forecast_data = my_data.to_forecast_data(n_forecast_points)
+    forecast_data = _build_forecast_data_through(
+        my_data,
+        forecast_through,
+        include_epiweekly=predict_hospital_admissions,
+    )
 
     posterior_predictive = my_model.posterior_predictive(
         data=forecast_data,
@@ -134,6 +167,7 @@ def generate_and_save_predictions(
         )
         .pipe(ft.coalesce_common_columns, "_time", "date")
         .rename({"site_level_log_ww_conc_site_id": "lab_site_index"}, strict=False)
+        .filter(pl.col("date").cast(pl.Date) <= forecast_through)
     )
 
     tidy_posterior_predictive.write_parquet(

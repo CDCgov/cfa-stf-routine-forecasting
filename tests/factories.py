@@ -12,7 +12,7 @@ from cfa.stf.routine.data.data_access import (
     SurveillanceInputs,
 )
 from cfa.stf.routine.forecast_run import ForecastRun
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
+from cfa.stf.routine.forecast_window import ForecastWindow
 
 DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
 
@@ -21,31 +21,35 @@ def make_test_surveillance_inputs(
     *,
     loc_abb: str = "CA",
     report_date: dt.date = DEFAULT_REPORT_DATE,
+    first_training_date: dt.date | None = None,
     last_training_date: dt.date | None = None,
     loc_pop: int = 1,
     nhsn_prelim: bool = False,
     sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
 ) -> SurveillanceInputs:
     last_training_date = last_training_date or report_date
+    first_training_date = first_training_date or last_training_date
+    training_dates = list(dict.fromkeys((first_training_date, last_training_date)))
     requested_sources = frozenset(sources)
 
     nssp_data = pl.DataFrame(
         {
-            "date": [last_training_date] * 2,
-            "state_abb": [loc_abb] * 2,
-            ".variable": ["observed_ed_visits", "other_ed_visits"],
-            ".value": [10, 90],
-            "data_type": ["train"] * 2,
-            "resolution": ["daily"] * 2,
+            "date": [date for date in training_dates for _ in range(2)],
+            "state_abb": [loc_abb] * (2 * len(training_dates)),
+            ".variable": ["observed_ed_visits", "other_ed_visits"]
+            * len(training_dates),
+            ".value": [10, 90] * len(training_dates),
+            "data_type": ["train"] * (2 * len(training_dates)),
+            "resolution": ["daily"] * (2 * len(training_dates)),
         }
     )
     nhsn_data = pl.DataFrame(
         {
-            "date": [last_training_date],
-            "state_abb": [loc_abb],
-            "value": [5],
-            "data_type": ["train"],
-            "resolution": ["epiweekly"],
+            "date": training_dates,
+            "state_abb": [loc_abb] * len(training_dates),
+            "value": [5] * len(training_dates),
+            "data_type": ["train"] * len(training_dates),
+            "resolution": ["epiweekly"] * len(training_dates),
         }
     )
 
@@ -53,7 +57,6 @@ def make_test_surveillance_inputs(
         return DataFreshness(
             source=source,
             selected_version_date=report_date,
-            latest_observed_date=last_training_date,
             run_date=report_date,
             is_stale=False,
             reason=f"Test {source.upper()} data",
@@ -90,10 +93,11 @@ def make_test_forecast_run(
     disease: str = "covid",
     loc: str = "CA",
     report_date: dt.date = DEFAULT_REPORT_DATE,
-    n_training_days: int = 90,
+    n_lookback_days: int = 90,
+    min_allowed_training_date: dt.date | None = None,
     first_training_date: dt.date | None = None,
+    max_allowed_training_date: dt.date | None = None,
     last_training_date: dt.date | None = None,
-    n_forecast_days: int = 28,
     exclude_last_n_days: int = 0,
     batch_exclude_last_n_days: int | None = None,
     model_name: str = "test_model",
@@ -102,54 +106,64 @@ def make_test_forecast_run(
     sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
 ) -> ForecastRun:
     """Build internally consistent state for one test forecast run."""
-    expected_last_training_date = report_date - dt.timedelta(
+    expected_max_allowed_training_date = report_date - dt.timedelta(
         days=exclude_last_n_days + 1
     )
-    if last_training_date is None:
-        last_training_date = expected_last_training_date
-    elif last_training_date != expected_last_training_date:
+    if max_allowed_training_date is None:
+        max_allowed_training_date = expected_max_allowed_training_date
+    elif max_allowed_training_date != expected_max_allowed_training_date:
         raise ValueError(
-            "last_training_date must agree with report_date and exclude_last_n_days"
+            "max_allowed_training_date must agree with report_date and "
+            "exclude_last_n_days"
         )
 
-    if batch_exclude_last_n_days is None:
-        batch_exclude_last_n_days = exclude_last_n_days
-    batch_last_training_date = report_date - dt.timedelta(
-        days=batch_exclude_last_n_days + 1
+    expected_min_allowed_training_date = report_date - dt.timedelta(
+        days=n_lookback_days
     )
-    batch_first_training_date = batch_last_training_date - dt.timedelta(
-        days=n_training_days - 1
-    )
-    if first_training_date is None:
-        first_training_date = batch_first_training_date
-    elif first_training_date != batch_first_training_date:
+    if min_allowed_training_date is None:
+        min_allowed_training_date = expected_min_allowed_training_date
+    elif min_allowed_training_date != expected_min_allowed_training_date:
         raise ValueError(
-            "first_training_date must agree with the batch window and n_training_days"
+            "min_allowed_training_date must agree with report_date and n_lookback_days"
         )
+    first_training_date = first_training_date or min_allowed_training_date
+    last_training_date = last_training_date or max_allowed_training_date
+    if (
+        not min_allowed_training_date
+        <= first_training_date
+        <= last_training_date
+        <= max_allowed_training_date
+    ):
+        raise ValueError("observed training dates must fall within the allowed window")
 
     surveillance = make_test_surveillance_inputs(
         loc_abb=loc,
         report_date=report_date,
+        first_training_date=first_training_date,
         last_training_date=last_training_date,
         loc_pop=loc_pop,
         nhsn_prelim=nhsn_prelim,
         sources=sources,
     )
+    batch_exclude_last_n_days = (
+        exclude_last_n_days
+        if batch_exclude_last_n_days is None
+        else batch_exclude_last_n_days
+    )
     return ForecastRun(
         disease=disease,
         loc=loc,
-        report_date=report_date,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
-        n_forecast_days=n_forecast_days,
-        exclude_last_n_days=exclude_last_n_days,
-        model_name=model_name,
-        model_batch_dir=Path(output_dir)
-        / get_model_batch_dir_name(
-            disease=disease,
+        forecast_window=ForecastWindow(
             report_date=report_date,
-            first_training_date=batch_first_training_date,
-            last_training_date=batch_last_training_date,
+            n_lookback_days=n_lookback_days,
+            exclude_last_n_days=exclude_last_n_days,
         ),
+        model_name=model_name,
+        output_dir=Path(output_dir),
         surveillance=surveillance,
+        batch_forecast_window=ForecastWindow(
+            report_date=report_date,
+            n_lookback_days=n_lookback_days,
+            exclude_last_n_days=batch_exclude_last_n_days,
+        ),
     )

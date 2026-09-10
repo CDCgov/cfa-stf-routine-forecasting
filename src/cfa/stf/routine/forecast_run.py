@@ -20,19 +20,13 @@ class ForecastRun:
     disease: str
     loc: str
     forecast_window: ForecastWindow
+    requested_window: ForecastWindow
     model_name: str
     output_dir: Path
     surveillance: SurveillanceInputs
-    requested_window: ForecastWindow | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "output_dir", Path(self.output_dir))
-        if self.requested_window is None:
-            object.__setattr__(
-                self,
-                "requested_window",
-                self.forecast_window,
-            )
 
     @property
     def report_date(self) -> dt.date:
@@ -66,7 +60,6 @@ class ForecastRun:
 
     @property
     def model_batch_dir(self) -> Path:
-        assert self.requested_window is not None
         return self.output_dir / self.requested_window.model_batch_dir_name(
             self.disease
         )

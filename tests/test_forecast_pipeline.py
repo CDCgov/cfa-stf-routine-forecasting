@@ -114,6 +114,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
             n_lookback_days=90,
             exclude_last_n_days=1,
         ),
+        requested_window=pipeline.requested_window,
         model_name="test_model",
         output_dir=tmp_path,
         surveillance=surveillance,

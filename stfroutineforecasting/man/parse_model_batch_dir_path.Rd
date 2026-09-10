@@ -13,7 +13,7 @@ directory to parse. Will parse only the basename.}
 \value{
 A one-row tibble containing canonical \code{disease}, \code{n_lookback_days},
 and \code{exclude_last_n_days} values. An unlimited lookback is represented by
-\code{NA_integer_}.
+\code{Inf}.
 }
 \description{
 Parse the name of a model batch directory

@@ -14,7 +14,7 @@ valid_model_batch <- dplyr::bind_rows(
   tibble::tibble(
     dirname = "rsv_lookback-all_omit-2",
     disease = "rsv",
-    n_lookback_days = NA_integer_,
+    n_lookback_days = Inf,
     exclude_last_n_days = 2L
   )
 )
@@ -64,6 +64,19 @@ test_that("parse_model_batch_dir_path() works as expected.", {
   expect_error(
     parse_model_batch_dir_path(invalid_model_batch_dirs),
     regex = "Invalid format for model batch directory name|Could not parse extracted values"
+  )
+})
+
+test_that("unlimited lookbacks sort after finite lookbacks", {
+  parsed_lookbacks <- parse_model_batch_dir_path(c(
+    "covid_lookback-150_omit-1",
+    "covid_lookback-all_omit-1",
+    "covid_lookback-90_omit-1"
+  ))
+
+  expect_equal(
+    dplyr::arrange(parsed_lookbacks, .data$n_lookback_days)$n_lookback_days,
+    c(90, 150, Inf)
   )
 })
 

@@ -174,6 +174,10 @@ class EpiAutoGPPipeline(ForecastPipeline):
     def ed_visit_input_resolution(self) -> DataResolution:
         return self.config.frequency
 
+    @property
+    def minimum_exclude_last_n_days(self) -> int:
+        return 4 if self.nowcast_source_name == "none" else 0
+
     def validate_configuration(self) -> None:
         _validate_epiautogp_parameters(
             self.config.target,

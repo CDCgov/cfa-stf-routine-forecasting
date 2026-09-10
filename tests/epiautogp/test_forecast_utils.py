@@ -72,6 +72,16 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
         pipeline.validate_configuration()
 
 
+@pytest.mark.parametrize(
+    ("nowcast_source_name", "expected"),
+    [("none", 4), ("reporting-delay", 0), ("hubverse", 0)],
+)
+def test_pipeline_declares_minimum_exclusion(tmp_path, nowcast_source_name, expected):
+    pipeline = _pipeline(tmp_path, nowcast_source_name=nowcast_source_name)
+
+    assert pipeline.minimum_exclude_last_n_days == expected
+
+
 @patch("cfa.stf.routine.epiautogp.forecast_epiautogp.convert_to_epiautogp_json")
 def test_prepare_model_artifacts_resolves_nowcast_without_mutating_state(
     mock_convert,

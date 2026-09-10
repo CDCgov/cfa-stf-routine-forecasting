@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
+from dataclasses import replace
 from pathlib import Path
 
 from cfa.stf.routine.data.data_access import (
@@ -38,7 +39,7 @@ class ForecastPipeline(ABC):
         self.disease = disease
         self.loc = loc
         self.output_dir = Path(output_dir)
-        self.forecast_window = ForecastWindow(
+        self.requested_window = ForecastWindow(
             report_date=run_date,
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=exclude_last_n_days,
@@ -61,26 +62,47 @@ class ForecastPipeline(ABC):
         """Resolution to use for serialized ED-visit inputs."""
         return "daily"
 
+    @property
+    def minimum_exclude_last_n_days(self) -> int:
+        """Minimum recent calendar days to exclude from model training."""
+        return 0
+
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        window = self.forecast_window
+        effective_exclusion = max(
+            self.requested_window.exclude_last_n_days,
+            self.minimum_exclude_last_n_days,
+        )
+        if effective_exclusion != self.requested_window.exclude_last_n_days:
+            effective_window = replace(
+                self.requested_window,
+                exclude_last_n_days=effective_exclusion,
+            )
+            self.logger.info(
+                "Increasing excluded training tail from %s to %s days for model %s.",
+                self.requested_window.exclude_last_n_days,
+                effective_window.exclude_last_n_days,
+                self.model_name,
+            )
+        else:
+            effective_window = self.requested_window
         self.logger.info(
             "Minimum allowed training date: %s",
-            window.min_allowed_training_date,
+            effective_window.min_allowed_training_date,
         )
         self.logger.info(
             "Maximum allowed training date: %s",
-            window.max_allowed_training_date,
+            effective_window.max_allowed_training_date,
         )
         surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
-            run_date=window.report_date,
-            min_allowed_training_date=window.min_allowed_training_date,
-            max_allowed_training_date=window.max_allowed_training_date,
+            run_date=effective_window.report_date,
+            min_allowed_training_date=effective_window.min_allowed_training_date,
+            max_allowed_training_date=effective_window.max_allowed_training_date,
             sources=self.sources,
             ed_visit_input_resolution=self.ed_visit_input_resolution,
             fail_on_stale_data=self.fail_on_stale_data,
@@ -89,10 +111,11 @@ class ForecastPipeline(ABC):
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,
-            forecast_window=window,
+            forecast_window=effective_window,
             model_name=self.model_name,
             output_dir=self.output_dir,
             surveillance=surveillance,
+            requested_window=self.requested_window,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)
         self.logger.info("Model run directory: %s", run.model_run_dir)
@@ -133,7 +156,7 @@ class ForecastPipeline(ABC):
             "date %s.",
             self.model_name,
             self.loc,
-            self.forecast_window.report_date,
+            self.requested_window.report_date,
         )
         self.validate_configuration()
         run = self.build_forecast_run()

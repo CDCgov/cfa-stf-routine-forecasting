@@ -55,6 +55,10 @@ class FablePipeline(ForecastPipeline):
     def ed_visit_input_resolution(self) -> DataResolution:
         return self._ed_visit_input_resolution
 
+    @property
+    def minimum_exclude_last_n_days(self) -> int:
+        return 4
+
     def run_model(self, run: ForecastRun) -> None:
         self.logger.info("Performing fable E-other forecasting")
         fable_e_other_forecasts(

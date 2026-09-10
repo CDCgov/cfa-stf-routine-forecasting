@@ -29,7 +29,6 @@ def run_epiautogp_forecast(
     json_input_path: Path,
     model_dir: Path,
     *,
-    n_ahead: int,
     n_particles: int,
     n_mcmc: int,
     n_hmc: int,
@@ -43,7 +42,6 @@ def run_epiautogp_forecast(
     args = [
         f"--json-input={json_input_path}",
         f"--output-dir={model_dir}",
-        f"--n-ahead={n_ahead}",
         f"--n-particles={n_particles}",
         f"--n-mcmc={n_mcmc}",
         f"--n-hmc={n_hmc}",
@@ -200,11 +198,6 @@ class EpiAutoGPPipeline(ForecastPipeline):
         )
 
     def run_model(self, run: ForecastRun) -> None:
-        n_ahead = (
-            (run.n_forecast_days + 6) // 7
-            if self.config.frequency == "epiweekly"
-            else run.n_forecast_days
-        )
         transformation = (
             "percentage" if self.config.ed_visit_type == "pct" else "boxcox"
         )
@@ -212,7 +205,6 @@ class EpiAutoGPPipeline(ForecastPipeline):
         run_epiautogp_forecast(
             json_input_path=run.model_dir / f"{run.model_name}_input.json",
             model_dir=run.model_dir,
-            n_ahead=n_ahead,
             n_particles=self.n_particles,
             n_mcmc=self.n_mcmc,
             n_hmc=self.n_hmc,
@@ -228,8 +220,7 @@ def main(
     run_date: dt.date,
     loc: str,
     output_dir: Path | str,
-    n_training_days: int,
-    n_forecast_days: int,
+    n_lookback_days: int,
     target: str,
     frequency: str,
     ed_visit_type: str = "observed",
@@ -266,8 +257,7 @@ def main(
         frequency=frequency,
         ed_visit_type=ed_visit_type,
         output_dir=output_dir,
-        n_training_days=n_training_days,
-        n_forecast_days=n_forecast_days,
+        n_lookback_days=n_lookback_days,
         exclude_last_n_days=exclude_last_n_days,
         exclude_date_ranges=parsed_exclude_date_ranges,
         logger=logger,

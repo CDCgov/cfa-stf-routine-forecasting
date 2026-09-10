@@ -32,20 +32,31 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
     model_batch_dir_name = model_batch_dir_path.name
     batch_info = parse_model_batch_dir_name(model_batch_dir_name)
 
-    output_file_name = _hubverse_table_filename(
-        batch_info["report_date"], batch_info["disease"]
-    )
-
-    output_path = Path(model_batch_dir_path, output_file_name)
     expected_file_name = "hubverse_table.parquet"
     parquet_files = list(model_batch_dir_path.rglob(expected_file_name))
     if not parquet_files:
         raise FileNotFoundError(
             f"No {expected_file_name} files found under {model_batch_dir_path}"
         )
-    pl.scan_parquet(
+    combined = pl.scan_parquet(
         parquet_files, cast_options=pl.ScanCastOptions(integer_cast="allow-float")
-    ).sink_parquet(output_path)
+    )
+    report_dates = (
+        combined.select("reference_date")
+        .unique()
+        .collect()
+        .get_column("reference_date")
+    )
+    if len(report_dates) != 1:
+        raise ValueError(
+            "Expected one reference_date across model batch Hubverse tables, "
+            f"found {report_dates.to_list()}"
+        )
+    output_file_name = _hubverse_table_filename(
+        report_dates.item(), batch_info["disease"]
+    )
+    output_path = model_batch_dir_path / output_file_name
+    combined.sink_parquet(output_path)
     return None
 
 
@@ -62,13 +73,10 @@ def model_batch_dir_to_target_path(
     pre_path: Path | str,
 ) -> Path:
     parts = parse_model_batch_dir_name(model_batch_dir)
-    lookback = (parts["last_training_date"] - parts["first_training_date"]).days + 1
-    omit = (
-        parts["report_date"] - parts["last_training_date"]
-    ).days - 1  # NSSP data available through report_date - 1
     target_path = Path(
         pre_path,
-        f"lookback-{lookback}-omit-{omit}",
+        f"lookback-{parts['n_lookback_days']}-"
+        f"omit-{parts['exclude_last_n_days']}-figures",
         parts["disease"],
     )
     return target_path

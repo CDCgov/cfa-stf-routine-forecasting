@@ -9,6 +9,7 @@ import pytest
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     _hubverse_table_filename,
     combine_hubverse_tables,
+    model_batch_dir_to_target_path,
 )
 
 
@@ -44,7 +45,7 @@ class TestCombineHubverseTables:
 
     def _make_batch_dir(self, tmp_path: Path) -> Path:
         """Create a model batch directory with a valid name."""
-        batch_dir = tmp_path / "covid_r_2024-12-21_f_2024-09-22_t_2024-12-20"
+        batch_dir = tmp_path / "covid_lookback-90_omit-0"
         batch_dir.mkdir()
         return batch_dir
 
@@ -66,7 +67,13 @@ class TestCombineHubverseTables:
         """combine_hubverse_tables creates the expected output parquet file."""
         batch_dir = self._make_batch_dir(tmp_path)
 
-        df = pl.DataFrame({"location": ["CA"], "value": [1.0]})
+        df = pl.DataFrame(
+            {
+                "reference_date": [dt.date(2024, 12, 21)],
+                "location": ["CA"],
+                "value": [1.0],
+            }
+        )
         self._write_hubverse_table(batch_dir / "loc_CA", df)
 
         combine_hubverse_tables(batch_dir)
@@ -78,8 +85,20 @@ class TestCombineHubverseTables:
         """combine_hubverse_tables concatenates tables from multiple subdirs."""
         batch_dir = self._make_batch_dir(tmp_path)
 
-        df_ca = pl.DataFrame({"location": ["CA"], "value": [1.0]})
-        df_tx = pl.DataFrame({"location": ["TX"], "value": [2.0]})
+        df_ca = pl.DataFrame(
+            {
+                "reference_date": [dt.date(2024, 12, 21)],
+                "location": ["CA"],
+                "value": [1.0],
+            }
+        )
+        df_tx = pl.DataFrame(
+            {
+                "reference_date": [dt.date(2024, 12, 21)],
+                "location": ["TX"],
+                "value": [2.0],
+            }
+        )
         self._write_hubverse_table(batch_dir / "loc_CA", df_ca)
         self._write_hubverse_table(batch_dir / "loc_TX", df_tx)
 
@@ -94,7 +113,13 @@ class TestCombineHubverseTables:
         """combine_hubverse_tables finds hubverse_table.parquet files recursively."""
         batch_dir = self._make_batch_dir(tmp_path)
 
-        df = pl.DataFrame({"location": ["WA"], "value": [3.0]})
+        df = pl.DataFrame(
+            {
+                "reference_date": [dt.date(2024, 12, 21)],
+                "location": ["WA"],
+                "value": [3.0],
+            }
+        )
         self._write_hubverse_table(batch_dir / "deep" / "nested" / "loc_WA", df)
 
         combine_hubverse_tables(batch_dir)
@@ -103,3 +128,9 @@ class TestCombineHubverseTables:
         result = pl.read_parquet(output)
         assert result.shape[0] == 1
         assert result["location"][0] == "WA"
+
+
+def test_model_batch_dir_to_target_path_uses_batch_configuration(tmp_path):
+    result = model_batch_dir_to_target_path("covid_lookback-150_omit-3", tmp_path)
+
+    assert result == tmp_path / "lookback-150-omit-3-figures" / "covid"

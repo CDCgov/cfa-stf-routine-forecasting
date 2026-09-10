@@ -4,12 +4,14 @@
 \alias{raw_samples_to_prelim}
 \title{Convert raw samples to preliminary format}
 \usage{
-raw_samples_to_prelim(samples_path)
+raw_samples_to_prelim(samples_path, report_date)
 }
 \arguments{
 \item{samples_path}{Path to the raw samples Parquet file, with form
 \verb{model_runs/<batch_id>/<model_id>/samples.parquet}, where \verb{<batch_id>} is the
 model batch identifier and \verb{<model_id>} is the model run identifier.}
+
+\item{report_date}{Forecast report date.}
 }
 \value{
 A data frame of preliminary samples.

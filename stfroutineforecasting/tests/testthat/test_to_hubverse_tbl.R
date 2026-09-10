@@ -17,7 +17,7 @@ raw_samples_fixture <- tibble::tibble(
 
 withr::with_tempdir({
   model_dir <- fs::path(
-    "covid_r_2024-02-03_f_2021-04-01_t_2024-01-23",
+    "covid_lookback-150_omit-1",
     "model_runs",
     "US",
     "pyrenew_e"
@@ -26,11 +26,14 @@ withr::with_tempdir({
 
   fs::dir_create(model_dir)
   forecasttools::write_tabular(raw_samples_fixture, samples_path)
-  prelim_samples <- raw_samples_to_prelim(samples_path)
+  prelim_samples <- raw_samples_to_prelim(
+    samples_path,
+    report_date = as.Date("2024-02-03")
+  )
 })
 
 
-test_that("raw_samples_to_prelim() derives report metadata from samples path", {
+test_that("raw_samples_to_prelim() uses the supplied report date", {
   expect_equal(
     dplyr::select(
       dplyr::collect(prelim_samples),

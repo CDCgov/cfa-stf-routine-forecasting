@@ -10,7 +10,7 @@ from cfa.stf.routine.data.data_access import (
     NSSPData,
     SurveillanceInputs,
 )
-from cfa.stf.routine.utils.directory_utils import get_model_batch_dir_name
+from cfa.stf.routine.forecast_window import ForecastWindow
 
 
 @dataclass(frozen=True)
@@ -19,11 +19,7 @@ class ForecastRun:
 
     disease: str
     loc: str
-    report_date: dt.date
-    first_training_date: dt.date
-    last_training_date: dt.date
-    n_forecast_days: int
-    exclude_last_n_days: int
+    forecast_window: ForecastWindow
     model_name: str
     output_dir: Path
     surveillance: SurveillanceInputs
@@ -32,13 +28,33 @@ class ForecastRun:
         object.__setattr__(self, "output_dir", Path(self.output_dir))
 
     @property
+    def report_date(self) -> dt.date:
+        """Date on which the forecast is issued."""
+        return self.forecast_window.report_date
+
+    @property
+    def forecast_through(self) -> dt.date:
+        """Last target date in the configured forecast window."""
+        return self.forecast_window.forecast_through
+
+    @property
+    def first_training_date(self) -> dt.date:
+        """Earliest observed training date across the run's data sources."""
+        return min(source.first_training_date for source in self.surveillance.sources)
+
+    @property
+    def last_training_date(self) -> dt.date:
+        """Latest observed training date across the run's data sources."""
+        return max(source.last_training_date for source in self.surveillance.sources)
+
+    @property
+    def n_forecast_days(self) -> int:
+        """Number of days after the last training date through the last target date."""
+        return (self.forecast_through - self.last_training_date).days
+
+    @property
     def model_batch_dir(self) -> Path:
-        return self.output_dir / get_model_batch_dir_name(
-            disease=self.disease,
-            report_date=self.report_date,
-            first_training_date=self.first_training_date,
-            last_training_date=self.last_training_date,
-        )
+        return self.output_dir / self.forecast_window.model_batch_dir_name(self.disease)
 
     @property
     def model_run_dir(self) -> Path:

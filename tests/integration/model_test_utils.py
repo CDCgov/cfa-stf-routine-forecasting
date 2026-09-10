@@ -1,9 +1,11 @@
+import datetime as dt
 import logging
 from dataclasses import replace
 from math import isclose
 from pathlib import Path
 
 import polars as pl
+from cfa.stf.forecasttools import ceiling_mmwr_epiweek
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from tests.integration.generate_test_data import (
     REPORT_DATE,
@@ -16,14 +18,13 @@ from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
 from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
-from cfa.stf.routine.utils.date_utils import calculate_training_dates
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
-N_TRAINING_DAYS = 42
-N_FORECAST_DAYS = 14
+N_LOOKBACK_DAYS = 42
 EXCLUDE_LAST_N_DAYS = 1
 MOCK_DATA_MODE = "mock"
 REAL_DATA_MODE = "real"
@@ -65,8 +66,8 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         disease,
         loc_abb,
         run_date,
-        first_training_date,
-        last_training_date,
+        min_allowed_training_date,
+        max_allowed_training_date,
         sources,
         ed_visit_input_resolution="daily",
         **kwargs,
@@ -75,8 +76,8 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
             location=loc_abb,
             disease=disease,
             sources=sources,
-            first_training_date=first_training_date,
-            last_training_date=last_training_date,
+            min_allowed_training_date=min_allowed_training_date,
+            max_allowed_training_date=max_allowed_training_date,
         )
         if surveillance.nssp is not None and ed_visit_input_resolution == "epiweekly":
             surveillance = replace(
@@ -130,18 +131,17 @@ def selected_nhsn_observations(
 ) -> pl.DataFrame:
     """Load the NHSN training observations selected for an integration run."""
     logger = logging.getLogger(__name__)
-    first_training_date, last_training_date = calculate_training_dates(
-        REPORT_DATE,
-        N_TRAINING_DAYS,
-        EXCLUDE_LAST_N_DAYS,
-        logger,
+    forecast_window = ForecastWindow(
+        report_date=REPORT_DATE,
+        n_lookback_days=N_LOOKBACK_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
     )
     surveillance = forecast_pipeline_module.load_surveillance_inputs(
         disease=disease,
         loc_abb=location,
         run_date=REPORT_DATE,
-        first_training_date=first_training_date,
-        last_training_date=last_training_date,
+        min_allowed_training_date=forecast_window.min_allowed_training_date,
+        max_allowed_training_date=forecast_window.max_allowed_training_date,
         sources={"nhsn"},
         ed_visit_input_resolution="epiweekly",
         logger=logger,
@@ -172,8 +172,7 @@ def run_fable(
         disease=disease,
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
-        n_training_days=N_TRAINING_DAYS,
-        n_forecast_days=N_FORECAST_DAYS,
+        n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
         run_date=REPORT_DATE,
@@ -194,8 +193,7 @@ def run_pyrenew(
         loc=location,
         priors_path=PRODUCTION_PRIORS,
         output_dir=workspace / FORECAST_DIR_NAME,
-        n_training_days=N_TRAINING_DAYS,
-        n_forecast_days=N_FORECAST_DAYS,
+        n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_chains=1,
         n_samples=40,
@@ -224,8 +222,7 @@ def run_epiautogp(
         run_date=REPORT_DATE,
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
-        n_training_days=N_TRAINING_DAYS,
-        n_forecast_days=N_FORECAST_DAYS,
+        n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         target=target,
         frequency=frequency,
@@ -242,7 +239,9 @@ def run_epiautogp(
 
 
 def model_batch_dir(workspace: Path, disease: str) -> Path:
-    candidates = list((workspace / FORECAST_DIR_NAME).glob(f"{disease}_r_*"))
+    candidates = list(
+        (workspace / FORECAST_DIR_NAME).glob(f"{disease}_lookback-*_omit-*")
+    )
     assert len(candidates) == 1, (
         f"Expected one batch directory for {disease}, "
         f"found {len(candidates)} in {workspace / FORECAST_DIR_NAME}"
@@ -254,6 +253,9 @@ def assert_model_outputs(
     workspace: Path, disease: str, location: str, model_names: list[str]
 ) -> None:
     model_run_dir = model_batch_dir(workspace, disease) / "model_runs" / location
+    expected_forecast_through = ceiling_mmwr_epiweek(
+        REPORT_DATE + dt.timedelta(weeks=3)
+    )
     for model_name in model_names:
         model_dir = model_run_dir / model_name
         assert model_dir.is_dir(), f"Missing model directory: {model_dir}"
@@ -262,4 +264,8 @@ def assert_model_outputs(
         )
         assert (model_dir / "hubverse_table.parquet").is_file(), (
             f"Missing hubverse table: {model_dir}"
+        )
+        samples = pl.read_parquet(model_dir / "samples.parquet")
+        assert samples.get_column("date").max() == expected_forecast_through, (
+            f"{model_name} forecasts do not end on {expected_forecast_through}"
         )

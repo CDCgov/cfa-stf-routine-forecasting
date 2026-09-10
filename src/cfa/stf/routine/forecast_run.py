@@ -20,6 +20,7 @@ class ForecastRun:
     disease: str
     loc: str
     forecast_window: ForecastWindow
+    requested_window: ForecastWindow
     model_name: str
     output_dir: Path
     surveillance: SurveillanceInputs
@@ -53,8 +54,15 @@ class ForecastRun:
         return (self.forecast_through - self.last_training_date).days
 
     @property
+    def exclude_last_n_days(self) -> int:
+        """Effective recent-data omission applied to this model run."""
+        return self.forecast_window.exclude_last_n_days
+
+    @property
     def model_batch_dir(self) -> Path:
-        return self.output_dir / self.forecast_window.model_batch_dir_name(self.disease)
+        return self.output_dir / self.requested_window.model_batch_dir_name(
+            self.disease
+        )
 
     @property
     def model_run_dir(self) -> Path:

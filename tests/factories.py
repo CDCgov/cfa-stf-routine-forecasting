@@ -155,4 +155,9 @@ def make_test_forecast_run(
         model_name=model_name,
         output_dir=Path(output_dir),
         surveillance=surveillance,
+        requested_window=ForecastWindow(
+            report_date=report_date,
+            n_lookback_days=n_lookback_days,
+            exclude_last_n_days=exclude_last_n_days,
+        ),
     )

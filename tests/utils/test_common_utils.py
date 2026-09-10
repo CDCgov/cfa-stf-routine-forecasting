@@ -6,6 +6,7 @@ import sys
 import pytest
 
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.lookback import format_lookback_days, parse_lookback_days
 from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
 from cfa.stf.routine.utils.date_utils import parse_exclude_date_ranges
@@ -29,6 +30,7 @@ class TestValidationUtils:
         [
             (90, 0, dt.date(2024, 9, 22), dt.date(2024, 12, 20)),
             (90, 5, dt.date(2024, 9, 22), dt.date(2024, 12, 15)),
+            (None, 5, dt.date.min, dt.date(2024, 12, 15)),
         ],
     )
     def test_forecast_window_boundaries(
@@ -48,9 +50,10 @@ class TestValidationUtils:
 
         assert window.min_allowed_training_date == expected_min_allowed
         assert window.max_allowed_training_date == expected_max_allowed
-        assert (report_date - window.min_allowed_training_date).days == (
-            n_lookback_days
-        )
+        if n_lookback_days is not None:
+            assert (report_date - window.min_allowed_training_date).days == (
+                n_lookback_days
+            )
 
     @pytest.mark.parametrize(
         ("n_lookback_days", "exclude_last_n_days", "message"),
@@ -79,6 +82,24 @@ class TestValidationUtils:
 
         assert window.forecast_through == dt.date(2026, 10, 3)
         assert window.model_batch_dir_name("covid") == ("covid_lookback-150_omit-3")
+
+    def test_unlimited_forecast_window_uses_all_batch_name(self):
+        window = ForecastWindow(
+            report_date=dt.date(2026, 9, 8),
+            n_lookback_days=None,
+            exclude_last_n_days=30,
+        )
+
+        assert window.min_allowed_training_date == dt.date.min
+        assert window.model_batch_dir_name("covid") == "covid_lookback-all_omit-30"
+
+    @pytest.mark.parametrize(
+        ("n_lookback_days", "encoded"),
+        [(150, "150"), (None, "all")],
+    )
+    def test_lookback_encoding_round_trip(self, n_lookback_days, encoded):
+        assert format_lookback_days(n_lookback_days) == encoded
+        assert parse_lookback_days(encoded) == n_lookback_days
 
     @pytest.mark.parametrize(
         "input_str,expected",
@@ -138,29 +159,38 @@ class TestValidationUtils:
 
 
 class TestDirectoryUtils:
-    def test_model_batch_directory_round_trip(self):
+    @pytest.mark.parametrize(
+        ("n_lookback_days", "expected_name"),
+        [
+            (150, "covid_lookback-150_omit-3"),
+            (None, "covid_lookback-all_omit-3"),
+        ],
+    )
+    def test_model_batch_directory_round_trip(self, n_lookback_days, expected_name):
         window = ForecastWindow(
             report_date=dt.date(2026, 9, 8),
-            n_lookback_days=150,
+            n_lookback_days=n_lookback_days,
             exclude_last_n_days=3,
         )
         name = window.model_batch_dir_name("covid")
 
-        assert name == "covid_lookback-150_omit-3"
+        assert name == expected_name
         assert parse_model_batch_dir_name(name) == {
             "disease": "covid",
-            "n_lookback_days": 150,
+            "n_lookback_days": n_lookback_days,
             "exclude_last_n_days": 3,
         }
 
     def test_get_all_forecast_dirs_matches_new_batch_prefix(self, tmp_path):
         (tmp_path / "covid_lookback-150_omit-1").mkdir()
+        (tmp_path / "covid_lookback-all_omit-1").mkdir()
         (tmp_path / "flu_lookback-90_omit-3").mkdir()
         (tmp_path / "covid_r_2026-09-02_f_2026-04-04_t_2026-08-31").mkdir()
 
-        assert get_all_forecast_dirs(tmp_path, ["covid", "rsv"]) == [
-            "covid_lookback-150_omit-1"
-        ]
+        assert set(get_all_forecast_dirs(tmp_path, ["covid", "rsv"])) == {
+            "covid_lookback-150_omit-1",
+            "covid_lookback-all_omit-1",
+        }
 
 
 class TestCLIUtils:

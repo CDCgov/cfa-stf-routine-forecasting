@@ -152,6 +152,40 @@ def test_normalize_nssp_data_requires_one_non_total_disease():
         )
 
 
+def test_load_dataops_nssp_all_history_passes_minimum_start_date(monkeypatch):
+    calls = {}
+    source_data = pl.DataFrame(
+        {
+            "date": [dt.date(2020, 1, 1)] * 2,
+            "state_abb": ["CA"] * 2,
+            "disease": ["covid", "total"],
+            "target_type": ["inc ed visits"] * 2,
+            "value": [10, 100],
+        }
+    )
+    monkeypatch.setattr(
+        data_access,
+        "resolve_nssp_report_date",
+        lambda: dt.date(2026, 1, 8),
+    )
+    monkeypatch.setattr(
+        data_access,
+        "get_nssp",
+        lambda **kwargs: calls.update(kwargs) or source_data,
+    )
+
+    result = data_access._load_dataops_nssp(
+        loc_abb="CA",
+        disease="covid",
+        min_allowed_training_date=dt.date.min,
+        max_allowed_training_date=dt.date(2026, 1, 7),
+        run_date=dt.date(2026, 1, 8),
+    )
+
+    assert result.first_training_date == dt.date(2020, 1, 1)
+    assert calls["start_date"] == dt.date.min
+
+
 def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
@@ -213,6 +247,44 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
         "start_date": dt.date(2026, 1, 1),
         "lazy": False,
     }
+
+
+def test_load_dataops_nhsn_all_history_uses_minimum_lower_bound(monkeypatch):
+    calls = {}
+    source_data = pl.DataFrame(
+        {
+            "date": [dt.date(2020, 1, 4), dt.date(2026, 1, 10)],
+            "state_abb": ["CA"] * 2,
+            "disease": ["covid"] * 2,
+            "target_type": ["wk inc hosp"] * 2,
+            "value": [3, 6],
+        }
+    )
+    monkeypatch.setattr(
+        data_access,
+        "select_latest_nhsn_release",
+        lambda: (True, dt.date(2026, 1, 8)),
+    )
+    monkeypatch.setattr(
+        data_access,
+        "get_nhsn_hrd",
+        lambda **kwargs: calls.update(kwargs) or source_data,
+    )
+
+    result = data_access._load_dataops_nhsn(
+        disease="covid",
+        loc_abb="CA",
+        min_allowed_training_date=dt.date.min,
+        max_allowed_training_date=dt.date(2026, 1, 7),
+        run_date=dt.date(2026, 1, 8),
+    )
+
+    assert result.first_training_date == dt.date(2020, 1, 4)
+    assert result.data.get_column("date").to_list() == [
+        dt.date(2020, 1, 4),
+        dt.date(2026, 1, 10),
+    ]
+    assert calls["start_date"] == dt.date.min
 
 
 @pytest.mark.parametrize("source_name", ["nssp", "nhsn"])

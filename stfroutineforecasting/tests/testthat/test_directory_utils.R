@@ -10,6 +10,12 @@ valid_model_batch <- dplyr::bind_rows(
     disease = "flu",
     n_lookback_days = 90L,
     exclude_last_n_days = 5L
+  ),
+  tibble::tibble(
+    dirname = "rsv_lookback-all_omit-2",
+    disease = "rsv",
+    n_lookback_days = Inf,
+    exclude_last_n_days = 2L
   )
 )
 
@@ -18,7 +24,7 @@ invalid_model_batch_dirs <- c(
   "flu_lookback-many_omit-2"
 )
 
-target_locations <- c("ME", "US")
+target_locations <- c("ME", "US", "CA")
 
 valid_model_run <- valid_model_batch |>
   dplyr::mutate(
@@ -61,6 +67,19 @@ test_that("parse_model_batch_dir_path() works as expected.", {
   )
 })
 
+test_that("unlimited lookbacks sort after finite lookbacks", {
+  parsed_lookbacks <- parse_model_batch_dir_path(c(
+    "covid_lookback-150_omit-1",
+    "covid_lookback-all_omit-1",
+    "covid_lookback-90_omit-1"
+  ))
+
+  expect_equal(
+    dplyr::arrange(parsed_lookbacks, .data$n_lookback_days)$n_lookback_days,
+    c(90, 150, Inf)
+  )
+})
+
 test_that("parse_model_run_dir_path() works as expected.", {
   expect_equal(
     parse_model_run_dir_path(valid_model_run$dirname),
@@ -100,7 +119,8 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
     )
     valid_rsv <- c(
       "rsv_lookback-60_omit-5",
-      "rsv_lookback-"
+      "rsv_lookback-",
+      "rsv_lookback-all_omit-5"
     )
     valid_dirs <- c(valid_flu, valid_covid, valid_rsv)
 

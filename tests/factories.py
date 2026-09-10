@@ -93,7 +93,7 @@ def make_test_forecast_run(
     disease: str = "covid",
     loc: str = "CA",
     report_date: dt.date = DEFAULT_REPORT_DATE,
-    n_lookback_days: int = 90,
+    n_lookback_days: int | None = 90,
     min_allowed_training_date: dt.date | None = None,
     first_training_date: dt.date | None = None,
     max_allowed_training_date: dt.date | None = None,
@@ -116,23 +116,27 @@ def make_test_forecast_run(
             "exclude_last_n_days"
         )
 
-    expected_min_allowed_training_date = report_date - dt.timedelta(
-        days=n_lookback_days
+    expected_min_allowed_training_date = (
+        report_date - dt.timedelta(days=n_lookback_days)
+        if n_lookback_days is not None
+        else dt.date.min
     )
-    if min_allowed_training_date is None:
-        min_allowed_training_date = expected_min_allowed_training_date
-    elif min_allowed_training_date != expected_min_allowed_training_date:
+    if (
+        min_allowed_training_date is not None
+        and min_allowed_training_date != expected_min_allowed_training_date
+    ):
         raise ValueError(
             "min_allowed_training_date must agree with report_date and n_lookback_days"
         )
-    first_training_date = first_training_date or min_allowed_training_date
+    min_allowed_training_date = expected_min_allowed_training_date
+    first_training_date = (
+        first_training_date or min_allowed_training_date or max_allowed_training_date
+    )
     last_training_date = last_training_date or max_allowed_training_date
     if (
-        not min_allowed_training_date
-        <= first_training_date
-        <= last_training_date
-        <= max_allowed_training_date
-    ):
+        min_allowed_training_date is not None
+        and first_training_date < min_allowed_training_date
+    ) or not first_training_date <= last_training_date <= max_allowed_training_date:
         raise ValueError("observed training dates must fall within the allowed window")
 
     surveillance = make_test_surveillance_inputs(

@@ -160,27 +160,52 @@ docker_execution_config = ExecutionConfig(
 )
 
 # Cloud execution. This is what we want for any model run.
-azure_batch_execution_config = ExecutionConfig(
+# Shared config for all Azure Batch pools; only pool_name differs between them.
+_azure_batch_shared_config = {
+    **(
+        {}
+        if is_production  # image will come from the code location in prod
+        else {"image": image}
+    ),
+    "container_kwargs": {
+        "volumes": [
+            # bind the ~/.azure folder for optional cli login
+            # f"/home/{user}/.azure:/root/.azure",
+            # bind current file so we don't have to rebuild
+            # the container image for workflow changes
+            # Azure blob output mounts
+        ]
+        + azure_blob_mounts,
+        "working_dir": f"{container_workdir}",
+    },
+}
+
+azure_batch_2cpu_execution_config = ExecutionConfig(
     executor=SelectorConfig(
         class_name=azure_batch_executor.__name__,
         config={
-            "pool_name": "stf-routine-forecasting-pool",
-            **(
-                {}
-                if is_production  # image will come from the code location in prod
-                else {"image": image}
-            ),
-            "container_kwargs": {
-                "volumes": [
-                    # bind the ~/.azure folder for optional cli login
-                    # f"/home/{user}/.azure:/root/.azure",
-                    # bind current file so we don't have to rebuild
-                    # the container image for workflow changes
-                    # Azure blob output mounts
-                ]
-                + azure_blob_mounts,
-                "working_dir": f"{container_workdir}",
-            },
+            "pool_name": "stf-routine-2cpu",
+            **_azure_batch_shared_config,
+        },
+    ),
+)
+
+azure_batch_4cpu_execution_config = ExecutionConfig(
+    executor=SelectorConfig(
+        class_name=azure_batch_executor.__name__,
+        config={
+            "pool_name": "stf-routine-4cpu",
+            **_azure_batch_shared_config,
+        },
+    ),
+)
+
+azure_batch_64cpu_execution_config = ExecutionConfig(
+    executor=SelectorConfig(
+        class_name=azure_batch_executor.__name__,
+        config={
+            "pool_name": "stf-routine-64cpu",
+            **_azure_batch_shared_config,
         },
     ),
 )
@@ -551,45 +576,53 @@ class IsWeekday(dg.AutomationCondition):
         return f"is_{days[self.weekday].lower()}"
 
 
-weekly_forecast_initial_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastInitial",
-    target=dg.AssetSelection.groups("WeeklyForecastInitial"),
+eager_on_wed = (
+    # We specifically don't want these to run unless it's Wednesday
+    # 0=monday,1=tuesday,2=wednesday,etc.
+    # Note this is different from cron which is 1-indexed
+    dg.AutomationCondition.eager() & IsWeekday(2)
+).with_label("eager_on_wed")
+
+
+weekly_fable_sensor = dg.AutomationConditionSensorDefinition(
+    name="Fable",
+    target=dg.AssetSelection.groups("Fable"),
+    run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
-weekly_forecast_fusion_sensor = dg.AutomationConditionSensorDefinition(
-    name="WeeklyForecastFusion",
-    target=dg.AssetSelection.groups("WeeklyForecastFusion"),
-    use_user_code_server=False,  # does NOT allow custom conditions
+weekly_pyrenew_sensor = dg.AutomationConditionSensorDefinition(
+    name="Pyrenew",
+    target=dg.AssetSelection.groups("Pyrenew"),
+    run_tags=azure_batch_4cpu_execution_config.to_run_tags(),
+    use_user_code_server=True,  # allows for custom automation conditions
 )
+
+weekly_fusion_sensor = dg.AutomationConditionSensorDefinition(
+    name="Fusion",
+    target=dg.AssetSelection.groups("Fusion"),
+    run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
+    use_user_code_server=True,  # allows for custom automation conditions
+)
+
+epiautogp_sensor = dg.AutomationConditionSensorDefinition(
+    name="EpiAutoGP",
+    # add a group_name="EpiAutoGP" to an epiautogp asset to include it
+    # in the rules and configuration this sensor provides
+    target=dg.AssetSelection.groups("EpiAutoGP"),
+    run_tags=azure_batch_64cpu_execution_config.to_run_tags(),
+    use_user_code_server=True,  # allows for custom automation conditions
+)
+
 
 # ---------- Shared Asset Decorator Arguments ----------
 
-# All of our forecast assets should materialize with the same
-# partitions, graph_dimensions, automation conditions, and asset groups
-# The only thing that differs between them are their dependencies
+# It's helpful (and helps reduce DRY issues) to specify some common
+# arguments that we give to the asset decorators, as well as some tags
 
-weekly_forecast_base_asset_args = {
-    "partitions_def": daily_partitions_def,
+common_asset_args = {
+    "partitions_def": daily_partitions_def,  # every asset uses this partitions def
     "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
-}
-
-weekly_forecast_initial_asset_args = {
-    **weekly_forecast_base_asset_args,
-    "group_name": "WeeklyForecastInitial",
-    "automation_condition": (
-        # We specifically don't want these to run unless it's Wednesday
-        # 0=monday,1=tuesday,2=wednesday,etc.
-        # Note this is different from cron which is 1-indexed
-        dg.AutomationCondition.eager() & IsWeekday(2)
-    ).with_label("eager_on_wed"),
-}
-
-weekly_forecast_fusion_asset_args = {
-    **weekly_forecast_base_asset_args,
-    "group_name": "WeeklyForecastFusion",
-    # we want vanilla eager for the fusion assets
-    "automation_condition": dg.AutomationCondition.eager(),
 }
 
 # Dagster tag keys cannot contain spaces. These tags make it easy to select all
@@ -619,12 +652,14 @@ nhsn_hrd_prelim = dg.AssetSpec(
 )
 
 
-# ---------------- Weekly Forecasts --------------
+# ----------------  Forecasts --------------
 
 
 # Fable E Other
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    group_name="Fable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -643,7 +678,9 @@ def fable_e_other(
 
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    group_name="Fable",
     ins={"nssp_gold_v1": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -662,7 +699,9 @@ def epiweekly_fable_e_other(
 
 # Pyrenew E
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    group_name="Pyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
     },
@@ -679,7 +718,9 @@ def pyrenew_e(
 
 # Pyrenew H
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
@@ -695,7 +736,9 @@ def pyrenew_h(
 
 # Pyrenew HE
 @dynamic_graph_asset(
-    **weekly_forecast_initial_asset_args,
+    **common_asset_args,
+    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    group_name="Pyrenew",
     ins={
         "nssp_gold_v1": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -715,7 +758,9 @@ def pyrenew_he(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **common_asset_args,
+    automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
@@ -733,7 +778,9 @@ def fuse_pyrenew_e_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **common_asset_args,
+    automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={
         "pyrenew_e": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
@@ -754,7 +801,9 @@ def fuse_pyrenew_e_ts_epiweekly(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **common_asset_args,
+    automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=HE_DATA_RERUN_TAGS,
 )
@@ -772,7 +821,9 @@ def fuse_pyrenew_he_ts(
 
 
 @dynamic_graph_asset(
-    **weekly_forecast_fusion_asset_args,
+    **common_asset_args,
+    automation_condition=dg.AutomationCondition.eager(),
+    group_name="Fusion",
     ins={
         "pyrenew_he": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
@@ -814,8 +865,8 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
+    group_name="Fusion",  # included with the fusion assets
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
-    group_name="WeeklyForecastFusion",
     tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(
@@ -912,7 +963,7 @@ def e2e_config() -> dg.RunConfig:
                 locations=GraphDimension(E2E_LOCATIONS)
             ),
         },
-        execution=azure_batch_execution_config.to_run_config(),
+        execution=azure_batch_4cpu_execution_config.to_run_config(),
     )
 
 
@@ -922,7 +973,7 @@ def e2e_json() -> str:
 
 end_to_end = dg.define_asset_job(
     name="end_to_end",
-    selection=dg.AssetSelection.groups("WeeklyForecastInitial", "WeeklyForecastFusion"),
+    selection=dg.AssetSelection.groups("Fable", "Pyrenew", "Fusion"),
     config=e2e_config(),
 )
 
@@ -1073,13 +1124,12 @@ defs = dg.Definitions(
         "w_model_exclusions": WModelExclusions(),
     },
     executor=dynamic_executor(
-        default_config=azure_batch_execution_config,
+        default_config=azure_batch_4cpu_execution_config,
         # default_config=basic_execution_config,
         # default_config=docker_execution_config,
         alternate_configs=[
             basic_execution_config,
             docker_execution_config,
-            azure_batch_execution_config,
         ],
     ),
 )

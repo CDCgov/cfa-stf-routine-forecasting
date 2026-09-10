@@ -161,9 +161,9 @@ def make_test_forecast_run(
         model_name=model_name,
         output_dir=Path(output_dir),
         surveillance=surveillance,
-        batch_forecast_window=ForecastWindow(
+        model_batch_dir_name=ForecastWindow(
             report_date=report_date,
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=batch_exclude_last_n_days,
-        ),
+        ).model_batch_dir_name(disease),
     )

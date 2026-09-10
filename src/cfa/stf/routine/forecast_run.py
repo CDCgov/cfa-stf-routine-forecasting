@@ -23,12 +23,16 @@ class ForecastRun:
     model_name: str
     output_dir: Path
     surveillance: SurveillanceInputs
-    batch_forecast_window: ForecastWindow | None = None
+    model_batch_dir_name: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "output_dir", Path(self.output_dir))
-        if self.batch_forecast_window is None:
-            object.__setattr__(self, "batch_forecast_window", self.forecast_window)
+        if self.model_batch_dir_name is None:
+            object.__setattr__(
+                self,
+                "model_batch_dir_name",
+                self.forecast_window.model_batch_dir_name(self.disease),
+            )
 
     @property
     def report_date(self) -> dt.date:
@@ -62,10 +66,8 @@ class ForecastRun:
 
     @property
     def model_batch_dir(self) -> Path:
-        assert self.batch_forecast_window is not None
-        return self.output_dir / self.batch_forecast_window.model_batch_dir_name(
-            self.disease
-        )
+        assert self.model_batch_dir_name is not None
+        return self.output_dir / self.model_batch_dir_name
 
     @property
     def model_run_dir(self) -> Path:

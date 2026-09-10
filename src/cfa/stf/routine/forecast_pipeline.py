@@ -76,31 +76,31 @@ class ForecastPipeline(ABC):
             self.forecast_window.exclude_last_n_days,
             self.minimum_exclude_last_n_days,
         )
-        window = replace(
+        effective_window = replace(
             self.forecast_window,
             exclude_last_n_days=effective_exclusion,
         )
-        if window != self.forecast_window:
+        if effective_window != self.forecast_window:
             self.logger.info(
                 "Increasing excluded training tail from %s to %s days for model %s.",
                 self.forecast_window.exclude_last_n_days,
-                window.exclude_last_n_days,
+                effective_window.exclude_last_n_days,
                 self.model_name,
             )
         self.logger.info(
             "Minimum allowed training date: %s",
-            window.min_allowed_training_date,
+            effective_window.min_allowed_training_date,
         )
         self.logger.info(
             "Maximum allowed training date: %s",
-            window.max_allowed_training_date,
+            effective_window.max_allowed_training_date,
         )
         surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
-            run_date=window.report_date,
-            min_allowed_training_date=window.min_allowed_training_date,
-            max_allowed_training_date=window.max_allowed_training_date,
+            run_date=effective_window.report_date,
+            min_allowed_training_date=effective_window.min_allowed_training_date,
+            max_allowed_training_date=effective_window.max_allowed_training_date,
             sources=self.sources,
             ed_visit_input_resolution=self.ed_visit_input_resolution,
             fail_on_stale_data=self.fail_on_stale_data,
@@ -109,11 +109,13 @@ class ForecastPipeline(ABC):
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,
-            forecast_window=window,
+            forecast_window=effective_window,
             model_name=self.model_name,
             output_dir=self.output_dir,
             surveillance=surveillance,
-            batch_forecast_window=self.forecast_window,
+            model_batch_dir_name=self.forecast_window.model_batch_dir_name(
+                self.disease
+            ),
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)
         self.logger.info("Model run directory: %s", run.model_run_dir)

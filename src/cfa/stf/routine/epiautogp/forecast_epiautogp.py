@@ -224,7 +224,7 @@ def main(
     run_date: dt.date,
     loc: str,
     output_dir: Path | str,
-    n_lookback_days: int,
+    n_lookback_days: int | None,
     target: str,
     frequency: str,
     ed_visit_type: str = "observed",

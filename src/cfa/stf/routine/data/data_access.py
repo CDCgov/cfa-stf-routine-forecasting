@@ -183,7 +183,7 @@ def _load_dataops_nssp(
     *,
     loc_abb: str,
     disease: str,
-    min_allowed_training_date: dt.date,
+    min_allowed_training_date: dt.date | None,
     max_allowed_training_date: dt.date,
     run_date: dt.date,
 ) -> NSSPData:
@@ -224,7 +224,7 @@ def _load_dataops_nhsn(
     *,
     disease: str,
     loc_abb: str,
-    min_allowed_training_date: dt.date,
+    min_allowed_training_date: dt.date | None,
     max_allowed_training_date: dt.date,
     run_date: dt.date,
 ) -> NHSNData:
@@ -240,21 +240,19 @@ def _load_dataops_nhsn(
         selected_version_date=version_date,
         run_date=run_date,
     )
-    data = (
-        source_data.filter(pl.col("date") >= min_allowed_training_date)
-        .with_columns(
-            data_type=pl.when(pl.col("date") <= max_allowed_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
-            resolution=pl.lit("epiweekly"),
-        )
-        .select(
-            "date",
-            "state_abb",
-            "value",
-            "data_type",
-            "resolution",
-        )
+    if min_allowed_training_date is not None:
+        source_data = source_data.filter(pl.col("date") >= min_allowed_training_date)
+    data = source_data.with_columns(
+        data_type=pl.when(pl.col("date") <= max_allowed_training_date)
+        .then(pl.lit("train"))
+        .otherwise(pl.lit("eval")),
+        resolution=pl.lit("epiweekly"),
+    ).select(
+        "date",
+        "state_abb",
+        "value",
+        "data_type",
+        "resolution",
     )
     return NHSNData(
         data=data,
@@ -348,7 +346,7 @@ def load_surveillance_inputs(
     disease: str,
     loc_abb: str,
     run_date: dt.date,
-    min_allowed_training_date: dt.date,
+    min_allowed_training_date: dt.date | None,
     max_allowed_training_date: dt.date,
     sources: Collection[ForecastSourceName],
     ed_visit_input_resolution: DataResolution = "daily",

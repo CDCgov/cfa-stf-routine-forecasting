@@ -13,7 +13,9 @@ loc_abbrs_ = LOCATION_LIST
 
 def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
     """Parse a standard model batch directory name."""
-    regex_match = re.fullmatch(r"(.+)_lookback-(\d+)_omit-(\d+)", model_batch_dir_name)
+    regex_match = re.fullmatch(
+        r"(.+)_lookback-(\d+|all)_omit-(\d+)", model_batch_dir_name
+    )
     if regex_match:
         disease, n_lookback_days, exclude_last_n_days = regex_match.groups()
     else:
@@ -30,7 +32,7 @@ def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
 
     return {
         "disease": disease,
-        "n_lookback_days": int(n_lookback_days),
+        "n_lookback_days": (int(n_lookback_days) if n_lookback_days != "all" else None),
         "exclude_last_n_days": int(exclude_last_n_days),
     }
 

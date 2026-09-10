@@ -10,6 +10,12 @@ valid_model_batch <- dplyr::bind_rows(
     disease = "flu",
     n_lookback_days = 90L,
     exclude_last_n_days = 5L
+  ),
+  tibble::tibble(
+    dirname = "rsv_lookback-all_omit-2",
+    disease = "rsv",
+    n_lookback_days = NA_integer_,
+    exclude_last_n_days = 2L
   )
 )
 
@@ -18,7 +24,7 @@ invalid_model_batch_dirs <- c(
   "flu_lookback-many_omit-2"
 )
 
-target_locations <- c("ME", "US")
+target_locations <- c("ME", "US", "CA")
 
 valid_model_run <- valid_model_batch |>
   dplyr::mutate(
@@ -100,7 +106,8 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
     )
     valid_rsv <- c(
       "rsv_lookback-60_omit-5",
-      "rsv_lookback-"
+      "rsv_lookback-",
+      "rsv_lookback-all_omit-5"
     )
     valid_dirs <- c(valid_flu, valid_covid, valid_rsv)
 

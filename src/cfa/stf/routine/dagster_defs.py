@@ -244,7 +244,7 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # using default_factory to prevent ConfigOverrides from populating fields in the Launchpad
 class _ModelTrainingFields(BaseModel):
     output_basedir: str = Field(default_factory=lambda: "")
-    n_lookback_days: int = Field(default_factory=lambda: 0)
+    n_lookback_days: int | None = Field(default_factory=lambda: None)
     exclude_last_n_days: int = Field(default_factory=lambda: 0)
     fail_on_stale_data: bool = Field(default_factory=lambda: is_production)
 
@@ -263,7 +263,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     """
 
     output_basedir: str = "output" if is_production else "test-output"
-    n_lookback_days: int = 150
+    n_lookback_days: int | None = None
     exclude_last_n_days: int = 1
     fail_on_stale_data: bool = is_production
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]

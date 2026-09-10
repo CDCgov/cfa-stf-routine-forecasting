@@ -73,10 +73,12 @@ def model_batch_dir_to_target_path(
     pre_path: Path | str,
 ) -> Path:
     parts = parse_model_batch_dir_name(model_batch_dir)
+    lookback = (
+        parts["n_lookback_days"] if parts["n_lookback_days"] is not None else "all"
+    )
     target_path = Path(
         pre_path,
-        f"lookback-{parts['n_lookback_days']}-"
-        f"omit-{parts['exclude_last_n_days']}-figures",
+        f"lookback-{lookback}-omit-{parts['exclude_last_n_days']}-figures",
         parts["disease"],
     )
     return target_path

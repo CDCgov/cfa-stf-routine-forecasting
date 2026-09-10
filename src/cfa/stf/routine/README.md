@@ -61,7 +61,7 @@ def main(
     disease: str,
     loc: str,
     output_dir: Path | str,
-    n_lookback_days: int,
+    n_lookback_days: int | None,
     n_samples: int,
     run_date: dt.date,
     exclude_last_n_days: int = 0,
@@ -103,6 +103,7 @@ Every subclass must implement:
 - `run_model(run)`: run the model and create a standardized `run.model_dir / "samples.parquet"`.
 
 `ForecastWindow` is the source of truth for the report-anchored training bounds, final forecast date, and model-batch directory name.
+Set `n_lookback_days` to `None` to retain all available training history; a positive integer limits training data to that many days before the report date.
 `ForecastRun` combines that configured window with the surveillance observations that were actually retained, the population, and the model output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
 Models can override `minimum_exclude_last_n_days` when they require a longer omitted tail than the caller requested.
@@ -110,7 +111,7 @@ The pipeline's `requested_window` preserves that caller configuration; the run's
 The resulting layout is:
 
 ```text
-<output_dir>/<disease>_lookback-<days>_omit-<days>/
+<output_dir>/<disease>_lookback-<days-or-all>_omit-<days>/
   model_runs/<location>/<model_name>/
     data/
       combined_data.tsv

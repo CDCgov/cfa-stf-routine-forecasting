@@ -11,7 +11,8 @@ parse_model_run_dir_path(model_run_dir_path)
 }
 \value{
 A one-row tibble containing \code{location}, canonical \code{disease},
-\code{n_lookback_days}, and \code{exclude_last_n_days} values.
+\code{n_lookback_days}, and \code{exclude_last_n_days} values. An unlimited lookback
+is represented by \code{NA_integer_}.
 }
 \description{
 Parse path to a model run directory

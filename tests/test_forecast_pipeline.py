@@ -60,12 +60,13 @@ def _pipeline(
     ed_visit_input_resolution="daily",
     minimum_exclude_last_n_days=0,
     exclude_last_n_days=1,
+    n_lookback_days=90,
 ):
     return TestPipeline(
         disease="covid",
         loc="CA",
         output_dir=tmp_path,
-        n_lookback_days=90,
+        n_lookback_days=n_lookback_days,
         run_date=dt.date(2024, 12, 20),
         exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
@@ -134,6 +135,33 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run.right_truncation_offset == 1
     assert run.forecast_through == dt.date(2025, 1, 11)
     assert run.n_forecast_days == 24
+
+
+def test_build_forecast_run_loads_all_available_history(monkeypatch, tmp_path):
+    from cfa.stf.routine import forecast_pipeline as pipeline_module
+
+    calls = {}
+
+    def load(**kwargs):
+        calls.update(kwargs)
+        return make_test_surveillance_inputs(
+            first_training_date=dt.date(2020, 1, 1),
+            last_training_date=kwargs["max_allowed_training_date"],
+            sources={"nssp"},
+        )
+
+    monkeypatch.setattr(pipeline_module, "load_surveillance_inputs", load)
+
+    run = _pipeline(
+        tmp_path,
+        n_lookback_days=None,
+        minimum_exclude_last_n_days=4,
+    ).build_forecast_run()
+
+    assert calls["min_allowed_training_date"] is None
+    assert run.first_training_date == dt.date(2020, 1, 1)
+    assert run.exclude_last_n_days == 4
+    assert run.model_batch_dir == tmp_path / "covid_lookback-all_omit-1"
 
 
 @pytest.mark.parametrize(

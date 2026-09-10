@@ -76,17 +76,19 @@ class ForecastPipeline(ABC):
             self.requested_window.exclude_last_n_days,
             self.minimum_exclude_last_n_days,
         )
-        effective_window = replace(
-            self.requested_window,
-            exclude_last_n_days=effective_exclusion,
-        )
-        if effective_window != self.requested_window:
+        if effective_exclusion != self.requested_window.exclude_last_n_days:
+            effective_window = replace(
+                self.requested_window,
+                exclude_last_n_days=effective_exclusion,
+            )
             self.logger.info(
                 "Increasing excluded training tail from %s to %s days for model %s.",
                 self.requested_window.exclude_last_n_days,
                 effective_window.exclude_last_n_days,
                 self.model_name,
             )
+        else:
+            effective_window = self.requested_window
         self.logger.info(
             "Minimum allowed training date: %s",
             effective_window.min_allowed_training_date,

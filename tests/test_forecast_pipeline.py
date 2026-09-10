@@ -201,6 +201,10 @@ def test_build_forecast_run_applies_minimum_exclusion(
     assert run.exclude_last_n_days == expected_exclusion
     assert run.forecast_window.exclude_last_n_days == expected_exclusion
     assert run.requested_window.exclude_last_n_days == requested_exclusion
+    if expected_exclusion == requested_exclusion:
+        assert run.forecast_window is run.requested_window
+    else:
+        assert run.forecast_window is not run.requested_window
     assert calls["load"]["min_allowed_training_date"] == dt.date(2024, 9, 21)
     assert calls["load"]["max_allowed_training_date"] == expected_max_allowed
     assert run.model_batch_dir == (

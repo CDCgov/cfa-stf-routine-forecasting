@@ -99,7 +99,6 @@ def make_test_forecast_run(
     max_allowed_training_date: dt.date | None = None,
     last_training_date: dt.date | None = None,
     exclude_last_n_days: int = 0,
-    batch_exclude_last_n_days: int | None = None,
     model_name: str = "test_model",
     loc_pop: int = 1,
     nhsn_prelim: bool = False,
@@ -145,11 +144,6 @@ def make_test_forecast_run(
         nhsn_prelim=nhsn_prelim,
         sources=sources,
     )
-    batch_exclude_last_n_days = (
-        exclude_last_n_days
-        if batch_exclude_last_n_days is None
-        else batch_exclude_last_n_days
-    )
     return ForecastRun(
         disease=disease,
         loc=loc,
@@ -164,6 +158,6 @@ def make_test_forecast_run(
         requested_window=ForecastWindow(
             report_date=report_date,
             n_lookback_days=n_lookback_days,
-            exclude_last_n_days=batch_exclude_last_n_days,
+            exclude_last_n_days=exclude_last_n_days,
         ),
     )

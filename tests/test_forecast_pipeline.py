@@ -158,7 +158,7 @@ def test_build_forecast_run_loads_all_available_history(monkeypatch, tmp_path):
         minimum_exclude_last_n_days=4,
     ).build_forecast_run()
 
-    assert calls["min_allowed_training_date"] is None
+    assert calls["min_allowed_training_date"] == dt.date.min
     assert run.first_training_date == dt.date(2020, 1, 1)
     assert run.exclude_last_n_days == 4
     assert run.model_batch_dir == tmp_path / "covid_lookback-all_omit-1"

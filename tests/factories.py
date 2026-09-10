@@ -119,7 +119,7 @@ def make_test_forecast_run(
     expected_min_allowed_training_date = (
         report_date - dt.timedelta(days=n_lookback_days)
         if n_lookback_days is not None
-        else None
+        else dt.date.min
     )
     if (
         min_allowed_training_date is not None

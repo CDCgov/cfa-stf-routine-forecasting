@@ -26,10 +26,10 @@ class ForecastWindow:
             raise ValueError("exclude_last_n_days must be less than n_lookback_days.")
 
     @property
-    def min_allowed_training_date(self) -> dt.date | None:
+    def min_allowed_training_date(self) -> dt.date:
         """Earliest date that may be retained for training."""
         if self.n_lookback_days is None:
-            return None
+            return dt.date.min
         return self.report_date - dt.timedelta(days=self.n_lookback_days)
 
     @property

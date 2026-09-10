@@ -29,7 +29,7 @@ class TestValidationUtils:
         [
             (90, 0, dt.date(2024, 9, 22), dt.date(2024, 12, 20)),
             (90, 5, dt.date(2024, 9, 22), dt.date(2024, 12, 15)),
-            (None, 5, None, dt.date(2024, 12, 15)),
+            (None, 5, dt.date.min, dt.date(2024, 12, 15)),
         ],
     )
     def test_forecast_window_boundaries(
@@ -89,7 +89,7 @@ class TestValidationUtils:
             exclude_last_n_days=30,
         )
 
-        assert window.min_allowed_training_date is None
+        assert window.min_allowed_training_date == dt.date.min
         assert window.model_batch_dir_name("covid") == "covid_lookback-all_omit-30"
 
     @pytest.mark.parametrize(

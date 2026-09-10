@@ -152,7 +152,7 @@ def test_normalize_nssp_data_requires_one_non_total_disease():
         )
 
 
-def test_load_dataops_nssp_all_history_passes_none_start_date(monkeypatch):
+def test_load_dataops_nssp_all_history_passes_minimum_start_date(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
         {
@@ -177,13 +177,13 @@ def test_load_dataops_nssp_all_history_passes_none_start_date(monkeypatch):
     result = data_access._load_dataops_nssp(
         loc_abb="CA",
         disease="covid",
-        min_allowed_training_date=None,
+        min_allowed_training_date=dt.date.min,
         max_allowed_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
     )
 
     assert result.first_training_date == dt.date(2020, 1, 1)
-    assert calls["start_date"] is None
+    assert calls["start_date"] == dt.date.min
 
 
 def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
@@ -249,7 +249,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     }
 
 
-def test_load_dataops_nhsn_all_history_skips_lower_bound(monkeypatch):
+def test_load_dataops_nhsn_all_history_uses_minimum_lower_bound(monkeypatch):
     calls = {}
     source_data = pl.DataFrame(
         {
@@ -274,7 +274,7 @@ def test_load_dataops_nhsn_all_history_skips_lower_bound(monkeypatch):
     result = data_access._load_dataops_nhsn(
         disease="covid",
         loc_abb="CA",
-        min_allowed_training_date=None,
+        min_allowed_training_date=dt.date.min,
         max_allowed_training_date=dt.date(2026, 1, 7),
         run_date=dt.date(2026, 1, 8),
     )
@@ -284,7 +284,7 @@ def test_load_dataops_nhsn_all_history_skips_lower_bound(monkeypatch):
         dt.date(2020, 1, 4),
         dt.date(2026, 1, 10),
     ]
-    assert calls["start_date"] is None
+    assert calls["start_date"] == dt.date.min
 
 
 @pytest.mark.parametrize("source_name", ["nssp", "nhsn"])

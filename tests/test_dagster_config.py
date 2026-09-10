@@ -1,8 +1,8 @@
 from cfa.stf.routine.dagster_defs import ConfigOverride, Location, ModelBaseConfig
 
 
-def test_model_base_config_defaults_to_all_available_history():
-    assert ModelBaseConfig().n_lookback_days is None
+def test_model_base_config_defaults_to_150_day_lookback():
+    assert ModelBaseConfig().n_lookback_days == 150
 
 
 def test_location_override_can_select_all_available_history():

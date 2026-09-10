@@ -263,7 +263,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
     """
 
     output_basedir: str = "output" if is_production else "test-output"
-    n_lookback_days: int | None = None
+    n_lookback_days: int | None = 150
     exclude_last_n_days: int = 1
     fail_on_stale_data: bool = is_production
     diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]

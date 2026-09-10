@@ -113,9 +113,7 @@ class ForecastPipeline(ABC):
             model_name=self.model_name,
             output_dir=self.output_dir,
             surveillance=surveillance,
-            model_batch_dir_name=self.requested_window.model_batch_dir_name(
-                self.disease
-            ),
+            requested_window=self.requested_window,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)
         self.logger.info("Model run directory: %s", run.model_run_dir)

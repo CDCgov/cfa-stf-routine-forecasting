@@ -198,6 +198,8 @@ def test_build_forecast_run_applies_minimum_exclusion(
     assert run.first_training_date == dt.date(2024, 9, 21)
     assert run.last_training_date == expected_max_allowed
     assert run.exclude_last_n_days == expected_exclusion
+    assert run.forecast_window.exclude_last_n_days == expected_exclusion
+    assert run.requested_window.exclude_last_n_days == requested_exclusion
     assert calls["load"]["min_allowed_training_date"] == dt.date(2024, 9, 21)
     assert calls["load"]["max_allowed_training_date"] == expected_max_allowed
     assert run.model_batch_dir == (
@@ -226,6 +228,7 @@ def test_model_minimum_does_not_change_batch_directory(monkeypatch, tmp_path):
 
     assert baseline_run.first_training_date == constrained_run.first_training_date
     assert baseline_run.last_training_date != constrained_run.last_training_date
+    assert baseline_run.requested_window == constrained_run.requested_window
     assert baseline_run.model_batch_dir == constrained_run.model_batch_dir
     assert baseline_run.model_batch_dir == tmp_path / "covid_lookback-90_omit-1"
 

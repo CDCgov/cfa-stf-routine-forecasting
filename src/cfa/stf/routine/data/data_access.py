@@ -113,8 +113,8 @@ def _resolved_version_date(
 
 
 def resolve_nssp_report_date() -> dt.date:
-    version = resolve_nssp_version(dataset="gold")
-    return _resolved_version_date(version, dataset="NSSP gold")
+    version = resolve_nssp_version(dataset="comprehensive")
+    return _resolved_version_date(version, dataset="comprehensive NSSP gold")
 
 
 def _normalize_nssp_data(
@@ -191,7 +191,7 @@ def _load_dataops_nssp(
     source_data = get_nssp(
         disease=[disease, "total"],
         state_abb=loc_abb,
-        dataset="gold",
+        dataset="comprehensive",
         start_date=min_allowed_training_date,
         lazy=False,
     )

@@ -129,7 +129,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
     assert calls == {
         "disease": ["covid", "total"],
         "state_abb": "CA",
-        "dataset": "gold",
+        "dataset": "comprehensive",
         "start_date": dt.date(2025, 12, 1),
         "lazy": False,
     }

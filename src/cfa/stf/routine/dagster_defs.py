@@ -643,8 +643,10 @@ HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 # They are replaced with true assets in production where
 # other code locations are able to be referenced.
 
-nssp_gold_v1 = dg.AssetSpec(
-    "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
+comprehensive_nssp_gold = dg.AssetSpec(
+    "comprehensive_nssp_gold",
+    partitions_def=daily_partitions_def,
+    group_name="Upstream",
 )
 
 nhsn_hrd_prelim = dg.AssetSpec(
@@ -660,7 +662,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
     **common_asset_args,
     automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Fable",
-    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+    ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
 def fable_e_other(
@@ -681,7 +683,7 @@ def fable_e_other(
     **common_asset_args,
     automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Fable",
-    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+    ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
 def epiweekly_fable_e_other(
@@ -703,7 +705,7 @@ def epiweekly_fable_e_other(
     automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Pyrenew",
     ins={
-        "nssp_gold_v1": dg.In(dg.Nothing),
+        "comprehensive_nssp_gold": dg.In(dg.Nothing),
     },
     tags=E_DATA_RERUN_TAGS,
 )
@@ -740,7 +742,7 @@ def pyrenew_h(
     automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
     group_name="Pyrenew",
     ins={
-        "nssp_gold_v1": dg.In(dg.Nothing),
+        "comprehensive_nssp_gold": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
     tags=HE_DATA_RERUN_TAGS,

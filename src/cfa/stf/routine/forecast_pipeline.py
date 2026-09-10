@@ -72,16 +72,18 @@ class ForecastPipeline(ABC):
 
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
-        batch_window = self.forecast_window
         effective_exclusion = max(
-            batch_window.exclude_last_n_days,
+            self.forecast_window.exclude_last_n_days,
             self.minimum_exclude_last_n_days,
         )
-        window = replace(batch_window, exclude_last_n_days=effective_exclusion)
-        if window != batch_window:
+        window = replace(
+            self.forecast_window,
+            exclude_last_n_days=effective_exclusion,
+        )
+        if window != self.forecast_window:
             self.logger.info(
                 "Increasing excluded training tail from %s to %s days for model %s.",
-                batch_window.exclude_last_n_days,
+                self.forecast_window.exclude_last_n_days,
                 window.exclude_last_n_days,
                 self.model_name,
             )
@@ -111,7 +113,7 @@ class ForecastPipeline(ABC):
             model_name=self.model_name,
             output_dir=self.output_dir,
             surveillance=surveillance,
-            batch_forecast_window=batch_window,
+            batch_forecast_window=self.forecast_window,
         )
         self.logger.info("Model batch directory: %s", run.model_batch_dir)
         self.logger.info("Model run directory: %s", run.model_run_dir)

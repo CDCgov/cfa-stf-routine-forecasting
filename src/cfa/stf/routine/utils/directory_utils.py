@@ -7,6 +7,8 @@ from pathlib import Path
 from cfa.stf.data import ensure_list
 from cfa.stf.forecasttools import LOCATION_LIST
 
+from cfa.stf.routine.lookback import ALL_AVAILABLE_LOOKBACK, parse_lookback_days
+
 DISEASE_NAMES = frozenset({"covid", "flu", "rsv"})
 loc_abbrs_ = LOCATION_LIST
 
@@ -14,7 +16,8 @@ loc_abbrs_ = LOCATION_LIST
 def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
     """Parse a standard model batch directory name."""
     regex_match = re.fullmatch(
-        r"(.+)_lookback-(\d+|all)_omit-(\d+)", model_batch_dir_name
+        rf"(.+)_lookback-(\d+|{ALL_AVAILABLE_LOOKBACK})_omit-(\d+)",
+        model_batch_dir_name,
     )
     if regex_match:
         disease, n_lookback_days, exclude_last_n_days = regex_match.groups()
@@ -32,7 +35,7 @@ def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
 
     return {
         "disease": disease,
-        "n_lookback_days": (int(n_lookback_days) if n_lookback_days != "all" else None),
+        "n_lookback_days": parse_lookback_days(n_lookback_days),
         "exclude_last_n_days": int(exclude_last_n_days),
     }
 

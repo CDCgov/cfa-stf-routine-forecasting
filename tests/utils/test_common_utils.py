@@ -6,6 +6,7 @@ import sys
 import pytest
 
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.lookback import format_lookback_days, parse_lookback_days
 from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
 from cfa.stf.routine.utils.date_utils import parse_exclude_date_ranges
@@ -91,6 +92,14 @@ class TestValidationUtils:
 
         assert window.min_allowed_training_date == dt.date.min
         assert window.model_batch_dir_name("covid") == "covid_lookback-all_omit-30"
+
+    @pytest.mark.parametrize(
+        ("n_lookback_days", "encoded"),
+        [(150, "150"), (None, "all")],
+    )
+    def test_lookback_encoding_round_trip(self, n_lookback_days, encoded):
+        assert format_lookback_days(n_lookback_days) == encoded
+        assert parse_lookback_days(encoded) == n_lookback_days
 
     @pytest.mark.parametrize(
         "input_str,expected",

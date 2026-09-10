@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from cfa.stf.forecasttools import ceiling_mmwr_epiweek
 
+from cfa.stf.routine.lookback import format_lookback_days
+
 
 @dataclass(frozen=True)
 class ForecastWindow:
@@ -45,5 +47,5 @@ class ForecastWindow:
 
     def model_batch_dir_name(self, disease: str) -> str:
         """Return the batch directory name for this window and disease."""
-        lookback = self.n_lookback_days if self.n_lookback_days is not None else "all"
+        lookback = format_lookback_days(self.n_lookback_days)
         return f"{disease}_lookback-{lookback}_omit-{self.exclude_last_n_days}"

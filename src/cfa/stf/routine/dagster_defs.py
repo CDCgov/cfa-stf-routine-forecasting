@@ -37,6 +37,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 # Model Code
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
+from cfa.stf.routine.epiautogp.forecast_epiautogp import main as forecast_epiautogp
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
 from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
@@ -292,7 +293,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
         return self.model_copy(update=overrides)
 
 
-class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
+class FableEOtherConfig(dg.ConfigurableResource):
     """
     Configuration for fable E-other model assets
     (fable_e_other, epiweekly_fable_e_other).
@@ -302,7 +303,7 @@ class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseCo
     n_samples: int = 400 if not is_production else 2000
 
 
-class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
+class PyrenewConfig(dg.ConfigurableResource):
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -315,16 +316,24 @@ class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     additional_forecast_letters: str = ""
 
 
-class EModelExclusions(
-    dg.ConfigurableResource
-):  # used to inherit ModelBaseConfig, used to be called FusionConfig
+class EpiAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
+    """Configuration for the epiweekly EpiAutoGP E-pct model asset."""
+
+    n_lookback_days: int | None = None if is_production else 150
+    n_particles: int = 64 if is_production else 4
+    n_mcmc: int = 200 if is_production else 100
+    n_hmc: int = 50 if is_production else 25
+    n_forecast_draws: int = 2000
+    smc_data_proportion: float = 0.1
+    n_threads: str = "auto"
+
+
+class EModelExclusions(dg.ConfigurableResource):
     # filter out WY
     locations: GraphDimensionExclusion[Location] = GraphDimensionExclusion(["WY"])  # type: ignore[reportInvalidTypeForm]
 
 
-class WModelExclusions(
-    dg.ConfigurableResource
-):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
+class WModelExclusions(dg.ConfigurableResource):
     # only covid is valid for W
     diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
 
@@ -337,7 +346,7 @@ class PostProcessConfig(dg.Config):
     output_basedir: str = "output" if is_production else "test-output"
     skip_existing: bool = False
     save_local_copy: bool = False
-    local_copy_dir: str = ""  # "stf_forecast_fig_share"
+    local_copy_dir: str = ""
     postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
 
 
@@ -439,6 +448,50 @@ def _run_pyrenew_model(
         fail_on_stale_data=model_base_config.fail_on_stale_data,
         **fit_flags,
         **forecast_flags,
+    )
+
+
+def _run_epiautogp_e_pct_epiweekly(
+    context: dg.OpExecutionContext,
+    epiautogp_e_pct_epiweekly_config: EpiAutoGPEPctEpiweeklyConfig,
+    model_base_config: ModelBaseConfig,
+) -> None:
+    """Run EpiAutoGP directly on epiweekly NSSP percentage data."""
+    _throw_if_backfill(context, daily_partitions_def)
+
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    daily_forecast_output_dir = Path(
+        model_base_config.output_basedir,
+        f"{context.partition_key}_forecasts",
+    )
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
+    context.log.info(
+        f"epiautogp_e_pct_epiweekly_config: '{epiautogp_e_pct_epiweekly_config}'"
+    )
+    context.log.info(f"Will write to: {daily_forecast_output_dir}")
+
+    forecast_epiautogp(
+        disease=disease,
+        loc=location,
+        output_dir=daily_forecast_output_dir,
+        n_lookback_days=epiautogp_e_pct_epiweekly_config.n_lookback_days,
+        target="nssp",
+        frequency="epiweekly",
+        ed_visit_type="pct",
+        exclude_last_n_days=loc_config.exclude_last_n_days,
+        n_particles=epiautogp_e_pct_epiweekly_config.n_particles,
+        n_mcmc=epiautogp_e_pct_epiweekly_config.n_mcmc,
+        n_hmc=epiautogp_e_pct_epiweekly_config.n_hmc,
+        n_forecast_draws=epiautogp_e_pct_epiweekly_config.n_forecast_draws,
+        smc_data_proportion=epiautogp_e_pct_epiweekly_config.smc_data_proportion,
+        n_threads=epiautogp_e_pct_epiweekly_config.n_threads,
+        nowcast_source_name="none",
+        run_date=run_date,
+        fail_on_stale_data=loc_config.fail_on_stale_data,
+        logger=context.log,
     )
 
 
@@ -660,7 +713,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -681,7 +734,7 @@ def fable_e_other(
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -702,7 +755,7 @@ def epiweekly_fable_e_other(
 # Pyrenew E
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -721,7 +774,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -739,7 +792,7 @@ def pyrenew_h(
 # Pyrenew HE
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -754,6 +807,26 @@ def pyrenew_he(
     e_model_exclusions: EModelExclusions,
 ):
     _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
+
+
+# EpiAutoGP E-pct (epiweekly)
+@dynamic_graph_asset(
+    **common_asset_args,
+    automation_condition=eager_on_wed,
+    group_name="EpiAutoGP",
+    ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
+    tags=E_DATA_RERUN_TAGS,
+)
+def epiautogp_e_pct_epiweekly(
+    context: dg.OpExecutionContext,
+    epiautogp_e_pct_epiweekly_config: EpiAutoGPEPctEpiweeklyConfig,
+    model_base_config: ModelBaseConfig,
+):
+    _run_epiautogp_e_pct_epiweekly(
+        context,
+        epiautogp_e_pct_epiweekly_config,
+        model_base_config,
+    )
 
 
 # ---------- Fusion Forecasts ----------
@@ -855,6 +928,7 @@ def fuse_pyrenew_he_ts_epiweekly(
         "fuse_pyrenew_he_ts",
         "fuse_pyrenew_he_ts_epiweekly",
         "pyrenew_h",
+        "epiautogp_e_pct_epiweekly",
     ],
     partitions_def=daily_partitions_def,
     # Runs when any dependency has been updated as long as at least one exists
@@ -867,7 +941,7 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    group_name="Fusion",  # included with the fusion assets
+    group_name="Fusion",  # included with the fusion assets, but should be separate
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )
@@ -975,7 +1049,7 @@ def e2e_json() -> str:
 
 end_to_end = dg.define_asset_job(
     name="end_to_end",
-    selection=dg.AssetSelection.groups("Fable", "Pyrenew", "Fusion"),
+    selection=dg.AssetSelection.groups("Fable", "Pyrenew", "EpiAutoGP", "Fusion"),
     config=e2e_config(),
 )
 
@@ -1121,6 +1195,7 @@ defs = dg.Definitions(
         # Shared resources for model assets
         "model_base_config": ModelBaseConfig(),
         "pyrenew_config": PyrenewConfig(),
+        "epiautogp_e_pct_epiweekly_config": EpiAutoGPEPctEpiweeklyConfig(),
         "fable_e_other_config": FableEOtherConfig(),
         "e_model_exclusions": EModelExclusions(),
         "w_model_exclusions": WModelExclusions(),

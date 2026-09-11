@@ -293,7 +293,7 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
         return self.model_copy(update=overrides)
 
 
-class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
+class FableEOtherConfig(dg.ConfigurableResource):
     """
     Configuration for fable E-other model assets
     (fable_e_other, epiweekly_fable_e_other).
@@ -303,7 +303,7 @@ class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseCo
     n_samples: int = 400 if not is_production else 2000
 
 
-class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
+class PyrenewConfig(dg.ConfigurableResource):
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -328,16 +328,12 @@ class EpiAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
     n_threads: str = "auto"
 
 
-class EModelExclusions(
-    dg.ConfigurableResource
-):  # used to inherit ModelBaseConfig, used to be called FusionConfig
+class EModelExclusions(dg.ConfigurableResource):
     # filter out WY
     locations: GraphDimensionExclusion[Location] = GraphDimensionExclusion(["WY"])  # type: ignore[reportInvalidTypeForm]
 
 
-class WModelExclusions(
-    dg.ConfigurableResource
-):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
+class WModelExclusions(dg.ConfigurableResource):
     # only covid is valid for W
     diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
 
@@ -350,7 +346,7 @@ class PostProcessConfig(dg.Config):
     output_basedir: str = "output" if is_production else "test-output"
     skip_existing: bool = False
     save_local_copy: bool = False
-    local_copy_dir: str = ""  # "stf_forecast_fig_share"
+    local_copy_dir: str = ""
     postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
 
 
@@ -717,7 +713,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -738,7 +734,7 @@ def fable_e_other(
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -759,7 +755,7 @@ def epiweekly_fable_e_other(
 # Pyrenew E
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -778,7 +774,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -796,7 +792,7 @@ def pyrenew_h(
 # Pyrenew HE
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -945,7 +941,7 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    group_name="Fusion",  # included with the fusion assets
+    group_name="Fusion",  # included with the fusion assets, but should be separate
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )

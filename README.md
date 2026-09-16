@@ -90,6 +90,47 @@ From our [production dagster server](https://dagster.apps.edav.ext.cdc.gov/), yo
   `cfa-dagster`, our own implementation of dagster, updates frequently.
   To specifically update that package, run `uv lock --upgrade-package cfa-dagster`.
 
+##### One-time activation of existing sensors
+
+The production defaults enable new sensors, but do not override a previously saved `STOPPED` state when definitions are reloaded.
+After deploying these defaults, an operator with permission to edit sensors must activate any previously stopped forecasting sensors once.
+Coordinate with the STF team before enabling production automation.
+
+To activate through the API, open the production server's [GraphQL playground](https://dagster.apps.edav.ext.cdc.gov/graphql) from the VAP and run:
+
+```graphql
+mutation StartForecastSensor($selector: SensorSelector!) {
+  startSensor(sensorSelector: $selector) {
+    __typename
+    ... on Sensor {
+      name
+      sensorState { status }
+    }
+    ... on SensorNotFoundError { message }
+    ... on UnauthorizedError { message }
+    ... on PythonError { message }
+  }
+}
+```
+
+Use these query variables, confirming the code location and repository names against the production UI:
+
+```json
+{
+  "selector": {
+    "repositoryLocationName": "cfa-stf-routine-forecasting",
+    "repositoryName": "__repository__",
+    "sensorName": "Fable"
+  }
+}
+```
+
+Repeat with `sensorName` set to `Pyrenew`, `Fusion`, and `EpiAutoGP`.
+For each response, verify `__typename` is `Sensor` and `sensorState.status` is `RUNNING`; an HTTP success alone does not indicate that activation succeeded.
+Starting an already-running sensor is safe.
+This is an explicit one-time operation, not a deployment hook: later intentional stops remain in effect.
+Development sensors still default to stopped.
+
 #### How to push to the dagster server
 
 1. You can use the Github Actions workflow in `containers.yaml` via workflow dispatch.

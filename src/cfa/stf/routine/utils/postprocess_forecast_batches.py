@@ -14,6 +14,7 @@ from pathlib import Path
 
 import polars as pl
 
+from cfa.stf.routine.lookback import format_lookback_days
 from cfa.stf.routine.utils import collate_plots as cp
 from cfa.stf.routine.utils.directory_utils import (
     get_all_forecast_dirs,
@@ -73,10 +74,10 @@ def model_batch_dir_to_target_path(
     pre_path: Path | str,
 ) -> Path:
     parts = parse_model_batch_dir_name(model_batch_dir)
+    lookback = format_lookback_days(parts["n_lookback_days"])
     target_path = Path(
         pre_path,
-        f"lookback-{parts['n_lookback_days']}-"
-        f"omit-{parts['exclude_last_n_days']}-figures",
+        f"lookback-{lookback}-omit-{parts['exclude_last_n_days']}-figures",
         parts["disease"],
     )
     return target_path

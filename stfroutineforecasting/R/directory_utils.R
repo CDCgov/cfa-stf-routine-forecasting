@@ -17,10 +17,11 @@ disease_names <- c("covid", "flu", "rsv")
 #' @param model_batch_dir_path Path to the model batch
 #' directory to parse. Will parse only the basename.
 #' @return A one-row tibble containing canonical `disease`, `n_lookback_days`,
-#' and `exclude_last_n_days` values.
+#' and `exclude_last_n_days` values. An unlimited lookback is represented by
+#' `Inf`.
 #' @export
 parse_model_batch_dir_path <- function(model_batch_dir_path) {
-  pattern <- "^(.+)_lookback-([0-9]+)_omit-([0-9]+)$"
+  pattern <- "^(.+)_lookback-([0-9]+|all)_omit-([0-9]+)$"
   model_batch_dir_name <- fs::path_file(model_batch_dir_path)
   matches <- stringr::str_match(
     model_batch_dir_name,
@@ -51,14 +52,18 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
         .data$disease,
         NA_character_
       ),
-      n_lookback_days = as.integer(.data$n_lookback_days),
+      n_lookback_days = dplyr::coalesce(
+        as.double(dplyr::na_if(.data$n_lookback_days, "all")),
+        Inf
+      ),
       exclude_last_n_days = as.integer(.data$exclude_last_n_days)
     )
 
   if (anyNA(result)) {
     stop(
       "Could not parse extracted values; expected 'disease' to be one of ",
-      "'covid', 'flu', or 'rsv' and day counts to be integers. Got: ",
+      "'covid', 'flu', or 'rsv', lookback to be 'all' or an integer, ",
+      "and omitted days to be an integer. Got: ",
       glue::glue(
         "disease: {matches[2]}, ",
         "n_lookback_days: {matches[3]}, ",
@@ -79,7 +84,8 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #'
 #' @param model_run_dir_path Path to parse.
 #' @return A one-row tibble containing `location`, canonical `disease`,
-#' `n_lookback_days`, and `exclude_last_n_days` values.
+#' `n_lookback_days`, and `exclude_last_n_days` values. An unlimited lookback
+#' is represented by `Inf`.
 #'
 #' @export
 parse_model_run_dir_path <- function(model_run_dir_path) {

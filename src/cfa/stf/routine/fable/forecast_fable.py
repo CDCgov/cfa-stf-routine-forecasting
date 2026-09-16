@@ -57,7 +57,7 @@ class FablePipeline(ForecastPipeline):
 
     @property
     def minimum_exclude_last_n_days(self) -> int:
-        return 4
+        return 3
 
     def run_model(self, run: ForecastRun) -> None:
         self.logger.info("Performing fable E-other forecasting")
@@ -72,7 +72,7 @@ def main(
     disease: str,
     loc: str,
     output_dir: Path | str,
-    n_lookback_days: int,
+    n_lookback_days: int | None,
     n_samples: int,
     run_date: dt.date,
     exclude_last_n_days: int = 0,

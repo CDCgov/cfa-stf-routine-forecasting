@@ -203,7 +203,7 @@ def main(
     loc: str,
     priors_path: Path,
     output_dir: Path,
-    n_lookback_days: int,
+    n_lookback_days: int | None,
     n_chains: int,
     n_warmup: int,
     n_samples: int,

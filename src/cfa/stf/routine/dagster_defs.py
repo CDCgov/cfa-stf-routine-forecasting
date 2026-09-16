@@ -37,6 +37,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 # Model Code
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
+from cfa.stf.routine.epiautogp.forecast_epiautogp import main as forecast_epiautogp
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
 from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
@@ -241,33 +242,69 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # ============================================================================
 
 
-# using default_factory to prevent ConfigOverrides from populating fields in the Launchpad
-class _ModelTrainingFields(BaseModel):
-    output_basedir: str = Field(default_factory=lambda: "")
-    n_lookback_days: int = Field(default_factory=lambda: 0)
-    exclude_last_n_days: int = Field(default_factory=lambda: 0)
-    fail_on_stale_data: bool = Field(default_factory=lambda: is_production)
+# Use default_factory to prevent ConfigOverrides from populating fields in the
+# Launchpad unless the user explicitly sets them.
+class _SharedModelConfigFields(BaseModel):
+    output_basedir: str = Field(
+        default_factory=lambda: "",
+        description="Output directory used by all forecast models.",
+    )
+    exclude_last_n_days: int = Field(
+        default_factory=lambda: 0,
+        description="Requested recent-data omission used by all forecast models.",
+    )
+    fail_on_stale_data: bool = Field(
+        default_factory=lambda: is_production,
+        description="Stale-input policy used by all forecast models.",
+    )
 
 
-class ConfigOverride(_ModelTrainingFields, dg.Config):
+class ConfigOverride(_SharedModelConfigFields, dg.Config):
     location: Location  # type: ignore[reportInvalidTypeForm]
+    n_lookback_days: int | None = Field(
+        default_factory=lambda: None,
+        description=(
+            "Training lookback applied to all forecast models for this location."
+        ),
+    )
 
     def as_dict(self) -> dict:  # type: ignore[reportInvalidTypeForm]
         return self.model_dump(mode="json", exclude_unset=True)
 
 
-class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
+class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
     """
-    Base configuration for all model assets.
-    Contains parameters common to Fable and Pyrenew models.
+    Shared configuration and explicitly model-scoped lookbacks for model assets.
     """
 
-    output_basedir: str = "output" if is_production else "test-output"
-    n_lookback_days: int = 150
-    exclude_last_n_days: int = 1
-    fail_on_stale_data: bool = is_production
-    diseases: GraphDimension[Disease] = GraphDimension(DISEASES)  # type: ignore[reportInvalidTypeForm]
-    locations: GraphDimension[Location] = GraphDimension(LOCATIONS)  # type: ignore[reportInvalidTypeForm]
+    output_basedir: str = Field(
+        default="output" if is_production else "test-output",
+        description="Output directory used by all forecast models.",
+    )
+    fable_pyrenew_n_lookback_days: int | None = Field(
+        default=150,
+        description="Training lookback used only by Fable and PyRenew models.",
+    )
+    epiautogp_n_lookback_days: int | None = Field(
+        default=None if is_production else 150,
+        description="Training lookback used only by EpiAutoGP models.",
+    )
+    exclude_last_n_days: int = Field(
+        default=1,
+        description="Requested recent-data omission used by all forecast models.",
+    )
+    fail_on_stale_data: bool = Field(
+        default=is_production,
+        description="Stale-input policy used by all forecast models.",
+    )
+    diseases: GraphDimension[Disease] = Field(  # type: ignore[reportInvalidTypeForm]
+        default=GraphDimension(DISEASES),
+        description="Diseases run by all selected forecast models.",
+    )
+    locations: GraphDimension[Location] = Field(  # type: ignore[reportInvalidTypeForm]
+        default=GraphDimension(LOCATIONS),
+        description="Locations run by all selected forecast models.",
+    )
     # Add defaults here, or add in the launchpad with ctrl+space
     config_overrides: list[ConfigOverride] = Field(
         default=[
@@ -275,9 +312,10 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
         ],
         description=(
             "Provide location-specific overrides as a list of dicts. "
-            "The Launchpad accepts both yaml and json-style lists e.g."
-            "config_overrides: [{ location: GA, exclude_last_n_days: 2 }]"
-            ""
+            "An explicitly provided n_lookback_days applies to all models, "
+            "which otherwise retain their model-specific defaults. "
+            "The Launchpad accepts both YAML and JSON-style lists, e.g. "
+            "config_overrides: [{ location: GA, n_lookback_days: 120 }]."
         ),
     )  # type: ignore[reportInvalidTypeForm]
 
@@ -288,11 +326,15 @@ class ModelBaseConfig(_ModelTrainingFields, dg.ConfigurableResource):
                 entry = ConfigOverride(**entry)
             if entry.location == loc:
                 overrides = entry.model_dump(exclude={"location"}, exclude_unset=True)
+                if "n_lookback_days" in overrides:
+                    n_lookback_days = overrides.pop("n_lookback_days")
+                    overrides["fable_pyrenew_n_lookback_days"] = n_lookback_days
+                    overrides["epiautogp_n_lookback_days"] = n_lookback_days
                 break
         return self.model_copy(update=overrides)
 
 
-class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
+class FableEOtherConfig(dg.ConfigurableResource):
     """
     Configuration for fable E-other model assets
     (fable_e_other, epiweekly_fable_e_other).
@@ -302,7 +344,7 @@ class FableEOtherConfig(dg.ConfigurableResource):  # used to inherit ModelBaseCo
     n_samples: int = 400 if not is_production else 2000
 
 
-class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
+class PyrenewConfig(dg.ConfigurableResource):
     """
     Configuration for Pyrenew model assets (pyrenew_e, pyrenew_h, pyrenew_he, etc.).
     These default values can be modified in the Dagster asset materialization launchpad.
@@ -315,16 +357,23 @@ class PyrenewConfig(dg.ConfigurableResource):  # used to inherit ModelBaseConfig
     additional_forecast_letters: str = ""
 
 
-class EModelExclusions(
-    dg.ConfigurableResource
-):  # used to inherit ModelBaseConfig, used to be called FusionConfig
+class EpiAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
+    """Configuration for the epiweekly EpiAutoGP E-pct model asset."""
+
+    n_particles: int = 64 if is_production else 4
+    n_mcmc: int = 200 if is_production else 100
+    n_hmc: int = 50 if is_production else 25
+    n_forecast_draws: int = 2000
+    smc_data_proportion: float = 0.1
+    n_threads: str = "auto"
+
+
+class EModelExclusions(dg.ConfigurableResource):
     # filter out WY
     locations: GraphDimensionExclusion[Location] = GraphDimensionExclusion(["WY"])  # type: ignore[reportInvalidTypeForm]
 
 
-class WModelExclusions(
-    dg.ConfigurableResource
-):  # used to inherit PyrenewConfig, used to be called PyrenewWConfig
+class WModelExclusions(dg.ConfigurableResource):
     # only covid is valid for W
     diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
 
@@ -336,8 +385,6 @@ class PostProcessConfig(dg.Config):
 
     output_basedir: str = "output" if is_production else "test-output"
     skip_existing: bool = False
-    save_local_copy: bool = False
-    local_copy_dir: str = ""  # "stf_forecast_fig_share"
     postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
 
 
@@ -369,14 +416,15 @@ def _run_fable_e_other(
     location = model_base_config.locations.current_value
     run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
-    # we let the user potentially override the basedir,
-    # but subdir is locked to the partition date
-    daily_forecast_output_dir: Path = Path(
-        model_base_config.output_basedir,
-        f"{context.partition_key}_forecasts",
-    )
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
+
+    # We let the user potentially override the basedir, but the subdirectory is
+    # locked to the partition date.
+    daily_forecast_output_dir: Path = Path(
+        loc_config.output_basedir,
+        f"{context.partition_key}_forecasts",
+    )
 
     context.log.info(f"fable_e_other_config: '{fable_e_other_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
@@ -384,12 +432,12 @@ def _run_fable_e_other(
         disease=disease,
         loc=location,
         output_dir=daily_forecast_output_dir,
-        n_lookback_days=loc_config.n_lookback_days,
+        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
         n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         ed_visit_input_resolution=ed_visit_input_resolution,
         run_date=run_date,
-        fail_on_stale_data=model_base_config.fail_on_stale_data,
+        fail_on_stale_data=loc_config.fail_on_stale_data,
     )
 
 
@@ -408,10 +456,13 @@ def _run_pyrenew_model(
     location = model_base_config.locations.current_value
     run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
-    # we let the user potentially override the basedir,
-    # but subdir is locked to the partition date
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
+
+    # We let the user potentially override the basedir, but the subdirectory is
+    # locked to the partition date.
     daily_forecast_output_dir: Path = Path(
-        model_base_config.output_basedir, f"{context.partition_key}_forecasts"
+        loc_config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
@@ -419,9 +470,6 @@ def _run_pyrenew_model(
         f"{model_letters}{pyrenew_config.additional_forecast_letters}",
         flag_prefix="forecast",
     )
-    loc_config = model_base_config.get_by_location(location)
-    context.log.debug(f"loc_config: '{loc_config}'")
-
     context.log.info(f"config: '{pyrenew_config}'")
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
@@ -429,16 +477,60 @@ def _run_pyrenew_model(
         loc=location,
         priors_path=PRODUCTION_PRIORS,
         output_dir=daily_forecast_output_dir,
-        n_lookback_days=loc_config.n_lookback_days,
+        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
         n_chains=pyrenew_config.n_chains,
         n_warmup=pyrenew_config.n_warmup,
         n_samples=pyrenew_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         rng_key=pyrenew_config.rng_key,
         run_date=run_date,
-        fail_on_stale_data=model_base_config.fail_on_stale_data,
+        fail_on_stale_data=loc_config.fail_on_stale_data,
         **fit_flags,
         **forecast_flags,
+    )
+
+
+def _run_epiautogp_e_pct_epiweekly(
+    context: dg.OpExecutionContext,
+    epiautogp_e_pct_epiweekly_config: EpiAutoGPEPctEpiweeklyConfig,
+    model_base_config: ModelBaseConfig,
+) -> None:
+    """Run EpiAutoGP directly on epiweekly NSSP percentage data."""
+    _throw_if_backfill(context, daily_partitions_def)
+
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
+    daily_forecast_output_dir = Path(
+        loc_config.output_basedir,
+        f"{context.partition_key}_forecasts",
+    )
+    context.log.info(
+        f"epiautogp_e_pct_epiweekly_config: '{epiautogp_e_pct_epiweekly_config}'"
+    )
+    context.log.info(f"Will write to: {daily_forecast_output_dir}")
+
+    forecast_epiautogp(
+        disease=disease,
+        loc=location,
+        output_dir=daily_forecast_output_dir,
+        n_lookback_days=loc_config.epiautogp_n_lookback_days,
+        target="nssp",
+        frequency="epiweekly",
+        ed_visit_type="pct",
+        exclude_last_n_days=loc_config.exclude_last_n_days,
+        n_particles=epiautogp_e_pct_epiweekly_config.n_particles,
+        n_mcmc=epiautogp_e_pct_epiweekly_config.n_mcmc,
+        n_hmc=epiautogp_e_pct_epiweekly_config.n_hmc,
+        n_forecast_draws=epiautogp_e_pct_epiweekly_config.n_forecast_draws,
+        smc_data_proportion=epiautogp_e_pct_epiweekly_config.smc_data_proportion,
+        n_threads=epiautogp_e_pct_epiweekly_config.n_threads,
+        nowcast_source_name="none",
+        run_date=run_date,
+        fail_on_stale_data=loc_config.fail_on_stale_data,
+        logger=context.log,
     )
 
 
@@ -455,13 +547,13 @@ def get_model_loc_dir(
     run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     forecast_window = ForecastWindow(
         report_date=run_date,
-        n_lookback_days=loc_config.n_lookback_days,
+        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
         exclude_last_n_days=loc_config.exclude_last_n_days,
     )
     model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
 
     model_loc_dir = Path(
-        model_base_config.output_basedir,
+        loc_config.output_basedir,
         f"{context.partition_key}_forecasts",
         model_batch_dir_name,
         "model_runs",
@@ -643,8 +735,10 @@ HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 # They are replaced with true assets in production where
 # other code locations are able to be referenced.
 
-nssp_gold_v1 = dg.AssetSpec(
-    "nssp_gold_v1", partitions_def=daily_partitions_def, group_name="Upstream"
+comprehensive_nssp_gold = dg.AssetSpec(
+    "comprehensive_nssp_gold",
+    partitions_def=daily_partitions_def,
+    group_name="Upstream",
 )
 
 nhsn_hrd_prelim = dg.AssetSpec(
@@ -658,9 +752,9 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Fable",
-    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+    ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
 def fable_e_other(
@@ -679,9 +773,9 @@ def fable_e_other(
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Fable",
-    ins={"nssp_gold_v1": dg.In(dg.Nothing)},
+    ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
 def epiweekly_fable_e_other(
@@ -700,10 +794,10 @@ def epiweekly_fable_e_other(
 # Pyrenew E
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
-        "nssp_gold_v1": dg.In(dg.Nothing),
+        "comprehensive_nssp_gold": dg.In(dg.Nothing),
     },
     tags=E_DATA_RERUN_TAGS,
 )
@@ -719,7 +813,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -737,10 +831,10 @@ def pyrenew_h(
 # Pyrenew HE
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,  # initial forecast assets get eager_on_wed
+    automation_condition=eager_on_wed,
     group_name="Pyrenew",
     ins={
-        "nssp_gold_v1": dg.In(dg.Nothing),
+        "comprehensive_nssp_gold": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
     tags=HE_DATA_RERUN_TAGS,
@@ -752,6 +846,26 @@ def pyrenew_he(
     e_model_exclusions: EModelExclusions,
 ):
     _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
+
+
+# EpiAutoGP E-pct (epiweekly)
+@dynamic_graph_asset(
+    **common_asset_args,
+    automation_condition=eager_on_wed,
+    group_name="EpiAutoGP",
+    ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
+    tags=E_DATA_RERUN_TAGS,
+)
+def epiautogp_e_pct_epiweekly(
+    context: dg.OpExecutionContext,
+    epiautogp_e_pct_epiweekly_config: EpiAutoGPEPctEpiweeklyConfig,
+    model_base_config: ModelBaseConfig,
+):
+    _run_epiautogp_e_pct_epiweekly(
+        context,
+        epiautogp_e_pct_epiweekly_config,
+        model_base_config,
+    )
 
 
 # ---------- Fusion Forecasts ----------
@@ -853,6 +967,7 @@ def fuse_pyrenew_he_ts_epiweekly(
         "fuse_pyrenew_he_ts",
         "fuse_pyrenew_he_ts_epiweekly",
         "pyrenew_h",
+        "epiautogp_e_pct_epiweekly",
     ],
     partitions_def=daily_partitions_def,
     # Runs when any dependency has been updated as long as at least one exists
@@ -865,7 +980,7 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    group_name="Fusion",  # included with the fusion assets
+    group_name="Fusion",  # included with the fusion assets, but should be separate
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )
@@ -973,7 +1088,7 @@ def e2e_json() -> str:
 
 end_to_end = dg.define_asset_job(
     name="end_to_end",
-    selection=dg.AssetSelection.groups("Fable", "Pyrenew", "Fusion"),
+    selection=dg.AssetSelection.groups("Fable", "Pyrenew", "EpiAutoGP", "Fusion"),
     config=e2e_config(),
 )
 
@@ -1119,6 +1234,7 @@ defs = dg.Definitions(
         # Shared resources for model assets
         "model_base_config": ModelBaseConfig(),
         "pyrenew_config": PyrenewConfig(),
+        "epiautogp_e_pct_epiweekly_config": EpiAutoGPEPctEpiweeklyConfig(),
         "fable_e_other_config": FableEOtherConfig(),
         "e_model_exclusions": EModelExclusions(),
         "w_model_exclusions": WModelExclusions(),

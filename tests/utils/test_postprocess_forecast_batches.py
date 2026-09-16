@@ -134,3 +134,9 @@ def test_model_batch_dir_to_target_path_uses_batch_configuration(tmp_path):
     result = model_batch_dir_to_target_path("covid_lookback-150_omit-3", tmp_path)
 
     assert result == tmp_path / "lookback-150-omit-3-figures" / "covid"
+
+
+def test_model_batch_dir_to_target_path_formats_unlimited_lookback(tmp_path):
+    result = model_batch_dir_to_target_path("covid_lookback-all_omit-3", tmp_path)
+
+    assert result == tmp_path / "lookback-all-omit-3-figures" / "covid"

@@ -25,6 +25,8 @@ e2e data_mode="auto":
       --e2e-force \
       --e2e-data-mode "{{data_mode}}"
 
+    just _print-output-location "{{e2e_output_dir}}"
+
 # Test Fable for one disease and location and retain its output.
 test-fable data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
@@ -34,6 +36,7 @@ test-fable data_mode="auto" location="CA" disease="covid":
       --model-test-disease "{{disease}}" \
       --e2e-output-dir "{{e2e_output_dir}}/fable" \
       --e2e-force
+    @just _print-output-location "{{e2e_output_dir}}/fable"
 
 # Test PyRenew for one disease and location and retain its output.
 test-pyrenew data_mode="auto" location="CA" disease="covid":
@@ -44,6 +47,7 @@ test-pyrenew data_mode="auto" location="CA" disease="covid":
       --model-test-disease "{{disease}}" \
       --e2e-output-dir "{{e2e_output_dir}}/pyrenew" \
       --e2e-force
+    @just _print-output-location "{{e2e_output_dir}}/pyrenew"
 
 # Test EpiAutoGP for one disease and location and retain its output.
 test-epiautogp data_mode="auto" location="CA" disease="covid":
@@ -54,6 +58,12 @@ test-epiautogp data_mode="auto" location="CA" disease="covid":
       --model-test-disease "{{disease}}" \
       --e2e-output-dir "{{e2e_output_dir}}/epiautogp" \
       --e2e-force
+    @just _print-output-location "{{e2e_output_dir}}/epiautogp"
+
+# Print a clickable absolute path to retained test output.
+[private]
+_print-output-location output_dir:
+    @output_path="{{absolute_path(output_dir)}}"; printf '\nTest output: \033]8;;file://%s\033\\%s\033]8;;\033\\\n' "$output_path" "$output_path"
 
 # Remove all retained end-to-end and single-model test outputs.
 clean-outputs:

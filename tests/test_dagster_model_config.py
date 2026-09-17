@@ -5,9 +5,7 @@ from unittest.mock import Mock
 import dagster as dg
 import pytest
 
-from cfa.stf.routine.dagster import asset_config
-from cfa.stf.routine.dagster import asset_helpers
-from cfa.stf.routine.dagster import assets
+from cfa.stf.routine.dagster import asset_config, asset_helpers, assets
 
 
 def _model_base_config() -> asset_config.ModelBaseConfig:

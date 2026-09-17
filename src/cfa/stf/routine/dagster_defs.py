@@ -697,6 +697,13 @@ weekly_fusion_sensor = dg.AutomationConditionSensorDefinition(
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
+postprocess_sensor = dg.AutomationConditionSensorDefinition(
+    name="Postprocess",
+    target=dg.AssetSelection.groups("Postprocess"),
+    run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
+    use_user_code_server=True,  # allows for custom automation conditions
+)
+
 epiautogp_sensor = dg.AutomationConditionSensorDefinition(
     name="EpiAutoGP",
     # add a group_name="EpiAutoGP" to an epiautogp asset to include it
@@ -980,7 +987,7 @@ def fuse_pyrenew_he_fable_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    group_name="Fusion",  # included with the fusion assets, but should be separate
+    group_name="Postprocess",
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )
@@ -1088,7 +1095,9 @@ def e2e_json() -> str:
 
 end_to_end = dg.define_asset_job(
     name="end_to_end",
-    selection=dg.AssetSelection.groups("Fable", "Pyrenew", "EpiAutoGP", "Fusion"),
+    selection=dg.AssetSelection.groups(
+        "Fable", "Pyrenew", "EpiAutoGP", "Fusion", "Postprocess"
+    ),
     config=e2e_config(),
 )
 

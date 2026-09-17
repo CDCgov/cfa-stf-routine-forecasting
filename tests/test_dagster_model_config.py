@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import dagster as dg
 import pytest
 
-from cfa.stf.routine import dagster_defs
+from cfa.stf.routine.dagster import defs as dagster_defs
 
 
 def _model_base_config() -> dagster_defs.ModelBaseConfig:

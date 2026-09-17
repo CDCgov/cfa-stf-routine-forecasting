@@ -18,8 +18,7 @@ These forecasts are submitted to CDC's forecasting hubs:
 - [FluSight Forecast Hub](https://github.com/cdcepi/FluSight-forecast-hub)
 - [COVID-19 Forecast Hub](https://github.com/CDCgov/covid19-forecast-hub)
 
-The modeling pipeline is orchestrated with [Dagster](src/cfa/stf/routine/dagster_defs.py).
-The root-level `dagster_defs.py` is a compatibility entrypoint for upstream tooling.
+The modeling pipeline is orchestrated with [Dagster](src/cfa/stf/routine/dagster/defs.py).
 
 ## Justfile
 
@@ -34,7 +33,7 @@ The images are currently hosted on Azure Container Registry and are built and pu
 Container images pushed to the Azure Container Registry are automatically tagged as either `latest` (if the commit is on the `main` branch) or with the branch name (if the commit is on a different branch).
 After a branch is deleted, the image tag is removed from the registry via the [delete-container-tag.yaml](.github/workflows/delete-container-tag.yaml) GitHub Actions workflow.
 
-Containers can also be built using a Dagster job on the dev webserver as defined in `dagster_defs.py`.
+Containers can also be built using a Dagster job on the dev webserver as defined in `./src/cfa/stf/routine/dagster/`.
 You can choose whether to push the image (generally you should) or to even push to the dagster production server (do so only in coordination with the STF team).
 
 ## Running Model Pipelines with Dagster
@@ -53,7 +52,7 @@ Local runs write forecast outputs to `test-output/` in the repository.
 
 The following instructions will set up Dagster on your VAP.
 However, based on the current configuration, actual execution will still run in the cloud via Azure Batch.
-You can change the `executor` option in `dagster_defs.py` or in the Dagster launchpad to test using the local Docker executor.
+You can change the `executor` option in `./src/cfa/stf/routine/dagster/defs.py` or in the Dagster launchpad to test using the local Docker executor.
 See [Using the local docker executor](#using-the-local-docker-executor).
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:

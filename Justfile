@@ -7,7 +7,7 @@ default:
 
 # Start Dagster from the project definitions entrypoint.
 dagster:
-    uv run src/cfa/stf/routine/dagster_defs.py
+    uv run src/cfa/stf/routine/dagster/defs.py
 
 # Run the fast Python test suite.
 test:

@@ -98,7 +98,7 @@ docker_execution_config = ExecutionConfig(
                     f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    f"{__file__}:{container_workdir / 'src/cfa/stf/routine/dagster_defs.py'}",
+                    f"{local_workdir}:{container_workdir / 'src/cfa/stf/routine/dagster'}",
                     # Store outputs on the host so they persist after the
                     # container exits.
                 ]

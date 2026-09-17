@@ -10,7 +10,9 @@ from cfa_dagster import (
     dynamic_executor,
     start_dev_env,
 )
-from cfa_dagster import is_production as is_prod
+
+# Initialization must precede imports that construct the definitions (E402).
+from cfa.stf.routine.dagster import asset_config, assets, automation, execution, jobs
 
 # ============================================================================
 # DAGSTER INITIALIZATION
@@ -25,13 +27,8 @@ warnings.filterwarnings(
 
 # Get the user running the Dagster instance.
 user = os.getenv("DAGSTER_USER")
-is_production = is_prod()
 
 start_dev_env(__name__)
-
-# Initialization must precede imports that construct the definitions (E402).
-
-from cfa.stf.routine.dagster import asset_config, assets, automation, execution, jobs
 
 # ============================================================================
 # DAGSTER DEFINITIONS OBJECT

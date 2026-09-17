@@ -726,7 +726,11 @@ common_asset_args = {
 
 # Dagster tag keys cannot contain spaces. These tags make it easy to select all
 # assets that need rerunning after their corresponding source data changes.
-E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
+E_DATA_RERUN_TAGS = {
+    "e-data-rerun": "",
+    "e-data-rerun-no-epiautogp": "",
+}
+EPIAUTOGP_E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
 H_DATA_RERUN_TAGS = {"h-data-rerun": ""}
 HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 
@@ -861,7 +865,7 @@ def pyrenew_he(
     automation_condition=eager_on_wed,
     group_name="EpiAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_DATA_RERUN_TAGS,
+    tags=EPIAUTOGP_E_DATA_RERUN_TAGS,
 )
 def epiautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,

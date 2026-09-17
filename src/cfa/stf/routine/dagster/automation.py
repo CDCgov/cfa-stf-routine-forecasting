@@ -1,4 +1,5 @@
 import dagster as dg
+from cfa_dagster import is_production as is_prod
 
 from cfa.stf.routine.dagster.execution import (
     azure_batch_2cpu_execution_config,
@@ -63,6 +64,9 @@ fable_sensor = dg.AutomationConditionSensorDefinition(
     name="Fable",
     target=dg.AssetSelection.groups("Fable"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
+    default_status=(
+        dg.DefaultSensorStatus.RUNNING if is_prod() else dg.DefaultSensorStatus.STOPPED
+    ),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
@@ -70,6 +74,9 @@ pyrenew_sensor = dg.AutomationConditionSensorDefinition(
     name="Pyrenew",
     target=dg.AssetSelection.groups("Pyrenew"),
     run_tags=azure_batch_4cpu_execution_config.to_run_tags(),
+    default_status=(
+        dg.DefaultSensorStatus.RUNNING if is_prod() else dg.DefaultSensorStatus.STOPPED
+    ),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
@@ -77,6 +84,9 @@ fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="Fusion",
     target=dg.AssetSelection.groups("Fusion"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
+    default_status=(
+        dg.DefaultSensorStatus.RUNNING if is_prod() else dg.DefaultSensorStatus.STOPPED
+    ),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
@@ -84,6 +94,9 @@ postprocess_sensor = dg.AutomationConditionSensorDefinition(
     name="Postprocess",
     target=dg.AssetSelection.groups("Postprocess"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
+    default_status=(
+        dg.DefaultSensorStatus.RUNNING if is_prod() else dg.DefaultSensorStatus.STOPPED
+    ),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
@@ -93,5 +106,8 @@ epiautogp_sensor = dg.AutomationConditionSensorDefinition(
     # in the rules and configuration this sensor provides
     target=dg.AssetSelection.groups("EpiAutoGP"),
     run_tags=azure_batch_64cpu_execution_config.to_run_tags(),
+    default_status=dg.DefaultSensorStatus.RUNNING
+    if is_prod()
+    else dg.DefaultSensorStatus.STOPPED,
     use_user_code_server=True,  # allows for custom automation conditions
 )

@@ -7,6 +7,7 @@ import warnings
 import dagster as dg
 from cfa_dagster import (
     ADLS2PickleIOManager,
+    collect_definitions,
     dynamic_executor,
     start_dev_env,
 )
@@ -43,9 +44,10 @@ azure_http_logger = logging.getLogger(
 )
 azure_http_logger.setLevel(logging.WARNING)
 
-# Create Definitions object
-defs = dg.load_definitions_from_modules(
-    modules=[assets, automation, jobs],
+collected_defs = collect_definitions(vars(assets) | vars(automation) | vars(jobs))
+
+defs = dg.Definitions(
+    **collected_defs,
     resources={
         # These IOManagers let Dagster serialize asset outputs and store them
         # in Azure to pass between assets
@@ -60,11 +62,37 @@ defs = dg.load_definitions_from_modules(
     },
     executor=dynamic_executor(
         default_config=execution.azure_batch_4cpu_execution_config,
-        # default_config=execution.basic_execution_config,
-        # default_config=execution.docker_execution_config,
+        # default_config=basic_execution_config,
+        # default_config=docker_execution_config,
         alternate_configs=[
             execution.basic_execution_config,
             execution.docker_execution_config,
         ],
     ),
 )
+
+# # Create Definitions object
+# defs = dg.load_definitions_from_modules(
+#     modules=[assets, automation, jobs],
+#     resources={
+#         # These IOManagers let Dagster serialize asset outputs and store them
+#         # in Azure to pass between assets
+#         "io_manager": ADLS2PickleIOManager(),
+#         # Shared resources for model assets
+#         "model_base_config": asset_config.ModelBaseConfig(),
+#         "pyrenew_config": asset_config.PyrenewConfig(),
+#         "epiautogp_e_pct_epiweekly_config": asset_config.EpiAutoGPEPctEpiweeklyConfig(),
+#         "fable_e_other_config": asset_config.FableEOtherConfig(),
+#         "e_model_exclusions": asset_config.EModelExclusions(),
+#         "w_model_exclusions": asset_config.WModelExclusions(),
+#     },
+#     executor=dynamic_executor(
+#         default_config=execution.azure_batch_4cpu_execution_config,
+#         # default_config=execution.basic_execution_config,
+#         # default_config=execution.docker_execution_config,
+#         alternate_configs=[
+#             execution.basic_execution_config,
+#             execution.docker_execution_config,
+#         ],
+#     ),
+# )

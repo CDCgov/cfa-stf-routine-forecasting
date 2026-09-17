@@ -34,7 +34,11 @@ common_asset_args = {
 
 # Dagster tag keys cannot contain spaces. These tags make it easy to select all
 # assets that need rerunning after their corresponding source data changes.
-E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
+E_DATA_RERUN_TAGS = {
+    "e-data-rerun": "",
+    "e-data-rerun-no-epiautogp": "",
+}
+EPIAUTOGP_E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
 H_DATA_RERUN_TAGS = {"h-data-rerun": ""}
 HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 
@@ -169,7 +173,7 @@ def pyrenew_he(
     automation_condition=eager_on_wed,
     group_name="EpiAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_DATA_RERUN_TAGS,
+    tags=EPIAUTOGP_E_DATA_RERUN_TAGS,
 )
 def epiautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,
@@ -193,7 +197,7 @@ def epiautogp_e_pct_epiweekly(
     ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
 )
-def fuse_pyrenew_e_ts(
+def fuse_pyrenew_e_fable(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
@@ -216,7 +220,7 @@ def fuse_pyrenew_e_ts(
     },
     tags=E_DATA_RERUN_TAGS,
 )
-def fuse_pyrenew_e_ts_epiweekly(
+def fuse_pyrenew_e_fable_epiweekly(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
@@ -236,7 +240,7 @@ def fuse_pyrenew_e_ts_epiweekly(
     ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
     tags=HE_DATA_RERUN_TAGS,
 )
-def fuse_pyrenew_he_ts(
+def fuse_pyrenew_he_fable(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
@@ -259,7 +263,7 @@ def fuse_pyrenew_he_ts(
     },
     tags=HE_DATA_RERUN_TAGS,
 )
-def fuse_pyrenew_he_ts_epiweekly(
+def fuse_pyrenew_he_fable_epiweekly(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
@@ -277,10 +281,10 @@ def fuse_pyrenew_he_ts_epiweekly(
 
 @dg.asset(
     deps=[
-        "fuse_pyrenew_e_ts",
-        "fuse_pyrenew_e_ts_epiweekly",
-        "fuse_pyrenew_he_ts",
-        "fuse_pyrenew_he_ts_epiweekly",
+        "fuse_pyrenew_e_fable",
+        "fuse_pyrenew_e_fable_epiweekly",
+        "fuse_pyrenew_he_fable",
+        "fuse_pyrenew_he_fable_epiweekly",
         "pyrenew_h",
         "epiautogp_e_pct_epiweekly",
     ],
@@ -295,7 +299,7 @@ def fuse_pyrenew_he_ts_epiweekly(
             ),
         )
     ).with_label("postprocess_custom_eager"),
-    group_name="Fusion",  # included with the fusion assets, but should be separate
+    group_name="Postprocess",
     retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )

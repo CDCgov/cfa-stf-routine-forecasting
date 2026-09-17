@@ -59,23 +59,30 @@ eager_on_wed = (
 ).with_label("eager_on_wed")
 
 
-weekly_fable_sensor = dg.AutomationConditionSensorDefinition(
+fable_sensor = dg.AutomationConditionSensorDefinition(
     name="Fable",
     target=dg.AssetSelection.groups("Fable"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
-weekly_pyrenew_sensor = dg.AutomationConditionSensorDefinition(
+pyrenew_sensor = dg.AutomationConditionSensorDefinition(
     name="Pyrenew",
     target=dg.AssetSelection.groups("Pyrenew"),
     run_tags=azure_batch_4cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
 )
 
-weekly_fusion_sensor = dg.AutomationConditionSensorDefinition(
+fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="Fusion",
     target=dg.AssetSelection.groups("Fusion"),
+    run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
+    use_user_code_server=True,  # allows for custom automation conditions
+)
+
+postprocess_sensor = dg.AutomationConditionSensorDefinition(
+    name="Postprocess",
+    target=dg.AssetSelection.groups("Postprocess"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
 )

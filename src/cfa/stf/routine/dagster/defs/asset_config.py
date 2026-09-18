@@ -1,3 +1,5 @@
+"Partitioning and configuration for our dagster assets."
+
 import datetime as dt
 from enum import StrEnum
 from zoneinfo import ZoneInfo
@@ -10,7 +12,7 @@ from pydantic import BaseModel, Field
 
 # ============================================================================
 # GRAPH DIMENSIONS AND PARTITIONS
-# How are the data split and processed in Azure Batch?
+# i.e. "How is execution parallelized?"
 # ============================================================================
 
 DEFAULT_EXCLUDED_LOCATIONS = ["AS", "GU", "MP", "PR", "UM", "VI"]
@@ -36,6 +38,7 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 
 # ============================================================================
 # ASSET CONFIGURATIONS
+# i.e. "What parameters can we toggle upon execution?"
 # ============================================================================
 
 

@@ -1,3 +1,5 @@
+"Internal helper functions called by our dagster assets."
+
 import datetime as dt
 from pathlib import Path
 
@@ -23,9 +25,7 @@ from cfa.stf.routine.utils.r_utils import (
     model_fit_dir_to_hub_tbl,
 )
 
-# ============================================================================
-# MODEL CONSTRUCTOR FUNCTIONS - these are used later, in Asset Definitions
-# ============================================================================
+# Utility Functions
 
 
 def _throw_if_backfill(
@@ -36,6 +36,37 @@ def _throw_if_backfill(
     latest_partition = partition_def.get_last_partition_key()
     if current_partition != latest_partition:
         raise RuntimeError("STF forecast models do not support backfills")
+
+
+def _get_model_loc_dir(
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+) -> Path:
+    disease = model_base_config.diseases.current_value
+    location = model_base_config.locations.current_value
+
+    loc_config = model_base_config.get_by_location(location)
+    context.log.debug(f"loc_config: '{loc_config}'")
+
+    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    forecast_window = ForecastWindow(
+        report_date=run_date,
+        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
+        exclude_last_n_days=loc_config.exclude_last_n_days,
+    )
+    model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
+
+    model_loc_dir = Path(
+        loc_config.output_basedir,
+        f"{context.partition_key}_forecasts",
+        model_batch_dir_name,
+        "model_runs",
+        location,
+    )
+    return model_loc_dir
+
+
+# Model Runner functions
 
 
 def _run_fable_e_other(
@@ -167,34 +198,6 @@ def _run_epiautogp_e_pct_epiweekly(
         fail_on_stale_data=loc_config.fail_on_stale_data,
         logger=context.log,
     )
-
-
-def _get_model_loc_dir(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-) -> Path:
-    disease = model_base_config.diseases.current_value
-    location = model_base_config.locations.current_value
-
-    loc_config = model_base_config.get_by_location(location)
-    context.log.debug(f"loc_config: '{loc_config}'")
-
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
-    forecast_window = ForecastWindow(
-        report_date=run_date,
-        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
-    )
-    model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
-
-    model_loc_dir = Path(
-        loc_config.output_basedir,
-        f"{context.partition_key}_forecasts",
-        model_batch_dir_name,
-        "model_runs",
-        location,
-    )
-    return model_loc_dir
 
 
 def _run_fusion_model(

@@ -52,6 +52,7 @@ directory_type = "project"
 
 [tool.dg.project]
 root_module = "cfa.stf.routine.dagster"
+defs_module = "cfa.stf.routine.dagster.defs"
 
 [dependency-groups]
 dev = [

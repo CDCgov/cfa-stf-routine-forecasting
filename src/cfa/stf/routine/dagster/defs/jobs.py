@@ -1,3 +1,5 @@
+"Utility jobs for our dagster project."
+
 import json
 import subprocess
 
@@ -17,7 +19,7 @@ from cfa.stf.routine.dagster.defs.execution import (
 
 # ============================================================================
 # JOBS AND OPS
-# These can create images.
+# i.e. "How is our project built, tested, and deployed?"
 # ============================================================================
 
 update_script_url = (

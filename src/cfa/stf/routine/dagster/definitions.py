@@ -1,4 +1,7 @@
+"Initialization and definitions object for our dagster project."
+
 # ruff: noqa: E402
+
 import logging
 import os
 import warnings

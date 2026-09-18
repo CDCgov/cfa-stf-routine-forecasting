@@ -5,8 +5,8 @@ import dagster as dg
 from cfa_dagster import GraphDimension, dynamic_executor
 from cfa_dagster import is_production as is_prod
 
-from cfa.stf.routine.dagster.asset_config import ModelBaseConfig, tz
-from cfa.stf.routine.dagster.execution import (
+from cfa.stf.routine.dagster.defs.asset_config import ModelBaseConfig, tz
+from cfa.stf.routine.dagster.defs.execution import (
     azure_batch_4cpu_execution_config,
     basic_execution_config,
     image,

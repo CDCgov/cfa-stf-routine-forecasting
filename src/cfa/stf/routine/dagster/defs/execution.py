@@ -8,6 +8,7 @@ from cfa_dagster import (
     SelectorConfig,
     azure_batch_executor,
     docker_executor,
+    dynamic_executor,
 )
 from cfa_dagster import is_production as is_prod
 from pygit2.repository import Repository
@@ -158,3 +159,18 @@ azure_batch_64cpu_execution_config = ExecutionConfig(
         },
     ),
 )
+
+
+@dg.definitions
+def execution():
+    return dg.Definitions(
+        executor=dynamic_executor(
+            default_config=azure_batch_4cpu_execution_config,
+            # default_config=basic_execution_config,
+            # default_config=docker_execution_config,
+            alternate_configs=[
+                basic_execution_config,
+                docker_execution_config,
+            ],
+        ),
+    )

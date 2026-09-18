@@ -183,3 +183,17 @@ class PostProcessConfig(dg.Config):
     output_basedir: str = "output" if is_prod() else "test-output"
     skip_existing: bool = False
     postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
+
+
+@dg.definitions
+def resources():
+    return dg.Definitions(
+        resources={
+            "model_base_config": ModelBaseConfig(),
+            "pyrenew_config": PyrenewConfig(),
+            "epiautogp_e_pct_epiweekly_config": EpiAutoGPEPctEpiweeklyConfig(),
+            "fable_e_other_config": FableEOtherConfig(),
+            "e_model_exclusions": EModelExclusions(),
+            "w_model_exclusions": WModelExclusions(),
+        }
+    )

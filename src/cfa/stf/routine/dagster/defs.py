@@ -62,8 +62,8 @@ defs = dg.Definitions(
     },
     executor=dynamic_executor(
         default_config=execution.azure_batch_4cpu_execution_config,
-        # default_config=basic_execution_config,
-        # default_config=docker_execution_config,
+        # default_config=execution.basic_execution_config,
+        # default_config=execution.docker_execution_config,
         alternate_configs=[
             execution.basic_execution_config,
             execution.docker_execution_config,

@@ -39,7 +39,7 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "cfa.stf.routine"
 source-include = [
-    "dagster/defs.py",
+    "dagster/definitions.py",
     "tests/**",
 ]
 source-exclude = [

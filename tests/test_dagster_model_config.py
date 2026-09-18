@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import dagster as dg
 import pytest
 
-from cfa.stf.routine.dagster import asset_config, asset_helpers, assets
+from cfa.stf.routine.dagster.defs import asset_config, asset_helpers, assets
 
 
 def _model_base_config() -> asset_config.ModelBaseConfig:
@@ -46,8 +46,8 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
 
 def test_postprocess_always_copies_to_daily_output(monkeypatch):
     postprocess = Mock()
-    monkeypatch.setattr(asset_helpers, "_throw_if_backfill", Mock())
-    monkeypatch.setattr(asset_helpers, "postprocess", postprocess)
+    monkeypatch.setattr(assets, "_throw_if_backfill", Mock())
+    monkeypatch.setattr(assets, "postprocess", postprocess)
 
     with dg.build_asset_context(partition_key="2026-09-09") as context:
         assets.postprocess_forecasts(

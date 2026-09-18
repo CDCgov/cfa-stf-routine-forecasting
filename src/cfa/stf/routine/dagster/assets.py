@@ -45,7 +45,6 @@ HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 # ============================================================================
 # ASSET DEFINITIONS
 # ============================================================================
-# These are the core of Dagster - functions that specify data
 
 # ---------- External Asset Specs -------------
 
@@ -276,7 +275,7 @@ def fuse_pyrenew_he_fable_epiweekly(
     )
 
 
-# ---------- Postprocessing Forecast Batches ----------
+# ---------- Postprocessing ----------
 
 
 @dg.asset(

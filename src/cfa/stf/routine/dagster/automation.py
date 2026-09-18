@@ -89,8 +89,6 @@ postprocess_sensor = dg.AutomationConditionSensorDefinition(
 
 epiautogp_sensor = dg.AutomationConditionSensorDefinition(
     name="EpiAutoGP",
-    # add a group_name="EpiAutoGP" to an epiautogp asset to include it
-    # in the rules and configuration this sensor provides
     target=dg.AssetSelection.groups("EpiAutoGP"),
     run_tags=azure_batch_64cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions

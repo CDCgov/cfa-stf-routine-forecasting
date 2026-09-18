@@ -22,7 +22,7 @@ from cfa.stf.routine.dagster.asset_helpers import (
 from cfa.stf.routine.dagster.automation import eager_on_wednesday
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
-# ---------- Shared Asset Decorator Arguments ----------
+# Shared Asset Decorator Arguments
 
 # It's helpful (and helps reduce DRY issues) to specify some common
 # arguments that we give to the asset decorators, as well as some tags
@@ -46,7 +46,7 @@ HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 # ASSET DEFINITIONS
 # ============================================================================
 
-# ---------- External Asset Specs -------------
+# External Asset Specs
 
 # These allow us to model external assets we do not have locally
 # while in development. They do not materialize.
@@ -64,7 +64,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 )
 
 
-# ----------------  Forecasts --------------
+# Forecast Assets
 
 
 # Fable E Other
@@ -186,7 +186,7 @@ def epiautogp_e_pct_epiweekly(
     )
 
 
-# ---------- Fusion Forecasts ----------
+# Fusion Assets
 
 
 @dynamic_graph_asset(
@@ -275,7 +275,7 @@ def fuse_pyrenew_he_fable_epiweekly(
     )
 
 
-# ---------- Postprocessing ----------
+# Postprocessing Asset
 
 
 @dg.asset(

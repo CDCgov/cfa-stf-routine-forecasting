@@ -1,6 +1,4 @@
-"""
-Internal helper functions called by our dagster assets.
-"""
+"Internal helper functions called by our dagster assets."
 
 import datetime as dt
 from pathlib import Path

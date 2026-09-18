@@ -1,6 +1,4 @@
-"""
-Automation for our dagster assets
-"""
+"Automation for our dagster assets."
 
 from calendar import Day
 from zoneinfo import ZoneInfo

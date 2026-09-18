@@ -1,3 +1,5 @@
+"Execution configuration for our dagster project."
+
 import logging
 import os
 from pathlib import Path
@@ -16,7 +18,8 @@ log = logging.getLogger(__name__)
 user = os.getenv("DAGSTER_USER")
 
 # ============================================================================
-# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
+# EXECUTION CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
+# i.e. "How do we run our project, and on what backends?"
 # ============================================================================
 # Executors define the runtime-location of an asset job
 # See later on for Asset job definitions

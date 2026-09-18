@@ -1,3 +1,5 @@
+"Our dagster assets"
+
 from pathlib import Path
 
 import dagster as dg
@@ -44,6 +46,7 @@ HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 
 # ============================================================================
 # ASSET DEFINITIONS
+# i.e. "What are our data and their relationships?"
 # ============================================================================
 
 # External Asset Specs

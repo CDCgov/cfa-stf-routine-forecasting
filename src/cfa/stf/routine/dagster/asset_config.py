@@ -1,3 +1,5 @@
+"Partitioning and configuration for our dagster assets."
+
 import datetime as dt
 from enum import StrEnum
 from zoneinfo import ZoneInfo

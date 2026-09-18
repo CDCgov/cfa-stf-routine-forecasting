@@ -156,7 +156,6 @@ def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
         num_model_name="num_model",
         other_model_name="other_model",
         aggregate_num=True,
-        augment_other_with_obs=False,
     )
 
     output_dir = tmp_path / "prop_epiweekly_aggregated_num_model_other_model"
@@ -174,49 +173,6 @@ def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
     assert ".chain" not in samples.columns
     assert ".iteration" not in samples.columns
     assert_frame_equal(data.select(expected.columns), expected, check_exact=False)
-
-
-def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
-    training_date = dt.date(2025, 1, 1)
-    forecast_date = dt.date(2025, 1, 2)
-    num_samples = _model_frame(
-        [training_date] * 2 + [forecast_date] * 2,
-        [2, 3, 4, 5],
-        variable="observed_ed_visits",
-        draws=[1, 2, 1, 2],
-        data_type=["train", "train", "forecast", "forecast"],
-    )
-    other_samples = _model_frame(
-        [forecast_date] * 2,
-        [5, 6],
-        variable="other_ed_visits",
-        draws=[2, 1],
-    )
-    num_data = num_samples.filter(pl.col("date") == training_date).drop(".draw")
-    other_data = _model_frame(
-        [training_date],
-        [8],
-        variable="other_ed_visits",
-        data_type="train",
-    )
-    _write_model_outputs(tmp_path / "num_model", num_samples, num_data)
-    _write_model_outputs(tmp_path / "other_model", other_samples, other_data)
-
-    create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
-    )
-
-    samples = read_tabular(tmp_path / "prop_num_model_other_model" / "samples.parquet")
-    expected = pl.DataFrame(
-        {
-            "date": [training_date] * 2 + [forecast_date] * 2,
-            ".draw": [1, 2, 1, 2],
-            ".value": [2 / 10, 3 / 11, 4 / 10, 5 / 10],
-        }
-    )
-    assert_frame_equal(samples.select(expected.columns), expected, check_exact=False)
 
 
 @pytest.mark.parametrize(
@@ -273,7 +229,6 @@ def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
         model_run_dir=tmp_path,
         num_model_name="num_model",
         other_model_name="other_model",
-        augment_other_with_obs=False,
     )
 
     output_dir = tmp_path / "prop_num_model_other_model"

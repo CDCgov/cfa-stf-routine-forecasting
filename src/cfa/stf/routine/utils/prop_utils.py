@@ -5,7 +5,6 @@ from pathlib import Path
 import polars as pl
 from cfa.stf.forecasttools import (
     append_prop_data,
-    augment_samples_with_observations,
     create_proportions,
     read_tabular,
     write_tabular,
@@ -21,8 +20,6 @@ def create_prop_fusion_model(
     num_var_name: str = "observed_ed_visits",
     other_var_name: str = "other_ed_visits",
     prop_var_name: str = "prop_disease_ed_visits",
-    augment_num_with_obs: bool = False,
-    augment_other_with_obs: bool = True,
     aggregate_num: bool = False,
     aggregate_other: bool = False,
 ) -> None:
@@ -57,16 +54,6 @@ def create_prop_fusion_model(
         other_model_name, other_var_name, "data/combined_data.tsv"
     )
 
-    if augment_num_with_obs:
-        num_samples = augment_samples_with_observations(
-            num_samples,
-            num_data.drop("data_type"),
-        )
-    if augment_other_with_obs:
-        other_samples = augment_samples_with_observations(
-            other_samples,
-            other_data.drop("data_type"),
-        )
     if aggregate_num:
         num_samples = aggregate_long_to_epiweekly(num_samples, value_col=num_var_name)
         num_data = aggregate_long_to_epiweekly(num_data, value_col=num_var_name)

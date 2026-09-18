@@ -143,7 +143,8 @@ jobs:
 
     approve-end-to-end-test:
         needs: acr-import
-        if: github.event_name == 'pull_request'
+        # Remote Dagster end-to-end testing is temporarily disabled.
+        if: ${{ false }}
         runs-on: ubuntu-latest
         environment: end-to-end-test-approval
         name: End-to-end test via Dagster (optional)
@@ -153,13 +154,8 @@ jobs:
 
     end-to-end-test:
         needs: [ acr-import, approve-end-to-end-test ]
-        if: |-
-          always() &&
-          needs.acr-import.result == 'success' &&
-          (
-            github.event_name == 'workflow_dispatch' ||
-            (github.event_name == 'pull_request' && needs.approve-end-to-end-test.result == 'success')
-          )
+        # Remote Dagster end-to-end testing is temporarily disabled.
+        if: ${{ false }}
         runs-on: ubuntu-latest
         permissions:
           id-token: write # This is required for requesting the JWT

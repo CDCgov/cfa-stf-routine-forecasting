@@ -5,7 +5,7 @@ from pathlib import Path
 import dagster as dg
 from cfa_dagster import dynamic_graph_asset
 
-from cfa.stf.routine.dagster.asset_config import (
+from cfa.stf.routine.dagster.defs.asset_config import (
     EModelExclusions,
     EpiAutoGPEPctEpiweeklyConfig,
     FableEOtherConfig,
@@ -14,14 +14,14 @@ from cfa.stf.routine.dagster.asset_config import (
     PyrenewConfig,
     daily_partitions_def,
 )
-from cfa.stf.routine.dagster.asset_helpers import (
+from cfa.stf.routine.dagster.defs.asset_helpers import (
     _fuse_pyrenew_fable_e_other,
     _run_epiautogp_e_pct_epiweekly,
     _run_fable_e_other,
     _run_pyrenew_model,
     _throw_if_backfill,
 )
-from cfa.stf.routine.dagster.automation import eager_on_wednesday
+from cfa.stf.routine.dagster.defs.automation import eager_on_wednesday
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
 # Shared Asset Decorator Arguments

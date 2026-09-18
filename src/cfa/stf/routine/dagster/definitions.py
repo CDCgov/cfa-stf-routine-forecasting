@@ -15,7 +15,13 @@ from cfa_dagster import (
 )
 
 # Initialization must precede imports that construct the definitions (E402).
-from cfa.stf.routine.dagster import asset_config, assets, automation, execution, jobs
+from cfa.stf.routine.dagster.defs import (
+    asset_config,
+    assets,
+    automation,
+    execution,
+    jobs,
+)
 
 # ============================================================================
 # DAGSTER INITIALIZATION

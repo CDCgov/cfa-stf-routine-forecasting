@@ -51,9 +51,8 @@ source-exclude = [
 directory_type = "project"
 
 [tool.dg.project]
-root_module = "cfa.stf.routine"
+root_module = "cfa.stf.routine.dagster"
 defs_module = "cfa.stf.routine.dagster.defs"
-code_location_target_module = "cfa.stf.routine.dagster.defs"
 
 [dependency-groups]
 dev = [

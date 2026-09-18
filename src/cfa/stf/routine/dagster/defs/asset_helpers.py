@@ -7,7 +7,7 @@ import dagster as dg
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
-from cfa.stf.routine.dagster.asset_config import (
+from cfa.stf.routine.dagster.defs.asset_config import (
     EpiAutoGPEPctEpiweeklyConfig,
     FableEOtherConfig,
     ModelBaseConfig,

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import dagster as dg
 
-from cfa.stf.routine.dagster.execution import (
+from cfa.stf.routine.dagster.defs.execution import (
     azure_batch_2cpu_execution_config,
     azure_batch_4cpu_execution_config,
     azure_batch_64cpu_execution_config,

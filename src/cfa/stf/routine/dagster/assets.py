@@ -19,7 +19,7 @@ from cfa.stf.routine.dagster.asset_helpers import (
     _run_pyrenew_model,
     _throw_if_backfill,
 )
-from cfa.stf.routine.dagster.automation import eager_on_wed
+from cfa.stf.routine.dagster.automation import eager_on_wednesday
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
 # ---------- Shared Asset Decorator Arguments ----------
@@ -70,7 +70,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
 # Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -91,7 +91,7 @@ def fable_e_other(
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -112,7 +112,7 @@ def epiweekly_fable_e_other(
 # Pyrenew E
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -131,7 +131,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -149,7 +149,7 @@ def pyrenew_h(
 # Pyrenew HE
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -169,7 +169,7 @@ def pyrenew_he(
 # EpiAutoGP E-pct (epiweekly)
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="EpiAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=EPIAUTOGP_E_DATA_RERUN_TAGS,

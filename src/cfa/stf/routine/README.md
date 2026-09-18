@@ -171,7 +171,7 @@ EpiAutoGP also requires at least three when it runs without a nowcast source.
 ## 4. Add orchestration explicitly
 
 Pipeline subclasses are not discovered automatically.
-To run the new model in production, update [`dagster_defs.py`](dagster_defs.py) to:
+To run the new model in production, update [`dagster/defs/`](./dagster/defs/) to:
 
 1. import the new module-level `main()` function;
 2. define any model-specific Dagster config;

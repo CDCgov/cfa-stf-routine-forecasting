@@ -1,3 +1,5 @@
+"Execution configuration for our dagster project."
+
 import logging
 import os
 from pathlib import Path
@@ -8,6 +10,7 @@ from cfa_dagster import (
     SelectorConfig,
     azure_batch_executor,
     docker_executor,
+    dynamic_executor,
 )
 from cfa_dagster import is_production as is_prod
 from pygit2.repository import Repository
@@ -16,12 +19,13 @@ log = logging.getLogger(__name__)
 user = os.getenv("DAGSTER_USER")
 
 # ============================================================================
-# RUNTIME CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
+# EXECUTION CONFIGURATION: WORKING DIRECTORY, EXECUTORS, VOLUME MOUNTS
+# i.e. "How do we run our project, and on what backends?"
 # ============================================================================
 # Executors define the runtime-location of an asset job
 # See later on for Asset job definitions
 
-# ---------- Working Directory, Branch, and Image Tag ----------
+# Working Directory, Branch, and Image Tag
 
 
 def _find_project_root() -> Path:
@@ -63,7 +67,7 @@ tag = (
 )
 image = f"{registry}/{local_workdir.name}:{tag}"
 
-# ----------- Output volume mount strings ---------------
+# Output volume mount strings
 
 # Azure Batch writes outputs directly to blob storage.
 azure_blob_mounts = [
@@ -76,7 +80,7 @@ local_output_mount = (
     f"{local_workdir / 'test-output'}:{container_workdir / 'test-output'}"
 )
 
-# ---------- Execution Configuration ----------
+# Execution Configuration
 
 # Launches locally in a new system process
 # Used for lightweight assets and jobs, etc. where volume mounts are not needed
@@ -158,3 +162,18 @@ azure_batch_64cpu_execution_config = ExecutionConfig(
         },
     ),
 )
+
+
+@dg.definitions
+def execution():
+    return dg.Definitions(
+        executor=dynamic_executor(
+            default_config=azure_batch_4cpu_execution_config,
+            # default_config=basic_execution_config,
+            # default_config=docker_execution_config,
+            alternate_configs=[
+                basic_execution_config,
+                docker_execution_config,
+            ],
+        ),
+    )

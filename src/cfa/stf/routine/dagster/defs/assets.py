@@ -1,9 +1,11 @@
+"Our dagster assets"
+
 from pathlib import Path
 
 import dagster as dg
 from cfa_dagster import dynamic_graph_asset
 
-from cfa.stf.routine.dagster.asset_config import (
+from cfa.stf.routine.dagster.defs.asset_config import (
     EModelExclusions,
     EpiAutoGPEPctEpiweeklyConfig,
     FableEOtherConfig,
@@ -12,17 +14,17 @@ from cfa.stf.routine.dagster.asset_config import (
     PyrenewConfig,
     daily_partitions_def,
 )
-from cfa.stf.routine.dagster.asset_helpers import (
+from cfa.stf.routine.dagster.defs.asset_helpers import (
     _fuse_pyrenew_fable_e_other,
     _run_epiautogp_e_pct_epiweekly,
     _run_fable_e_other,
     _run_pyrenew_model,
     _throw_if_backfill,
 )
-from cfa.stf.routine.dagster.automation import eager_on_wed
+from cfa.stf.routine.dagster.defs.automation import eager_on_wednesday
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
-# ---------- Shared Asset Decorator Arguments ----------
+# Shared Asset Decorator Arguments
 
 # It's helpful (and helps reduce DRY issues) to specify some common
 # arguments that we give to the asset decorators, as well as some tags
@@ -44,10 +46,10 @@ HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 
 # ============================================================================
 # ASSET DEFINITIONS
+# i.e. "What are our data and their relationships?"
 # ============================================================================
-# These are the core of Dagster - functions that specify data
 
-# ---------- External Asset Specs -------------
+# External Asset Specs
 
 # These allow us to model external assets we do not have locally
 # while in development. They do not materialize.
@@ -65,13 +67,13 @@ nhsn_hrd_prelim = dg.AssetSpec(
 )
 
 
-# ----------------  Forecasts --------------
+# Forecast Assets
 
 
 # Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -92,7 +94,7 @@ def fable_e_other(
 # Epiweekly Fable E Other
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=E_DATA_RERUN_TAGS,
@@ -113,7 +115,7 @@ def epiweekly_fable_e_other(
 # Pyrenew E
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -132,7 +134,7 @@ def pyrenew_e(
 # Pyrenew H
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Pyrenew",
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
@@ -150,7 +152,7 @@ def pyrenew_h(
 # Pyrenew HE
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="Pyrenew",
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
@@ -170,7 +172,7 @@ def pyrenew_he(
 # EpiAutoGP E-pct (epiweekly)
 @dynamic_graph_asset(
     **common_asset_args,
-    automation_condition=eager_on_wed,
+    automation_condition=eager_on_wednesday,
     group_name="EpiAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
     tags=EPIAUTOGP_E_DATA_RERUN_TAGS,
@@ -187,7 +189,7 @@ def epiautogp_e_pct_epiweekly(
     )
 
 
-# ---------- Fusion Forecasts ----------
+# Fusion Assets
 
 
 @dynamic_graph_asset(
@@ -276,7 +278,7 @@ def fuse_pyrenew_he_fable_epiweekly(
     )
 
 
-# ---------- Postprocessing Forecast Batches ----------
+# Postprocessing Asset
 
 
 @dg.asset(

@@ -5,18 +5,18 @@ from unittest.mock import Mock
 import dagster as dg
 import pytest
 
-from cfa.stf.routine import dagster_defs
+from cfa.stf.routine.dagster.defs import asset_config, asset_helpers, assets
 
 
-def _model_base_config() -> dagster_defs.ModelBaseConfig:
-    config = dagster_defs.ModelBaseConfig(
+def _model_base_config() -> asset_config.ModelBaseConfig:
+    config = asset_config.ModelBaseConfig(
         output_basedir="default-output",
         fable_pyrenew_n_lookback_days=100,
         epiautogp_n_lookback_days=200,
         exclude_last_n_days=1,
         fail_on_stale_data=True,
         config_overrides=[
-            dagster_defs.ConfigOverride(
+            asset_config.ConfigOverride(
                 location="CA",
                 output_basedir="ca-output",
                 exclude_last_n_days=2,
@@ -30,9 +30,9 @@ def _model_base_config() -> dagster_defs.ModelBaseConfig:
 
 
 def test_launchpad_has_model_defaults_and_shared_location_override():
-    base_fields = dagster_defs.ModelBaseConfig.model_fields
-    override_fields = dagster_defs.ConfigOverride.model_fields
-    config = dagster_defs.ModelBaseConfig()
+    base_fields = asset_config.ModelBaseConfig.model_fields
+    override_fields = asset_config.ConfigOverride.model_fields
+    config = asset_config.ModelBaseConfig()
 
     assert "n_lookback_days" not in base_fields
     assert "n_lookback_days" in override_fields
@@ -40,19 +40,19 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     assert "epiautogp_n_lookback_days" not in override_fields
     assert config.fable_pyrenew_n_lookback_days == 150
     assert (
-        "n_lookback_days" not in dagster_defs.EpiAutoGPEPctEpiweeklyConfig.model_fields
+        "n_lookback_days" not in asset_config.EpiAutoGPEPctEpiweeklyConfig.model_fields
     )
 
 
 def test_postprocess_always_copies_to_daily_output(monkeypatch):
     postprocess = Mock()
-    monkeypatch.setattr(dagster_defs, "_throw_if_backfill", Mock())
-    monkeypatch.setattr(dagster_defs, "postprocess", postprocess)
+    monkeypatch.setattr(assets, "_throw_if_backfill", Mock())
+    monkeypatch.setattr(assets, "postprocess", postprocess)
 
     with dg.build_asset_context(partition_key="2026-09-09") as context:
-        dagster_defs.postprocess_forecasts(
+        assets.postprocess_forecasts(
             context,
-            dagster_defs.PostProcessConfig(
+            asset_config.PostProcessConfig(
                 output_basedir="custom-output",
                 postprocess_diseases=["flu"],
                 skip_existing=True,
@@ -92,11 +92,11 @@ def test_location_lookback_override(
     override_fields: dict[str, object],
     expected_lookbacks: tuple[int | None, int | None],
 ):
-    config = dagster_defs.ModelBaseConfig(
+    config = asset_config.ModelBaseConfig(
         fable_pyrenew_n_lookback_days=100,
         epiautogp_n_lookback_days=200,
         config_overrides=[
-            dagster_defs.ConfigOverride(
+            asset_config.ConfigOverride(
                 location="CA",
                 **override_fields,
             ).as_dict()
@@ -121,26 +121,26 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     forecast_pyrenew = Mock()
     forecast_epiautogp = Mock()
 
-    monkeypatch.setattr(dagster_defs, "_throw_if_backfill", Mock())
-    monkeypatch.setattr(dagster_defs, "forecast_fable", forecast_fable)
-    monkeypatch.setattr(dagster_defs, "forecast_pyrenew", forecast_pyrenew)
-    monkeypatch.setattr(dagster_defs, "forecast_epiautogp", forecast_epiautogp)
+    monkeypatch.setattr(asset_helpers, "_throw_if_backfill", Mock())
+    monkeypatch.setattr(asset_helpers, "forecast_fable", forecast_fable)
+    monkeypatch.setattr(asset_helpers, "forecast_pyrenew", forecast_pyrenew)
+    monkeypatch.setattr(asset_helpers, "forecast_epiautogp", forecast_epiautogp)
 
-    dagster_defs._run_fable_e_other(
+    asset_helpers._run_fable_e_other(
         context,
-        dagster_defs.FableEOtherConfig(),
+        asset_config.FableEOtherConfig(),
         model_base_config,
         ed_visit_input_resolution="daily",
     )
-    dagster_defs._run_pyrenew_model(
+    asset_helpers._run_pyrenew_model(
         context,
-        dagster_defs.PyrenewConfig(),
+        asset_config.PyrenewConfig(),
         model_base_config,
         model_letters="e",
     )
-    dagster_defs._run_epiautogp_e_pct_epiweekly(
+    asset_helpers._run_epiautogp_e_pct_epiweekly(
         context,
-        dagster_defs.EpiAutoGPEPctEpiweeklyConfig(),
+        asset_config.EpiAutoGPEPctEpiweeklyConfig(),
         model_base_config,
     )
 
@@ -166,7 +166,7 @@ def test_fusion_directory_uses_fable_pyrenew_lookback():
     )
     model_base_config = _model_base_config()
 
-    assert dagster_defs.get_model_loc_dir(context, model_base_config) == Path(
+    assert asset_helpers._get_model_loc_dir(context, model_base_config) == Path(
         "ca-output",
         "2026-09-09_forecasts",
         "covid_lookback-100_omit-2",

@@ -52,7 +52,7 @@ Local runs write forecast outputs to `test-output/` in the repository.
 
 The following instructions will set up Dagster on your VAP.
 However, based on the current configuration, actual execution will still run in the cloud via Azure Batch.
-You can change the `executor` option in `./src/cfa/stf/routine/dagster/definitions.py` or in the Dagster launchpad to test using the local Docker executor.
+You can change the `executor` option in `./src/cfa/stf/routine/dagster/defs/execution.py` or in the Dagster launchpad to test using the local Docker executor.
 See [Using the local docker executor](#using-the-local-docker-executor).
 
 1. Build and push the `cfa-stf-routine-forecasting` container, as also described above:

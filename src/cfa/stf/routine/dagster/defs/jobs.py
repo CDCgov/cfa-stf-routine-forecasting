@@ -203,7 +203,7 @@ if not is_prod():
         explore_cmd = (
             ["docker", "run", "-it"]
             + ["-v", local_output_mount]
-            + +["--rm", image, "bash"]
+            + ["--rm", image, "bash"]
         )
         subprocess.run(explore_cmd, check=True)
 

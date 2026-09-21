@@ -21,7 +21,7 @@ NEW_YORK = ZoneInfo("America/New_York")
 class IsWeekday(dg.AutomationCondition):
     """
     Check if evaluation time falls on a specific weekday.
-    This is is a simple evaluation, rather than a stateful operation,
+    This is a simple evaluation, rather than a stateful operation,
     such as with cron_tick_passed().
 
     Args:

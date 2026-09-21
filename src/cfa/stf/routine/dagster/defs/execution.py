@@ -48,6 +48,9 @@ container_workdir = Path(
     f"/{local_workdir.name}"
 )  # in the container, workdir is mounted at /
 
+# Dagster project path relative to our project root
+dagster_project_dir = Path("src/cfa/stf/routine/dagster")
+
 # Get branch name from git, defaulting to main if not in a git repo
 try:
     current_branch_name = os.environ.get("GITHUB_HEAD_REF") or str(
@@ -102,7 +105,7 @@ docker_execution_config = ExecutionConfig(
                     f"/home/{user}/.azure:/root/.azure",
                     # bind current file so we don't have to rebuild
                     # the container image for workflow changes
-                    f"{local_workdir}:{container_workdir / 'src/cfa/stf/routine/dagster'}",
+                    f"{local_workdir / dagster_project_dir}:{container_workdir / dagster_project_dir}",
                     # Store outputs on the host so they persist after the
                     # container exits.
                 ]

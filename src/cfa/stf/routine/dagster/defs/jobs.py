@@ -192,19 +192,18 @@ if not is_prod():
     # Explore the image you built as it will be run with dagster ---------------------------
 
     @dg.op
-    def explore_image_op(
-        context: dg.OpExecutionContext,
-    ):
+    def explore_image_op(context: dg.OpExecutionContext):
         """
-        Allows you to run the container you previously built and explore the filesystem that will be used by dagster.
+        Allows you to run the container you previously built and explore the filesystem that will be used by dagster in Azure Batch.
         """
         context.log.info(
             "Check the terminal from which you ran the webserver to interact; stdout from your terminal will appear below."
         )
+
         explore_cmd = (
             ["docker", "run", "-it"]
             + ["-v", local_output_mount]
-            + ["--rm", image, "bash"]
+            + +["--rm", image, "bash"]
         )
         subprocess.run(explore_cmd, check=True)
 

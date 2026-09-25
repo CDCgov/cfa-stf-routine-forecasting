@@ -39,7 +39,7 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "cfa.stf.routine"
 source-include = [
-    "dagster_defs.py",
+    "dagster/definitions.py",
     "tests/**",
 ]
 source-exclude = [
@@ -51,9 +51,7 @@ source-exclude = [
 directory_type = "project"
 
 [tool.dg.project]
-root_module = "cfa.stf.routine"
-defs_module = "cfa.stf.routine.dagster_defs"
-code_location_target_module = "cfa.stf.routine.dagster_defs"
+root_module = "cfa.stf.routine.dagster"
 
 [dependency-groups]
 dev = [
@@ -107,7 +105,7 @@ show_missing = true
 skip_covered = true
 
 [tool.uv.sources]
-cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.5.0" }
+cfa-dagster = { git = "https://github.com/cdcgov/cfa-dagster", rev = "v1.5.1" }
 cfa-cloudops = { git = "https://github.com/CDCgov/cfa-cloudops.git" }
 pyrenew-multisignal = {git = "https://github.com/CDCgov/pyrenew-multisignal", rev = "1c9fa48"}
 polarbayes = { git = "https://github.com/cdcgov/polarbayes", rev = "main" }

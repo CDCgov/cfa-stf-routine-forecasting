@@ -396,10 +396,12 @@ function build_model(ctx)
             (Rt = prior_unconstrained_variance(priors.Rt),),
             NamedTuple{
                 (ASCERTAINMENT_TREND_RATE, ASCERTAINMENT_TREND_LEVEL),
-            }((
-                prior_unconstrained_variance(ascertainment_rate_prior),
-                ASCERTAINMENT_TREND_LEVEL_LOG_SD^2,
-            )),
+            }(
+                (
+                    prior_unconstrained_variance(ascertainment_rate_prior),
+                    ASCERTAINMENT_TREND_LEVEL_LOG_SD^2,
+                )
+            ),
         ),
         # The reset accumulator is 0 at t = 0 and only means "this week's incidence" after a week
         # has been integrated — but the filter corrects before it ever predicts, so the first

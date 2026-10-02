@@ -48,9 +48,9 @@ just test-mech-nssp-daily mock CA covid
 ### Live-data pipeline
 
 > [!IMPORTANT]
-> This is not a self-contained local example. It loads the private `comprehensive` NSSP dataset
-> through `cfa-dataops`, so Azure/EXT data access must already be configured. The repository's
-> Julia environments and current local `stfroutineforecasting` R package must also be installed.
+> This is not a self-contained local example.
+> It loads the private `comprehensive` NSSP dataset through `cfa-dataops`, so Azure/EXT data access must already be configured.
+> The repository's Julia environments and current local `stfroutineforecasting` R package must also be installed.
 
 ```bash
 uv run python -c "
@@ -74,10 +74,9 @@ julia --project=src/cfa/stf/routine/mech_nssp_daily --threads=4 \
 ## Numerical parity with the backtest (developer check)
 
 > [!IMPORTANT]
-> This check cannot run from `cfa-stf-routine-forecasting` alone. You must have access to the
-> private `cdcent/cfa-mech-experiment` repository, clone it locally, and instantiate its Julia
-> environment. The command below assumes that private checkout is a sibling directory named
-> `cfa-mech-experiment`.
+> This check cannot run from `cfa-stf-routine-forecasting` alone.
+> You must have access to the private `cdcent/cfa-mech-experiment` repository, clone it locally, and instantiate its Julia environment.
+> The command below assumes that private checkout is a sibling directory named `cfa-mech-experiment`.
 
 ```bash
 uv run src/cfa/stf/routine/mech_nssp_daily/parity_check.py --mech-experiment ../cfa-mech-experiment --work-dir /tmp/mech-parity

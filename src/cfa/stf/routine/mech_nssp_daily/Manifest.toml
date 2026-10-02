@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "d5eb92f98e31092d7100adb7e29b1dc608704805"
+project_hash = "0e110783a560637ad516ccac61490f9626839751"
 
 [[deps.ACSets]]
 deps = ["AlgebraicInterfaces", "Base64", "CompTime", "DataStructures", "JSON3", "MLStyle", "PEG", "Permutations", "Pkg", "PrettyTables", "Random", "Reexport", "SHA", "StaticArrays", "StructEquality", "StructTypes", "Tables"]
@@ -91,12 +91,12 @@ weakdeps = ["SparseArrays", "StaticArrays"]
 
 [[deps.AlgebraicEpiMech]]
 deps = ["AlgebraicPetri", "Catlab", "DocStringExtensions"]
-git-tree-sha1 = "22c84535dd5d36b747d67cdc3882519b8f98e937"
+git-tree-sha1 = "95f75f08c4cdcb4997b9db4633fd543d32a2fd7a"
 repo-rev = "main"
 repo-subdir = "AlgebraicEpiMech"
 repo-url = "https://github.com/CDCgov/AlgebraicEpiModels"
 uuid = "a6e39d6b-8b2d-49f3-aca0-f4154643f040"
-version = "0.1.0"
+version = "0.2.0"
 
 [[deps.AlgebraicInterfaces]]
 git-tree-sha1 = "28cca88bde1068ccf57f950e639df67975517c25"
@@ -124,6 +124,12 @@ deps = ["PtrArrays", "Random"]
 git-tree-sha1 = "9876e1e164b144ca45e9e3198d0b689cadfed9ff"
 uuid = "66dad0bd-aa9a-41b7-9441-69ab47430ed8"
 version = "1.1.3"
+
+[[deps.ArgParse]]
+deps = ["Logging", "TextWrap"]
+git-tree-sha1 = "22cf435ac22956a7b45b0168abbc871176e7eecc"
+uuid = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+version = "1.2.0"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -381,12 +387,12 @@ version = "0.2.8"
 
 [[deps.ConfigurableEpi]]
 deps = ["AlgebraicEpiMech", "AlgebraicPetri", "Configurations", "DBInterface", "DataFramesMeta", "DataInterpolations", "Dates", "Distributions", "DuckDB", "EnsembleKalmanProcesses", "ForwardDiff", "LabelledArrays", "LinearAlgebra", "LowLevelParticleFilters", "Optimization", "OptimizationOptimJL", "OptimizationOptimisers", "PositiveFactorizations", "Random", "SeeToDee", "StaticArrays", "Statistics", "TOML"]
-git-tree-sha1 = "6d8f1456c91fe88cd408b3236c92593e024b22d3"
+git-tree-sha1 = "e5ca6bb621bd5a1ccb51f4d50ca20ec17de517b3"
 repo-rev = "main"
 repo-subdir = "ConfigurableEpi"
 repo-url = "https://github.com/CDCgov/AlgebraicEpiModels"
 uuid = "805b86f7-2d53-4db0-a930-efd5b25deb53"
-version = "0.1.0"
+version = "0.2.0"
 
 [[deps.Configurations]]
 deps = ["ExproniconLite", "OrderedCollections", "TOML"]
@@ -2083,6 +2089,11 @@ version = "0.1.8"
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 version = "1.11.0"
+
+[[deps.TextWrap]]
+git-tree-sha1 = "43044b737fa70bc12f6105061d3da38f881a3e3c"
+uuid = "b718987f-49a8-5099-9789-dcd902bef87d"
+version = "1.0.2"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "PrettyTables", "Printf", "Tables"]

@@ -115,6 +115,11 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         "get_nnh_right_truncation_pmf",
         lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )
+    monkeypatch.setattr(
+        mech_nssp_daily_module,
+        "get_nnh_right_truncation_pmf",
+        lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
+    )
 
 
 def configure_data_mode(request, monkeypatch) -> str:
@@ -235,6 +240,30 @@ def run_nowcastautogp(
         n_threads=2,
         nowcast_source_name=nowcast_source_name,
         hubverse_nowcast_dir=hubverse_nowcast_dir,
+    )
+
+
+def run_mech_nssp_daily(
+    workspace: Path,
+    disease: str,
+    location: str,
+    *,
+    n_forecast_draws: int = 40,
+) -> None:
+    # The model anchors its start on the whole history, so it runs without a
+    # lookback (as in production); the mocked series is long enough for the
+    # default burn-in and weekday-effect requirements.
+    mech_nssp_daily_module.main(
+        disease=disease,
+        loc=location,
+        output_dir=workspace / FORECAST_DIR_NAME,
+        n_lookback_days=None,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
+        run_date=REPORT_DATE,
+        n_particles=50,
+        n_forecast_draws=n_forecast_draws,
+        seed=2026,
+        n_threads=2,
     )
 
 

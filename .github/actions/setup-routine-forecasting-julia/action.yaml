@@ -15,3 +15,7 @@ runs:
     - name: Install Julia dependencies
       run: julia --project=src/cfa/stf/routine/nowcastautogp -e 'using Pkg; Pkg.instantiate()'
       shell: bash
+
+    - name: Install mech_nssp_daily Julia dependencies
+      run: julia --project=src/cfa/stf/routine/mech_nssp_daily -e 'using Pkg; Pkg.instantiate()'
+      shell: bash

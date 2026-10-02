@@ -1,6 +1,7 @@
 [deps]
 AlgebraicEpiMech = "a6e39d6b-8b2d-49f3-aca0-f4154643f040"
 AlgebraicPetri = "4f99eebe-17bf-4e98-b6a1-2c4f205a959b"
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Catlab = "134e5e36-593f-5add-ad60-77f754baafbe"
 ConfigurableEpi = "805b86f7-2d53-4db0-a930-efd5b25deb53"
@@ -18,6 +19,7 @@ ConfigurableEpi = {url = "https://github.com/CDCgov/AlgebraicEpiModels", subdir 
 
 [compat]
 AlgebraicPetri = "0.10"
+ArgParse = "1.2"
 CSV = "0.10.16"
 Catlab = "0.17.6"
 Configurations = "0.17.6"

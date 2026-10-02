@@ -18,7 +18,7 @@ using AlgebraicEpiMech
 
 # The local production submodel defines `parse_epi_config`, `default_priors` and
 # `build_model(ctx)` in `Main`.
-include(joinpath(@__DIR__, "submodels", "basic_seir_daily_nssp_trend.jl"))
+include(joinpath(@__DIR__, "basic_seir_daily_nssp_trend.jl"))
 
 const SUBMODEL = "basic_seir_daily_nssp_trend"
 const CLIMATOLOGY_PATH = joinpath(@__DIR__, "data", "indoor_activity_climatology.csv2")

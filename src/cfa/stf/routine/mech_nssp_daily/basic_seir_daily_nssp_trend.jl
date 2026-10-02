@@ -213,14 +213,14 @@ function build_init(
     state = (;
         (
             n => (
-                    n === :S ? susceptible :
+                n === :S ? susceptible :
                     n === :R ? immune :
                     startswith(string(n), "E") ? exposed / n_E :
                     startswith(string(n), "I") ? infectious / n_I :
                     # The terminal accumulator is zeroed at the start of every step, so priming
                     # it would be overwritten; only the in-transit stages carry the delay.
                     (startswith(string(n), "O") && i != accumulator) ? obs_stage : 0.0
-                ) for (i, n) in enumerate(names)
+            ) for (i, n) in enumerate(names)
         )...,
     )
     return (; state, anchor)

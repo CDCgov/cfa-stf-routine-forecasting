@@ -9,8 +9,9 @@ Julia thread, and compares the forecast draws exactly. Needs a local checkout of
 the private repository with its Julia environment instantiated; it is not part
 of the test suite.
 
-NB: This script is intended for developer use and requires a local checkout of the
-private repository `cdcent/cfa-mech-experiment` with its Julia environment instantiated.
+IMPORTANT: This script cannot run from `cfa-stf-routine-forecasting` alone. It requires access
+to a local clone of the private `cdcent/cfa-mech-experiment` repository with its Julia environment
+instantiated. The example below assumes that clone is a sibling of this repository.
 
     uv run src/cfa/stf/routine/mech_nssp_daily/parity_check.py --mech-experiment ../cfa-mech-experiment --work-dir /tmp/mech-parity
 """
@@ -164,17 +165,32 @@ def run(command: list[str], log: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mech-experiment", type=Path, required=True)
-    parser.add_argument("--work-dir", type=Path, required=True)
+    parser.add_argument(
+        "--mech-experiment",
+        type=Path,
+        required=True,
+        help="path to a local clone of the private cdcent/cfa-mech-experiment repository",
+    )
+    parser.add_argument(
+        "--work-dir",
+        type=Path,
+        required=True,
+        help="directory for temporary parity outputs",
+    )
     parser.add_argument(
         "--julia", default="julia", help="Julia command, e.g. 'julia +1.11'"
     )
     args = parser.parse_args()
 
+    upstream = (args.mech_experiment / "models" / "ConfigurableEpi").resolve()
+    if not (upstream / "run_model.jl").is_file():
+        parser.error(
+            "--mech-experiment must point to a local clone of the private "
+            "cdcent/cfa-mech-experiment repository"
+        )
     work_dir = args.work_dir.resolve()
     work_dir.mkdir(parents=True, exist_ok=True)
     write_inputs(work_dir)
-    upstream = (args.mech_experiment / "models" / "ConfigurableEpi").resolve()
     julia = shlex.split(args.julia)
 
     print("running upstream run_model.jl ...", flush=True)

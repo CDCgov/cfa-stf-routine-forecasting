@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Developer check: the production runner reproduces the backtest runner bit for bit.
 
@@ -11,8 +12,7 @@ of the test suite.
 NB: This script is intended for developer use and requires a local checkout of the
 private repository `cdcent/cfa-mech-experiment` with its Julia environment instantiated.
 
-    uv run python src/cfa/stf/routine/mech_nssp_daily/parity_check.py \\
-        --mech-experiment ../cfa-mech-experiment --work-dir /tmp/mech-parity
+    uv run src/cfa/stf/routine/mech_nssp_daily/parity_check.py --mech-experiment ../cfa-mech-experiment --work-dir /tmp/mech-parity
 """
 
 import argparse

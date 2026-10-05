@@ -2,11 +2,14 @@
 
 import datetime as dt
 
+import jax.numpy as jnp
 import pytest
+from pyrenew.convolve import compute_prop_already_reported
 
 from cfa.stf.routine.data.reporting_delay import (
     correct_reports_by_lag,
     inflate_report,
+    reporting_fractions_by_lag,
     reporting_inflation_factors,
 )
 from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
@@ -111,3 +114,20 @@ def test_rejects_length_mismatch():
             pmf=PMF,
             report_date=REPORT_DATE,
         )
+
+
+@pytest.mark.parametrize("exclude_last_n_days", [0, 1, 2, 6])
+def test_fractions_match_pyrenew_prop_already_reported(exclude_last_n_days):
+    last = REPORT_DATE - dt.timedelta(days=exclude_last_n_days + 1)
+    dates = _dates_ending(last, 8)
+    # ForecastRun.right_truncation_offset for a series ending at `last`.
+    right_truncation_offset = (REPORT_DATE - last).days - 1
+
+    fractions = reporting_fractions_by_lag(
+        dates=dates, pmf=PMF, report_date=REPORT_DATE
+    )
+
+    expected = compute_prop_already_reported(
+        jnp.array(PMF), len(dates), right_truncation_offset
+    )
+    assert fractions == pytest.approx(expected.tolist())

@@ -6,6 +6,7 @@ import pytest
 
 from cfa.stf.routine.epiautogp import forecast_epiautogp
 from cfa.stf.routine.fable import forecast_fable
+from cfa.stf.routine.mech_nssp_daily import forecast_mech_nssp_daily
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
 
 
@@ -86,6 +87,45 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
                 "ed_visit_input_resolution": "epiweekly",
             },
             id="fable",
+        ),
+        pytest.param(
+            forecast_mech_nssp_daily,
+            "MechNSSPDailyPipeline",
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "output_dir": Path("mech-output"),
+                "n_lookback_days": None,
+                "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 1,
+                "fail_on_stale_data": True,
+                "n_particles": 21,
+                "n_forecast_draws": 22,
+                "seed": 23,
+                "n_threads": 2,
+                "min_observations": 24,
+                "dow_window_days": 40,
+                "dow_min_exclude_days": 3,
+                "reporting_delay_pmf": [0.25, 0.75],
+            },
+            {
+                "disease": "covid",
+                "loc": "CA",
+                "output_dir": Path("mech-output"),
+                "n_lookback_days": None,
+                "run_date": dt.date(2026, 1, 7),
+                "exclude_last_n_days": 1,
+                "fail_on_stale_data": True,
+                "n_particles": 21,
+                "n_forecast_draws": 22,
+                "seed": 23,
+                "n_threads": 2,
+                "min_observations": 24,
+                "dow_window_days": 40,
+                "dow_min_exclude_days": 3,
+                "reporting_delay_pmf": [0.25, 0.75],
+            },
+            id="mech_nssp_daily",
         ),
         pytest.param(
             forecast_pyrenew,

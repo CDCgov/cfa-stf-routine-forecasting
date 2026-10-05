@@ -36,6 +36,35 @@ def inflate_report(report: float, fraction: float) -> float:
     return (report + 1.0 - fraction) / fraction
 
 
+def reporting_fractions_by_lag(
+    *,
+    dates: list[dt.date],
+    pmf: list[float],
+    report_date: dt.date,
+) -> list[float]:
+    """
+    Return the expected reporting fraction of each reference date by its true lag.
+
+    This uses PyRenew's convention (``pyrenew.convolve.compute_prop_already_reported``
+    with ``ForecastRun.right_truncation_offset``): the lag of a reference date is
+    ``report_date - date`` in days and must be at least one, reporting CDF entry
+    ``lag - 1`` applies to it, and a lag past the end of the CDF is fully
+    reported (fraction ``1.0``). Indexing by date rather than by position from
+    the end of the series keeps reporting gaps from shifting the CDF. A CDF
+    that overshoots one through rounding is capped at ``1.0``.
+    """
+    cdf = list(accumulate(pmf))
+    fractions: list[float] = []
+    for date in dates:
+        lag = (report_date - date).days
+        if lag < 1:
+            raise ValueError(
+                f"Reference date {date} is not before report date {report_date}"
+            )
+        fractions.append(min(cdf[lag - 1], 1.0) if lag <= len(cdf) else 1.0)
+    return fractions
+
+
 def correct_reports_by_lag(
     *,
     dates: list[dt.date],
@@ -46,9 +75,7 @@ def correct_reports_by_lag(
     """
     Nowcast each report by its true reporting lag.
 
-    The lag of a reference date is ``report_date - date`` in days and must be at
-    least one. A date whose lag lies beyond the incomplete part of the reporting
-    CDF is treated as fully reported (fraction ``1.0``). Unlike a positional
+    Fractions come from ``reporting_fractions_by_lag``. Unlike a positional
     pairing of the newest reports with the CDF, this stays correct when the
     series stops before ``report_date - 1`` (a nonzero ``exclude_last_n_days``).
 
@@ -56,16 +83,11 @@ def correct_reports_by_lag(
     """
     if len(dates) != len(reports):
         raise ValueError("dates and reports must have the same length")
-    factors = reporting_inflation_factors(pmf)
-    corrected: list[float] = []
-    fractions: list[float] = []
-    for date, report in zip(dates, reports, strict=True):
-        lag = (report_date - date).days
-        if lag < 1:
-            raise ValueError(
-                f"Reference date {date} is not before report date {report_date}"
-            )
-        fraction = factors[lag - 1] if lag <= len(factors) else 1.0
-        corrected.append(inflate_report(float(report), fraction))
-        fractions.append(fraction)
+    fractions = reporting_fractions_by_lag(
+        dates=dates, pmf=pmf, report_date=report_date
+    )
+    corrected = [
+        inflate_report(float(report), fraction)
+        for report, fraction in zip(reports, fractions, strict=True)
+    ]
     return corrected, fractions

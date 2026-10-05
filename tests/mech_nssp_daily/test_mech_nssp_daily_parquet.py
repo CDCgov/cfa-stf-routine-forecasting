@@ -147,6 +147,19 @@ def test_runner_writes_pipeline_parquet_and_diagnostics(tmp_path) -> None:
     }
 
 
+def test_trailing_gap_is_a_filter_step_not_a_forecast(tmp_path) -> None:
+    output_dir = _run_runner(
+        tmp_path, _synthetic_input(gap=(198, 199)), *SMALL, name="trailing"
+    )
+
+    samples = pl.read_parquet(output_dir / "samples.parquet")
+    assert samples["date"].min() == REPORT_DATE
+    assert samples["date"].max() == FORECAST_THROUGH
+    fitted = pl.read_csv(output_dir / "mech_nssp_daily_fitted.csv")
+    assert fitted.height == 200
+    assert fitted["observation"].null_count() == 2
+
+
 def test_same_seed_reproduces_draws(tmp_path) -> None:
     payload = _synthetic_input()
     first = _run_runner(tmp_path, payload, *SMALL, name="first")

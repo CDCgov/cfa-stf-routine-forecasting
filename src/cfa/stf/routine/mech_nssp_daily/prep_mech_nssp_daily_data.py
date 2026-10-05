@@ -7,7 +7,10 @@ from pathlib import Path
 
 import polars as pl
 
-from cfa.stf.routine.data.reporting_delay import correct_reports_by_lag
+from cfa.stf.routine.data.reporting_delay import (
+    correct_reports_by_lag,
+    reporting_fractions_by_lag,
+)
 from cfa.stf.routine.forecast_run import ForecastRun
 
 MODEL_VARIABLE = "observed_ed_visits"
@@ -20,8 +23,9 @@ def _extract_model_series(
 ) -> tuple[list[dt.date], list[float | None]]:
     """Select the daily observed-ED-visit training series from shared run state.
 
-    The returned dates cover every calendar day from the first through the last
-    observation. A reporting gap has a ``None`` report so the Julia runner can
+    The returned dates cover every calendar day from the first observation
+    through the source's last training date, so a gap at the end of the series
+    is kept too. A reporting gap has a ``None`` report so the Julia runner can
     predict through that day without correcting the filter.
     """
     source = forecast_run.nssp
@@ -44,10 +48,9 @@ def _extract_model_series(
         raise ValueError(f"No NSSP {MODEL_VARIABLE!r} training observations available")
     if observed.get_column("date").n_unique() != observed.height:
         raise ValueError("NSSP training observations contain duplicate dates")
-    first, last = (
-        observed.get_column("date").min(),
-        observed.get_column("date").max(),
-    )
+    # End at the source's last training date rather than the last report: a
+    # training row whose disease value is null is a trailing gap, not a forecast.
+    first, last = observed.get_column("date").min(), source.last_training_date
     grid = pl.DataFrame({"date": pl.date_range(first, last, interval="1d", eager=True)})
     data = grid.join(observed, on="date", how="left").sort("date")
     dates = data.get_column("date").to_list()
@@ -81,6 +84,34 @@ def convert_to_mech_nssp_daily_json(
         logger=logger,
     )
     present = [index for index, report in enumerate(reports) if report is not None]
+
+    # A zero expected reporting fraction carries no information and cannot be
+    # inflated, so that slot becomes a reporting gap. The CDF is nondecreasing,
+    # so these are always the newest days.
+    lag_fractions = reporting_fractions_by_lag(
+        dates=[dates[index] for index in present],
+        pmf=reporting_delay_pmf,
+        report_date=forecast_run.report_date,
+    )
+    unreported = [
+        index
+        for index, fraction in zip(present, lag_fractions, strict=True)
+        if fraction <= 0.0
+    ]
+    if unreported:
+        logger.warning(
+            "Reporting-delay PMF gives zero expected reporting for %s; treating "
+            "those days as reporting gaps (raw reports %s discarded)",
+            [dates[index].isoformat() for index in unreported],
+            [reports[index] for index in unreported],
+        )
+        for index in unreported:
+            reports[index] = None
+        present = [index for index in present if reports[index] is not None]
+    if not present:
+        raise ValueError(
+            "Every NSSP training observation has zero expected reporting fraction"
+        )
 
     corrected, fractions = correct_reports_by_lag(
         dates=[dates[index] for index in present],

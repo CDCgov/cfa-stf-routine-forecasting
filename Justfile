@@ -60,6 +60,16 @@ test-epiautogp data_mode="auto" location="CA" disease="covid":
       --e2e-force
     @just _print-output-location "{{e2e_output_dir}}/epiautogp"
 
+test-mech-nssp-daily data_mode="auto" location="CA" disease="covid":
+    uv run pytest -s \
+      tests/integration/test_mech_nssp_daily_forecast.py \
+      --e2e-data-mode "{{data_mode}}" \
+      --model-test-location "{{location}}" \
+      --model-test-disease "{{disease}}" \
+      --e2e-output-dir "{{e2e_output_dir}}/mech_nssp_daily" \
+      --e2e-force
+    @just _print-output-location "{{e2e_output_dir}}/mech_nssp_daily"
+
 # Print a clickable absolute path to retained test output.
 [private]
 _print-output-location output_dir:

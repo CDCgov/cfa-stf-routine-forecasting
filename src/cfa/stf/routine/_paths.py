@@ -6,6 +6,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PACKAGE_ROOT / "data"
 EPIAUTOGP_DIR = PACKAGE_ROOT / "epiautogp"
 FABLE_DIR = PACKAGE_ROOT / "fable"
+MECH_NSSP_DAILY_DIR = PACKAGE_ROOT / "mech_nssp_daily"
 PYRENEW_HEW_DIR = PACKAGE_ROOT / "pyrenew_hew"
 UTILS_DIR = PACKAGE_ROOT / "utils"
 

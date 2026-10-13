@@ -1,5 +1,5 @@
 name: "Set up routine forecasting Julia"
-description: "Set up Julia and instantiate the EpiAutoGP project."
+description: "Set up Julia and instantiate the EpiAutoGP and mech_nssp_daily projects."
 inputs: {}
 runs:
   using: "composite"
@@ -14,4 +14,8 @@ runs:
 
     - name: Install Julia dependencies
       run: julia --project=src/cfa/stf/routine/epiautogp -e 'using Pkg; Pkg.instantiate()'
+      shell: bash
+
+    - name: Install mech_nssp_daily Julia dependencies
+      run: julia --project=src/cfa/stf/routine/mech_nssp_daily -e 'using Pkg; Pkg.instantiate()'
       shell: bash

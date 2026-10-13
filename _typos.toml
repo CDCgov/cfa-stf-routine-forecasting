@@ -1,6 +1,8 @@
 [default.extend-words]
 ND = "ND"
 lod = "lod"
+# Petri-net variable in the verbatim mech_nssp_daily submodel scripts
+pn = "pn"
 
 [files]
 extend-exclude = [

@@ -57,7 +57,7 @@ def run_nowcastautogp_forecast(
             f"--threads={n_threads}",
         ],
         function_name="run_nowcastautogp_forecast",
-        capture_output=False,
+        capture_output=True,
     )
 
 

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from cfa.stf.routine.fable import forecast_fable
+from cfa.stf.routine.mech_nssp_daily import forecast_mech_nssp_daily
 from cfa.stf.routine.nowcastautogp import forecast_nowcastautogp
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
 

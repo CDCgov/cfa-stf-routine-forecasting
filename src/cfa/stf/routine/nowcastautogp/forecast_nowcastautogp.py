@@ -57,7 +57,8 @@ def run_nowcastautogp_forecast(
             f"--threads={n_threads}",
         ],
         function_name="run_nowcastautogp_forecast",
-        capture_output=False,
+        # Include Julia's stderr in the exception recorded by Dagster on failure.
+        capture_output=True,
     )
 
 

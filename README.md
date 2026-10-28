@@ -70,6 +70,10 @@ Pushing your code to github will also re-build and push the container image, but
 
 By default, on this repository, Dagster will submit tasks to Azure Batch for execution.
 
+Azure Batch steps enable resource profiling, with CPU, memory, and I/O metrics reported in the Dagster event log.
+Profiling includes child processes such as Julia.
+NowcastAutoGP captures Julia output so that a failed Julia process's stderr is included in the Python exception recorded by Dagster.
+
 #### Using the local docker executor
 
 If you'd like to test a few "tasks" locally, you can have dagster execute on your machine, which is much faster than waiting for Azure Batch to pick up jobs.

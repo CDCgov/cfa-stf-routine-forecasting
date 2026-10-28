@@ -10,8 +10,8 @@ ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 # Additional programming language compilers/interpreters
 #
 
-# Julia 1.11 from official image
-COPY --from=julia:1.11 /usr/local/julia /usr/local/julia
+# Julia 1.13 from official image
+COPY --from=julia:1.13 /usr/local/julia /usr/local/julia
 ENV PATH="/usr/local/julia/bin:${PATH}"
 ENV JULIA_DEPOT_DIR=/opt/julia-depot
 ENV JULIA_DEPOT_PATH=${JULIA_DEPOT_DIR}:

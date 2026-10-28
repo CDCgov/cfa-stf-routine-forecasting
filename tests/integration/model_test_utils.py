@@ -18,6 +18,9 @@ from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.mech_nssp_daily import (
+    forecast_mech_nssp_daily as mech_nssp_daily_module,
+)
 from cfa.stf.routine.nowcastautogp import forecast_nowcastautogp as nowcastautogp_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module

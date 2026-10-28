@@ -4,7 +4,6 @@ import datetime as dt
 
 import jax.numpy as jnp
 import pytest
-from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from pyrenew.convolve import compute_prop_already_reported
 
 from cfa.stf.routine.data.reporting_delay import (
@@ -13,6 +12,7 @@ from cfa.stf.routine.data.reporting_delay import (
     reporting_fractions_by_lag,
     reporting_inflation_factors,
 )
+from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import ReportingDelayNowcast
 
 # CDF 0.6, 0.8, 0.9, 0.99, 1.0: four incomplete lags.
 PMF = [0.6, 0.2, 0.1, 0.09, 0.01]

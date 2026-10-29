@@ -204,7 +204,7 @@ def nowcastautogp_e_pct_epiweekly(
     },
     tags=HE_DATA_RERUN_TAGS,
 )
-def fuse_forecasts(
+def fuse_e_forecasts(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
@@ -244,10 +244,7 @@ def fuse_forecasts(
 
 @dg.asset(
     deps=[
-        "fuse_pyrenew_e_fable",
-        "fuse_pyrenew_e_fable_epiweekly",
-        "fuse_pyrenew_he_fable",
-        "fuse_pyrenew_he_fable_epiweekly",
+        "fuse_e_forecasts",
         "pyrenew_h",
         "nowcastautogp_e_pct_epiweekly",
     ],

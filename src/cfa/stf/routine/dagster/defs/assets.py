@@ -31,7 +31,7 @@ from cfa.stf.routine.utils.postprocess_forecast_batches import main as postproce
 
 common_asset_args = {
     "partitions_def": daily_partitions_def,  # every asset uses this partitions def
-    "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
+    # "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
 }
 
 # Dagster tag keys cannot contain spaces. These tags make it easy to select all
@@ -302,7 +302,7 @@ def fuse_pyrenew_he_fable_epiweekly(
         )
     ).with_label("postprocess_custom_eager"),
     group_name="Postprocess",
-    retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
+    # retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(

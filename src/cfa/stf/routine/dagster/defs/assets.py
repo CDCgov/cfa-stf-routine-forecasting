@@ -189,7 +189,7 @@ def nowcastautogp_e_pct_epiweekly(
     )
 
 
-# Fusion Assets
+# Fusion Asset
 
 
 @dynamic_graph_asset(
@@ -198,12 +198,13 @@ def nowcastautogp_e_pct_epiweekly(
     group_name="Fusion",
     ins={
         "pyrenew_e": dg.In(dg.Nothing),
+        "pyrenew_he": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
         "fable_e_other": dg.In(dg.Nothing),
     },
-    tags=E_DATA_RERUN_TAGS,
+    tags=HE_DATA_RERUN_TAGS,
 )
-def fuse_e_forecasts(
+def fuse_forecasts(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
@@ -222,24 +223,6 @@ def fuse_e_forecasts(
         pyrenew_model_name="pyrenew_e",
         epiweekly=False,
     )
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
-    ins={
-        "pyrenew_he": dg.In(dg.Nothing),
-        "epiweekly_fable_e_other": dg.In(dg.Nothing),
-        "fable_e_other": dg.In(dg.Nothing),
-    },
-    tags=HE_DATA_RERUN_TAGS,
-)
-def fuse_he_forecasts(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
     # Fuse he*epiweekly
     _fuse_pyrenew_fable_e_other(
         context,

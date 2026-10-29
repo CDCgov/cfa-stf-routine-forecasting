@@ -196,61 +196,30 @@ def nowcastautogp_e_pct_epiweekly(
     **common_asset_args,
     automation_condition=dg.AutomationCondition.eager(),
     group_name="Fusion",
-    ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
-    tags=E_DATA_RERUN_TAGS,
-)
-def fuse_pyrenew_e_fable(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
-    _fuse_pyrenew_fable_e_other(
-        context,
-        model_base_config,
-        pyrenew_model_name="pyrenew_e",
-        epiweekly=False,
-    )
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
     ins={
         "pyrenew_e": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
+        "fable_e_other": dg.In(dg.Nothing),
     },
     tags=E_DATA_RERUN_TAGS,
 )
-def fuse_pyrenew_e_fable_epiweekly(
+def fuse_e_forecasts(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
 ):
+    # Fuse e*non-epiweekly
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
         pyrenew_model_name="pyrenew_e",
         epiweekly=True,
     )
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
-    ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
-    tags=HE_DATA_RERUN_TAGS,
-)
-def fuse_pyrenew_he_fable(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
+    # Fuse e*epiweekly
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
-        pyrenew_model_name="pyrenew_he",
+        pyrenew_model_name="pyrenew_e",
         epiweekly=False,
     )
 
@@ -262,19 +231,28 @@ def fuse_pyrenew_he_fable(
     ins={
         "pyrenew_he": dg.In(dg.Nothing),
         "epiweekly_fable_e_other": dg.In(dg.Nothing),
+        "fable_e_other": dg.In(dg.Nothing),
     },
     tags=HE_DATA_RERUN_TAGS,
 )
-def fuse_pyrenew_he_fable_epiweekly(
+def fuse_he_forecasts(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
     e_model_exclusions: EModelExclusions,
 ):
+    # Fuse he*epiweekly
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
         pyrenew_model_name="pyrenew_he",
         epiweekly=True,
+    )
+    # Fuse he*non-epiweekly
+    _fuse_pyrenew_fable_e_other(
+        context,
+        model_base_config,
+        pyrenew_model_name="pyrenew_he",
+        epiweekly=False,
     )
 
 

@@ -210,6 +210,7 @@ def fuse_e_forecasts(
     e_model_exclusions: EModelExclusions,
 ):
     # Fuse e*non-epiweekly
+    context.log.info("Fusing Pyrenew E * Fable E Epiweekly")
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
@@ -217,6 +218,7 @@ def fuse_e_forecasts(
         epiweekly=True,
     )
     # Fuse e*epiweekly
+    context.log.info("Fusing Pyrenew E * Fable E Non-epiweekly")
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
@@ -224,6 +226,7 @@ def fuse_e_forecasts(
         epiweekly=False,
     )
     # Fuse he*epiweekly
+    context.log.info("Fusing Pyrenew HE * Fable E Epiweekly")
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,
@@ -231,6 +234,7 @@ def fuse_e_forecasts(
         epiweekly=True,
     )
     # Fuse he*non-epiweekly
+    context.log.info("Fusing Pyrenew HE * Fable E Non-epiweekly")
     _fuse_pyrenew_fable_e_other(
         context,
         model_base_config,

@@ -73,13 +73,13 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("nowcast_source_name", "expected"),
-    [("none", 3), ("reporting-delay", 0), ("hubverse", 0)],
+    "nowcast_source_name",
+    ["none", "reporting-delay", "hubverse"],
 )
-def test_pipeline_declares_minimum_exclusion(tmp_path, nowcast_source_name, expected):
+def test_pipeline_has_no_model_specific_exclusion(tmp_path, nowcast_source_name):
     pipeline = _pipeline(tmp_path, nowcast_source_name=nowcast_source_name)
 
-    assert pipeline.minimum_exclude_last_n_days == expected
+    assert not hasattr(pipeline, "minimum_exclude_last_n_days")
 
 
 @patch(
@@ -146,7 +146,6 @@ def test_epiweekly_input_includes_forecast_through(tmp_path):
     run = make_test_forecast_run(
         output_dir=tmp_path,
         report_date=dt.date(2026, 9, 8),
-        exclude_last_n_days=2,
         model_name=pipeline.model_name,
         sources=("nssp",),
     )

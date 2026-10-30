@@ -9,7 +9,7 @@ get_all_model_batch_dirs(dir_of_batch_dirs, diseases)
 \arguments{
 \item{dir_of_batch_dirs}{Directory in which to look for
 "model batch" directories, each of which represents an
-individual lookback/omission / pathogen configuration.}
+individual lookback / pathogen configuration.}
 
 \item{diseases}{Canonical disease identifiers to match (\code{"covid"}, \code{"flu"},
 or \code{"rsv"}), supplied as a character vector.}

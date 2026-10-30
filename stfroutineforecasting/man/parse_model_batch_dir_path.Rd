@@ -11,14 +11,14 @@ parse_model_batch_dir_path(model_batch_dir_path)
 directory to parse. Will parse only the basename.}
 }
 \value{
-A one-row tibble containing canonical \code{disease}, \code{n_lookback_days},
-and \code{exclude_last_n_days} values. An unlimited lookback is represented by
+A one-row tibble containing canonical \code{disease} and
+\code{n_lookback_days} values. An unlimited lookback is represented by
 \code{Inf}.
 }
 \description{
 Parse the name of a model batch directory
 (i.e. a directory representing a single
-lookback/omission configuration and disease, but potentially
+lookback configuration and disease, but potentially
 with fits for multiple locations), returning
 a named list of quantities of interest.
 }

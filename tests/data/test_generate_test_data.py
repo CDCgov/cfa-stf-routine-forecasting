@@ -81,8 +81,7 @@ def test_make_surveillance_inputs_respects_nssp_training_window():
     assert nssp_data.get_column("date").min() == min_allowed_training_date
     assert training_dates.min() == min_allowed_training_date
     assert training_dates.max() == max_allowed_training_date
-    assert evaluation_dates.min() == max_allowed_training_date + dt.timedelta(days=1)
-    assert evaluation_dates.max() == LAST_OBS_DATE
+    assert evaluation_dates.is_empty()
 
 
 @pytest.mark.parametrize(("n_selected", "n_nowcast"), [(5, 3), (6, 4)])

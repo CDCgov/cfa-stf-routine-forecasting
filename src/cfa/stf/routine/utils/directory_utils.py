@@ -16,11 +16,11 @@ loc_abbrs_ = LOCATION_LIST
 def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
     """Parse a standard model batch directory name."""
     regex_match = re.fullmatch(
-        rf"(.+)_lookback-(\d+|{ALL_AVAILABLE_LOOKBACK})_omit-(\d+)",
+        rf"(.+)_lookback-(\d+|{ALL_AVAILABLE_LOOKBACK})",
         model_batch_dir_name,
     )
     if regex_match:
-        disease, n_lookback_days, exclude_last_n_days = regex_match.groups()
+        disease, n_lookback_days = regex_match.groups()
     else:
         raise ValueError(
             f"Invalid model batch directory name format: {model_batch_dir_name}"
@@ -36,7 +36,6 @@ def parse_model_batch_dir_name(model_batch_dir_name: str) -> dict:
     return {
         "disease": disease,
         "n_lookback_days": parse_lookback_days(n_lookback_days),
-        "exclude_last_n_days": int(exclude_last_n_days),
     }
 
 
@@ -46,9 +45,11 @@ def get_all_forecast_dirs(
 ) -> list[str]:
     """Return model-batch subdirectories matching the requested diseases."""
     diseases = ensure_list(diseases)
-    valid_starts = tuple(f"{disease}_lookback-" for disease in diseases)
+    pattern = re.compile(
+        rf"({'|'.join(re.escape(disease) for disease in diseases)})_lookback-(\d+|{ALL_AVAILABLE_LOOKBACK})"
+    )
     return [
         entry.name
         for entry in os.scandir(parent_dir)
-        if entry.is_dir() and entry.name.startswith(valid_starts)
+        if entry.is_dir() and pattern.fullmatch(entry.name)
     ]

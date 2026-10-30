@@ -83,6 +83,7 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
             ],
             "target_type": ["inc ed visits"] * 4,
             "value": [12, 120, 100, 10],
+            "exclude": [False] * 4,
         }
     )
     monkeypatch.setattr(
@@ -106,11 +107,11 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
 
     expected = pl.DataFrame(
         {
-            "date": [dt.date(2026, 1, 7)] * 2 + [dt.date(2026, 1, 8)] * 2,
-            ".variable": ["observed_ed_visits", "other_ed_visits"] * 2,
-            ".value": [10, 90, 12, 108],
-            "data_type": ["train"] * 2 + ["eval"] * 2,
-            "resolution": ["daily"] * 4,
+            "date": [dt.date(2026, 1, 7)] * 2,
+            ".variable": ["observed_ed_visits", "other_ed_visits"],
+            ".value": [10, 90],
+            "data_type": ["train"] * 2,
+            "resolution": ["daily"] * 2,
         }
     )
     assert_frame_equal(
@@ -131,6 +132,8 @@ def test_load_dataops_nssp_returns_normalized_source(monkeypatch):
         "state_abb": "CA",
         "dataset": "comprehensive",
         "start_date": dt.date(2025, 12, 1),
+        "end_date": dt.date(2026, 1, 7),
+        "get_exclusions": True,
         "lazy": False,
     }
 
@@ -161,6 +164,7 @@ def test_load_dataops_nssp_all_history_passes_minimum_start_date(monkeypatch):
             "disease": ["covid", "total"],
             "target_type": ["inc ed visits"] * 2,
             "value": [10, 100],
+            "exclude": [False] * 2,
         }
     )
     monkeypatch.setattr(
@@ -225,14 +229,13 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     expected = pl.DataFrame(
         {
             "date": [
-                dt.date(2026, 1, 10),
                 dt.date(2026, 1, 1),
                 dt.date(2026, 1, 7),
             ],
-            "state_abb": ["CA"] * 3,
-            "value": [6, 4, 5],
-            "data_type": ["eval", "train", "train"],
-            "resolution": ["epiweekly"] * 3,
+            "state_abb": ["CA"] * 2,
+            "value": [4, 5],
+            "data_type": ["train", "train"],
+            "resolution": ["epiweekly"] * 2,
         }
     )
     assert_frame_equal(result.data, expected)
@@ -245,6 +248,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
         "state_abb": "CA",
         "prelim": True,
         "start_date": dt.date(2026, 1, 1),
+        "end_date": dt.date(2026, 1, 7),
         "lazy": False,
     }
 
@@ -282,7 +286,6 @@ def test_load_dataops_nhsn_all_history_uses_minimum_lower_bound(monkeypatch):
     assert result.first_training_date == dt.date(2020, 1, 4)
     assert result.data.get_column("date").to_list() == [
         dt.date(2020, 1, 4),
-        dt.date(2026, 1, 10),
     ]
     assert calls["start_date"] == dt.date.min
 

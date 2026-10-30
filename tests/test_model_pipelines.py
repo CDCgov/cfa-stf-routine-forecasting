@@ -10,10 +10,9 @@ from cfa.stf.routine.pyrenew_hew.model_inputs import PyRenewModelInputs
 from tests.factories import make_test_forecast_run
 
 
-def _run(tmp_path, *, model_name="test_model", exclude_last_n_days=2):
+def _run(tmp_path, *, model_name="test_model"):
     return make_test_forecast_run(
         output_dir=tmp_path,
-        exclude_last_n_days=exclude_last_n_days,
         model_name=model_name,
     )
 
@@ -40,7 +39,7 @@ def test_fable_pipeline_declares_ed_visit_input_resolution(tmp_path, resolution)
     )
     assert pipeline.ed_visit_input_resolution == resolution
     assert pipeline.model_name == f"{resolution}_fable_e_other"
-    assert pipeline.minimum_exclude_last_n_days == 3
+    assert not hasattr(pipeline, "minimum_exclude_last_n_days")
 
 
 @patch("cfa.stf.routine.fable.forecast_fable.fable_e_other_forecasts")
@@ -49,7 +48,12 @@ def test_fable_pipeline_forecasts_through_excluded_tail(mock_forecast, tmp_path)
         **_common_kwargs(tmp_path),
         n_samples=10,
     )
-    run = _run(tmp_path, model_name=pipeline.model_name)
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        model_name=pipeline.model_name,
+        last_training_date=dt.date(2024, 12, 17),
+        sources=("nssp",),
+    )
 
     pipeline.run_model(run)
 

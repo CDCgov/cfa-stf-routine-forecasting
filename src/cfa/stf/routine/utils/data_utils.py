@@ -9,12 +9,14 @@ def aggregate_long_to_epiweekly(
     data: pl.DataFrame,
     date_col: str = "date",
     value_col: str = ".value",
+    id_columns: list[str] | None = None,
 ) -> pl.DataFrame:
     """Aggregate daily values into complete MMWR weeks."""
-    id_columns = list(cs.expand_selector(data, cs.exclude(date_col, value_col)))
+    if id_columns is None:
+        id_columns = list(cs.expand_selector(data, cs.exclude(date_col, value_col)))
     return (
         daily_to_weekly(
-            data,
+            data.filter(pl.col(value_col).is_finite()),
             value_col=value_col,
             date_col=date_col,
             id_cols=id_columns,
@@ -32,7 +34,10 @@ def aggregate_long_to_epiweekly(
 def aggregate_nssp_to_epiweekly(data: pl.DataFrame) -> pl.DataFrame:
     """Aggregate long daily NSSP data to complete MMWR weeks."""
     return (
-        aggregate_long_to_epiweekly(data)
-        .select(data.columns)
+        aggregate_long_to_epiweekly(
+            data,
+            id_columns=["state_abb", ".variable", "data_type", "resolution"],
+        )
+        .select("date", "state_abb", ".variable", ".value", "data_type", "resolution")
         .sort("date", "state_abb", ".variable")
     )

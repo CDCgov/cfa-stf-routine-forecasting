@@ -54,7 +54,6 @@ def _get_model_loc_dir(
     forecast_window = ForecastWindow(
         report_date=run_date,
         n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
     )
     model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
 
@@ -102,7 +101,6 @@ def _run_fable_e_other(
         output_dir=daily_forecast_output_dir,
         n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
         n_samples=fable_e_other_config.n_samples,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
         ed_visit_input_resolution=ed_visit_input_resolution,
         run_date=run_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,
@@ -149,7 +147,6 @@ def _run_pyrenew_model(
         n_chains=pyrenew_config.n_chains,
         n_warmup=pyrenew_config.n_warmup,
         n_samples=pyrenew_config.n_samples,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
         rng_key=pyrenew_config.rng_key,
         run_date=run_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,
@@ -188,7 +185,6 @@ def _run_nowcastautogp_e_pct_epiweekly(
         target="nssp",
         frequency="epiweekly",
         ed_visit_type="pct",
-        exclude_last_n_days=loc_config.exclude_last_n_days,
         n_particles=nowcastautogp_e_pct_epiweekly_config.n_particles,
         n_mcmc=nowcastautogp_e_pct_epiweekly_config.n_mcmc,
         n_hmc=nowcastautogp_e_pct_epiweekly_config.n_hmc,

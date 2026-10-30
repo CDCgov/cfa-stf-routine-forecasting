@@ -11,6 +11,7 @@ def make_figures_from_model_fit_dir(
     model_fit_dir: Path,
     save_ci: bool = False,
     save_figs: bool = True,
+    show_excluded: bool = False,
 ) -> None:
     """Generate forecast figures from a model fit directory."""
     args = [f"{model_fit_dir}"]
@@ -18,6 +19,8 @@ def make_figures_from_model_fit_dir(
         args.append("--save-ci")
     if save_figs:
         args.append("--save-figs")
+    if show_excluded:
+        args.append("--show-excluded")
 
     run_r_script(
         UTILS_DIR / "make_figures_from_model_fit_dir.R",

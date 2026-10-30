@@ -1,27 +1,24 @@
 valid_model_batch <- dplyr::bind_rows(
   tibble::tibble(
-    dirname = "covid_lookback-150_omit-1",
+    dirname = "covid_lookback-150",
     disease = "covid",
-    n_lookback_days = 150L,
-    exclude_last_n_days = 1L
+    n_lookback_days = 150L
   ),
   tibble::tibble(
-    dirname = "flu_lookback-90_omit-5",
+    dirname = "flu_lookback-90",
     disease = "flu",
-    n_lookback_days = 90L,
-    exclude_last_n_days = 5L
+    n_lookback_days = 90L
   ),
   tibble::tibble(
-    dirname = "rsv_lookback-all_omit-2",
+    dirname = "rsv_lookback-all",
     disease = "rsv",
-    n_lookback_days = Inf,
-    exclude_last_n_days = 2L
+    n_lookback_days = Inf
   )
 )
 
 invalid_model_batch_dirs <- c(
-  "qcovid_lookback-150_omit-1",
-  "flu_lookback-many_omit-2"
+  "qcovid_lookback-150",
+  "flu_lookback-many"
 )
 
 target_locations <- c("ME", "US", "CA")
@@ -69,9 +66,9 @@ test_that("parse_model_batch_dir_path() works as expected.", {
 
 test_that("unlimited lookbacks sort after finite lookbacks", {
   parsed_lookbacks <- parse_model_batch_dir_path(c(
-    "covid_lookback-150_omit-1",
-    "covid_lookback-all_omit-1",
-    "covid_lookback-90_omit-1"
+    "covid_lookback-150",
+    "covid_lookback-all",
+    "covid_lookback-90"
   ))
 
   expect_equal(
@@ -110,21 +107,22 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
   withr::with_tempdir({
     ## create some directories
     valid_covid <- c(
-      "covid_lookback-150_omit-1",
-      "covid_lookback-"
+      "covid_lookback-150"
     )
     valid_flu <- c(
-      "flu_lookback-90_omit-3",
-      "flu_lookback-"
+      "flu_lookback-90"
     )
     valid_rsv <- c(
-      "rsv_lookback-60_omit-5",
-      "rsv_lookback-",
-      "rsv_lookback-all_omit-5"
+      "rsv_lookback-60",
+      "rsv_lookback-all"
     )
     valid_dirs <- c(valid_flu, valid_covid, valid_rsv)
 
     invalid_dirs <- c(
+      "covid_lookback-",
+      "flu_lookback-",
+      "rsv_lookback-",
+      "covid_lookback-150_omit-1",
       "this_is_not_valid",
       "covid19_r",
       "covid-r",

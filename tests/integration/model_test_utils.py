@@ -25,7 +25,6 @@ from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 
 FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
 N_LOOKBACK_DAYS = 42
-EXCLUDE_LAST_N_DAYS = 1
 MOCK_DATA_MODE = "mock"
 REAL_DATA_MODE = "real"
 
@@ -136,7 +135,6 @@ def patch_mock_nssp_with_missing_values(
     window = ForecastWindow(
         report_date=REPORT_DATE,
         n_lookback_days=N_LOOKBACK_DAYS,
-        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
     )
     midpoint = window.min_allowed_training_date + (
         (window.max_allowed_training_date - window.min_allowed_training_date) / 2
@@ -168,7 +166,6 @@ def selected_nhsn_observations(
     forecast_window = ForecastWindow(
         report_date=REPORT_DATE,
         n_lookback_days=N_LOOKBACK_DAYS,
-        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
     )
     surveillance = forecast_pipeline_module.load_surveillance_inputs(
         disease=disease,
@@ -207,7 +204,6 @@ def run_fable(
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
         n_lookback_days=N_LOOKBACK_DAYS,
-        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
         run_date=REPORT_DATE,
         ed_visit_input_resolution=ed_visit_input_resolution,
@@ -228,7 +224,6 @@ def run_pyrenew(
         priors_path=PRODUCTION_PRIORS,
         output_dir=workspace / FORECAST_DIR_NAME,
         n_lookback_days=N_LOOKBACK_DAYS,
-        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_chains=1,
         n_samples=40,
         n_warmup=40,
@@ -257,7 +252,6 @@ def run_nowcastautogp(
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
         n_lookback_days=N_LOOKBACK_DAYS,
-        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         target=target,
         frequency=frequency,
         ed_visit_type=ed_visit_type,
@@ -273,9 +267,7 @@ def run_nowcastautogp(
 
 
 def model_batch_dir(workspace: Path, disease: str) -> Path:
-    candidates = list(
-        (workspace / FORECAST_DIR_NAME).glob(f"{disease}_lookback-*_omit-*")
-    )
+    candidates = list((workspace / FORECAST_DIR_NAME).glob(f"{disease}_lookback-*"))
     assert len(candidates) == 1, (
         f"Expected one batch directory for {disease}, "
         f"found {len(candidates)} in {workspace / FORECAST_DIR_NAME}"

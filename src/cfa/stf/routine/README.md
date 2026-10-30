@@ -64,7 +64,6 @@ def main(
     n_lookback_days: int | None,
     n_samples: int,
     run_date: dt.date,
-    exclude_last_n_days: int = 0,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
 ) -> None:
@@ -77,7 +76,6 @@ def main(
         output_dir=output_dir,
         n_lookback_days=n_lookback_days,
         run_date=run_date,
-        exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
         n_samples=n_samples,
         logger=logger,
@@ -107,16 +105,18 @@ Set `n_lookback_days` to `None` to retain all supported training history, beginn
 A positive integer limits training data to that many days before the report date, subject to the same earliest supported date.
 `ForecastRun` combines that configured window with the surveillance observations that were actually retained, the population, and the model output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
-Models can override `minimum_exclude_last_n_days` when they require a longer omitted tail than the caller requested.
-The pipeline's `requested_window` preserves that caller configuration; the run's `forecast_window` records the effective omission, while `run.requested_window` determines the batch directory so all models remain in the same batch.
+Canonical NSSP exclusions are applied by the shared loader, before deriving counts, proportions, or weekly totals.
+`NSSPData.data` contains retained observations only; `NSSPData.excluded_data` is a separate audit frame that models never consume.
+All models use the same training-window policy, with no model-specific omitted tail or date-range exclusions.
 The resulting layout is:
 
 ```text
-<output_dir>/<disease>_lookback-<days-or-all>_omit-<days>/
+<output_dir>/<disease>_lookback-<days-or-all>/
   model_runs/<location>/<model_name>/
     data/
       combined_data.tsv
       data_for_model_fit.json
+      excluded_data.tsv
     samples.parquet
     ci.parquet
     hubverse_table.parquet
@@ -124,6 +124,8 @@ The resulting layout is:
 
 The base pipeline creates `data/`, `combined_data.tsv`, and `data_for_model_fit.json`.
 The model creates `samples.parquet`; common post-processing creates `ci.parquet`, figures, and `hubverse_table.parquet`.
+`excluded_data.tsv` is an NSSP audit artifact, not a model input.
+Plots show retained observations by default; `show_excluded=True` in the plotting wrapper (or `--show-excluded` in its R CLI) also shows audited observations at the matching resolution.
 
 ### Forecast sample format
 
@@ -155,19 +157,25 @@ The base class also provides optional hooks for model-specific preparation:
   | ------------------------------ | -------------------------------------------------------- |
   | `validate_configuration()`     | Reject invalid option combinations before loading data   |
   | `prepare_model_artifacts(run)` | Create model-specific inputs, such as JSON or parameters |
-  | `minimum_exclude_last_n_days`  | Require a longer recent-data omission for this model     |
 
 Do not override `execute()`, `build_forecast_run()`, `prepare_input_artifacts()`, or `publish_outputs()` unless the shared lifecycle itself must change.
 Keeping those methods common preserves data freshness checks and compatible outputs.
 `run_model()` is responsible for any native-output conversion needed to leave a standardized `samples.parquet` for publishing.
 
-When fitting stops before the report date because `exclude_last_n_days` is nonzero, decide whether the model must predict through that excluded tail.
+When exclusions move the final retained observation earlier, extend predictions through the fixed `run.forecast_through` date.
 `run.forecast_window.min_allowed_training_date` and `run.forecast_window.max_allowed_training_date` are the inclusive bounds used while loading and labeling observations for training.
 `run.first_training_date` and `run.last_training_date` are instead derived from the observations actually retained.
 For daily models, forecasting often means generating `run.n_forecast_days` days from that observed last training date through `run.forecast_through`.
 See the Fable and PyRenew implementations.
-Fable requires at least three omitted calendar days.
-NowcastAutoGP also requires at least three when it runs without a nowcast source.
+Explicit boundary rows are unnecessary as long as every requested forecast date is produced.
+Weekly counts require seven retained daily observations; a week containing an excluded or missing day is absent from model inputs.
+PyRenew and NowcastAutoGP index retained observations by calendar date.
+Reporting-delay adjustments use the report date as their fixed reference.
+Fable fills internal gaps using ARIMA interpolation before fitting ETS + ARIMA; its forecast uncertainty is conditional on those point imputations.
+
+This replaces the previous omission policy, including the default three-day tail for models without nowcasting.
+Canonical quality exclusions do not by themselves establish that retained recent reports are complete; forecast-quality evaluation remains necessary when adopting this policy.
+Existing directories with an `_omit-` suffix are not part of the new directory format and should be kept separate from new runs.
 
 ## 4. Add orchestration explicitly
 

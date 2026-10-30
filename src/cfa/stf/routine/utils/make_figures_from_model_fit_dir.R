@@ -90,7 +90,11 @@ make_forecast_figure <- function(
     ) +
     ggplot2::scale_color_manual(
       name = "Data Type",
-      values = c("olivedrab1", "deeppink"),
+      values = c(
+        train = "olivedrab1",
+        excluded = "deeppink",
+        eval = "deeppink"
+      ),
       labels = stringr::str_to_title
     ) +
     ggplot2::ggtitle(title) +
@@ -105,13 +109,20 @@ make_forecast_figure <- function(
 make_forecast_figure_from_model_fit_dir <- function(
   model_fit_dir,
   save_ci = FALSE,
-  save_figs = TRUE
+  save_figs = TRUE,
+  show_excluded = FALSE
 ) {
   model_name <- path_file(model_fit_dir)
   ci <- get_ci(model_fit_dir, save = save_ci)
 
   dat_path <- path(model_fit_dir, "data", "combined_data", ext = "tsv")
   dat <- read_tabular(dat_path)
+  if (show_excluded) {
+    excluded_path <- path(model_fit_dir, "data", "excluded_data", ext = "tsv")
+    if (file_exists(excluded_path)) {
+      dat <- bind_rows(dat, read_tabular(excluded_path))
+    }
+  }
 
   fig_tbl <- ci |>
     distinct(geo_value, disease, resolution, .variable) |>
@@ -171,6 +182,11 @@ p <- arg_parser(
     "--save-figs",
     help = "Whether to save figures to disk.",
     flag = TRUE
+  ) |>
+  add_argument(
+    "--show-excluded",
+    help = "Include excluded observations from the separate audit artifact.",
+    flag = TRUE
   )
 
 argv <- parse_args(p)
@@ -178,5 +194,6 @@ argv <- parse_args(p)
 make_forecast_figure_from_model_fit_dir(
   model_fit_dir = argv$model_fit_dir,
   save_figs = argv$save_figs,
-  save_ci = argv$save_ci
+  save_ci = argv$save_ci,
+  show_excluded = argv$show_excluded
 )

@@ -55,10 +55,6 @@ class FablePipeline(ForecastPipeline):
     def ed_visit_input_resolution(self) -> DataResolution:
         return self._ed_visit_input_resolution
 
-    @property
-    def minimum_exclude_last_n_days(self) -> int:
-        return 3
-
     def run_model(self, run: ForecastRun) -> None:
         self.logger.info("Performing fable E-other forecasting")
         fable_e_other_forecasts(
@@ -75,7 +71,6 @@ def main(
     n_lookback_days: int | None,
     n_samples: int,
     run_date: dt.date,
-    exclude_last_n_days: int = 0,
     ed_visit_input_resolution: DataResolution = "daily",
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
@@ -90,7 +85,6 @@ def main(
         output_dir=output_dir,
         n_lookback_days=n_lookback_days,
         run_date=run_date,
-        exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
         logger=logger,
         n_samples=n_samples,

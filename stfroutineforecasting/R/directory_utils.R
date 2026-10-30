@@ -10,18 +10,18 @@ disease_names <- c("covid", "flu", "rsv")
 #'
 #' Parse the name of a model batch directory
 #' (i.e. a directory representing a single
-#' lookback/omission configuration and disease, but potentially
+#' lookback configuration and disease, but potentially
 #' with fits for multiple locations), returning
 #' a named list of quantities of interest.
 #'
 #' @param model_batch_dir_path Path to the model batch
 #' directory to parse. Will parse only the basename.
-#' @return A one-row tibble containing canonical `disease`, `n_lookback_days`,
-#' and `exclude_last_n_days` values. An unlimited lookback is represented by
+#' @return A one-row tibble containing canonical `disease` and
+#' `n_lookback_days` values. An unlimited lookback is represented by
 #' `Inf`.
 #' @export
 parse_model_batch_dir_path <- function(model_batch_dir_path) {
-  pattern <- "^(.+)_lookback-([0-9]+|all)_omit-([0-9]+)$"
+  pattern <- "^(.+)_lookback-([0-9]+|all)$"
   model_batch_dir_name <- fs::path_file(model_batch_dir_path)
   matches <- stringr::str_match(
     model_batch_dir_name,
@@ -32,8 +32,7 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
     stop(
       "Invalid format for model batch directory name; ",
       "could not parse. Expected ",
-      "'<disease>_lookback-<n_lookback_days>_omit-",
-      "<exclude_last_n_days>'."
+      "'<disease>_lookback-<n_lookback_days>'."
     )
   }
 
@@ -42,8 +41,7 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
     tibble::as_tibble(.name_repair = \(x) {
       c(
         "disease",
-        "n_lookback_days",
-        "exclude_last_n_days"
+        "n_lookback_days"
       )
     }) |>
     dplyr::mutate(
@@ -55,19 +53,16 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
       n_lookback_days = dplyr::coalesce(
         as.double(dplyr::na_if(.data$n_lookback_days, "all")),
         Inf
-      ),
-      exclude_last_n_days = as.integer(.data$exclude_last_n_days)
+      )
     )
 
   if (anyNA(result)) {
     stop(
       "Could not parse extracted values; expected 'disease' to be one of ",
-      "'covid', 'flu', or 'rsv', lookback to be 'all' or an integer, ",
-      "and omitted days to be an integer. Got: ",
+      "'covid', 'flu', or 'rsv', and lookback to be 'all' or an integer. Got: ",
       glue::glue(
         "disease: {matches[2]}, ",
-        "n_lookback_days: {matches[3]}, ",
-        "exclude_last_n_days: {matches[4]}."
+        "n_lookback_days: {matches[3]}."
       )
     )
   }
@@ -84,7 +79,7 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #'
 #' @param model_run_dir_path Path to parse.
 #' @return A one-row tibble containing `location`, canonical `disease`,
-#' `n_lookback_days`, and `exclude_last_n_days` values. An unlimited lookback
+#' and `n_lookback_days` values. An unlimited lookback
 #' is represented by `Inf`.
 #'
 #' @export
@@ -108,13 +103,18 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
 #'
 #' @param dir_of_batch_dirs Directory in which to look for
 #' "model batch" directories, each of which represents an
-#' individual lookback/omission / pathogen configuration.
+#' individual lookback / pathogen configuration.
 #' @param diseases Canonical disease identifiers to match (`"covid"`, `"flu"`,
 #' or `"rsv"`), supplied as a character vector.
 #' @return A vector of paths to the forecast subdirectories.
 #' @export
 get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
-  match_patterns <- stringr::str_c(diseases, "_lookback-", collapse = "|")
+  match_patterns <- stringr::str_c(
+    "^",
+    diseases,
+    "_lookback-([0-9]+|all)$",
+    collapse = "|"
+  )
 
   dirs <- tibble::tibble(
     dir_path = fs::dir_ls(
@@ -122,7 +122,7 @@ get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
       type = "directory"
     )
   ) |>
-    dplyr::filter(stringr::str_starts(
+    dplyr::filter(stringr::str_detect(
       fs::path_file(.data$dir_path),
       !!match_patterns
     )) |>

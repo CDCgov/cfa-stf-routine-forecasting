@@ -13,13 +13,11 @@ def _model_base_config() -> asset_config.ModelBaseConfig:
         output_basedir="default-output",
         fable_pyrenew_n_lookback_days=100,
         nowcastautogp_n_lookback_days=200,
-        exclude_last_n_days=1,
         fail_on_stale_data=True,
         config_overrides=[
             asset_config.ConfigOverride(
                 location="CA",
                 output_basedir="ca-output",
-                exclude_last_n_days=2,
                 fail_on_stale_data=False,
             ).as_dict()
         ],
@@ -35,6 +33,8 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     config = asset_config.ModelBaseConfig()
 
     assert "n_lookback_days" not in base_fields
+    assert "exclude_last_n_days" not in base_fields
+    assert "exclude_last_n_days" not in override_fields
     assert "n_lookback_days" in override_fields
     assert "fable_pyrenew_n_lookback_days" not in override_fields
     assert "nowcastautogp_n_lookback_days" not in override_fields
@@ -73,7 +73,7 @@ def test_postprocess_always_copies_to_daily_output(monkeypatch):
     ("override_fields", "expected_lookbacks"),
     [
         pytest.param(
-            {"exclude_last_n_days": 2},
+            {},
             (100, 200),
             id="omitted-retains-model-defaults",
         ),
@@ -147,7 +147,6 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
 
     shared_arguments = {
         "output_dir": Path("ca-output/2026-09-09_forecasts"),
-        "exclude_last_n_days": 2,
         "fail_on_stale_data": False,
     }
     for forecast in (forecast_fable, forecast_pyrenew):
@@ -170,7 +169,7 @@ def test_fusion_directory_uses_fable_pyrenew_lookback():
     assert asset_helpers._get_model_loc_dir(context, model_base_config) == Path(
         "ca-output",
         "2026-09-09_forecasts",
-        "covid_lookback-100_omit-2",
+        "covid_lookback-100",
         "model_runs",
         "CA",
     )

@@ -49,10 +49,6 @@ class _SharedModelConfigFields(BaseModel):
         default_factory=lambda: "",
         description="Output directory used by all forecast models.",
     )
-    exclude_last_n_days: int = Field(
-        default_factory=lambda: 0,
-        description="Requested recent-data omission used by all forecast models.",
-    )
     fail_on_stale_data: bool = Field(
         default_factory=lambda: is_prod(),
         description="Stale-input policy used by all forecast models.",
@@ -89,10 +85,6 @@ class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
         default=None if is_prod() else 150,
         description="Training lookback used only by NowcastAutoGP models.",
     )
-    exclude_last_n_days: int = Field(
-        default=1,
-        description="Requested recent-data omission used by all forecast models.",
-    )
     fail_on_stale_data: bool = Field(
         default=is_prod(),
         description="Stale-input policy used by all forecast models.",
@@ -107,9 +99,7 @@ class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
     )
     # Add defaults here, or add in the launchpad with ctrl+space
     config_overrides: list[ConfigOverride] = Field(
-        default=[
-            # ConfigOverride(location="GA", exclude_last_n_days=2).as_dict(),
-        ],
+        default=[],
         description=(
             "Provide location-specific overrides as a list of dicts. "
             "An explicitly provided n_lookback_days applies to all models, "

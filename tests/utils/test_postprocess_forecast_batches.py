@@ -45,7 +45,7 @@ class TestCombineHubverseTables:
 
     def _make_batch_dir(self, tmp_path: Path) -> Path:
         """Create a model batch directory with a valid name."""
-        batch_dir = tmp_path / "covid_lookback-90_omit-0"
+        batch_dir = tmp_path / "covid_lookback-90"
         batch_dir.mkdir()
         return batch_dir
 
@@ -131,12 +131,12 @@ class TestCombineHubverseTables:
 
 
 def test_model_batch_dir_to_target_path_uses_batch_configuration(tmp_path):
-    result = model_batch_dir_to_target_path("covid_lookback-150_omit-3", tmp_path)
+    result = model_batch_dir_to_target_path("covid_lookback-150", tmp_path)
 
-    assert result == tmp_path / "lookback-150-omit-3-figures" / "covid"
+    assert result == tmp_path / "lookback-150-figures" / "covid"
 
 
 def test_model_batch_dir_to_target_path_formats_unlimited_lookback(tmp_path):
-    result = model_batch_dir_to_target_path("covid_lookback-all_omit-3", tmp_path)
+    result = model_batch_dir_to_target_path("covid_lookback-all", tmp_path)
 
-    assert result == tmp_path / "lookback-all-omit-3-figures" / "covid"
+    assert result == tmp_path / "lookback-all-figures" / "covid"

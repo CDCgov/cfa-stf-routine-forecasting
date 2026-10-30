@@ -25,3 +25,18 @@ Replace `mock` with `real` to use CFA DataOps data.
 All arguments are optional; the defaults are `auto`, `CA`, and `covid`.
 
 The combined test remains available through `just e2e auto`, `just e2e real`, or `just e2e mock`.
+
+## Canonical exclusions
+
+`data/test_canonical_exclusions.py` exercises the production NSSP loader, derived counts and proportions, complete-week aggregation, and both shared and NowcastAutoGP serialization.
+Excluded values are multiplied by 20 and 1,000,000; the model-input files must remain byte-for-byte identical while the separate audit file changes.
+The tests also check PyRenew's reporting CDF against each observation's calendar age.
+
+Run the production model adapters and postprocessing with simultaneous leading, internal, and trailing exclusions:
+
+```bash
+uv run --frozen pytest tests/integration/test_canonical_exclusion_forecasts.py
+```
+
+These six synthetic-data cases fit Fable daily/weekly, NowcastAutoGP daily/weekly, and PyRenew E/HE, then check that every draw covers the requested forecast dates.
+They use small inference settings to test execution and output contracts, not convergence or forecast calibration.

@@ -123,3 +123,12 @@ def serialize_data(
     logger.info(f"Saving {forecast_run.loc} to {save_dir}")
 
     write_tabular(combined_data, save_dir / "combined_data.tsv")
+
+    # Separate audit artifact: deliberately not part of either model input file.
+    if forecast_run.nssp is not None and forecast_run.nssp.excluded_data is not None:
+        excluded_data = combine_surveillance_data(
+            disease=forecast_run.disease,
+            nssp_data=forecast_run.nssp.excluded_data,
+            nhsn_data=None,
+        )
+        write_tabular(excluded_data, save_dir / "excluded_data.tsv")

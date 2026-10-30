@@ -42,7 +42,7 @@ def _apply_date_exclusions(
     exclude_date_ranges: list[tuple[dt.date, dt.date]],
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Remove observations whose dates fall in any inclusive exclusion range."""
+    """Legacy standalone helper; production uses canonical source exclusions."""
     if not exclude_date_ranges:
         return data
     excluded = pl.any_horizontal(
@@ -113,8 +113,6 @@ def _extract_model_series(
         .drop("data_type")
         .sort("date")
     )
-    if config.exclude_date_ranges:
-        data = _apply_date_exclusions(data, config.exclude_date_ranges, logger)
     if data.is_empty():
         raise ValueError(
             f"No training observations are available for target={config.target!r}, "

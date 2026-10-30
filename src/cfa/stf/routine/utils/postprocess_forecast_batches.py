@@ -77,7 +77,7 @@ def model_batch_dir_to_target_path(
     lookback = format_lookback_days(parts["n_lookback_days"])
     target_path = Path(
         pre_path,
-        f"lookback-{lookback}-omit-{parts['exclude_last_n_days']}-figures",
+        f"lookback-{lookback}-figures",
         parts["disease"],
     )
     return target_path

@@ -104,7 +104,7 @@ def nowcastautogp_interop_paths(
 ) -> Iterator[NowcastAutoGPInteropPaths]:
     tmp_dir = tmp_path_factory.mktemp("nowcastautogp-parquet-interop")
     try:
-        batch_dir = tmp_dir / "covid_lookback-33_omit-1"
+        batch_dir = tmp_dir / "covid_lookback-33"
         model_fit_dir = batch_dir / "model_runs" / "US" / "nowcastautogp_nssp_daily_pct"
         input_path = tmp_dir / "nowcastautogp-input.json"
         _write_nowcastautogp_input(input_path)

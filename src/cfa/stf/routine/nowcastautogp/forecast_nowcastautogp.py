@@ -17,7 +17,6 @@ from cfa.stf.routine.nowcastautogp.prep_nowcastautogp_data import (
     convert_to_nowcastautogp_json,
 )
 from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import ReportingDelayNowcast
-from cfa.stf.routine.utils.date_utils import parse_exclude_date_ranges
 from cfa.stf.routine.utils.language_utils import run_julia_script
 
 _FIT_SCRIPT = Path(__file__).parent / "fit_nowcastautogp.jl"
@@ -74,7 +73,10 @@ def _build_reporting_delay_nowcast(
             as_of=forecast_run.report_date,
             reference_date=forecast_run.report_date,
         )
-    return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
+    return ReportingDelayNowcast(
+        reporting_delay_pmf=reporting_delay_pmf,
+        reference_date=forecast_run.report_date - dt.timedelta(days=1),
+    )
 
 
 def _resolve_nowcast_source(
@@ -128,7 +130,6 @@ class NowcastAutoGPPipeline(ForecastPipeline):
         target: str,
         frequency: str,
         ed_visit_type: str = "observed",
-        exclude_date_ranges: list[tuple[dt.date, dt.date]] | None = None,
         n_particles: int = 24,
         n_mcmc: int = 100,
         n_hmc: int = 50,
@@ -145,7 +146,6 @@ class NowcastAutoGPPipeline(ForecastPipeline):
             target=target,
             frequency=frequency,
             ed_visit_type=ed_visit_type,
-            exclude_date_ranges=exclude_date_ranges,
         )
         self.n_particles = n_particles
         self.n_mcmc = n_mcmc
@@ -173,10 +173,6 @@ class NowcastAutoGPPipeline(ForecastPipeline):
     @property
     def ed_visit_input_resolution(self) -> DataResolution:
         return self.config.frequency
-
-    @property
-    def minimum_exclude_last_n_days(self) -> int:
-        return 3 if self.nowcast_source_name == "none" else 0
 
     def validate_configuration(self) -> None:
         _validate_nowcastautogp_parameters(
@@ -228,8 +224,6 @@ def main(
     target: str,
     frequency: str,
     ed_visit_type: str = "observed",
-    exclude_last_n_days: int = 0,
-    exclude_date_ranges: str | None = None,
     n_particles: int = 24,
     n_mcmc: int = 100,
     n_hmc: int = 50,
@@ -247,13 +241,6 @@ def main(
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
 
-    parsed_exclude_date_ranges = parse_exclude_date_ranges(exclude_date_ranges)
-    if parsed_exclude_date_ranges:
-        logger.info(
-            f"Excluding {len(parsed_exclude_date_ranges)} date range(s): "
-            f"{parsed_exclude_date_ranges}"
-        )
-
     NowcastAutoGPPipeline(
         disease=disease,
         loc=loc,
@@ -262,8 +249,6 @@ def main(
         ed_visit_type=ed_visit_type,
         output_dir=output_dir,
         n_lookback_days=n_lookback_days,
-        exclude_last_n_days=exclude_last_n_days,
-        exclude_date_ranges=parsed_exclude_date_ranges,
         logger=logger,
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,

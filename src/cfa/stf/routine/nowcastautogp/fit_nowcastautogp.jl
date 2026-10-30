@@ -215,15 +215,15 @@ function prepare_for_modelling(
         "forecast_through must be after the final training date; got " *
             "$last_training_date and $(input.forecast_through)",
     )
-    n_ahead, extra_days = divrem(horizon_days, step_days)
+    _, extra_days = divrem(horizon_days, step_days)
     _require(
         iszero(extra_days),
         "The distance from the final $(input.frequency) training date to " *
             "forecast_through must be a whole number of model steps; got " *
             "$last_training_date and $(input.forecast_through)",
     )
-    forecast_dates = [last_training_date + i * time_step for i in 1:n_ahead]
-    prediction_dates = vcat(input.dates, forecast_dates)
+    # Predict through missing dates while conditioning only on retained reports.
+    prediction_dates = collect(first(input.dates):time_step:input.forecast_through)
 
     n_forecasts_per_nowcast = isnothing(nowcast_data) ?
         n_forecasts :

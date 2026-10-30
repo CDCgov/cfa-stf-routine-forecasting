@@ -17,7 +17,7 @@ raw_samples_fixture <- tibble::tibble(
 
 withr::with_tempdir({
   model_dir <- fs::path(
-    "covid_lookback-150_omit-1",
+    "covid_lookback-150",
     "model_runs",
     "US",
     "pyrenew_e"

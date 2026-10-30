@@ -87,6 +87,21 @@ class TestReportingDelayNowcastEnsureApplicable:
 
 
 class TestReportingDelayNowcastGetNowcastData:
+    @pytest.mark.parametrize("missing", [{4}, {2, 4}, {2, 3, 4}])
+    def test_exclusions_do_not_shift_reporting_fractions(self, missing):
+        dates = [dt.date(2026, 1, i + 1) for i in range(5)]
+        source = ReportingDelayNowcast([0.4, 0.3, 0.2, 0.1], reference_date=dates[-1])
+        retained = [date for i, date in enumerate(dates) if i not in missing]
+        result = source.get_nowcast_data(dates=retained, reports=[10.0] * len(retained))
+        cdf = [0.4, 0.7, 0.9, 1.0]
+        expected_dates = [date for date in retained if (dates[-1] - date).days < 3]
+        assert result.dates == expected_dates
+        expected = [
+            inflate_report(10.0, cdf[(dates[-1] - date).days])
+            for date in expected_dates
+        ]
+        assert result.reports == ([pytest.approx(expected)] if expected else [])
+
     def test_returns_inflated_estimates_for_partial_tail(self):
         # PMF = [0.5, 0.5] -> CDF = [0.5, 1.0] -> incomplete = [0.5];
         # only the most-recent observation gets inflated.

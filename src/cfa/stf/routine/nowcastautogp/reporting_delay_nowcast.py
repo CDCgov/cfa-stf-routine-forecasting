@@ -23,7 +23,7 @@ REPORTING_FRACTION_TOL = 1e-9
 
 
 def reporting_inflation_factors(pmf: list[float]) -> list[float]:
-    """Return incomplete reporting CDF entries, ordered oldest first."""
+    """Return incomplete reporting CDF entries, ordered by increasing delay."""
     return [
         fraction
         for fraction in accumulate(pmf)
@@ -54,6 +54,8 @@ class ReportingDelayNowcast:
     """
 
     reporting_delay_pmf: list[float]
+    reference_date: dt.date | None = None
+    step_days: int = 1
 
     @staticmethod
     def ensure_applicable(
@@ -94,17 +96,25 @@ class ReportingDelayNowcast:
 
         incomplete_fractions = reporting_inflation_factors(self.reporting_delay_pmf)
 
-        n_nowcast = min(len(reports), len(incomplete_fractions))
-        if n_nowcast == 0:
+        if not dates or not incomplete_fractions:
             return NowcastData()
-
-        nowcast_dates = dates[-n_nowcast:]
-        nowcast_estimates = [
-            inflate_report(float(report), fraction)
-            for report, fraction in zip(
-                reports[-n_nowcast:],
-                reversed(incomplete_fractions[-n_nowcast:]),
-            )
-        ]
+        # PMF bin zero describes reference_date, normally report_date - 1.
+        # Keep the anchor fixed when observations are missing or omitted.
+        reference_date = self.reference_date or max(dates)
+        nowcast_dates = []
+        nowcast_estimates = []
+        for date, report in zip(dates, reports, strict=True):
+            age, remainder = divmod((reference_date - date).days, self.step_days)
+            if age < 0 or remainder:
+                raise ValueError(
+                    "Observation dates must precede and align with reference_date"
+                )
+            if age < len(incomplete_fractions):
+                nowcast_dates.append(date)
+                nowcast_estimates.append(
+                    inflate_report(float(report), incomplete_fractions[age])
+                )
+        if not nowcast_dates:
+            return NowcastData()
 
         return NowcastData(dates=nowcast_dates, reports=[nowcast_estimates])

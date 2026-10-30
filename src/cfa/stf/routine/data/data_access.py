@@ -1,7 +1,7 @@
 import datetime as dt
 import logging
 from collections.abc import Collection
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import ClassVar, Literal, get_args
 
 import polars as pl
@@ -68,7 +68,8 @@ class ForecastSourceData:
 
 @dataclass(frozen=True)
 class NSSPData(ForecastSourceData):
-    pass
+    # Audit/plotting only. Model preparation consumes `data`, never this frame.
+    excluded_data: pl.DataFrame | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -130,7 +131,7 @@ def _normalize_nssp_data(
         .sort()
         .to_list()
     )
-    if len(observed_diseases) != 1:
+    if not source_data.is_empty() and len(observed_diseases) != 1:
         raise ValueError(
             f"Expected exactly one non-total NSSP disease; found {observed_diseases}"
         )
@@ -169,10 +170,9 @@ def _normalize_nssp_data(
                 ),
             ]
         )
+        .filter(pl.col("date") <= max_allowed_training_date)
         .with_columns(
-            data_type=pl.when(pl.col("date") <= max_allowed_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
+            data_type=pl.lit("train"),
             resolution=pl.lit("daily"),
         )
         .sort("date", "state_abb", ".variable")
@@ -193,17 +193,49 @@ def _load_dataops_nssp(
         state_abb=loc_abb,
         dataset="comprehensive",
         start_date=min_allowed_training_date,
+        end_date=max_allowed_training_date,
+        get_exclusions=True,
         lazy=False,
     )
+    # Fail visibly if the upstream exclusion contract is absent or ambiguous.
+    if (
+        source_data.schema.get("exclude") != pl.Boolean
+        or source_data["exclude"].has_nulls()
+    ):
+        raise ValueError("NSSP data must include a non-null Boolean exclude column")
+    # Decisions are location/date based. Apply the union across diseases before
+    # subtraction, ratios, aggregation, or any model-specific processing.
+    excluded_dates = (
+        source_data.filter(pl.col("exclude")).select("date", "state_abb").unique()
+    )
+    retained = source_data.join(excluded_dates, on=["date", "state_abb"], how="anti")
+    excluded = source_data.join(excluded_dates, on=["date", "state_abb"], how="semi")
     freshness = nssp_freshness(
         selected_version_date=version_date,
         run_date=run_date,
     )
     data = _normalize_nssp_data(
-        source_data,
+        retained,
         max_allowed_training_date=max_allowed_training_date,
     )
-    return NSSPData(data=data, freshness=freshness, resolution="daily")
+    # Missing source values cannot yield complete counts or proportions. Drop
+    # the date for both variables rather than allow a partial denominator.
+    unavailable_dates = (
+        data.filter(~pl.col(".value").is_finite().fill_null(False))
+        .select("date", "state_abb")
+        .unique()
+    )
+    data = data.join(unavailable_dates, on=["date", "state_abb"], how="anti")
+    if data.is_empty():
+        raise ValueError("No retained NSSP observations are available for training")
+    return NSSPData(
+        data=data,
+        freshness=freshness,
+        resolution="daily",
+        excluded_data=_normalize_nssp_data(
+            excluded, max_allowed_training_date=max_allowed_training_date
+        ).with_columns(data_type=pl.lit("excluded")),
+    )
 
 
 def select_latest_nhsn_release() -> tuple[bool, dt.date]:
@@ -234,6 +266,7 @@ def _load_dataops_nhsn(
         state_abb=loc_abb,
         prelim=prelim,
         start_date=min_allowed_training_date,
+        end_date=max_allowed_training_date,
         lazy=False,
     )
     freshness = nhsn_freshness(
@@ -241,11 +274,14 @@ def _load_dataops_nhsn(
         run_date=run_date,
     )
     data = (
-        source_data.filter(pl.col("date") >= min_allowed_training_date)
+        source_data.filter(
+            pl.col("date").is_between(
+                min_allowed_training_date, max_allowed_training_date
+            ),
+            pl.col("value").is_finite(),
+        )
         .with_columns(
-            data_type=pl.when(pl.col("date") <= max_allowed_training_date)
-            .then(pl.lit("train"))
-            .otherwise(pl.lit("eval")),
+            data_type=pl.lit("train"),
             resolution=pl.lit("epiweekly"),
         )
         .select(

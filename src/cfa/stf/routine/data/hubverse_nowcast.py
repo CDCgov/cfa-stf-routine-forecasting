@@ -12,8 +12,8 @@ import polars as pl
 from cfa.stf.routine.data.nowcast import NowcastData
 
 if TYPE_CHECKING:
-    from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
     from cfa.stf.routine.forecast_run import ForecastRun
+    from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
 
 HUBVERSE_MODEL_OUTPUT_SUBDIR = Path("model-output", "CFA-nowcastNHSN")
 HUBVERSE_TARGETS = {
@@ -38,13 +38,13 @@ class HubverseNowcast:
 
     containing_dir: Path
     forecast_run: ForecastRun
-    config: EpiAutoGPConfig
+    config: NowcastAutoGPConfig
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "containing_dir", Path(self.containing_dir))
 
     @staticmethod
-    def ensure_applicable(*, config: EpiAutoGPConfig) -> None:
+    def ensure_applicable(*, config: NowcastAutoGPConfig) -> None:
         """Whether Hubverse NHSN sample output matches the requested model."""
         if (
             config.target != "nhsn"
@@ -88,7 +88,7 @@ class HubverseNowcast:
         dates: list[dt.date],
         reports: list[float],
     ) -> NowcastData:
-        """Convert Hubverse long sample rows to EpiAutoGP trajectories."""
+        """Convert Hubverse long sample rows to NowcastAutoGP trajectories."""
         if len(dates) != len(reports):
             raise ValueError("dates and reports must have the same length")
 
@@ -116,7 +116,7 @@ class HubverseNowcast:
         expected_origin = self.forecast_run.report_date
         if len(origins) != 1 or origins[0] != expected_origin:
             raise ValueError(
-                "Hubverse Parquet must contain exactly the EpiAutoGP run vintage "
+                "Hubverse Parquet must contain exactly the NowcastAutoGP run vintage "
                 f"{expected_origin}; found {sorted(origins)}."
             )
 
@@ -196,7 +196,7 @@ class HubverseNowcast:
         missing_observation_dates = sorted(set(nowcast_dates) - set(dates))
         if missing_observation_dates:
             raise ValueError(
-                "Hubverse nowcast dates are absent from the EpiAutoGP "
+                "Hubverse nowcast dates are absent from the NowcastAutoGP "
                 f"observation dates: {missing_observation_dates}."
             )
 

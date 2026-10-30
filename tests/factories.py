@@ -116,11 +116,12 @@ def make_test_forecast_run(
             "exclude_last_n_days"
         )
 
-    expected_min_allowed_training_date = (
-        report_date - dt.timedelta(days=n_lookback_days)
-        if n_lookback_days is not None
-        else dt.date.min
+    forecast_window = ForecastWindow(
+        report_date=report_date,
+        n_lookback_days=n_lookback_days,
+        exclude_last_n_days=exclude_last_n_days,
     )
+    expected_min_allowed_training_date = forecast_window.min_allowed_training_date
     if (
         min_allowed_training_date is not None
         and min_allowed_training_date != expected_min_allowed_training_date
@@ -151,17 +152,9 @@ def make_test_forecast_run(
     return ForecastRun(
         disease=disease,
         loc=loc,
-        forecast_window=ForecastWindow(
-            report_date=report_date,
-            n_lookback_days=n_lookback_days,
-            exclude_last_n_days=exclude_last_n_days,
-        ),
+        forecast_window=forecast_window,
         model_name=model_name,
         output_dir=Path(output_dir),
         surveillance=surveillance,
-        requested_window=ForecastWindow(
-            report_date=report_date,
-            n_lookback_days=n_lookback_days,
-            exclude_last_n_days=exclude_last_n_days,
-        ),
+        requested_window=forecast_window,
     )

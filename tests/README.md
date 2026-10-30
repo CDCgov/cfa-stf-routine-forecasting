@@ -3,7 +3,7 @@
 Tests are organized to match the `cfa.stf.routine` package layout:
 
 - `data/`: tests for `cfa.stf.routine.data`
-- `epiautogp/`: tests for `cfa.stf.routine.epiautogp`
+- `nowcastautogp/`: tests for `cfa.stf.routine.nowcastautogp`
 - `fable/`: tests for `cfa.stf.routine.fable`
 - `pyrenew_hew/`: tests for `cfa.stf.routine.pyrenew_hew`
 - `utils/`: tests for `cfa.stf.routine.utils`
@@ -13,12 +13,12 @@ The pipeline tests use real DataOps data when `cfa.cloudops.util.check_ext_env()
 The data source can also be selected explicitly with `--e2e-data-mode real|mock`.
 
 Each model has a standalone `just` recipe that runs one disease/location pair.
-The PyRenew recipe runs the H, E, and HE versions once each; the EpiAutoGP recipe runs weekly NHSN counts, weekly NSSP percentages, daily NSSP disease counts, and daily NSSP other counts.
+The PyRenew recipe runs the H, E, and HE versions once each; the NowcastAutoGP recipe runs weekly NHSN counts, weekly NSSP percentages, daily NSSP disease counts, and daily NSSP other counts.
 
 ```bash
 just test-fable mock CA covid
 just test-pyrenew mock CA covid
-just test-epiautogp mock CA covid
+just test-nowcastautogp mock CA covid
 ```
 
 Replace `mock` with `real` to use CFA DataOps data.
@@ -28,7 +28,7 @@ The combined test remains available through `just e2e auto`, `just e2e real`, or
 
 ## Canonical-exclusion proof of concept (#1343)
 
-`just exclusion-poc` runs the synthetic-data experiment for Fable daily/weekly, PyRenew H/E/HE, and four EpiAutoGP configurations.
+`just exclusion-poc` runs the synthetic-data experiment for Fable daily/weekly, PyRenew H/E/HE, and four NowcastAutoGP configurations.
 The full profile uses four PyRenew chains with 500 warmup and 500 sampling iterations, and 12 GP particles with 25 structure and 10 HMC steps.
 `just exclusion-poc smoke` checks execution with small inference settings; it does not establish inference quality.
 
@@ -44,10 +44,11 @@ Reports explicitly distinguish reused fits.
 Exclusion invariance does not imply that removing observations leaves a complete-data fit unchanged, or that a fit has converged.
 PyRenew divergences, R-hat and ESS, and GP particle ESS are retained.
 
-Fable uses ARIMA alone when training observations are missing and records the component choice in `components.txt`.
-Its missing-data forecasts draw jointly from the fitted Kalman forecast distribution.
-Complete-data runs retain the ETS/ARIMA ensemble.
-No missing counts are imputed as observations.
+Fable uses the production implementation from #1368: fill missing calendar rows, then impute missing values with an ARIMA Kalman smoother before fitting ETS + ARIMA.
+It records the ensemble in `components.txt`.
+Forecasts condition on point imputations and do not propagate imputation uncertainty.
+Exclusion invariance is therefore distinct from forecast calibration.
+Explicit boundary rows remain necessary: `fill_gaps()` cannot infer deleted leading or trailing dates.
 
 Outputs include `report.html`, `results.json`, `manifest.json`, plots, raw-data audits, effective inputs, logs, samples, and inference diagnostics beneath `test_output/canonical-exclusions/{full,smoke}`.
 Existing omission policies are held fixed; canonical data-service integration is a later step.
@@ -62,4 +63,4 @@ uv run --frozen python experiments/canonical_exclusions/run.py --prepare-only
 ```
 
 Resumption requires matching effective inputs and implementation hashes.
-The fast suite includes input-invariance checks across the full configuration matrix, a calendar-based oracle for PyRenew's reporting CDF, and R tests of joint forecast moments across missing observations.
+The fast suite includes input-invariance checks across the full configuration matrix, a calendar-based oracle for PyRenew's reporting CDF, and R tests of missing-data ensemble forecasts and calendar boundaries.

@@ -10,8 +10,8 @@ ENV XLA_FLAGS=--xla_force_host_platform_device_count=4
 # Additional programming language compilers/interpreters
 #
 
-# Julia 1.11 from official image
-COPY --from=julia:1.11 /usr/local/julia /usr/local/julia
+# Julia 1.13 from official image
+COPY --from=julia:1.13 /usr/local/julia /usr/local/julia
 ENV PATH="/usr/local/julia/bin:${PATH}"
 ENV JULIA_DEPOT_DIR=/opt/julia-depot
 ENV JULIA_DEPOT_PATH=${JULIA_DEPOT_DIR}:
@@ -37,19 +37,19 @@ COPY ./stfroutineforecasting /cfa-stf-routine-forecasting/stfroutineforecasting
 # Copy only Julia environment metadata first so dependency installation is cached
 # independently of changes to pipeline source files. The full source tree is
 # copied later.
-COPY ./src/cfa/stf/routine/epiautogp/Project.toml \
-     ./src/cfa/stf/routine/epiautogp/Manifest.toml \
-     /cfa-stf-routine-forecasting/src/cfa/stf/routine/epiautogp/
+COPY ./src/cfa/stf/routine/nowcastautogp/Project.toml \
+     ./src/cfa/stf/routine/nowcastautogp/Manifest.toml \
+     /cfa-stf-routine-forecasting/src/cfa/stf/routine/nowcastautogp/
 
 # Set working directory
 WORKDIR /cfa-stf-routine-forecasting
 
 # Instantiate Julia dependencies into the image so the runtime container can run
-# the EpiAutoGP subprocess without downloading packages. This is a script
-# environment under the EpiAutoGP package, so we commit its Manifest.toml for a
-# reproducible EpiAutoGP dependency set.
+# the NowcastAutoGP subprocess without downloading packages. This is a script
+# environment under the NowcastAutoGP package, so we commit its Manifest.toml for a
+# reproducible NowcastAutoGP dependency set.
 RUN mkdir -p "${JULIA_DEPOT_DIR}" \
-    && julia --project=src/cfa/stf/routine/epiautogp -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
+    && julia --project=src/cfa/stf/routine/nowcastautogp -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
     && chmod -R a+rwX "${JULIA_DEPOT_DIR}"
 
 # Install stfroutineforecasting

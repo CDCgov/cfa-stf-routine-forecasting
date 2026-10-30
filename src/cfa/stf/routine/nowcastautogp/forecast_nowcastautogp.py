@@ -5,27 +5,27 @@ from typing import Literal, get_args
 
 from cfa.stf.data import get_nnh_right_truncation_pmf
 
-from cfa.stf.routine._paths import EPIAUTOGP_DIR
+from cfa.stf.routine._paths import NOWCASTAUTOGP_DIR
 from cfa.stf.routine.data.data_access import DataResolution, ForecastSourceName
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.nowcast import NowcastSource
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.prep_epiautogp_data import (
-    _validate_epiautogp_parameters,
-    convert_to_epiautogp_json,
-)
-from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
+from cfa.stf.routine.nowcastautogp.prep_nowcastautogp_data import (
+    _validate_nowcastautogp_parameters,
+    convert_to_nowcastautogp_json,
+)
+from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from cfa.stf.routine.utils.date_utils import parse_exclude_date_ranges
 from cfa.stf.routine.utils.language_utils import run_julia_script
 
-_FIT_SCRIPT = Path(__file__).parent / "fit_epiautogp.jl"
+_FIT_SCRIPT = Path(__file__).parent / "fit_nowcastautogp.jl"
 NowcastSourceName = Literal["none", "reporting-delay", "hubverse"]
 VALID_NOWCAST_SOURCE_NAMES: tuple[str, ...] = get_args(NowcastSourceName)
 
 
-def run_epiautogp_forecast(
+def run_nowcastautogp_forecast(
     json_input_path: Path,
     model_dir: Path,
     *,
@@ -53,11 +53,11 @@ def run_epiautogp_forecast(
         _FIT_SCRIPT,
         args,
         executor_flags=[
-            f"--project={EPIAUTOGP_DIR}",
+            f"--project={NOWCASTAUTOGP_DIR}",
             f"--threads={n_threads}",
         ],
-        function_name="run_epiautogp_forecast",
-        capture_output=False,
+        function_name="run_nowcastautogp_forecast",
+        capture_output=True,
     )
 
 
@@ -83,12 +83,12 @@ def _build_reporting_delay_nowcast(
 def _resolve_nowcast_source(
     *,
     forecast_run: ForecastRun,
-    config: EpiAutoGPConfig,
+    config: NowcastAutoGPConfig,
     nowcast_source_name: NowcastSourceName,
     reporting_delay_pmf: list[float] | None = None,
     hubverse_nowcast_dir: Path | str | None = None,
 ) -> NowcastSource | None:
-    """Resolve the requested nowcast source for one EpiAutoGP run."""
+    """Resolve the requested nowcast source for one NowcastAutoGP run."""
     if reporting_delay_pmf is not None and hubverse_nowcast_dir is not None:
         raise ValueError(
             "reporting_delay_pmf and hubverse_nowcast_dir are mutually exclusive."
@@ -122,8 +122,8 @@ def _resolve_nowcast_source(
             )
 
 
-class EpiAutoGPPipeline(ForecastPipeline):
-    """Single-location EpiAutoGP forecast pipeline."""
+class NowcastAutoGPPipeline(ForecastPipeline):
+    """Single-location NowcastAutoGP forecast pipeline."""
 
     def __init__(
         self,
@@ -144,7 +144,7 @@ class EpiAutoGPPipeline(ForecastPipeline):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.config = EpiAutoGPConfig(
+        self.config = NowcastAutoGPConfig(
             target=target,
             frequency=frequency,
             ed_visit_type=ed_visit_type,
@@ -162,7 +162,7 @@ class EpiAutoGPPipeline(ForecastPipeline):
 
     @property
     def model_name(self) -> str:
-        model_name = f"epiautogp_{self.config.target}_{self.config.frequency}"
+        model_name = f"nowcastautogp_{self.config.target}_{self.config.frequency}"
         if self.config.ed_visit_type == "pct":
             model_name += "_pct"
         if self.config.ed_visit_type == "other":
@@ -182,7 +182,7 @@ class EpiAutoGPPipeline(ForecastPipeline):
         return 3 if self.nowcast_source_name == "none" else 0
 
     def validate_configuration(self) -> None:
-        _validate_epiautogp_parameters(
+        _validate_nowcastautogp_parameters(
             self.config.target,
             self.config.frequency,
             self.config.ed_visit_type,
@@ -196,8 +196,8 @@ class EpiAutoGPPipeline(ForecastPipeline):
             reporting_delay_pmf=self.reporting_delay_pmf,
             hubverse_nowcast_dir=self.hubverse_nowcast_dir,
         )
-        self.logger.info("Converting data to EpiAutoGP JSON format...")
-        convert_to_epiautogp_json(
+        self.logger.info("Converting data to NowcastAutoGP JSON format...")
+        convert_to_nowcastautogp_json(
             forecast_run=run,
             config=self.config,
             nowcast_source=nowcast_source,
@@ -208,8 +208,8 @@ class EpiAutoGPPipeline(ForecastPipeline):
         transformation = (
             "percentage" if self.config.ed_visit_type == "pct" else "boxcox"
         )
-        self.logger.info("Performing EpiAutoGP forecasting...")
-        run_epiautogp_forecast(
+        self.logger.info("Performing NowcastAutoGP forecasting...")
+        run_nowcastautogp_forecast(
             json_input_path=run.model_dir / f"{run.model_name}_input.json",
             model_dir=run.model_dir,
             n_particles=self.n_particles,
@@ -245,7 +245,7 @@ def main(
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
 ) -> None:
-    """Run the complete EpiAutoGP pipeline for one location."""
+    """Run the complete NowcastAutoGP pipeline for one location."""
     if logger is None:
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
@@ -257,7 +257,7 @@ def main(
             f"{parsed_exclude_date_ranges}"
         )
 
-    EpiAutoGPPipeline(
+    NowcastAutoGPPipeline(
         disease=disease,
         loc=loc,
         target=target,

@@ -1,4 +1,4 @@
-"""Run the R regression tests for missing-data forecasts and joint uncertainty."""
+"""Run R regression tests for missing-data forecasts and calendar boundaries."""
 
 import subprocess
 from pathlib import Path

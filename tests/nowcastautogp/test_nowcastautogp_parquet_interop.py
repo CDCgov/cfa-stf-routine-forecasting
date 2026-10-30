@@ -1,7 +1,7 @@
-"""Cross-language checks for EpiAutoGP parquet output.
+"""Cross-language checks for NowcastAutoGP parquet output.
 
 This module guards the schema boundary that failed in pipeline-run-check
-postprocessing: EpiAutoGP wrote samples through Julia/DuckDB, R converted each
+postprocessing: NowcastAutoGP wrote samples through Julia/DuckDB, R converted each
 model's samples to a hubverse table, and Python/Polars combined those hubverse
 tables across model directories. The failure was caused by one producer writing
 draw IDs as floats while the rest wrote integer sample identifiers.
@@ -9,7 +9,7 @@ Those draw IDs are `.draw` in `samples.parquet`; the hubverse conversion renames
 them to `output_type_id`, which is where the CI failure surfaced.
 
 The fixtures build tiny but realistic model-fit directories for each producer
-family: EpiAutoGP samples from the direct NowcastAutoGP Julia runner,
+family: NowcastAutoGP samples from the direct NowcastAutoGP Julia runner,
 fable-style samples from R, and PyRenew-style posterior predictive output
 converted by the real Polars sample conversion function. The final test then
 runs the same hubverse conversion and batch combine functions
@@ -28,7 +28,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from cfa.stf.routine._paths import EPIAUTOGP_DIR
+from cfa.stf.routine._paths import NOWCASTAUTOGP_DIR
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import (
     format_pyrenew_samples,
 )
@@ -46,14 +46,14 @@ FORECAST_DATES = [
 TRAINING_DATES = [dt.date(2024, 1, 1) + dt.timedelta(days=i) for i in range(36)]
 REPORT_DATE = dt.date(2024, 2, 3)
 EXPECTED_DATES = FORECAST_DATES * 2
-EPIAUTOGP_EXPECTED_DATES = (TRAINING_DATES + FORECAST_DATES) * 2
-EPIAUTOGP_EXPECTED_DRAWS = [
+NOWCASTAUTOGP_EXPECTED_DATES = (TRAINING_DATES + FORECAST_DATES) * 2
+NOWCASTAUTOGP_EXPECTED_DRAWS = [
     draw for draw in range(1, 3) for _ in range(len(TRAINING_DATES + FORECAST_DATES))
 ]
 
 
 @dataclass(frozen=True)
-class EpiAutoGPInteropPaths:
+class NowcastAutoGPInteropPaths:
     batch_dir: Path
     model_fit_dir: Path
     samples_path: Path
@@ -81,7 +81,7 @@ def _skip_if_r_packages_missing(*packages: str) -> None:
         pytest.skip(f"R packages are not available: {exc}")
 
 
-def _write_epiautogp_input(path: Path) -> None:
+def _write_nowcastautogp_input(path: Path) -> None:
     reports = [12.0 + (i % 7) * 0.4 + i * 0.05 for i in range(len(TRAINING_DATES))]
     input_data = {
         "dates": [date.isoformat() for date in TRAINING_DATES],
@@ -99,17 +99,19 @@ def _write_epiautogp_input(path: Path) -> None:
 
 
 @pytest.fixture(scope="module")
-def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]:
-    tmp_dir = tmp_path_factory.mktemp("epiautogp-parquet-interop")
+def nowcastautogp_interop_paths(
+    tmp_path_factory,
+) -> Iterator[NowcastAutoGPInteropPaths]:
+    tmp_dir = tmp_path_factory.mktemp("nowcastautogp-parquet-interop")
     try:
         batch_dir = tmp_dir / "covid_lookback-33_omit-1"
-        model_fit_dir = batch_dir / "model_runs" / "US" / "epiautogp_nssp_daily_pct"
-        input_path = tmp_dir / "epiautogp-input.json"
-        _write_epiautogp_input(input_path)
+        model_fit_dir = batch_dir / "model_runs" / "US" / "nowcastautogp_nssp_daily_pct"
+        input_path = tmp_dir / "nowcastautogp-input.json"
+        _write_nowcastautogp_input(input_path)
 
         try:
             run_julia_script(
-                EPIAUTOGP_DIR / "fit_epiautogp.jl",
+                NOWCASTAUTOGP_DIR / "fit_nowcastautogp.jl",
                 [
                     f"--json-input={input_path}",
                     f"--output-dir={model_fit_dir}",
@@ -120,8 +122,8 @@ def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]
                     "--transformation=percentage",
                     "--smc-data-proportion=0.5",
                 ],
-                executor_flags=[f"--project={EPIAUTOGP_DIR}", "--startup-file=no"],
-                function_name="run_epiautogp_interop_fixture",
+                executor_flags=[f"--project={NOWCASTAUTOGP_DIR}", "--startup-file=no"],
+                function_name="run_nowcastautogp_interop_fixture",
                 text=True,
             )
         except FileNotFoundError:
@@ -129,7 +131,7 @@ def epiautogp_interop_paths(tmp_path_factory) -> Iterator[EpiAutoGPInteropPaths]
 
         samples_path = model_fit_dir / "samples.parquet"
         assert samples_path.is_file()
-        yield EpiAutoGPInteropPaths(
+        yield NowcastAutoGPInteropPaths(
             batch_dir=batch_dir,
             model_fit_dir=model_fit_dir,
             samples_path=samples_path,
@@ -201,18 +203,18 @@ def _write_pyrenew_reference_model_samples(batch_dir: Path) -> Path:
     return pyrenew_model_fit_dir
 
 
-def test_epiautogp_samples_parquet_date_is_discovered_by_polars(
-    epiautogp_interop_paths,
+def test_nowcastautogp_samples_parquet_date_is_discovered_by_polars(
+    nowcastautogp_interop_paths,
 ):
-    samples = pl.read_parquet(epiautogp_interop_paths.samples_path)
+    samples = pl.read_parquet(nowcastautogp_interop_paths.samples_path)
 
     assert samples.schema["date"] == pl.Date
     assert samples.schema[".draw"] == pl.Int32
-    assert samples["date"].to_list() == EPIAUTOGP_EXPECTED_DATES
-    assert samples[".draw"].to_list() == EPIAUTOGP_EXPECTED_DRAWS
+    assert samples["date"].to_list() == NOWCASTAUTOGP_EXPECTED_DATES
+    assert samples[".draw"].to_list() == NOWCASTAUTOGP_EXPECTED_DRAWS
 
     lazy_schema = (
-        pl.scan_parquet(epiautogp_interop_paths.samples_path)
+        pl.scan_parquet(nowcastautogp_interop_paths.samples_path)
         .select(pl.col("date").min())
         .collect()
         .schema
@@ -220,17 +222,17 @@ def test_epiautogp_samples_parquet_date_is_discovered_by_polars(
     assert lazy_schema["date"] == pl.Date
 
 
-def test_epiautogp_samples_parquet_date_is_discovered_by_r_dplyr(
-    epiautogp_interop_paths,
+def test_nowcastautogp_samples_parquet_date_is_discovered_by_r_dplyr(
+    nowcastautogp_interop_paths,
 ):
     _skip_if_r_packages_missing("forecasttools", "dplyr", "lubridate")
     expected_dates_r = ", ".join(
         _quote_for_embedded_code(expected_date.isoformat())
-        for expected_date in EPIAUTOGP_EXPECTED_DATES
+        for expected_date in NOWCASTAUTOGP_EXPECTED_DATES
     )
     r_code = textwrap.dedent(
         f"""
-        samples <- forecasttools::read_tabular({_quote_for_embedded_code(epiautogp_interop_paths.samples_path)})
+        samples <- forecasttools::read_tabular({_quote_for_embedded_code(nowcastautogp_interop_paths.samples_path)})
         stopifnot(inherits(samples$date, "Date"))
         stopifnot(is.integer(samples[[".draw"]]))
         stopifnot(identical(
@@ -255,8 +257,8 @@ def test_epiautogp_samples_parquet_date_is_discovered_by_r_dplyr(
         pytest.skip("Rscript is not available")
 
 
-def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
-    epiautogp_interop_paths,
+def test_nowcastautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
+    nowcastautogp_interop_paths,
 ):
     _skip_if_r_packages_missing(
         "argparser",
@@ -267,9 +269,11 @@ def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
     )
     try:
         model_fit_dirs = [
-            epiautogp_interop_paths.model_fit_dir,
-            _write_fable_reference_model_samples(epiautogp_interop_paths.batch_dir),
-            _write_pyrenew_reference_model_samples(epiautogp_interop_paths.batch_dir),
+            nowcastautogp_interop_paths.model_fit_dir,
+            _write_fable_reference_model_samples(nowcastautogp_interop_paths.batch_dir),
+            _write_pyrenew_reference_model_samples(
+                nowcastautogp_interop_paths.batch_dir
+            ),
         ]
         for model_fit_dir in model_fit_dirs:
             model_fit_dir_to_hub_tbl(model_fit_dir, report_date=REPORT_DATE)
@@ -279,12 +283,13 @@ def test_epiautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
             # Sample .draw values become hubverse output_type_id values.
             assert hubverse_table.schema["output_type_id"] == pl.Int32
 
-        combine_hubverse_tables(epiautogp_interop_paths.batch_dir)
+        combine_hubverse_tables(nowcastautogp_interop_paths.batch_dir)
     except FileNotFoundError:
         pytest.skip("Rscript is not available")
 
     combined_path = (
-        epiautogp_interop_paths.batch_dir / "2024-02-03-covid-hubverse-table.parquet"
+        nowcastautogp_interop_paths.batch_dir
+        / "2024-02-03-covid-hubverse-table.parquet"
     )
     assert combined_path.is_file()
     combined = pl.read_parquet(combined_path)

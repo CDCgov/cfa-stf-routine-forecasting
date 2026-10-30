@@ -137,7 +137,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert run.n_forecast_days == 24
 
 
-def test_build_forecast_run_loads_all_available_history(monkeypatch, tmp_path):
+def test_build_forecast_run_loads_all_supported_history(monkeypatch, tmp_path):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     calls = {}
@@ -145,7 +145,7 @@ def test_build_forecast_run_loads_all_available_history(monkeypatch, tmp_path):
     def load(**kwargs):
         calls.update(kwargs)
         return make_test_surveillance_inputs(
-            first_training_date=dt.date(2020, 1, 1),
+            first_training_date=dt.date(2022, 3, 1),
             last_training_date=kwargs["max_allowed_training_date"],
             sources={"nssp"},
         )
@@ -158,8 +158,8 @@ def test_build_forecast_run_loads_all_available_history(monkeypatch, tmp_path):
         minimum_exclude_last_n_days=4,
     ).build_forecast_run()
 
-    assert calls["min_allowed_training_date"] == dt.date.min
-    assert run.first_training_date == dt.date(2020, 1, 1)
+    assert calls["min_allowed_training_date"] == dt.date(2022, 3, 1)
+    assert run.first_training_date == dt.date(2022, 3, 1)
     assert run.exclude_last_n_days == 4
     assert run.model_batch_dir == tmp_path / "covid_lookback-all_omit-1"
 

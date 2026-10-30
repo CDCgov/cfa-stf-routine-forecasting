@@ -99,7 +99,7 @@ def e2e_json() -> str:
 end_to_end = dg.define_asset_job(
     name="end_to_end",
     selection=dg.AssetSelection.groups(
-        "Fable", "Pyrenew", "EpiAutoGP", "Fusion", "Postprocess"
+        "Fable", "Pyrenew", "NowcastAutoGP", "Fusion", "Postprocess"
     ),
     config=e2e_config(),
 )

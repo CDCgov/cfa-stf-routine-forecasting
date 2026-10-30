@@ -1,5 +1,5 @@
 """
-Reporting-delay nowcasting for EpiAutoGP.
+Reporting-delay nowcasting for NowcastAutoGP.
 
 The estimator inflates the most-recent observations of a daily count series by
 the inverse of the reporting CDF. It is only meaningful for *count* targets:
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from itertools import accumulate
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
 
 logger = logging.getLogger(__name__)
 REPORTING_FRACTION_TOL = 1e-9
@@ -60,7 +60,7 @@ class ReportingDelayNowcast:
     @staticmethod
     def ensure_applicable(
         *,
-        config: EpiAutoGPConfig,
+        config: NowcastAutoGPConfig,
     ) -> None:
         # The estimator multiplies recent observations by 1/reporting_fraction.
         # For a percentage (numerator / denominator) the same factor applies to

@@ -87,8 +87,8 @@ jobs:
           --model-test-location CA
           --model-test-disease covid
 
-  epiautogp:
-    name: EpiAutoGP model test
+  nowcastautogp:
+    name: NowcastAutoGP model test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -102,10 +102,10 @@ jobs:
       - name: Set up routine forecasting Julia
         uses: ./.github/actions/setup-routine-forecasting-julia
 
-      - name: Run EpiAutoGP model test
+      - name: Run NowcastAutoGP model test
         run: >-
           uv run pytest -s
-          tests/integration/test_epiautogp_forecast.py
+          tests/integration/test_nowcastautogp_forecast.py
           --e2e-data-mode mock
           --model-test-location CA
           --model-test-disease covid

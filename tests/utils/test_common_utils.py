@@ -5,7 +5,10 @@ import sys
 
 import pytest
 
-from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.forecast_window import (
+    EARLIEST_TRAINING_DATE,
+    ForecastWindow,
+)
 from cfa.stf.routine.lookback import format_lookback_days, parse_lookback_days
 from cfa.stf.routine.utils import language_utils
 from cfa.stf.routine.utils.cli_utils import run_command
@@ -30,7 +33,8 @@ class TestValidationUtils:
         [
             (90, 0, dt.date(2024, 9, 22), dt.date(2024, 12, 20)),
             (90, 5, dt.date(2024, 9, 22), dt.date(2024, 12, 15)),
-            (None, 5, dt.date.min, dt.date(2024, 12, 15)),
+            (1_200, 5, dt.date(2022, 3, 1), dt.date(2024, 12, 15)),
+            (None, 5, dt.date(2022, 3, 1), dt.date(2024, 12, 15)),
         ],
     )
     def test_forecast_window_boundaries(
@@ -50,10 +54,14 @@ class TestValidationUtils:
 
         assert window.min_allowed_training_date == expected_min_allowed
         assert window.max_allowed_training_date == expected_max_allowed
-        if n_lookback_days is not None:
-            assert (report_date - window.min_allowed_training_date).days == (
-                n_lookback_days
-            )
+        requested_start = (
+            dt.date.min
+            if n_lookback_days is None
+            else report_date - dt.timedelta(days=n_lookback_days)
+        )
+        assert window.min_allowed_training_date == max(
+            requested_start, EARLIEST_TRAINING_DATE
+        )
 
     @pytest.mark.parametrize(
         ("n_lookback_days", "exclude_last_n_days", "message"),
@@ -90,7 +98,7 @@ class TestValidationUtils:
             exclude_last_n_days=30,
         )
 
-        assert window.min_allowed_training_date == dt.date.min
+        assert window.min_allowed_training_date == dt.date(2022, 3, 1)
         assert window.model_batch_dir_name("covid") == "covid_lookback-all_omit-30"
 
     @pytest.mark.parametrize(

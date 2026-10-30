@@ -21,55 +21,20 @@ purrr::walk(script_packages, \(pkg) {
   )
 })
 
-# Draw jointly from the Gaussian state-space forecast. Fable's ARIMA generate()
-# conditions on lagged observations/residuals directly, which propagates tail
-# NAs into every draw. The filtered state retains uncertainty across those gaps.
-generate_missing_arima <- function(
-  fit,
-  horizon,
-  n_samples,
-  target_col,
-  offset
-) {
-  predicted <- forecast(fit, h = horizon)
-  arima <- fit$comb_model[[1]]$fit$model
-  state <- arima$model
-  n <- nrow(predicted)
-  covariance <- matrix(0, n, n)
-  P <- state$P
-  for (i in seq_len(n)) {
-    P <- state$T %*% P %*% t(state$T) + state$V
-    covariance[i, i] <- drop(crossprod(state$Z, P %*% state$Z)) + state$h
-    cross <- P
-    if (i < n) {
-      for (j in seq.int(i + 1L, n)) {
-        cross <- cross %*% t(state$T)
-        covariance[i, j] <- covariance[j, i] <- drop(crossprod(
-          state$Z,
-          cross %*% state$Z
-        ))
-      }
-    }
-  }
-  covariance <- covariance * arima$sigma2
-  # The response distribution is exp(N(mu, sigma^2)) - offset, so its median
-  # recovers the Gaussian location without confusing it with the response mean.
-  location <- log(
-    unlist(stats::quantile(predicted[[target_col]], 0.5)) + offset
-  )
-  draws <- mvtnorm::rmvnorm(n_samples, mean = location, sigma = covariance)
-  tibble::tibble(
-    date = rep(predicted$date, each = n_samples),
-    .rep = rep(seq_len(n_samples), n),
-    .sim = as.vector(exp(draws) - offset)
-  )
-}
-
 
 #' Fit and Forecast Time Series Data
 #'
 #' This function fits a combination ensemble model to the training data and
 #' generates forecast samples for a specified number of days.
+#'
+#' @details
+#' This function is hardened against missing data in two ways:
+#'
+#' 1. Checks for missing daily dates and adds them to the data with `NA`
+#' values if missing.
+#' 2. Checks for missing values in the target column and imputes
+#' them using an ARIMA Kalman smoother if necessary as per
+#' [standard practise](https://otexts.com/fpp3/practical.html#missing-values)
 #'
 #' @param data A data frame containing only the training time series data.
 #' @param n_forecast_days An integer specifying the number of days to forecast.
@@ -95,43 +60,33 @@ fit_and_forecast_ensemble <- function(
 
   offset <- 1
 
-  series <- data |> as_tsibble(index = date) |> tsibble::fill_gaps()
-  has_missing <- anyNA(series[[target_col]])
+  series <- data |>
+    as_tsibble(index = date) |>
+    tsibble::fill_gaps()
   if (all(is.na(series[[target_col]]))) {
-    stop("At least one finite training observation is required")
+    stop(glue::glue("All training values of {target_col} are missing"))
   }
-  # Seasonal ETS cannot estimate its initial state with internal missing values.
-  # ARIMA integrates missing observations through its state-space likelihood.
-  # Do not fill gaps with point estimates and treat them as observed counts.
-  fit <- if (has_missing) {
-    warning(
-      "Missing training observations: using ARIMA without the ETS component"
-    )
-    series |>
-      model(
-        comb_model = ARIMA(log(!!target_sym + !!offset), approximation = FALSE)
-      )
-  } else {
-    series |>
-      model(
-        comb_model = combination_ensemble(
-          ETS(
-            log(!!target_sym + !!offset) ~
-              trend(
-                method = c("N", "M", "A")
-              )
-          ),
-          ARIMA(log(!!target_sym + !!offset))
-        )
-      )
+  if (anyNA(series[[target_col]])) {
+    series <- series |>
+      model(ARIMA(log(!!target_sym + !!offset))) |>
+      interpolate(series)
   }
 
-  generated <- if (has_missing) {
-    generate_missing_arima(fit, forecast_horizon, n_samples, target_col, offset)
-  } else {
-    generate(fit, h = forecast_horizon, times = n_samples)
-  }
-  forecast_samples <- generated |>
+  fit <- series |>
+    model(
+      comb_model = combination_ensemble(
+        ETS(
+          log(!!target_sym + !!offset) ~
+            trend(
+              method = c("N", "M", "A")
+            )
+        ),
+        ARIMA(log(!!target_sym + !!offset))
+      )
+    )
+
+  forecast_samples <- fit |>
+    generate(h = forecast_horizon, times = n_samples) |>
     as_tibble() |>
     mutate(
       !!output_col := pmax(.data$.sim, 0), # clip values
@@ -143,15 +98,11 @@ fit_and_forecast_ensemble <- function(
     !all(is.finite(forecast_samples[[output_col]])) ||
       any(forecast_samples[[output_col]] < 0)
   ) {
-    stop(glue::glue("Nonfinite or negative count forecast for {output_col}"))
+    stop(glue::glue("Non-finite or negative count forecast for {output_col}"))
   }
 
   attr(forecast_samples, "fitted") <- augment(fit)
-  attr(forecast_samples, "components") <- if (has_missing) {
-    "ARIMA"
-  } else {
-    "ETS + ARIMA"
-  }
+  attr(forecast_samples, "components") <- "ETS + ARIMA"
   forecast_samples
 }
 

@@ -8,16 +8,18 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.dagster.defs.asset_config import (
-    EpiAutoGPEPctEpiweeklyConfig,
     FableEOtherConfig,
     ModelBaseConfig,
+    NowcastAutoGPEPctEpiweeklyConfig,
     PyrenewConfig,
     daily_partitions_def,
 )
 from cfa.stf.routine.data.data_access import DataResolution
-from cfa.stf.routine.epiautogp.forecast_epiautogp import main as forecast_epiautogp
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
+    main as forecast_nowcastautogp,
+)
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
 from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
 from cfa.stf.routine.utils.r_utils import (
@@ -156,12 +158,12 @@ def _run_pyrenew_model(
     )
 
 
-def _run_epiautogp_e_pct_epiweekly(
+def _run_nowcastautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,
-    epiautogp_e_pct_epiweekly_config: EpiAutoGPEPctEpiweeklyConfig,
+    nowcastautogp_e_pct_epiweekly_config: NowcastAutoGPEPctEpiweeklyConfig,
     model_base_config: ModelBaseConfig,
 ) -> None:
-    """Run EpiAutoGP directly on epiweekly NSSP percentage data."""
+    """Run NowcastAutoGP directly on epiweekly NSSP percentage data."""
     _throw_if_backfill(context, daily_partitions_def)
 
     disease = model_base_config.diseases.current_value
@@ -174,25 +176,25 @@ def _run_epiautogp_e_pct_epiweekly(
         f"{context.partition_key}_forecasts",
     )
     context.log.info(
-        f"epiautogp_e_pct_epiweekly_config: '{epiautogp_e_pct_epiweekly_config}'"
+        f"nowcastautogp_e_pct_epiweekly_config: '{nowcastautogp_e_pct_epiweekly_config}'"
     )
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
 
-    forecast_epiautogp(
+    forecast_nowcastautogp(
         disease=disease,
         loc=location,
         output_dir=daily_forecast_output_dir,
-        n_lookback_days=loc_config.epiautogp_n_lookback_days,
+        n_lookback_days=loc_config.nowcastautogp_n_lookback_days,
         target="nssp",
         frequency="epiweekly",
         ed_visit_type="pct",
         exclude_last_n_days=loc_config.exclude_last_n_days,
-        n_particles=epiautogp_e_pct_epiweekly_config.n_particles,
-        n_mcmc=epiautogp_e_pct_epiweekly_config.n_mcmc,
-        n_hmc=epiautogp_e_pct_epiweekly_config.n_hmc,
-        n_forecast_draws=epiautogp_e_pct_epiweekly_config.n_forecast_draws,
-        smc_data_proportion=epiautogp_e_pct_epiweekly_config.smc_data_proportion,
-        n_threads=epiautogp_e_pct_epiweekly_config.n_threads,
+        n_particles=nowcastautogp_e_pct_epiweekly_config.n_particles,
+        n_mcmc=nowcastautogp_e_pct_epiweekly_config.n_mcmc,
+        n_hmc=nowcastautogp_e_pct_epiweekly_config.n_hmc,
+        n_forecast_draws=nowcastautogp_e_pct_epiweekly_config.n_forecast_draws,
+        smc_data_proportion=nowcastautogp_e_pct_epiweekly_config.smc_data_proportion,
+        n_threads=nowcastautogp_e_pct_epiweekly_config.n_threads,
         nowcast_source_name="none",
         run_date=run_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,

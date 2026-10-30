@@ -1,4 +1,4 @@
-"""Build the model-specific JSON input consumed by EpiAutoGP."""
+"""Build the model-specific JSON input consumed by NowcastAutoGP."""
 
 import datetime as dt
 import json
@@ -8,17 +8,17 @@ from pathlib import Path
 import polars as pl
 
 from cfa.stf.routine.data.nowcast import NowcastData, NowcastSource
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
 from cfa.stf.routine.forecast_run import ForecastRun
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
 from cfa.stf.routine.utils.prop_utils import append_prop_ed_data
 
 
-def _validate_epiautogp_parameters(
+def _validate_nowcastautogp_parameters(
     target: str,
     frequency: str,
     ed_visit_type: str,
 ) -> None:
-    """Validate the model-input combination supported by EpiAutoGP."""
+    """Validate the model-input combination supported by NowcastAutoGP."""
     if target not in {"nssp", "nhsn"}:
         raise ValueError(f"target must be 'nssp' or 'nhsn', got {target!r}")
     if frequency not in {"daily", "epiweekly"}:
@@ -66,7 +66,7 @@ def _apply_date_exclusions(
 def _extract_model_series(
     *,
     forecast_run: ForecastRun,
-    config: EpiAutoGPConfig,
+    config: NowcastAutoGPConfig,
     logger: logging.Logger,
 ) -> tuple[list[dt.date], list[float]]:
     """Select the requested training series directly from shared run state."""
@@ -77,7 +77,7 @@ def _extract_model_series(
         if source.resolution != config.frequency:
             raise ValueError(
                 f"NSSP data resolution {source.resolution!r} does not match "
-                f"EpiAutoGP frequency {config.frequency!r}"
+                f"NowcastAutoGP frequency {config.frequency!r}"
             )
         variable = {
             "observed": "observed_ed_visits",
@@ -135,16 +135,16 @@ def _extract_model_series(
     return dates, reports
 
 
-def convert_to_epiautogp_json(
+def convert_to_nowcastautogp_json(
     *,
     forecast_run: ForecastRun,
-    config: EpiAutoGPConfig,
+    config: NowcastAutoGPConfig,
     nowcast_source: NowcastSource | None = None,
     logger: logging.Logger | None = None,
 ) -> Path:
-    """Serialize one shared forecast run in EpiAutoGP's JSON input format."""
+    """Serialize one shared forecast run in NowcastAutoGP's JSON input format."""
     logger = logger or logging.getLogger(__name__)
-    _validate_epiautogp_parameters(
+    _validate_nowcastautogp_parameters(
         config.target,
         config.frequency,
         config.ed_visit_type,
@@ -176,5 +176,5 @@ def convert_to_epiautogp_json(
     input_path.parent.mkdir(parents=True, exist_ok=True)
     with input_path.open("w") as file:
         json.dump(model_input, file, indent=2)
-    logger.info("Saved EpiAutoGP input JSON to %s", input_path)
+    logger.info("Saved NowcastAutoGP input JSON to %s", input_path)
     return input_path

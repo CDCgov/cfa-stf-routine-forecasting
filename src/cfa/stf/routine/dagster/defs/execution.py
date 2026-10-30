@@ -118,6 +118,7 @@ docker_execution_config = ExecutionConfig(
 # Cloud execution. This is what we want for any model run.
 # Shared config for all Azure Batch pools; only pool_name differs between them.
 _azure_batch_shared_config = {
+    "profiling": {"enabled": True},
     **(
         {}
         if is_prod()  # image will come from the code location in prod

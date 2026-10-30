@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from cfa.stf.routine.epiautogp import forecast_epiautogp
 from cfa.stf.routine.fable import forecast_fable
+from cfa.stf.routine.nowcastautogp import forecast_nowcastautogp
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
 
 
@@ -13,13 +13,13 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
     ("module", "pipeline_class_name", "main_kwargs", "expected_pipeline_kwargs"),
     [
         pytest.param(
-            forecast_epiautogp,
-            "EpiAutoGPPipeline",
+            forecast_nowcastautogp,
+            "NowcastAutoGPPipeline",
             {
                 "disease": "covid",
                 "run_date": dt.date(2026, 1, 7),
                 "loc": "CA",
-                "output_dir": Path("epiautogp-output"),
+                "output_dir": Path("nowcastautogp-output"),
                 "n_lookback_days": 91,
                 "target": "nssp",
                 "frequency": "epiweekly",
@@ -42,7 +42,7 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
                 "target": "nssp",
                 "frequency": "epiweekly",
                 "ed_visit_type": "other",
-                "output_dir": Path("epiautogp-output"),
+                "output_dir": Path("nowcastautogp-output"),
                 "n_lookback_days": 91,
                 "exclude_last_n_days": 2,
                 "exclude_date_ranges": [(dt.date(2025, 12, 1), dt.date(2025, 12, 3))],
@@ -58,7 +58,7 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew
                 "smc_data_proportion": 0.25,
                 "n_threads": 3,
             },
-            id="epiautogp",
+            id="nowcastautogp",
         ),
         pytest.param(
             forecast_fable,

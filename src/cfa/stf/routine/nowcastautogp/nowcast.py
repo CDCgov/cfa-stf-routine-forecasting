@@ -1,10 +1,10 @@
-"""Simple nowcast source implementations for EpiAutoGP."""
+"""Simple nowcast source implementations for NowcastAutoGP."""
 
 import datetime as dt
 from dataclasses import dataclass
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
 
 
 @dataclass(frozen=True)
@@ -14,8 +14,8 @@ class FixedNowcast:
     data: NowcastData
 
     @staticmethod
-    def ensure_applicable(*, config: EpiAutoGPConfig) -> None:
-        """Accept every supported EpiAutoGP configuration."""
+    def ensure_applicable(*, config: NowcastAutoGPConfig) -> None:
+        """Accept every supported NowcastAutoGP configuration."""
 
     def get_nowcast_data(
         self,

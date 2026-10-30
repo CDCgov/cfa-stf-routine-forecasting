@@ -1,4 +1,4 @@
-"""Tests for converting Hubverse sample output to EpiAutoGP nowcasts."""
+"""Tests for converting Hubverse sample output to NowcastAutoGP nowcasts."""
 
 import datetime as dt
 from dataclasses import replace
@@ -9,7 +9,7 @@ from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
 
 ORIGIN = dt.date(2026, 7, 18)
 NOWCAST_DATES = [dt.date(2026, 7, 4), dt.date(2026, 7, 11)]
@@ -38,7 +38,7 @@ def _run(
         loc=loc,
         report_date=report_date,
         max_allowed_training_date=report_date - dt.timedelta(days=1),
-        model_name="epiautogp_nhsn_epiweekly",
+        model_name="nowcastautogp_nhsn_epiweekly",
         sources={"nhsn"},
     )
 
@@ -48,8 +48,8 @@ def _config(
     target: str = "nhsn",
     frequency: str = "epiweekly",
     ed_visit_type: str = "observed",
-) -> EpiAutoGPConfig:
-    return EpiAutoGPConfig(
+) -> NowcastAutoGPConfig:
+    return NowcastAutoGPConfig(
         target=target,
         frequency=frequency,
         ed_visit_type=ed_visit_type,

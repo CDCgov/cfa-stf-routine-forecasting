@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from cfa.stf.routine._paths import EPIAUTOGP_DIR, FABLE_DIR, PRODUCTION_PRIORS
+from cfa.stf.routine._paths import FABLE_DIR, NOWCASTAUTOGP_DIR, PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import (
     DataFreshness,
     NHSNData,
@@ -32,11 +32,13 @@ from cfa.stf.routine.data.data_access import (
 )
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.data.prep_data import serialize_data
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.prep_epiautogp_data import convert_to_epiautogp_json
-from cfa.stf.routine.epiautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
+from cfa.stf.routine.nowcastautogp.prep_nowcastautogp_data import (
+    convert_to_nowcastautogp_json,
+)
+from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import ReportingDelayNowcast
 from cfa.stf.routine.pyrenew_hew.model_inputs import (
     PyRenewModelInputs,
     serialize_pyrenew_model_params,
@@ -76,7 +78,7 @@ class GPWorker:
         self.process = subprocess.Popen(
             [
                 "julia",
-                f"--project={EPIAUTOGP_DIR}",
+                f"--project={NOWCASTAUTOGP_DIR}",
                 "--threads=1",
                 "--startup-file=no",
                 str(Path(__file__).with_name("gp_worker.jl")),
@@ -263,10 +265,10 @@ def prepare(output, model, scenario, condition):
     names = {
         "fable_daily": "daily_fable_e_other",
         "fable_weekly": "epiweekly_fable_e_other",
-        "gp_daily": "epiautogp_nssp_daily",
-        "gp_other": "epiautogp_nssp_daily_other",
-        "gp_weekly": "epiautogp_nssp_epiweekly_pct",
-        "gp_hubverse": "epiautogp_nhsn_epiweekly",
+        "gp_daily": "nowcastautogp_nssp_daily",
+        "gp_other": "nowcastautogp_nssp_daily_other",
+        "gp_weekly": "nowcastautogp_nssp_epiweekly_pct",
+        "gp_hubverse": "nowcastautogp_nhsn_epiweekly",
     }
     run = ForecastRun(
         "covid", "CA", window, window, names.get(model, model), output, surveillance
@@ -286,7 +288,7 @@ def prepare(output, model, scenario, condition):
         )
         (run.model_dir / "priors.py").write_bytes(PRODUCTION_PRIORS.read_bytes())
     elif model.startswith("gp"):
-        config = EpiAutoGPConfig(
+        config = NowcastAutoGPConfig(
             target="nhsn" if need_h else "nssp",
             frequency="epiweekly" if weekly or need_h else "daily",
             ed_visit_type="pct"
@@ -321,7 +323,7 @@ def prepare(output, model, scenario, condition):
                 directory / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet"
             )
             nowcast = HubverseNowcast(output / "nowcasts", run, config)
-        convert_to_epiautogp_json(
+        convert_to_nowcastautogp_json(
             forecast_run=run, config=config, nowcast_source=nowcast
         )
     return run
@@ -409,11 +411,11 @@ def worker(args):
             check=True,
         )
     else:
-        code = f"using Random; Random.seed!({SEED}); include({json.dumps(str(EPIAUTOGP_DIR / 'fit_epiautogp.jl'))}); main()"
+        code = f"using Random; Random.seed!({SEED}); include({json.dumps(str(NOWCASTAUTOGP_DIR / 'fit_nowcastautogp.jl'))}); main()"
         subprocess.run(
             [
                 "julia",
-                f"--project={EPIAUTOGP_DIR}",
+                f"--project={NOWCASTAUTOGP_DIR}",
                 "--threads=1",
                 "--startup-file=no",
                 "-e",
@@ -520,7 +522,7 @@ def write_report(output, records):
             if fits:
                 warning = f"Clean/missing fits: min particle ESS {min(d['effective_sample_size'] for d in fits):.2f} of {fits[0]['particles']}. Particle ESS does not establish convergence."
         elif model.startswith("fable"):
-            warning = "Missing data: ARIMA only; ETS omitted because observations are missing. Complete data: ETS + ARIMA."
+            warning = "ETS + ARIMA after ARIMA Kalman point imputation; imputation uncertainty is not propagated."
         overview.append(
             "<tr>"
             + "".join(
@@ -569,7 +571,7 @@ def write_report(output, records):
     <p>Unmasked contamination is a sensitivity control and may cause inference failure. The smoke profile is only
     a wiring check. Full-profile inference diagnostics are stored beside model samples; poor diagnostics limit
     scientific interpretation even when exclusion invariance holds. Figures show predictive medians and 90% intervals.</p>
-    <p>Fable uses ARIMA alone for missing series, with joint Kalman forecast draws; complete series retain ETS + ARIMA.
+    <p>Fable retains ETS + ARIMA after ARIMA Kalman point imputation. Forecasts condition on the imputed values; imputation uncertainty is not propagated.
     Fable fitted curves are conditional point estimates. GP particle ESS measures weight concentration, not convergence.
     Forecast change is mean absolute change in forecast medians relative to complete clean data, by variable.</p>
     """

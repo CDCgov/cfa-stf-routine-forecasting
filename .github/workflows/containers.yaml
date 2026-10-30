@@ -85,6 +85,7 @@ jobs:
 
     acr-import:
         needs: build-pipeline-image
+        # Pin until cfa-actions removes the invalid -pubin flag from openssl enc.
         runs-on: ubuntu-latest
         permissions:
           id-token: write # This is required for requesting the JWT
@@ -114,7 +115,7 @@ jobs:
                 coredemo.setOutput('id_token', id_token)
 
           - name: ACR Import
-            uses: CDCgov/cfa-actions/runner-action@v1.7.0
+            uses: CDCgov/cfa-actions/runner-action@v1.9.0
             with:
               github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
               github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
@@ -195,7 +196,7 @@ jobs:
                 coredemo.setOutput('id_token', id_token)
 
           - name: Run test
-            uses: CDCgov/cfa-actions/runner-action@v1.7.0
+            uses: CDCgov/cfa-actions/runner-action@v1.9.0
             with:
               github_app_id: ${{ secrets.REPO_CDCENT_ACTOR_APP_ID }}
               github_app_pem: ${{ secrets.REPO_CDCENT_ACTOR_APP_PEM }}
@@ -285,7 +286,7 @@ jobs:
             fi
 
         - name: Run update script with cfa runner-action
-          uses: CDCgov/cfa-actions/runner-action@v1.7.0
+          uses: CDCgov/cfa-actions/runner-action@v1.9.0
           if: >-
               ( github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_dagster == 'yes' ) ||
               ( github.event_name == 'push' && github.ref_name == 'main' && steps.dagster_changed.outputs.changed == 'true' )

@@ -1,6 +1,6 @@
 # Fit JSON-line requests in one process, resetting the RNG for every fit.
 using Random
-include(joinpath(@__DIR__, "../../src/cfa/stf/routine/epiautogp/fit_epiautogp.jl"))
+include(joinpath(@__DIR__, "../../src/cfa/stf/routine/nowcastautogp/fit_nowcastautogp.jl"))
 
 for line in eachline(stdin)
     request = JSON3.read(line)

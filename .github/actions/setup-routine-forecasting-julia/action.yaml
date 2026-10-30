@@ -1,5 +1,5 @@
 name: "Set up routine forecasting Julia"
-description: "Set up Julia and instantiate the EpiAutoGP project."
+description: "Set up Julia and instantiate the NowcastAutoGP project."
 inputs: {}
 runs:
   using: "composite"
@@ -7,11 +7,11 @@ runs:
     - name: Set up Julia
       uses: julia-actions/setup-julia@v3
       with:
-        version: "1.11"
+        version: "1.13"
 
     - name: Cache Julia packages
       uses: julia-actions/cache@v3
 
     - name: Install Julia dependencies
-      run: julia --project=src/cfa/stf/routine/epiautogp -e 'using Pkg; Pkg.instantiate()'
+      run: julia --project=src/cfa/stf/routine/nowcastautogp -e 'using Pkg; Pkg.instantiate()'
       shell: bash

@@ -53,16 +53,16 @@ test-pyrenew data_mode="auto" location="CA" disease="covid":
       --e2e-force
     @just _print-output-location "{{e2e_output_dir}}/pyrenew"
 
-# Test EpiAutoGP for one disease and location and retain its output.
-test-epiautogp data_mode="auto" location="CA" disease="covid":
+# Test NowcastAutoGP for one disease and location and retain its output.
+test-nowcastautogp data_mode="auto" location="CA" disease="covid":
     uv run pytest -s \
-      tests/integration/test_epiautogp_forecast.py \
+      tests/integration/test_nowcastautogp_forecast.py \
       --e2e-data-mode "{{data_mode}}" \
       --model-test-location "{{location}}" \
       --model-test-disease "{{disease}}" \
-      --e2e-output-dir "{{e2e_output_dir}}/epiautogp" \
+      --e2e-output-dir "{{e2e_output_dir}}/nowcastautogp" \
       --e2e-force
-    @just _print-output-location "{{e2e_output_dir}}/epiautogp"
+    @just _print-output-location "{{e2e_output_dir}}/nowcastautogp"
 
 # Print a clickable absolute path to retained test output.
 [private]

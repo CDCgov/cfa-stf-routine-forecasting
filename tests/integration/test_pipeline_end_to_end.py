@@ -16,8 +16,8 @@ from tests.integration.model_test_utils import (
     assert_model_outputs,
     configure_data_mode,
     model_batch_dir,
-    run_epiautogp,
     run_fable,
+    run_nowcastautogp,
     run_pyrenew,
 )
 
@@ -35,10 +35,10 @@ EXPECTED_MODELS = [
     "daily_fable_e_other",
     "epiweekly_fable_e_other",
     "pyrenew_e",
-    "epiautogp_nssp_daily_other",
+    "nowcastautogp_nssp_daily_other",
     "prop_pyrenew_e_daily_fable_e_other",
     "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other",
-    "prop_pyrenew_e_epiautogp_nssp_daily_other",
+    "prop_pyrenew_e_nowcastautogp_nssp_daily_other",
 ]
 
 
@@ -75,9 +75,9 @@ def _run_fusions(model_run_dir: Path) -> None:
         },
         {
             "num_model_name": "pyrenew_e",
-            "other_model_name": "epiautogp_nssp_daily_other",
+            "other_model_name": "nowcastautogp_nssp_daily_other",
             "aggregate_num": False,
-            "fusion_model_name": "prop_pyrenew_e_epiautogp_nssp_daily_other",
+            "fusion_model_name": "prop_pyrenew_e_nowcastautogp_nssp_daily_other",
         },
     ]
     for fusion_spec in fusion_specs:
@@ -117,8 +117,8 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             with _status_step(f"Running PyRenew for {disease}, {location}"):
                 run_pyrenew(workspace, disease, location)
 
-            with _status_step(f"Running EpiAutoGP for {disease}, {location}"):
-                run_epiautogp(workspace, disease, location)
+            with _status_step(f"Running NowcastAutoGP for {disease}, {location}"):
+                run_nowcastautogp(workspace, disease, location)
 
             model_run_dir = (
                 model_batch_dir(workspace, disease) / "model_runs" / location

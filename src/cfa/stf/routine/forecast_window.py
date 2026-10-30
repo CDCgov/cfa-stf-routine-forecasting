@@ -7,6 +7,8 @@ from cfa.stf.forecasttools import ceiling_mmwr_epiweek
 
 from cfa.stf.routine.lookback import format_lookback_days
 
+EARLIEST_TRAINING_DATE = dt.date(2022, 3, 1)
+
 
 @dataclass(frozen=True)
 class ForecastWindow:
@@ -30,9 +32,12 @@ class ForecastWindow:
     @property
     def min_allowed_training_date(self) -> dt.date:
         """Earliest date that may be retained for training."""
-        if self.n_lookback_days is None:
-            return dt.date.min
-        return self.report_date - dt.timedelta(days=self.n_lookback_days)
+        requested_start = (
+            dt.date.min
+            if self.n_lookback_days is None
+            else self.report_date - dt.timedelta(days=self.n_lookback_days)
+        )
+        return max(requested_start, EARLIEST_TRAINING_DATE)
 
     @property
     def max_allowed_training_date(self) -> dt.date:

@@ -7,38 +7,38 @@ from tests.integration.generate_test_data import (
 from tests.integration.model_test_utils import (
     assert_model_outputs,
     configure_data_mode,
-    run_epiautogp,
+    run_nowcastautogp,
     selected_nhsn_observations,
 )
 
-EPIAUTOGP_CONFIGURATIONS = (
+NOWCASTAUTOGP_CONFIGURATIONS = (
     (
         "nhsn",
         "epiweekly",
         "observed",
         "hubverse",
-        "epiautogp_nhsn_epiweekly",
+        "nowcastautogp_nhsn_epiweekly",
     ),
-    ("nssp", "epiweekly", "pct", "none", "epiautogp_nssp_epiweekly_pct"),
+    ("nssp", "epiweekly", "pct", "none", "nowcastautogp_nssp_epiweekly_pct"),
     (
         "nssp",
         "daily",
         "observed",
         "reporting-delay",
-        "epiautogp_nssp_daily",
+        "nowcastautogp_nssp_daily",
     ),
     (
         "nssp",
         "daily",
         "other",
         "none",
-        "epiautogp_nssp_daily_other",
+        "nowcastautogp_nssp_daily_other",
     ),
 )
 
 
 @pytest.mark.model_integration
-def test_epiautogp_forecast(pipeline_workspace, monkeypatch, request):
+def test_nowcastautogp_forecast(pipeline_workspace, monkeypatch, request):
     disease = request.config.getoption("--model-test-disease")
     location = request.config.getoption("--model-test-location")
     configure_data_mode(request, monkeypatch)
@@ -58,8 +58,8 @@ def test_epiautogp_forecast(pipeline_workspace, monkeypatch, request):
         ed_visit_type,
         nowcast_source_name,
         _,
-    ) in EPIAUTOGP_CONFIGURATIONS:
-        run_epiautogp(
+    ) in NOWCASTAUTOGP_CONFIGURATIONS:
+        run_nowcastautogp(
             pipeline_workspace,
             disease,
             location,
@@ -79,5 +79,5 @@ def test_epiautogp_forecast(pipeline_workspace, monkeypatch, request):
         pipeline_workspace,
         disease,
         location,
-        [model_name for *_, model_name in EPIAUTOGP_CONFIGURATIONS],
+        [model_name for *_, model_name in NOWCASTAUTOGP_CONFIGURATIONS],
     )

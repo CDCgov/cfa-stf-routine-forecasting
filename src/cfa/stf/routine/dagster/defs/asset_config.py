@@ -85,9 +85,9 @@ class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
         default=150,
         description="Training lookback used only by Fable and PyRenew models.",
     )
-    epiautogp_n_lookback_days: int | None = Field(
+    nowcastautogp_n_lookback_days: int | None = Field(
         default=None if is_prod() else 150,
-        description="Training lookback used only by EpiAutoGP models.",
+        description="Training lookback used only by NowcastAutoGP models.",
     )
     exclude_last_n_days: int = Field(
         default=1,
@@ -129,7 +129,7 @@ class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
                 if "n_lookback_days" in overrides:
                     n_lookback_days = overrides.pop("n_lookback_days")
                     overrides["fable_pyrenew_n_lookback_days"] = n_lookback_days
-                    overrides["epiautogp_n_lookback_days"] = n_lookback_days
+                    overrides["nowcastautogp_n_lookback_days"] = n_lookback_days
                 break
         return self.model_copy(update=overrides)
 
@@ -157,8 +157,8 @@ class PyrenewConfig(dg.ConfigurableResource):
     additional_forecast_letters: str = ""
 
 
-class EpiAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
-    """Configuration for the epiweekly EpiAutoGP E-pct model asset."""
+class NowcastAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
+    """Configuration for the epiweekly NowcastAutoGP E-pct model asset."""
 
     n_particles: int = 64 if is_prod() else 4
     n_mcmc: int = 200 if is_prod() else 100
@@ -194,7 +194,7 @@ def resources():
         resources={
             "model_base_config": ModelBaseConfig(),
             "pyrenew_config": PyrenewConfig(),
-            "epiautogp_e_pct_epiweekly_config": EpiAutoGPEPctEpiweeklyConfig(),
+            "nowcastautogp_e_pct_epiweekly_config": NowcastAutoGPEPctEpiweeklyConfig(),
             "fable_e_other_config": FableEOtherConfig(),
             "e_model_exclusions": EModelExclusions(),
             "w_model_exclusions": WModelExclusions(),

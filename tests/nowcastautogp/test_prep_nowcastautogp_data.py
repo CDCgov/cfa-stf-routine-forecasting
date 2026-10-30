@@ -1,7 +1,7 @@
-"""Unit tests for EpiAutoGP data preparation date exclusion functionality.
+"""Unit tests for NowcastAutoGP data preparation date exclusion functionality.
 
 This module tests the Polars-based date exclusion filtering used in
-prep_epiautogp_data._apply_date_exclusions(). It includes both direct tests
+prep_nowcastautogp_data._apply_date_exclusions(). It includes both direct tests
 of the actual production implementation and cross-validation against a reference
 list-based implementation to ensure correctness.
 """
@@ -16,10 +16,10 @@ import pytest
 from tests.factories import make_test_forecast_run
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.prep_epiautogp_data import (
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
+from cfa.stf.routine.nowcastautogp.prep_nowcastautogp_data import (
     _apply_date_exclusions,
-    convert_to_epiautogp_json,
+    convert_to_nowcastautogp_json,
 )
 
 N_DAYS = 10
@@ -78,7 +78,7 @@ class TestDateExclusionFiltering:
     @pytest.fixture
     def sample_dataframe(self, test_year, test_month):
         """
-        Create a sample Polars DataFrame matching the structure used in prep_epiautogp_data.
+        Create a sample Polars DataFrame matching the structure used in prep_nowcastautogp_data.
 
         The DataFrame has:
         - date: Date column
@@ -293,7 +293,7 @@ class FakeNowcastSource:
         return NowcastData(dates=[dates[-1]], reports=[[reports[-1] + 1.0]])
 
 
-def _epiautogp_run(tmp_path):
+def _nowcastautogp_run(tmp_path):
     report_date = dt.date(2024, 1, 3)
     run = make_test_forecast_run(
         output_dir=tmp_path,
@@ -326,16 +326,16 @@ def _epiautogp_run(tmp_path):
     return replace(run, surveillance=surveillance)
 
 
-class TestConvertToEpiAutoGpJson:
-    """Tests for EpiAutoGP JSON serialization."""
+class TestConvertToNowcastAutoGPJson:
+    """Tests for NowcastAutoGP JSON serialization."""
 
     def test_only_training_rows_are_serialized_without_nowcast_source(self, tmp_path):
         """Test converter excludes evaluation rows from model input."""
-        forecast_run = _epiautogp_run(tmp_path)
+        forecast_run = _nowcastautogp_run(tmp_path)
 
-        output_path = convert_to_epiautogp_json(
+        output_path = convert_to_nowcastautogp_json(
             forecast_run=forecast_run,
-            config=EpiAutoGPConfig("nssp", "daily", "observed"),
+            config=NowcastAutoGPConfig("nssp", "daily", "observed"),
         )
 
         output = json.loads(output_path.read_text())
@@ -359,9 +359,9 @@ class TestConvertToEpiAutoGpJson:
         ed_visit_type,
         expected,
     ):
-        output_path = convert_to_epiautogp_json(
-            forecast_run=_epiautogp_run(tmp_path),
-            config=EpiAutoGPConfig("nssp", "daily", ed_visit_type),
+        output_path = convert_to_nowcastautogp_json(
+            forecast_run=_nowcastautogp_run(tmp_path),
+            config=NowcastAutoGPConfig("nssp", "daily", ed_visit_type),
         )
 
         assert json.loads(output_path.read_text())["reports"] == expected
@@ -369,13 +369,13 @@ class TestConvertToEpiAutoGpJson:
     def test_reads_nhsn_series_from_shared_run(self, tmp_path):
         forecast_run = make_test_forecast_run(
             output_dir=tmp_path,
-            model_name="epiautogp_nhsn_epiweekly",
+            model_name="nowcastautogp_nhsn_epiweekly",
             sources=("nhsn",),
         )
 
-        output_path = convert_to_epiautogp_json(
+        output_path = convert_to_nowcastautogp_json(
             forecast_run=forecast_run,
-            config=EpiAutoGPConfig("nhsn", "epiweekly", "observed"),
+            config=NowcastAutoGPConfig("nhsn", "epiweekly", "observed"),
         )
 
         output = json.loads(output_path.read_text())
@@ -386,10 +386,10 @@ class TestConvertToEpiAutoGpJson:
         assert output["reports"] == [5.0, 5.0]
 
     def test_rejects_mismatched_nssp_resolution(self, tmp_path):
-        with pytest.raises(ValueError, match="does not match EpiAutoGP frequency"):
-            convert_to_epiautogp_json(
-                forecast_run=_epiautogp_run(tmp_path),
-                config=EpiAutoGPConfig("nssp", "epiweekly", "observed"),
+        with pytest.raises(ValueError, match="does not match NowcastAutoGP frequency"):
+            convert_to_nowcastautogp_json(
+                forecast_run=_nowcastautogp_run(tmp_path),
+                config=NowcastAutoGPConfig("nssp", "epiweekly", "observed"),
             )
 
     @pytest.mark.parametrize(
@@ -406,19 +406,19 @@ class TestConvertToEpiAutoGpJson:
         )
 
         with pytest.raises(ValueError, match=message):
-            convert_to_epiautogp_json(
+            convert_to_nowcastautogp_json(
                 forecast_run=forecast_run,
-                config=EpiAutoGPConfig(target, "epiweekly", "observed"),
+                config=NowcastAutoGPConfig(target, "epiweekly", "observed"),
             )
 
     def test_nowcast_source_serializes_nowcast_data(self, tmp_path):
         """Test converter writes nowcast data supplied by the context source."""
-        forecast_run = _epiautogp_run(tmp_path)
+        forecast_run = _nowcastautogp_run(tmp_path)
         source = FakeNowcastSource()
 
-        output_path = convert_to_epiautogp_json(
+        output_path = convert_to_nowcastautogp_json(
             forecast_run=forecast_run,
-            config=EpiAutoGPConfig("nssp", "daily", "observed"),
+            config=NowcastAutoGPConfig("nssp", "daily", "observed"),
             nowcast_source=source,
         )
 

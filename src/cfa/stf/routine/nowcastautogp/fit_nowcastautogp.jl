@@ -13,10 +13,10 @@ using NowcastAutoGP:
     make_and_fit_model
 
 """
-Input data structure for EpiAutoGP pipeline,
+Input data structure for NowcastAutoGP pipeline,
 representing the JSON input format expected by the pipeline.
 """
-struct EpiAutoGPInput
+struct NowcastAutoGPInput
     dates::Vector{Date}
     reports::Vector{Float64}
     pathogen::String
@@ -29,7 +29,7 @@ struct EpiAutoGPInput
     nowcast_reports::Vector{Vector{Float64}}
 end
 
-StructType(::Type{EpiAutoGPInput}) = Struct()
+StructType(::Type{NowcastAutoGPInput}) = Struct()
 
 const DEFAULT_ARGS = Dict{String, Any}(
     "n-particles" => 24,
@@ -104,10 +104,10 @@ function parse_arguments(args = ARGS)
 end
 
 """
-JSON reader that parses the input JSON file into an EpiAutoGPInput struct.
+JSON reader that parses the input JSON file into an NowcastAutoGPInput struct.
 """
 function read_data(path_to_json::String)
-    return JSON3.read(read(path_to_json, String), EpiAutoGPInput)
+    return JSON3.read(read(path_to_json, String), NowcastAutoGPInput)
 end
 
 ################ Validation and preparation of input data for modeling
@@ -116,7 +116,7 @@ function _require(condition::Bool, message::String)
     return nothing
 end
 
-function _validate_frequency(data::EpiAutoGPInput)
+function _validate_frequency(data::NowcastAutoGPInput)
     valid_frequencies = ["daily", "epiweekly"]
     _require(
         data.frequency in valid_frequencies,
@@ -135,7 +135,7 @@ function _validate_nonnegative_finite_values(values; label::String)
     return nothing
 end
 
-function _validate_observations(data::EpiAutoGPInput)
+function _validate_observations(data::NowcastAutoGPInput)
     _require(
         !isempty(data.dates) && !isempty(data.reports),
         "Empty data: dates and reports cannot be empty",
@@ -144,7 +144,7 @@ function _validate_observations(data::EpiAutoGPInput)
     return nothing
 end
 
-function _validate_nowcasts(data::EpiAutoGPInput)
+function _validate_nowcasts(data::NowcastAutoGPInput)
     _require(
         !isempty(data.nowcast_dates) || isempty(data.nowcast_reports),
         "Nowcast reports cannot be provided without nowcast dates",
@@ -169,9 +169,9 @@ function _validate_nowcasts(data::EpiAutoGPInput)
 end
 
 """
-Validates the input data for the EpiAutoGP pipeline.
+Validates the input data for the NowcastAutoGP pipeline.
 """
-function validate_input(data::EpiAutoGPInput)
+function validate_input(data::NowcastAutoGPInput)
     _validate_frequency(data)
     _validate_observations(data)
     _validate_nowcasts(data)
@@ -192,7 +192,7 @@ Prepares the input data for modelling by:
     - Determine the data forwards and inverse transformations
 """
 function prepare_for_modelling(
-        input::EpiAutoGPInput,
+        input::NowcastAutoGPInput,
         transformation_name::String,
         n_forecasts::Int,
     )
@@ -299,7 +299,7 @@ function _do_forecasts(
     )
 end
 
-function forecast_with_nowcastautogp(input::EpiAutoGPInput, args::Dict{String, Any})
+function forecast_with_nowcastautogp(input::NowcastAutoGPInput, args::Dict{String, Any})
     model_info = prepare_for_modelling(
         input,
         args["transformation"],
@@ -363,7 +363,7 @@ function _write_parquet_with_duckdb(path::AbstractString, table)
 end
 
 function create_forecast_output(
-        input::EpiAutoGPInput,
+        input::NowcastAutoGPInput,
         results::NamedTuple,
         output_dir::String;
         save_output::Bool,

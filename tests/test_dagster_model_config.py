@@ -12,7 +12,7 @@ def _model_base_config() -> asset_config.ModelBaseConfig:
     config = asset_config.ModelBaseConfig(
         output_basedir="default-output",
         fable_pyrenew_n_lookback_days=100,
-        epiautogp_n_lookback_days=200,
+        nowcastautogp_n_lookback_days=200,
         exclude_last_n_days=1,
         fail_on_stale_data=True,
         config_overrides=[
@@ -37,10 +37,11 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     assert "n_lookback_days" not in base_fields
     assert "n_lookback_days" in override_fields
     assert "fable_pyrenew_n_lookback_days" not in override_fields
-    assert "epiautogp_n_lookback_days" not in override_fields
+    assert "nowcastautogp_n_lookback_days" not in override_fields
     assert config.fable_pyrenew_n_lookback_days == 150
     assert (
-        "n_lookback_days" not in asset_config.EpiAutoGPEPctEpiweeklyConfig.model_fields
+        "n_lookback_days"
+        not in asset_config.NowcastAutoGPEPctEpiweeklyConfig.model_fields
     )
 
 
@@ -94,7 +95,7 @@ def test_location_lookback_override(
 ):
     config = asset_config.ModelBaseConfig(
         fable_pyrenew_n_lookback_days=100,
-        epiautogp_n_lookback_days=200,
+        nowcastautogp_n_lookback_days=200,
         config_overrides=[
             asset_config.ConfigOverride(
                 location="CA",
@@ -107,7 +108,7 @@ def test_location_lookback_override(
 
     assert (
         loc_config.fable_pyrenew_n_lookback_days,
-        loc_config.epiautogp_n_lookback_days,
+        loc_config.nowcastautogp_n_lookback_days,
     ) == expected_lookbacks
 
 
@@ -119,12 +120,12 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     model_base_config = _model_base_config()
     forecast_fable = Mock()
     forecast_pyrenew = Mock()
-    forecast_epiautogp = Mock()
+    forecast_nowcastautogp = Mock()
 
     monkeypatch.setattr(asset_helpers, "_throw_if_backfill", Mock())
     monkeypatch.setattr(asset_helpers, "forecast_fable", forecast_fable)
     monkeypatch.setattr(asset_helpers, "forecast_pyrenew", forecast_pyrenew)
-    monkeypatch.setattr(asset_helpers, "forecast_epiautogp", forecast_epiautogp)
+    monkeypatch.setattr(asset_helpers, "forecast_nowcastautogp", forecast_nowcastautogp)
 
     asset_helpers._run_fable_e_other(
         context,
@@ -138,9 +139,9 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
         model_base_config,
         model_letters="e",
     )
-    asset_helpers._run_epiautogp_e_pct_epiweekly(
+    asset_helpers._run_nowcastautogp_e_pct_epiweekly(
         context,
-        asset_config.EpiAutoGPEPctEpiweeklyConfig(),
+        asset_config.NowcastAutoGPEPctEpiweeklyConfig(),
         model_base_config,
     )
 
@@ -155,8 +156,8 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
         assert forecast.call_args.kwargs["n_lookback_days"] == 100
 
     for name, expected in shared_arguments.items():
-        assert forecast_epiautogp.call_args.kwargs[name] == expected
-    assert forecast_epiautogp.call_args.kwargs["n_lookback_days"] == 200
+        assert forecast_nowcastautogp.call_args.kwargs[name] == expected
+    assert forecast_nowcastautogp.call_args.kwargs["n_lookback_days"] == 200
 
 
 def test_fusion_directory_uses_fable_pyrenew_lookback():

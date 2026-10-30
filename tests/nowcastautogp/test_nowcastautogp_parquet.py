@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from cfa.stf.routine._paths import EPIAUTOGP_DIR
+from cfa.stf.routine._paths import NOWCASTAUTOGP_DIR
 from cfa.stf.routine.utils.language_utils import run_julia_script
 
 
@@ -31,13 +31,13 @@ def _write_synthetic_input(path: Path) -> None:
 
 
 def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
-    input_path = tmp_path / "epiautogp-input.json"
+    input_path = tmp_path / "nowcastautogp-input.json"
     output_dir = tmp_path / "model-fit"
     _write_synthetic_input(input_path)
 
     try:
         run_julia_script(
-            EPIAUTOGP_DIR / "fit_epiautogp.jl",
+            NOWCASTAUTOGP_DIR / "fit_nowcastautogp.jl",
             [
                 f"--json-input={input_path}",
                 f"--output-dir={output_dir}",
@@ -48,7 +48,7 @@ def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
                 "--transformation=percentage",
                 "--smc-data-proportion=0.5",
             ],
-            executor_flags=[f"--project={EPIAUTOGP_DIR}", "--startup-file=no"],
+            executor_flags=[f"--project={NOWCASTAUTOGP_DIR}", "--startup-file=no"],
             function_name="test_direct_nowcastautogp_runner_writes_pipeline_parquet",
             text=True,
         )
@@ -75,7 +75,7 @@ def test_direct_nowcastautogp_runner_writes_pipeline_parquet(tmp_path) -> None:
 
 
 def test_direct_runner_rejects_partial_epiweekly_horizon(tmp_path) -> None:
-    input_path = tmp_path / "epiautogp-input.json"
+    input_path = tmp_path / "nowcastautogp-input.json"
     output_dir = tmp_path / "model-fit"
     _write_synthetic_input(input_path)
     input_data = json.loads(input_path.read_text())
@@ -86,12 +86,12 @@ def test_direct_runner_rejects_partial_epiweekly_horizon(tmp_path) -> None:
     try:
         with pytest.raises(RuntimeError, match="whole number of model steps"):
             run_julia_script(
-                EPIAUTOGP_DIR / "fit_epiautogp.jl",
+                NOWCASTAUTOGP_DIR / "fit_nowcastautogp.jl",
                 [
                     f"--json-input={input_path}",
                     f"--output-dir={output_dir}",
                 ],
-                executor_flags=[f"--project={EPIAUTOGP_DIR}", "--startup-file=no"],
+                executor_flags=[f"--project={NOWCASTAUTOGP_DIR}", "--startup-file=no"],
                 function_name="test_direct_runner_rejects_partial_epiweekly_horizon",
                 text=True,
             )

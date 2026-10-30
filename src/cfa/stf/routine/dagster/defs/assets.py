@@ -7,17 +7,17 @@ from cfa_dagster import dynamic_graph_asset
 
 from cfa.stf.routine.dagster.defs.asset_config import (
     EModelExclusions,
-    EpiAutoGPEPctEpiweeklyConfig,
     FableEOtherConfig,
     ModelBaseConfig,
+    NowcastAutoGPEPctEpiweeklyConfig,
     PostProcessConfig,
     PyrenewConfig,
     daily_partitions_def,
 )
 from cfa.stf.routine.dagster.defs.asset_helpers import (
     _fuse_pyrenew_fable_e_other,
-    _run_epiautogp_e_pct_epiweekly,
     _run_fable_e_other,
+    _run_nowcastautogp_e_pct_epiweekly,
     _run_pyrenew_model,
     _throw_if_backfill,
 )
@@ -31,16 +31,16 @@ from cfa.stf.routine.utils.postprocess_forecast_batches import main as postproce
 
 common_asset_args = {
     "partitions_def": daily_partitions_def,  # every asset uses this partitions def
-    "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
+    # "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
 }
 
 # Dagster tag keys cannot contain spaces. These tags make it easy to select all
 # assets that need rerunning after their corresponding source data changes.
 E_DATA_RERUN_TAGS = {
     "e-data-rerun": "",
-    "e-data-rerun-no-epiautogp": "",
+    "e-data-rerun-no-nowcastautogp": "",
 }
-EPIAUTOGP_E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
+NOWCASTAUTOGP_E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
 H_DATA_RERUN_TAGS = {"h-data-rerun": ""}
 HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
 
@@ -169,22 +169,22 @@ def pyrenew_he(
     _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
 
 
-# EpiAutoGP E-pct (epiweekly)
+# NowcastAutoGP E-pct (epiweekly)
 @dynamic_graph_asset(
     **common_asset_args,
     automation_condition=eager_on_wednesday,
-    group_name="EpiAutoGP",
+    group_name="NowcastAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=EPIAUTOGP_E_DATA_RERUN_TAGS,
+    tags=NOWCASTAUTOGP_E_DATA_RERUN_TAGS,
 )
-def epiautogp_e_pct_epiweekly(
+def nowcastautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,
-    epiautogp_e_pct_epiweekly_config: EpiAutoGPEPctEpiweeklyConfig,
+    nowcastautogp_e_pct_epiweekly_config: NowcastAutoGPEPctEpiweeklyConfig,
     model_base_config: ModelBaseConfig,
 ):
-    _run_epiautogp_e_pct_epiweekly(
+    _run_nowcastautogp_e_pct_epiweekly(
         context,
-        epiautogp_e_pct_epiweekly_config,
+        nowcastautogp_e_pct_epiweekly_config,
         model_base_config,
     )
 
@@ -288,7 +288,7 @@ def fuse_pyrenew_he_fable_epiweekly(
         "fuse_pyrenew_he_fable",
         "fuse_pyrenew_he_fable_epiweekly",
         "pyrenew_h",
-        "epiautogp_e_pct_epiweekly",
+        "nowcastautogp_e_pct_epiweekly",
     ],
     partitions_def=daily_partitions_def,
     # Runs when any dependency has been updated as long as at least one exists
@@ -302,7 +302,7 @@ def fuse_pyrenew_he_fable_epiweekly(
         )
     ).with_label("postprocess_custom_eager"),
     group_name="Postprocess",
-    retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
+    # retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(

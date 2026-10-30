@@ -24,7 +24,7 @@ def fable_e_other_forecasts(
         FABLE_DIR / "fit_fable.R",
         script_args,
         function_name="fit_fable",
-        capture_output=False,
+        capture_output=True,
     )
     return None
 

@@ -16,9 +16,9 @@ from tests.integration.generate_test_data import (
 from cfa.stf.routine import forecast_pipeline as forecast_pipeline_module
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.data.data_access import DataResolution
-from cfa.stf.routine.epiautogp import forecast_epiautogp as epiautogp_module
 from cfa.stf.routine.fable import forecast_fable as fable_module
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.nowcastautogp import forecast_nowcastautogp as nowcastautogp_module
 from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
 from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
@@ -111,7 +111,7 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )
     monkeypatch.setattr(
-        epiautogp_module,
+        nowcastautogp_module,
         "get_nnh_right_truncation_pmf",
         lambda **kwargs: RIGHT_TRUNCATION_PMF.copy(),
     )
@@ -123,6 +123,40 @@ def configure_data_mode(request, monkeypatch) -> str:
     if data_mode == MOCK_DATA_MODE:
         patch_dataops_with_mock_data(monkeypatch)
     return data_mode
+
+
+def patch_mock_nssp_with_missing_values(
+    monkeypatch,
+) -> tuple[list[dt.date], dt.date]:
+    """Null two days and drop a third within one mid-training MMWR week.
+
+    Daily runs then see explicit ``NA`` values plus an implicit date gap, and
+    epiweekly runs see one dropped week. Returns the nulled and dropped dates.
+    """
+    window = ForecastWindow(
+        report_date=REPORT_DATE,
+        n_lookback_days=N_LOOKBACK_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
+    )
+    midpoint = window.min_allowed_training_date + (
+        (window.max_allowed_training_date - window.min_allowed_training_date) / 2
+    )
+    sunday = midpoint - dt.timedelta(days=(midpoint.weekday() + 1) % 7)
+    null_dates = [sunday + dt.timedelta(days=offset) for offset in (1, 2)]
+    dropped_date = sunday + dt.timedelta(days=3)
+    original = make_surveillance_inputs
+
+    def with_missing_values(**kwargs):
+        surveillance = original(**kwargs)
+        data = surveillance.nssp.data.filter(
+            pl.col("date") != dropped_date
+        ).with_columns(
+            pl.when(~pl.col("date").is_in(null_dates)).then(pl.col(".value"))
+        )
+        return replace(surveillance, nssp=replace(surveillance.nssp, data=data))
+
+    monkeypatch.setitem(globals(), "make_surveillance_inputs", with_missing_values)
+    return null_dates, dropped_date
 
 
 def selected_nhsn_observations(
@@ -205,7 +239,7 @@ def run_pyrenew(
     )
 
 
-def run_epiautogp(
+def run_nowcastautogp(
     workspace: Path,
     disease: str,
     location: str,
@@ -217,7 +251,7 @@ def run_epiautogp(
     hubverse_nowcast_dir: Path | None = None,
     n_forecast_draws: int = 40,
 ) -> None:
-    epiautogp_module.main(
+    nowcastautogp_module.main(
         disease=disease,
         run_date=REPORT_DATE,
         loc=location,

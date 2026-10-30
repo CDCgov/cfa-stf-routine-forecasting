@@ -1,4 +1,4 @@
-# EpiAutoGP integration
+# NowcastAutoGP integration
 
 This directory is the model-specific adapter between the shared forecast pipeline and [`NowcastAutoGP.jl`](https://github.com/CDCgov/NowcastAutoGP).
 It is not a standalone pipeline implementation.
@@ -12,15 +12,15 @@ The shared `ForecastPipeline` owns:
 - `ForecastRun`, output directories, and common serialized artifacts;
 - standard plots, credible intervals, and Hubverse output.
 
-The EpiAutoGP adapter owns:
+The NowcastAutoGP adapter owns:
 
 - validation of supported target combinations;
 - selection of one training series from `ForecastRun`;
 - optional reporting-delay or Hubverse nowcast trajectories;
-- EpiAutoGP JSON serialization and Julia invocation.
+- NowcastAutoGP JSON serialization and Julia invocation.
 
 The model input is built directly from the loaded NSSP or NHSN frame.
-`combined_data.tsv` remains a shared plotting and interchange artifact; EpiAutoGP does not reread it to reconstruct data already present in memory.
+`combined_data.tsv` remains a shared plotting and interchange artifact; NowcastAutoGP does not reread it to reconstruct data already present in memory.
 
 ## Supported configurations
 
@@ -42,12 +42,16 @@ Nowcast modes are:
 
 ## Files
 
-- `forecast_epiautogp.py`: pipeline subclass, nowcast-source resolution, and Julia invocation.
+- `forecast_nowcastautogp.py`: pipeline subclass, nowcast-source resolution, and Julia invocation.
 - `nowcast.py`: fixed-data nowcast source for callers supplying precomputed trajectories.
-- `prep_epiautogp_data.py`: training-series selection and JSON serialization.
+- `prep_nowcastautogp_data.py`: training-series selection and JSON serialization.
 - `reporting_delay_nowcast.py`: reporting-delay nowcast implementation.
-- `fit_epiautogp.jl`: thin Julia adapter that calls `NowcastAutoGP` and writes standardized `samples.parquet` output.
+- `fit_nowcastautogp.jl`: thin Julia adapter that calls `NowcastAutoGP` and writes standardized `samples.parquet` output.
 - `Project.toml` and `Manifest.toml`: pinned Julia environment.
 
 The JSON input is written as `{model_dir}/{model_name}_input.json`.
 The Julia adapter writes `{model_dir}/samples.parquet`; the shared publication stage creates the remaining standard outputs.
+
+Model identifiers use `nowcastautogp_{target}_{frequency}`, with an `_other` or `_pct` suffix for those NSSP visit types.
+Downstream model-name mappings in [the handbook](https://github.com/cdcent/cfa-stf-handbook) and [the Hubverse processor](https://github.com/cdcent/cfa-hubverse-processor) must use these identifiers, including any identifiers embedded in fusion model names.
+Dagster uses the `NowcastAutoGP` asset group and sensor, the `nowcastautogp_e_pct_epiweekly` asset, and the `nowcastautogp_e_pct_epiweekly_config` resource; model lookback configuration uses `nowcastautogp_n_lookback_days`.

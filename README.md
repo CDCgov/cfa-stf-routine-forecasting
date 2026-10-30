@@ -6,11 +6,11 @@
 
 The STF Routine Forecasting project contains code for producing short-term forecasts of respiratory disease burden using several models:
 
-- [EpiAutoGP](src/cfa/stf/routine/epiautogp)
+- [NowcastAutoGP](src/cfa/stf/routine/nowcastautogp)
 - [fable](src/cfa/stf/routine/fable)
 - [PyRenew-HEW](src/cfa/stf/routine/pyrenew_hew)
 
-EpiAutoGP test coverage is included in the `pipelines` coverage badge above rather than reported separately.
+NowcastAutoGP test coverage is included in the `pipelines` coverage badge above rather than reported separately.
 
 These forecasts are submitted to CDC's forecasting hubs:
 

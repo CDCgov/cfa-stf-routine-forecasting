@@ -6,9 +6,9 @@ import math
 import pytest
 
 from cfa.stf.routine.data.nowcast import NowcastData
-from cfa.stf.routine.epiautogp.config import EpiAutoGPConfig
-from cfa.stf.routine.epiautogp.nowcast import FixedNowcast
-from cfa.stf.routine.epiautogp.reporting_delay_nowcast import (
+from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
+from cfa.stf.routine.nowcastautogp.nowcast import FixedNowcast
+from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import (
     ReportingDelayNowcast,
     inflate_report,
     reporting_inflation_factors,
@@ -17,9 +17,9 @@ from cfa.stf.routine.epiautogp.reporting_delay_nowcast import (
 
 def _spec(
     *, target: str = "nssp", ed_visit_type: str = "observed", frequency: str = "daily"
-) -> EpiAutoGPConfig:
-    """Build an EpiAutoGPConfig varying only the applicability fields."""
-    return EpiAutoGPConfig(
+) -> NowcastAutoGPConfig:
+    """Build an NowcastAutoGPConfig varying only the applicability fields."""
+    return NowcastAutoGPConfig(
         target=target,
         frequency=frequency,
         ed_visit_type=ed_visit_type,

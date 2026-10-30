@@ -48,7 +48,9 @@ Fable uses the production implementation from #1368: fill missing calendar rows,
 It records the ensemble in `components.txt`.
 Forecasts condition on point imputations and do not propagate imputation uncertainty.
 Exclusion invariance is therefore distinct from forecast calibration.
-Explicit boundary rows remain necessary: `fill_gaps()` cannot infer deleted leading or trailing dates.
+Explicit boundary rows are optional: the requirement is coverage of the requested forecast period.
+When trailing rows are dropped, compute the horizon from the retained training endpoint to the fixed forecast-through date, as `ForecastRun.n_forecast_days` does.
+Dropping boundary rows need not yield the same fitted model as imputing them; exclusion invariance compares inputs with the same retained dates and exclusion policy.
 
 Outputs include `report.html`, `results.json`, `manifest.json`, plots, raw-data audits, effective inputs, logs, samples, and inference diagnostics beneath `test_output/canonical-exclusions/{full,smoke}`.
 Existing omission policies are held fixed; canonical data-service integration is a later step.

@@ -24,11 +24,33 @@ testthat::test_that("the ensemble handles gaps without moving calendar boundarie
     testthat::expect_equal(min(draws$date), max(x$date) + 1)
     testthat::expect_equal(max(draws$date), max(x$date) + 28)
 
-    # Keep boundary rows so the training interval remains explicit.
+    # Hold endpoints fixed only for the explicit/implicit internal-gap comparison.
     internal <- setdiff(mask, c(1L, nrow(x)))
     set.seed(1343)
     implicit <- fit_and_forecast_ensemble(x[-internal, ], n_samples = 20)
     testthat::expect_equal(implicit, draws)
+
+    # Boundary rows may also be dropped: extend the horizon from the retained
+    # endpoint to cover the same requested period, without requiring equal fits.
+    retained <- x[-mask, ]
+    forecast_start <- max(complete$date) + 1
+    forecast_through <- max(complete$date) + 28
+    horizon <- as.integer(forecast_through - max(retained$date))
+    set.seed(1343)
+    dropped <- fit_and_forecast_ensemble(
+      retained,
+      n_forecast_days = horizon,
+      n_samples = 20
+    )
+    requested <- dplyr::filter(dropped, date >= forecast_start)
+    testthat::expect_equal(
+      sort(unique(requested$date)),
+      seq(forecast_start, forecast_through, by = "day")
+    )
+    testthat::expect_equal(nrow(requested), 28 * 20)
+    testthat::expect_equal(max(dropped$date), forecast_through)
+    testthat::expect_true(all(is.finite(requested$other_ed_visits)))
+    testthat::expect_true(all(requested$other_ed_visits >= 0))
   })
 })
 

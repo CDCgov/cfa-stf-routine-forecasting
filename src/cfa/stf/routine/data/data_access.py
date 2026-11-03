@@ -102,19 +102,10 @@ class SurveillanceInputs:
         return any(record.is_stale for record in self.freshness)
 
 
-def _resolved_version_date(
-    version: dt.datetime | str | None,
-    *,
-    dataset: str,
-) -> dt.date:
-    if not isinstance(version, dt.datetime):
-        raise ValueError(f"No dated {dataset} version found")
-    return version.date()
-
-
 def resolve_latest_nssp_version() -> dt.datetime:
     version = resolve_nssp_version(dataset="comprehensive")
-    _resolved_version_date(version, dataset="comprehensive NSSP gold")
+    if not isinstance(version, dt.datetime):
+        raise ValueError("No dated comprehensive NSSP gold version found")
     return version
 
 
@@ -211,8 +202,10 @@ def _load_dataops_nssp(
 def select_latest_nhsn_release() -> tuple[bool, dt.datetime]:
     prelim_version = resolve_nhsn_hrd_version(prelim=True)
     final_version = resolve_nhsn_hrd_version(prelim=False)
-    _resolved_version_date(prelim_version, dataset="NHSN preliminary")
-    _resolved_version_date(final_version, dataset="NHSN final")
+    if not isinstance(prelim_version, dt.datetime):
+        raise ValueError("No dated NHSN preliminary version found")
+    if not isinstance(final_version, dt.datetime):
+        raise ValueError("No dated NHSN final version found")
     if prelim_version >= final_version:
         return True, prelim_version
     return False, final_version

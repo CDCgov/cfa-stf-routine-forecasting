@@ -419,9 +419,26 @@ def test_apply_freshness_policy_logs_versions_and_warns_or_raises(caplog):
 
 
 @pytest.mark.parametrize("version", [None, "latest"])
-def test_resolved_version_date_requires_datetime(version):
-    with pytest.raises(ValueError, match="No dated NHSN version found"):
-        data_access._resolved_version_date(version, dataset="NHSN")
+def test_resolve_latest_nssp_version_requires_datetime(monkeypatch, version):
+    monkeypatch.setattr(data_access, "resolve_nssp_version", lambda **kwargs: version)
+    with pytest.raises(ValueError, match="No dated comprehensive NSSP gold version"):
+        data_access.resolve_latest_nssp_version()
+
+
+@pytest.mark.parametrize("version", [None, "latest"])
+@pytest.mark.parametrize("invalid_prelim", [True, False])
+def test_select_latest_nhsn_release_requires_datetime(
+    monkeypatch, version, invalid_prelim
+):
+    monkeypatch.setattr(
+        data_access,
+        "resolve_nhsn_hrd_version",
+        lambda *, prelim: (
+            version if prelim == invalid_prelim else dt.datetime(2026, 1, 8)
+        ),
+    )
+    with pytest.raises(ValueError, match="No dated NHSN"):
+        data_access.select_latest_nhsn_release()
 
 
 def test_select_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):

@@ -199,13 +199,18 @@ def _load_dataops_nssp(
     return NSSPData(data=data, freshness=freshness, resolution="daily")
 
 
+def resolve_latest_nhsn_version(*, prelim: bool) -> dt.datetime:
+    """Resolve the latest version of the preliminary or final NHSN data."""
+    version = resolve_nhsn_hrd_version(prelim=prelim)
+    if not isinstance(version, dt.datetime):
+        release = "preliminary" if prelim else "final"
+        raise ValueError(f"No dated NHSN {release} version found")
+    return version
+
+
 def select_latest_nhsn_release() -> tuple[bool, dt.datetime]:
-    prelim_version = resolve_nhsn_hrd_version(prelim=True)
-    final_version = resolve_nhsn_hrd_version(prelim=False)
-    if not isinstance(prelim_version, dt.datetime):
-        raise ValueError("No dated NHSN preliminary version found")
-    if not isinstance(final_version, dt.datetime):
-        raise ValueError("No dated NHSN final version found")
+    prelim_version = resolve_latest_nhsn_version(prelim=True)
+    final_version = resolve_latest_nhsn_version(prelim=False)
     if prelim_version >= final_version:
         return True, prelim_version
     return False, final_version

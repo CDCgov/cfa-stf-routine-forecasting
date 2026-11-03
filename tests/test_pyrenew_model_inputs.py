@@ -3,15 +3,111 @@ import json
 from dataclasses import replace
 from unittest.mock import patch
 
+import jax.numpy as jnp
 import polars as pl
 import pytest
+from numpyro.handlers import seed, trace
+from pyrenew_multisignal.hew import PyrenewHEWData
 
+from cfa.stf.routine._paths import PRODUCTION_PRIORS
+from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import PyRenewPipeline
 from cfa.stf.routine.pyrenew_hew.model_inputs import (
     PyRenewModelInputs,
     resolve_pyrenew_model_inputs,
     serialize_pyrenew_model_params,
 )
+from cfa.stf.routine.pyrenew_hew.utils import build_pyrenew_hew_model_from_dir
 from tests.factories import make_test_forecast_run
+
+
+@pytest.mark.parametrize("fit_hospital_admissions", [False, True])
+@pytest.mark.parametrize("omitted_days, expected_fraction", [(0, 0.25), (1, 0.75)])
+@patch(
+    "cfa.stf.routine.pyrenew_hew.model_inputs.approx_lognorm", return_value=(1.2, 0.3)
+)
+@patch(
+    "cfa.stf.routine.pyrenew_hew.forecast_pyrenew.resolve_pyrenew_model_inputs",
+    return_value=PyRenewModelInputs((0.4, 0.6), (0.0, 0.5, 0.5), (0.25, 0.5, 0.25)),
+)
+def test_pyrenew_reporting_age_with_nssp_vintage_one_day_before_forecast_date(
+    _mock_inputs,
+    _mock_lognorm,
+    tmp_path,
+    fit_hospital_admissions,
+    omitted_days,
+    expected_fraction,
+):
+    pipeline = PyRenewPipeline(
+        disease="covid",
+        loc="CA",
+        output_dir=tmp_path,
+        forecast_date=dt.date(2026, 11, 1),
+        priors_path=PRODUCTION_PRIORS,
+        n_chains=1,
+        n_warmup=1,
+        n_samples=1,
+        fit_ed_visits=True,
+        forecast_ed_visits=True,
+        fit_hospital_admissions=fit_hospital_admissions,
+        forecast_hospital_admissions=fit_hospital_admissions,
+    )
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        model_name=pipeline.model_name,
+        forecast_date=dt.date(2026, 11, 1),
+        first_training_date=dt.date(2026, 10, 1),
+        last_training_date=dt.date(2026, 10, 30) - dt.timedelta(days=omitted_days),
+        sources=pipeline.sources,
+        loc_pop=39_000_000,
+    )
+    nssp = replace(
+        run.nssp,
+        freshness=replace(
+            run.nssp.freshness, selected_version_date=dt.date(2026, 10, 31)
+        ),
+    )
+    nhsn = run.nhsn
+    if fit_hospital_admissions:
+        # A later NHSN observation extends the latent timeline past the last
+        # NSSP observation, requiring a zero-padded reporting PMF.
+        nhsn = replace(
+            nhsn, data=nhsn.data.head(1).with_columns(date=dt.date(2026, 10, 31))
+        )
+    run = replace(run, surveillance=replace(run.surveillance, nssp=nssp, nhsn=nhsn))
+    pipeline.prepare_input_artifacts(run)
+
+    data = PyrenewHEWData.from_json(
+        run.data_dir / "data_for_model_fit.json",
+        fit_ed_visits=True,
+        fit_hospital_admissions=fit_hospital_admissions,
+    )
+    model = build_pyrenew_hew_model_from_dir(
+        run.model_dir,
+        fit_ed_visits=True,
+        fit_hospital_admissions=fit_hospital_admissions,
+    )
+    assert run.forecast_through == dt.date(2026, 11, 28)
+    assert data.right_truncation_offset == (
+        0 if fit_hospital_admissions else omitted_days
+    )
+
+    n_init = model.latent_infection_process_rv.n_initialization_points
+
+    def observation_mean(offset):
+        # Same latent incidence and random seed isolate the effect of reporting
+        # truncation in the actual PyRenew ED observation likelihood.
+        samples = trace(seed(model.ed_visit_obs_process_rv, rng_seed=0)).get_trace(
+            latent_infections=jnp.full(data.n_days_post_init + n_init, 0.001),
+            population_size=data.population_size,
+            data_observed=data.data_observed_disease_ed_visits,
+            model_t_observed=data.model_t_obs_ed_visits,
+            model_t_first_latent_infection=-n_init,
+            right_truncation_offset=offset,
+        )
+        return samples["observed_ed_visits"]["fn"].mean
+
+    fraction = observation_mean(data.right_truncation_offset) / observation_mean(None)
+    assert fraction.tolist() == pytest.approx([1.0, expected_fraction])
 
 
 def _run(tmp_path):

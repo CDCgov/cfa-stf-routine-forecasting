@@ -261,11 +261,11 @@ def nssp_freshness(
     selected_version_date: dt.date,
     forecast_date: dt.date,
 ) -> DataFreshness:
-    is_stale = selected_version_date != forecast_date
+    is_stale = selected_version_date < forecast_date
     reason = (
-        f"NSSP version {selected_version_date} does not match run date {forecast_date}"
+        f"NSSP version {selected_version_date} is older than forecast date {forecast_date}"
         if is_stale
-        else "NSSP version matches run date"
+        else "NSSP version is on or after forecast date"
     )
     return DataFreshness(
         source="nssp",
@@ -284,19 +284,21 @@ def nhsn_freshness(
     is_data_pub_day = forecast_date.weekday() in {2, 4}
 
     if is_data_pub_day:
-        is_stale = selected_version_date != forecast_date
+        is_stale = selected_version_date < forecast_date
         if is_stale:
             reason = (
-                f"NHSN version {selected_version_date} does not match run date "
+                f"NHSN version {selected_version_date} is older than forecast date "
                 f"{forecast_date}"
             )
         else:
-            reason = "NHSN version matches run date"
+            reason = "NHSN version is on or after forecast date"
     else:
         age_days = (forecast_date - selected_version_date).days
         is_stale = age_days >= 7
         if is_stale:
             reason = f"NHSN version {selected_version_date} is not less than a week old"
+        elif age_days < 0:
+            reason = "NHSN version is after forecast date"
         else:
             reason = f"NHSN version is {age_days} days old"
 

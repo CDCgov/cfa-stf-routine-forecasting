@@ -322,7 +322,7 @@ def test_surveillance_inputs_requires_at_least_one_source():
         )
 
 
-def test_nssp_freshness_requires_forecast_date_match():
+def test_nssp_freshness_marks_older_versions_stale():
     fresh = data_access.nssp_freshness(
         selected_version_date=dt.date(2026, 1, 7),
         forecast_date=dt.date(2026, 1, 7),
@@ -334,7 +334,21 @@ def test_nssp_freshness_requires_forecast_date_match():
 
     assert not fresh.is_stale
     assert stale.is_stale
-    assert "does not match run date" in stale.reason
+    assert "is older than forecast date" in stale.reason
+
+
+@pytest.mark.parametrize(
+    "freshness", [data_access.nssp_freshness, data_access.nhsn_freshness]
+)
+@pytest.mark.parametrize("day", [7, 8, 9])
+@pytest.mark.parametrize("offset", [0, 1])
+def test_versions_on_or_after_forecast_date_are_fresh(freshness, day, offset):
+    forecast_date = dt.date(2026, 1, day)
+    record = freshness(
+        selected_version_date=forecast_date + dt.timedelta(days=offset),
+        forecast_date=forecast_date,
+    )
+    assert not record.is_stale
 
 
 @pytest.mark.parametrize(

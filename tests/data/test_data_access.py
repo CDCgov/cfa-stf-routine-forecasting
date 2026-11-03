@@ -205,7 +205,7 @@ def test_load_dataops_nhsn_returns_normalized_source(monkeypatch):
     )
     monkeypatch.setattr(
         data_access,
-        "select_latest_nhsn_release",
+        "resolve_latest_nhsn_release",
         lambda: (True, dt.datetime(2026, 1, 8, 8)),
     )
     monkeypatch.setattr(
@@ -264,7 +264,7 @@ def test_load_dataops_nhsn_all_history_uses_minimum_lower_bound(monkeypatch):
     )
     monkeypatch.setattr(
         data_access,
-        "select_latest_nhsn_release",
+        "resolve_latest_nhsn_release",
         lambda: (True, dt.datetime(2026, 1, 8, 8)),
     )
     monkeypatch.setattr(
@@ -427,7 +427,7 @@ def test_resolve_latest_nssp_version_requires_datetime(monkeypatch, version):
 
 @pytest.mark.parametrize("version", [None, "latest"])
 @pytest.mark.parametrize("invalid_prelim", [True, False])
-def test_select_latest_nhsn_release_requires_datetime(
+def test_resolve_latest_nhsn_release_requires_datetime(
     monkeypatch, version, invalid_prelim
 ):
     monkeypatch.setattr(
@@ -438,10 +438,10 @@ def test_select_latest_nhsn_release_requires_datetime(
         ),
     )
     with pytest.raises(ValueError, match="No dated NHSN"):
-        data_access.select_latest_nhsn_release()
+        data_access.resolve_latest_nhsn_release()
 
 
-def test_select_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):
+def test_resolve_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):
     versions = iter([dt.datetime(2026, 1, 8, 8), dt.datetime(2026, 1, 7, 10)])
     calls = []
     monkeypatch.setattr(
@@ -450,7 +450,7 @@ def test_select_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):
         lambda **kwargs: calls.append(kwargs) or next(versions),
     )
 
-    prelim, selected_version = data_access.select_latest_nhsn_release()
+    prelim, selected_version = data_access.resolve_latest_nhsn_release()
 
     assert prelim
     assert selected_version == dt.datetime(2026, 1, 8, 8)
@@ -460,7 +460,7 @@ def test_select_latest_nhsn_release_uses_newer_preliminary_version(monkeypatch):
     ]
 
 
-def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
+def test_resolve_latest_nhsn_release_uses_newer_final_version(monkeypatch):
     versions = iter([dt.datetime(2026, 1, 7, 10), dt.datetime(2026, 1, 8, 8)])
     monkeypatch.setattr(
         data_access,
@@ -468,7 +468,7 @@ def test_select_latest_nhsn_release_uses_newer_final_version(monkeypatch):
         lambda **kwargs: next(versions),
     )
 
-    prelim, selected_version = data_access.select_latest_nhsn_release()
+    prelim, selected_version = data_access.resolve_latest_nhsn_release()
 
     assert not prelim
     assert selected_version == dt.datetime(2026, 1, 8, 8)

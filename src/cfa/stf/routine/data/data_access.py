@@ -199,18 +199,14 @@ def _load_dataops_nssp(
     return NSSPData(data=data, freshness=freshness, resolution="daily")
 
 
-def resolve_latest_nhsn_version(*, prelim: bool) -> dt.datetime:
-    """Resolve the latest version of the preliminary or final NHSN data."""
-    version = resolve_nhsn_hrd_version(prelim=prelim)
-    if not isinstance(version, dt.datetime):
-        release = "preliminary" if prelim else "final"
-        raise ValueError(f"No dated NHSN {release} version found")
-    return version
-
-
-def select_latest_nhsn_release() -> tuple[bool, dt.datetime]:
-    prelim_version = resolve_latest_nhsn_version(prelim=True)
-    final_version = resolve_latest_nhsn_version(prelim=False)
+def resolve_latest_nhsn_release() -> tuple[bool, dt.datetime]:
+    """Return the preliminary flag and timestamp of the latest NHSN release."""
+    prelim_version = resolve_nhsn_hrd_version(prelim=True)
+    final_version = resolve_nhsn_hrd_version(prelim=False)
+    if not isinstance(prelim_version, dt.datetime):
+        raise ValueError("No dated NHSN preliminary version found")
+    if not isinstance(final_version, dt.datetime):
+        raise ValueError("No dated NHSN final version found")
     if prelim_version >= final_version:
         return True, prelim_version
     return False, final_version
@@ -224,7 +220,7 @@ def _load_dataops_nhsn(
     max_allowed_training_date: dt.date,
     forecast_date: dt.date,
 ) -> NHSNData:
-    prelim, version = select_latest_nhsn_release()
+    prelim, version = resolve_latest_nhsn_release()
     source_data = get_nhsn_hrd(
         disease=disease,
         state_abb=loc_abb,

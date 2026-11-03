@@ -205,18 +205,3 @@ Run the reduced end-to-end pipeline when the model participates in fusion or bat
 ```shell
 just e2e mock
 ```
-
-## Forecast dates and data vintages
-
-`forecast_date` is the run's calendar date (the Dagster partition date).
-It anchors lookback, excluded training days, output dates, and the forecast endpoint: the MMWR week-ending Saturday containing `forecast_date + 21 days`.
-It replaces the former `run_date` and `report_date` arguments without aliases.
-Hubverse column names and horizon conventions are unchanged.
-
-Surveillance loaders resolve the latest available catalog version and pass its full timestamp as the loading cutoff.
-Each source records its actual vintage in `freshness.selected_version_date`.
-Older data do not move the forecast window.
-Parameter PMFs remain selected for `forecast_date`; the NSSP vintage determines reporting age.
-NowcastAutoGP indexes the reporting CDF by observation date.
-PyRenew aligns it to the shared latent timeline, padding the PMF with zeros if that timeline extends beyond the NSSP vintage.
-Existing freshness warnings and `fail_on_stale_data` remain available.

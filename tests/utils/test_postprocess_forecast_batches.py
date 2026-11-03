@@ -17,7 +17,7 @@ class TestHubverseTableFilename:
     """Tests for _hubverse_table_filename."""
 
     @pytest.mark.parametrize(
-        "report_date,disease,expected",
+        "forecast_date,disease,expected",
         [
             (
                 dt.date(2024, 12, 21),
@@ -36,8 +36,8 @@ class TestHubverseTableFilename:
             ),
         ],
     )
-    def test_hubverse_table_filename(self, report_date, disease, expected):
-        assert _hubverse_table_filename(report_date, disease) == expected
+    def test_hubverse_table_filename(self, forecast_date, disease, expected):
+        assert _hubverse_table_filename(forecast_date, disease) == expected
 
 
 class TestCombineHubverseTables:

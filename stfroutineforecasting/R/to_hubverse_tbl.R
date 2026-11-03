@@ -17,18 +17,18 @@ var_to_target <- function(variable, disease) {
 #' `model_runs/<batch_id>/<model_id>/samples.parquet`, where `<batch_id>` is the
 #' model batch identifier and `<model_id>` is the model run identifier.
 #'
-#' @param report_date Forecast report date.
+#' @param forecast_date Forecast report date.
 #'
 #' @returns A data frame of preliminary samples.
 #'
 #' @export
-raw_samples_to_prelim <- function(samples_path, report_date) {
+raw_samples_to_prelim <- function(samples_path, forecast_date) {
   raw_samples <- duckplyr::read_parquet_duckdb(
     samples_path,
     prudence = "lavish"
   )
 
-  report_date <- as.Date(report_date)
+  forecast_date <- as.Date(forecast_date)
 
   model_id <- samples_path |>
     fs::path_dir() |>
@@ -49,7 +49,7 @@ raw_samples_to_prelim <- function(samples_path, report_date) {
         .data$target_core
       )
     ) |>
-    dplyr::mutate(reference_date = report_date) |>
+    dplyr::mutate(reference_date = forecast_date) |>
     dplyr::mutate(horizon_timescale = "days") |>
     dplyr::mutate(
       horizon = forecasttools::horizons_from_target_end_dates(

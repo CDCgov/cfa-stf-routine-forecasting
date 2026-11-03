@@ -67,7 +67,7 @@ def _pipeline(
         loc="CA",
         output_dir=tmp_path,
         n_lookback_days=n_lookback_days,
-        run_date=dt.date(2024, 12, 20),
+        forecast_date=dt.date(2024, 12, 20),
         exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
         logger=logging.getLogger("test-forecast-pipeline"),
@@ -103,7 +103,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     run = pipeline.build_forecast_run()
 
     assert pipeline.requested_window == ForecastWindow(
-        report_date=dt.date(2024, 12, 20),
+        forecast_date=dt.date(2024, 12, 20),
         n_lookback_days=90,
         exclude_last_n_days=1,
     )
@@ -111,7 +111,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         disease="covid",
         loc="CA",
         forecast_window=ForecastWindow(
-            report_date=dt.date(2024, 12, 20),
+            forecast_date=dt.date(2024, 12, 20),
             n_lookback_days=90,
             exclude_last_n_days=1,
         ),
@@ -165,7 +165,7 @@ def test_build_forecast_run_loads_all_supported_history(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("report_date", "expected", "expected_days"),
+    ("forecast_date", "expected", "expected_days"),
     [
         (dt.date(2026, 9, 2), dt.date(2026, 9, 26), 25),
         (dt.date(2026, 9, 3), dt.date(2026, 9, 26), 24),
@@ -177,8 +177,10 @@ def test_build_forecast_run_loads_all_supported_history(monkeypatch, tmp_path):
         (dt.date(2026, 9, 9), dt.date(2026, 10, 3), 25),
     ],
 )
-def test_forecast_run_forecast_through(tmp_path, report_date, expected, expected_days):
-    run = make_test_forecast_run(output_dir=tmp_path, report_date=report_date)
+def test_forecast_run_forecast_through(
+    tmp_path, forecast_date, expected, expected_days
+):
+    run = make_test_forecast_run(output_dir=tmp_path, forecast_date=forecast_date)
 
     assert run.forecast_through == expected
     assert run.n_forecast_days == expected_days
@@ -347,7 +349,7 @@ def test_forecast_run_calculates_training_date_offsets(
 ):
     run = make_test_forecast_run(
         output_dir=tmp_path,
-        report_date=dt.date(2024, 12, 20),
+        forecast_date=dt.date(2024, 12, 20),
         max_allowed_training_date=max_allowed_training_date,
         exclude_last_n_days=exclude_last_n_days,
     )
@@ -361,7 +363,7 @@ def test_right_truncation_offset_uses_overall_last_date_with_multiple_sources(
 ):
     run = make_test_forecast_run(
         output_dir=tmp_path,
-        report_date=dt.date(2026, 9, 9),
+        forecast_date=dt.date(2026, 9, 9),
         n_lookback_days=30,
         max_allowed_training_date=dt.date(2026, 9, 7),
         last_training_date=dt.date(2026, 9, 4),
@@ -381,7 +383,7 @@ def test_right_truncation_offset_uses_overall_last_date_with_multiple_sources(
     assert run.nssp.last_training_date == dt.date(2026, 9, 4)
     assert run.nhsn.last_training_date == dt.date(2026, 9, 5)
     assert run.last_training_date == dt.date(2026, 9, 5)
-    expected_offset = (run.report_date - run.last_training_date).days - 1
+    expected_offset = (run.forecast_date - run.last_training_date).days - 1
     assert expected_offset == 3
     assert run.right_truncation_offset == expected_offset
 
@@ -390,3 +392,25 @@ def test_right_truncation_offset_uses_nhsn_date_without_nssp(tmp_path):
     run = make_test_forecast_run(output_dir=tmp_path, sources=("nhsn",))
 
     assert run.right_truncation_offset == 0
+
+
+@pytest.mark.parametrize("excluded_days", [0, 2])
+def test_stale_vintage_changes_offset_without_moving_window(tmp_path, excluded_days):
+    run = make_test_forecast_run(
+        output_dir=tmp_path,
+        forecast_date=dt.date(2026, 11, 3),
+        last_training_date=dt.date(2026, 10, 29) - dt.timedelta(days=excluded_days),
+        sources=("nssp",),
+    )
+    stale_nssp = replace(
+        run.nssp,
+        freshness=replace(
+            run.nssp.freshness, selected_version_date=dt.date(2026, 10, 30)
+        ),
+    )
+    stale_run = replace(run, surveillance=replace(run.surveillance, nssp=stale_nssp))
+    assert stale_run.forecast_window == run.forecast_window
+    assert stale_run.forecast_date == dt.date(2026, 11, 3)
+    assert stale_run.forecast_through == dt.date(2026, 11, 28)
+    assert stale_run.n_forecast_days == 30 + excluded_days
+    assert stale_run.right_truncation_offset == excluded_days

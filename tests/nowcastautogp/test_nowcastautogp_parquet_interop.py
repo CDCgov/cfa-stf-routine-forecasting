@@ -44,7 +44,7 @@ FORECAST_DATES = [
     dt.date(2024, 2, 7),
 ]
 TRAINING_DATES = [dt.date(2024, 1, 1) + dt.timedelta(days=i) for i in range(36)]
-REPORT_DATE = dt.date(2024, 2, 3)
+FORECAST_DATE = dt.date(2024, 2, 3)
 EXPECTED_DATES = FORECAST_DATES * 2
 NOWCASTAUTOGP_EXPECTED_DATES = (TRAINING_DATES + FORECAST_DATES) * 2
 NOWCASTAUTOGP_EXPECTED_DRAWS = [
@@ -276,7 +276,7 @@ def test_nowcastautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
             ),
         ]
         for model_fit_dir in model_fit_dirs:
-            model_fit_dir_to_hub_tbl(model_fit_dir, report_date=REPORT_DATE)
+            model_fit_dir_to_hub_tbl(model_fit_dir, forecast_date=FORECAST_DATE)
             hubverse_table_path = model_fit_dir / "hubverse_table.parquet"
             assert hubverse_table_path.is_file()
             hubverse_table = pl.read_parquet(hubverse_table_path)

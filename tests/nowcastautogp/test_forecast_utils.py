@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 from tests.factories import make_test_forecast_run
 
+from cfa.stf.routine.data import data_access
 from cfa.stf.routine.data.hubverse_nowcast import HubverseNowcast
 from cfa.stf.routine.nowcastautogp.config import NowcastAutoGPConfig
 from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
@@ -35,7 +36,7 @@ def _pipeline(tmp_path, **overrides):
         "ed_visit_type": "observed",
         "output_dir": tmp_path,
         "n_lookback_days": 90,
-        "run_date": dt.date(2024, 12, 20),
+        "forecast_date": dt.date(2024, 12, 20),
         "logger": logging.getLogger("test-nowcastautogp-pipeline"),
     }
     kwargs.update(overrides)
@@ -70,6 +71,65 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
     pipeline = _pipeline(tmp_path, target="nhsn", frequency="daily")
     with pytest.raises(ValueError, match="only available in epiweekly"):
         pipeline.validate_configuration()
+
+
+@patch("cfa.stf.routine.forecast_pipeline.ForecastPipeline.publish_outputs")
+@patch(
+    "cfa.stf.routine.nowcastautogp.forecast_nowcastautogp.run_nowcastautogp_forecast"
+)
+def test_forecast_with_nssp_vintage_one_day_before_forecast_date(
+    mock_forecast, mock_publish, monkeypatch, tmp_path, caplog
+):
+    forecast_date = dt.date(2026, 11, 3)
+    version = dt.datetime(2026, 11, 2, 12)
+    dates = [dt.date(2026, 10, 30), dt.date(2026, 10, 31), dt.date(2026, 11, 1)]
+    monkeypatch.setattr(data_access, "resolve_nssp_version", lambda **kwargs: version)
+
+    def get_nssp(**kwargs):
+        assert kwargs["as_of"] == version
+        return pl.DataFrame(
+            {
+                "date": date,
+                "state_abb": "CA",
+                "disease": disease,
+                "value": value,
+            }
+            for date in dates
+            for disease, value in [("covid", 10), ("total", 100)]
+        )
+
+    monkeypatch.setattr(data_access, "get_nssp", get_nssp)
+    monkeypatch.setattr(
+        data_access,
+        "get_us_loc_pop_tbl",
+        lambda: pl.DataFrame({"abbr": ["CA"], "population": [39_000_000]}),
+    )
+    pipeline = _pipeline(
+        tmp_path,
+        forecast_date=forecast_date,
+        nowcast_source_name="reporting-delay",
+        reporting_delay_pmf=[0.25, 0.5, 0.25],
+    )
+
+    pipeline.execute()
+
+    mock_forecast.assert_called_once()
+    model_input = json.loads(
+        mock_forecast.call_args.kwargs["json_input_path"].read_text()
+    )
+    assert model_input["dates"] == [date.isoformat() for date in dates]
+    assert model_input["forecast_through"] == "2026-11-28"
+    assert model_input["nowcast_dates"] == ["2026-10-31", "2026-11-01"]
+    # Reporting fractions are 0.75 and 0.25 at the actual Nov 2 vintage.
+    # Using the Nov 3 forecast date would incorrectly treat Oct 31 as complete.
+    assert model_input["nowcast_reports"][0] == pytest.approx([41 / 3, 43])
+    run = mock_publish.call_args.args[0]
+    assert run.forecast_date == forecast_date
+    assert run.nssp.freshness.selected_version_date == version.date()
+    assert run.is_stale
+    assert run.right_truncation_offset == 0
+    assert run.n_forecast_days == 27
+    assert "Stale input data" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -145,7 +205,7 @@ def test_epiweekly_input_includes_forecast_through(tmp_path):
     pipeline = _pipeline(tmp_path, frequency="epiweekly")
     run = make_test_forecast_run(
         output_dir=tmp_path,
-        report_date=dt.date(2026, 9, 8),
+        forecast_date=dt.date(2026, 9, 8),
         exclude_last_n_days=2,
         model_name=pipeline.model_name,
         sources=("nssp",),

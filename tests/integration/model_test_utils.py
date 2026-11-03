@@ -125,6 +125,40 @@ def configure_data_mode(request, monkeypatch) -> str:
     return data_mode
 
 
+def patch_mock_nssp_with_missing_values(
+    monkeypatch,
+) -> tuple[list[dt.date], dt.date]:
+    """Null two days and drop a third within one mid-training MMWR week.
+
+    Daily runs then see explicit ``NA`` values plus an implicit date gap, and
+    epiweekly runs see one dropped week. Returns the nulled and dropped dates.
+    """
+    window = ForecastWindow(
+        report_date=REPORT_DATE,
+        n_lookback_days=N_LOOKBACK_DAYS,
+        exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
+    )
+    midpoint = window.min_allowed_training_date + (
+        (window.max_allowed_training_date - window.min_allowed_training_date) / 2
+    )
+    sunday = midpoint - dt.timedelta(days=(midpoint.weekday() + 1) % 7)
+    null_dates = [sunday + dt.timedelta(days=offset) for offset in (1, 2)]
+    dropped_date = sunday + dt.timedelta(days=3)
+    original = make_surveillance_inputs
+
+    def with_missing_values(**kwargs):
+        surveillance = original(**kwargs)
+        data = surveillance.nssp.data.filter(
+            pl.col("date") != dropped_date
+        ).with_columns(
+            pl.when(~pl.col("date").is_in(null_dates)).then(pl.col(".value"))
+        )
+        return replace(surveillance, nssp=replace(surveillance.nssp, data=data))
+
+    monkeypatch.setitem(globals(), "make_surveillance_inputs", with_missing_values)
+    return null_dates, dropped_date
+
+
 def selected_nhsn_observations(
     disease: str,
     location: str,

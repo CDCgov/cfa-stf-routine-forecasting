@@ -168,3 +168,16 @@ def test_no_nan_in_inflate():
     # Sanity: typical numbers should not produce NaN/inf.
     value = inflate_report(7.0, 0.25)
     assert math.isfinite(value)
+
+
+@pytest.mark.parametrize("age, fraction", [(0, 0.25), (1, 0.75), (3, None)])
+def test_vintage_aligns_reporting_fraction_by_calendar_age(age, fraction):
+    as_of = dt.date(2026, 10, 30)
+    date = as_of - dt.timedelta(days=age + 1)
+    source = ReportingDelayNowcast([0.25, 0.5, 0.25], as_of=as_of)
+    result = source.get_nowcast_data(dates=[date], reports=[10.0])
+    if fraction is None:
+        assert result == NowcastData()
+    else:
+        assert result.dates == [date]
+        assert result.reports[0] == pytest.approx([(11.0 - fraction) / fraction])

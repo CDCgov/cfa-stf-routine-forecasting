@@ -54,6 +54,7 @@ class ReportingDelayNowcast:
     """
 
     reporting_delay_pmf: list[float]
+    as_of: dt.date | None = None
 
     @staticmethod
     def ensure_applicable(
@@ -93,6 +94,24 @@ class ReportingDelayNowcast:
             raise ValueError("dates and reports must have the same length")
 
         incomplete_fractions = reporting_inflation_factors(self.reporting_delay_pmf)
+
+        if self.as_of is not None:
+            nowcast_dates = []
+            estimates = []
+            for date, report in zip(dates, reports):
+                offset = (self.as_of - date).days - 1
+                if offset < 0:
+                    raise ValueError("Nowcast observation dates must precede as_of")
+                if offset < len(incomplete_fractions):
+                    nowcast_dates.append(date)
+                    estimates.append(
+                        inflate_report(float(report), incomplete_fractions[offset])
+                    )
+            return (
+                NowcastData(dates=nowcast_dates, reports=[estimates])
+                if nowcast_dates
+                else NowcastData()
+            )
 
         n_nowcast = min(len(reports), len(incomplete_fractions))
         if n_nowcast == 0:

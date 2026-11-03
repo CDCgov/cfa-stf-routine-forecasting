@@ -35,7 +35,7 @@ def _pipeline(tmp_path, **overrides):
         "ed_visit_type": "observed",
         "output_dir": tmp_path,
         "n_lookback_days": 90,
-        "run_date": dt.date(2024, 12, 20),
+        "forecast_date": dt.date(2024, 12, 20),
         "logger": logging.getLogger("test-nowcastautogp-pipeline"),
     }
     kwargs.update(overrides)
@@ -145,7 +145,7 @@ def test_epiweekly_input_includes_forecast_through(tmp_path):
     pipeline = _pipeline(tmp_path, frequency="epiweekly")
     run = make_test_forecast_run(
         output_dir=tmp_path,
-        report_date=dt.date(2026, 9, 8),
+        forecast_date=dt.date(2026, 9, 8),
         exclude_last_n_days=2,
         model_name=pipeline.model_name,
         sources=("nssp",),

@@ -1,7 +1,9 @@
 import datetime as dt
 import json
+from dataclasses import replace
 from unittest.mock import patch
 
+import polars as pl
 import pytest
 
 from cfa.stf.routine.pyrenew_hew.model_inputs import (
@@ -17,7 +19,7 @@ def _run(tmp_path):
         output_dir=tmp_path,
         disease="covid",
         loc="CA",
-        report_date=dt.date(2026, 7, 28),
+        forecast_date=dt.date(2026, 7, 28),
         first_training_date=dt.date(2026, 4, 29),
         max_allowed_training_date=dt.date(2026, 7, 27),
         model_name="pyrenew_e",
@@ -52,14 +54,14 @@ def test_resolve_pyrenew_model_inputs_loads_run_vintaged_pmfs(
     assert model_inputs.right_truncation_pmf == (0.25, 0.75)
     mock_generation_interval.assert_called_once_with(
         disease="covid",
-        as_of=run.report_date,
+        as_of=run.forecast_date,
     )
-    mock_delay.assert_called_once_with(disease="covid", as_of=run.report_date)
+    mock_delay.assert_called_once_with(disease="covid", as_of=run.forecast_date)
     mock_right_truncation.assert_called_once_with(
         state_abb="CA",
         disease="covid",
-        as_of=run.report_date,
-        reference_date=run.report_date,
+        as_of=run.forecast_date,
+        reference_date=run.forecast_date,
     )
 
 
@@ -122,3 +124,29 @@ def test_serialize_pyrenew_model_params_uses_run_population(
         "inf_to_hosp_admit_pmf": [0.0, 0.375, 0.625],
     }
     mock_approx_lognorm.assert_called_once()
+
+
+@patch(
+    "cfa.stf.routine.pyrenew_hew.model_inputs.approx_lognorm", return_value=(1.2, 0.3)
+)
+def test_shared_timeline_after_nssp_vintage_preserves_reporting_age(_mock, tmp_path):
+    from cfa.stf.routine.data.prep_data import serialize_data
+
+    run = _run(tmp_path)
+    nssp = replace(
+        run.nssp,
+        data=run.nssp.data.filter(pl.col("date") < dt.date(2026, 7, 25)),
+        freshness=replace(
+            run.nssp.freshness, selected_version_date=dt.date(2026, 7, 25)
+        ),
+    )
+    run = replace(run, surveillance=replace(run.surveillance, nssp=nssp))
+    assert run.last_training_date == dt.date(2026, 7, 27)
+    assert run.right_truncation_offset == -3
+    inputs = PyRenewModelInputs((1.0,), (0.0, 1.0), (0.25, 0.75))
+    serialize_pyrenew_model_params(run=run, model_inputs=inputs, save_dir=tmp_path)
+    params = json.loads((tmp_path / "model_params.json").read_text())
+    assert params["right_truncation_pmf"] == [0.0, 0.0, 0.0, 0.25, 0.75]
+    serialize_data(run)
+    data = json.loads((run.data_dir / "data_for_model_fit.json").read_text())
+    assert data["right_truncation_offset"] == 0

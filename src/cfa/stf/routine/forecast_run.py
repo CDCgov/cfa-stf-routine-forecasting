@@ -29,9 +29,9 @@ class ForecastRun:
         object.__setattr__(self, "output_dir", Path(self.output_dir))
 
     @property
-    def report_date(self) -> dt.date:
+    def forecast_date(self) -> dt.date:
         """Date on which the forecast is issued."""
-        return self.forecast_window.report_date
+        return self.forecast_window.forecast_date
 
     @property
     def forecast_through(self) -> dt.date:
@@ -82,9 +82,13 @@ class ForecastRun:
 
     @property
     def right_truncation_offset(self) -> int:
-        # The first entry of a source right-truncation PMF corresponds to reports
-        # for reference_date = report_date - 1 as of report_date.
-        return (self.report_date - self.last_training_date).days - 1
+        """Signed ED reporting age at the shared latent timeline endpoint."""
+        if self.nssp is None:
+            return 0
+        offset = (
+            self.nssp.freshness.selected_version_date - self.last_training_date
+        ).days - 1
+        return offset
 
     @property
     def nssp(self) -> NSSPData | None:

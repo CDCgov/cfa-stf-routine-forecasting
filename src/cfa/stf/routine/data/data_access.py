@@ -25,7 +25,7 @@ _FORECAST_SOURCE_NAMES = frozenset(get_args(ForecastSourceName))
 class DataFreshness:
     source: str
     selected_version_date: dt.date
-    run_date: dt.date
+    forecast_date: dt.date
     is_stale: bool
     reason: str
 
@@ -112,9 +112,10 @@ def _resolved_version_date(
     return version.date()
 
 
-def resolve_nssp_report_date() -> dt.date:
+def resolve_latest_nssp_version() -> dt.datetime:
     version = resolve_nssp_version(dataset="comprehensive")
-    return _resolved_version_date(version, dataset="comprehensive NSSP gold")
+    _resolved_version_date(version, dataset="comprehensive NSSP gold")
+    return version
 
 
 def _normalize_nssp_data(
@@ -185,19 +186,20 @@ def _load_dataops_nssp(
     disease: str,
     min_allowed_training_date: dt.date,
     max_allowed_training_date: dt.date,
-    run_date: dt.date,
+    forecast_date: dt.date,
 ) -> NSSPData:
-    version_date = resolve_nssp_report_date()
+    version = resolve_latest_nssp_version()
     source_data = get_nssp(
         disease=[disease, "total"],
         state_abb=loc_abb,
         dataset="comprehensive",
+        as_of=version,
         start_date=min_allowed_training_date,
         lazy=False,
     )
     freshness = nssp_freshness(
-        selected_version_date=version_date,
-        run_date=run_date,
+        selected_version_date=version.date(),
+        forecast_date=forecast_date,
     )
     data = _normalize_nssp_data(
         source_data,
@@ -206,15 +208,11 @@ def _load_dataops_nssp(
     return NSSPData(data=data, freshness=freshness, resolution="daily")
 
 
-def select_latest_nhsn_release() -> tuple[bool, dt.date]:
-    prelim_version = _resolved_version_date(
-        resolve_nhsn_hrd_version(prelim=True),
-        dataset="NHSN preliminary",
-    )
-    final_version = _resolved_version_date(
-        resolve_nhsn_hrd_version(prelim=False),
-        dataset="NHSN final",
-    )
+def select_latest_nhsn_release() -> tuple[bool, dt.datetime]:
+    prelim_version = resolve_nhsn_hrd_version(prelim=True)
+    final_version = resolve_nhsn_hrd_version(prelim=False)
+    _resolved_version_date(prelim_version, dataset="NHSN preliminary")
+    _resolved_version_date(final_version, dataset="NHSN final")
     if prelim_version >= final_version:
         return True, prelim_version
     return False, final_version
@@ -226,19 +224,20 @@ def _load_dataops_nhsn(
     loc_abb: str,
     min_allowed_training_date: dt.date,
     max_allowed_training_date: dt.date,
-    run_date: dt.date,
+    forecast_date: dt.date,
 ) -> NHSNData:
-    prelim, version_date = select_latest_nhsn_release()
+    prelim, version = select_latest_nhsn_release()
     source_data = get_nhsn_hrd(
         disease=disease,
         state_abb=loc_abb,
         prelim=prelim,
+        as_of=version,
         start_date=min_allowed_training_date,
         lazy=False,
     )
     freshness = nhsn_freshness(
-        selected_version_date=version_date,
-        run_date=run_date,
+        selected_version_date=version.date(),
+        forecast_date=forecast_date,
     )
     data = (
         source_data.filter(pl.col("date") >= min_allowed_training_date)
@@ -266,18 +265,18 @@ def _load_dataops_nhsn(
 def nssp_freshness(
     *,
     selected_version_date: dt.date,
-    run_date: dt.date,
+    forecast_date: dt.date,
 ) -> DataFreshness:
-    is_stale = selected_version_date != run_date
+    is_stale = selected_version_date != forecast_date
     reason = (
-        f"NSSP version {selected_version_date} does not match run date {run_date}"
+        f"NSSP version {selected_version_date} does not match run date {forecast_date}"
         if is_stale
         else "NSSP version matches run date"
     )
     return DataFreshness(
         source="nssp",
         selected_version_date=selected_version_date,
-        run_date=run_date,
+        forecast_date=forecast_date,
         is_stale=is_stale,
         reason=reason,
     )
@@ -286,21 +285,21 @@ def nssp_freshness(
 def nhsn_freshness(
     *,
     selected_version_date: dt.date,
-    run_date: dt.date,
+    forecast_date: dt.date,
 ) -> DataFreshness:
-    is_data_pub_day = run_date.weekday() in {2, 4}
+    is_data_pub_day = forecast_date.weekday() in {2, 4}
 
     if is_data_pub_day:
-        is_stale = selected_version_date != run_date
+        is_stale = selected_version_date != forecast_date
         if is_stale:
             reason = (
                 f"NHSN version {selected_version_date} does not match run date "
-                f"{run_date}"
+                f"{forecast_date}"
             )
         else:
             reason = "NHSN version matches run date"
     else:
-        age_days = (run_date - selected_version_date).days
+        age_days = (forecast_date - selected_version_date).days
         is_stale = age_days >= 7
         if is_stale:
             reason = f"NHSN version {selected_version_date} is not less than a week old"
@@ -310,7 +309,7 @@ def nhsn_freshness(
     return DataFreshness(
         source="nhsn",
         selected_version_date=selected_version_date,
-        run_date=run_date,
+        forecast_date=forecast_date,
         is_stale=is_stale,
         reason=reason,
     )
@@ -324,10 +323,10 @@ def apply_freshness_policy(
 ) -> None:
     for record in freshness:
         logger.info(
-            "Input data freshness: source=%s version=%s run_date=%s status=%s (%s)",
+            "Input data freshness: source=%s version=%s forecast_date=%s status=%s (%s)",
             record.source,
             record.selected_version_date,
-            record.run_date,
+            record.forecast_date,
             "stale" if record.is_stale else "fresh",
             record.reason,
         )
@@ -347,7 +346,7 @@ def load_surveillance_inputs(
     *,
     disease: str,
     loc_abb: str,
-    run_date: dt.date,
+    forecast_date: dt.date,
     min_allowed_training_date: dt.date,
     max_allowed_training_date: dt.date,
     sources: Collection[ForecastSourceName],
@@ -372,7 +371,7 @@ def load_surveillance_inputs(
             disease=disease,
             min_allowed_training_date=min_allowed_training_date,
             max_allowed_training_date=max_allowed_training_date,
-            run_date=run_date,
+            forecast_date=forecast_date,
         )
         if ed_visit_input_resolution == "epiweekly":
             logger.info("Aggregating ED visits to epiweekly resolution...")
@@ -389,7 +388,7 @@ def load_surveillance_inputs(
             loc_abb=loc_abb,
             min_allowed_training_date=min_allowed_training_date,
             max_allowed_training_date=max_allowed_training_date,
-            run_date=run_date,
+            forecast_date=forecast_date,
         )
         freshness.append(nhsn.freshness)
 

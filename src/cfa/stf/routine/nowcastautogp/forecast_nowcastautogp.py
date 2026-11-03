@@ -71,10 +71,15 @@ def _build_reporting_delay_nowcast(
         reporting_delay_pmf = get_nnh_right_truncation_pmf(
             state_abb=forecast_run.loc,
             disease=forecast_run.disease,
-            as_of=forecast_run.report_date,
-            reference_date=forecast_run.report_date,
+            as_of=forecast_run.forecast_date,
+            reference_date=forecast_run.forecast_date,
         )
-    return ReportingDelayNowcast(reporting_delay_pmf=reporting_delay_pmf)
+    if forecast_run.nssp is None:
+        raise ValueError("Reporting-delay nowcasting requires NSSP data")
+    return ReportingDelayNowcast(
+        reporting_delay_pmf=reporting_delay_pmf,
+        as_of=forecast_run.nssp.freshness.selected_version_date,
+    )
 
 
 def _resolve_nowcast_source(
@@ -221,7 +226,7 @@ class NowcastAutoGPPipeline(ForecastPipeline):
 
 def main(
     disease: str,
-    run_date: dt.date,
+    forecast_date: dt.date,
     loc: str,
     output_dir: Path | str,
     n_lookback_days: int | None,
@@ -268,7 +273,7 @@ def main(
         nowcast_source_name=nowcast_source_name,
         reporting_delay_pmf=reporting_delay_pmf,
         hubverse_nowcast_dir=hubverse_nowcast_dir,
-        run_date=run_date,
+        forecast_date=forecast_date,
         fail_on_stale_data=fail_on_stale_data,
         n_particles=n_particles,
         n_mcmc=n_mcmc,

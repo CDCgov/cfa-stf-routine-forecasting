@@ -63,7 +63,7 @@ def main(
     output_dir: Path | str,
     n_lookback_days: int | None,
     n_samples: int,
-    run_date: dt.date,
+    forecast_date: dt.date,
     exclude_last_n_days: int = 0,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
@@ -76,7 +76,7 @@ def main(
         loc=loc,
         output_dir=output_dir,
         n_lookback_days=n_lookback_days,
-        run_date=run_date,
+        forecast_date=forecast_date,
         exclude_last_n_days=exclude_last_n_days,
         fail_on_stale_data=fail_on_stale_data,
         n_samples=n_samples,
@@ -205,3 +205,18 @@ Run the reduced end-to-end pipeline when the model participates in fusion or bat
 ```shell
 just e2e mock
 ```
+
+## Forecast dates and data vintages
+
+`forecast_date` is the run's calendar date (the Dagster partition date).
+It anchors lookback, excluded training days, output dates, and the forecast endpoint: the MMWR week-ending Saturday containing `forecast_date + 21 days`.
+It replaces the former `run_date` and `report_date` arguments without aliases.
+Hubverse column names and horizon conventions are unchanged.
+
+Surveillance loaders resolve the latest available catalog version and pass its full timestamp as the loading cutoff.
+Each source records its actual vintage in `freshness.selected_version_date`.
+Older data do not move the forecast window.
+Parameter PMFs remain selected for `forecast_date`; the NSSP vintage determines reporting age.
+NowcastAutoGP indexes the reporting CDF by observation date.
+PyRenew aligns it to the shared latent timeline, padding the PMF with zeros if that timeline extends beyond the NSSP vintage.
+Existing freshness warnings and `fail_on_stale_data` remain available.

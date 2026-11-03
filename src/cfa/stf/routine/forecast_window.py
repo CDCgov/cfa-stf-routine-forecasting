@@ -47,7 +47,7 @@ class ForecastWindow:
 
     @property
     def forecast_through(self) -> dt.date:
-        """Last target date, three MMWR epiweeks beyond the report date."""
+        """Last target date, three MMWR epiweeks beyond the forecast date."""
         return ceiling_mmwr_epiweek(self.forecast_date + dt.timedelta(weeks=3))
 
     def model_batch_dir_name(self, disease: str) -> str:

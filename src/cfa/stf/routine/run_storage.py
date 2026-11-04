@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-import yaml
+from yaml12 import format_yaml
 
 RUN_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}(?:_[\w-]+)?")
 
@@ -50,7 +50,7 @@ def execution_directory(
             },
         )
         temporary = directory / f".launchpad.{uuid4().hex}.yaml"
-        temporary.write_text(yaml.safe_dump(config))
+        temporary.write_text(format_yaml(config))
         temporary.replace(directory / "launchpad.yaml")
         return directory
     raise RuntimeError("Execution directory is owned by another run")

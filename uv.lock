@@ -771,12 +771,12 @@ dependencies = [
     { name = "numpyro" },
     { name = "polarbayes" },
     { name = "polars", extra = ["numpy", "pyarrow"] },
+    { name = "py-yaml12" },
     { name = "pydantic" },
     { name = "pygit2" },
     { name = "pypdf" },
     { name = "pyrenew" },
     { name = "pyrenew-multisignal" },
-    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -816,12 +816,12 @@ requires-dist = [
     { name = "numpyro" },
     { name = "polarbayes", git = "https://github.com/cdcgov/polarbayes?rev=main" },
     { name = "polars", extras = ["pyarrow", "numpy"], specifier = ">=1.36" },
+    { name = "py-yaml12" },
     { name = "pydantic" },
     { name = "pygit2", specifier = ">=1.17.0" },
     { name = "pypdf", specifier = ">=6.10.1" },
     { name = "pyrenew" },
     { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=1c9fa48" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [package.metadata.requires-dev]

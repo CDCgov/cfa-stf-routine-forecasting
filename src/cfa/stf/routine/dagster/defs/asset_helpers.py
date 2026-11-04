@@ -50,9 +50,9 @@ def _get_model_loc_dir(
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
 
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     forecast_window = ForecastWindow(
-        report_date=run_date,
+        forecast_date=forecast_date,
         n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
         exclude_last_n_days=loc_config.exclude_last_n_days,
     )
@@ -82,7 +82,7 @@ def _run_fable_e_other(
 
     disease = model_base_config.diseases.current_value
     location = model_base_config.locations.current_value
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
@@ -104,7 +104,7 @@ def _run_fable_e_other(
         n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         ed_visit_input_resolution=ed_visit_input_resolution,
-        run_date=run_date,
+        forecast_date=forecast_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,
     )
 
@@ -122,7 +122,7 @@ def _run_pyrenew_model(
 
     disease = model_base_config.diseases.current_value
     location = model_base_config.locations.current_value
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
@@ -151,7 +151,7 @@ def _run_pyrenew_model(
         n_samples=pyrenew_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         rng_key=pyrenew_config.rng_key,
-        run_date=run_date,
+        forecast_date=forecast_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,
         **fit_flags,
         **forecast_flags,
@@ -168,7 +168,7 @@ def _run_nowcastautogp_e_pct_epiweekly(
 
     disease = model_base_config.diseases.current_value
     location = model_base_config.locations.current_value
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
     daily_forecast_output_dir = Path(
@@ -196,7 +196,7 @@ def _run_nowcastautogp_e_pct_epiweekly(
         smc_data_proportion=nowcastautogp_e_pct_epiweekly_config.smc_data_proportion,
         n_threads=nowcastautogp_e_pct_epiweekly_config.n_threads,
         nowcast_source_name="none",
-        run_date=run_date,
+        forecast_date=forecast_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,
         logger=context.log,
     )
@@ -233,8 +233,8 @@ def _run_fusion_model(
         save_figs=True,
         save_ci=True,
     )
-    run_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
-    model_fit_dir_to_hub_tbl(fusion_model_fit_dir, report_date=run_date)
+    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
+    model_fit_dir_to_hub_tbl(fusion_model_fit_dir, forecast_date=forecast_date)
 
     context.log.debug(f"config: '{model_base_config}'")
 

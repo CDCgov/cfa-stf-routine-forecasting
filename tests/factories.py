@@ -14,20 +14,20 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.forecast_window import ForecastWindow
 
-DEFAULT_REPORT_DATE = dt.date(2024, 12, 20)
+DEFAULT_FORECAST_DATE = dt.date(2024, 12, 20)
 
 
 def make_test_surveillance_inputs(
     *,
     loc_abb: str = "CA",
-    report_date: dt.date = DEFAULT_REPORT_DATE,
+    forecast_date: dt.date = DEFAULT_FORECAST_DATE,
     first_training_date: dt.date | None = None,
     last_training_date: dt.date | None = None,
     loc_pop: int = 1,
     nhsn_prelim: bool = False,
     sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
 ) -> SurveillanceInputs:
-    last_training_date = last_training_date or report_date
+    last_training_date = last_training_date or forecast_date
     first_training_date = first_training_date or last_training_date
     training_dates = list(dict.fromkeys((first_training_date, last_training_date)))
     requested_sources = frozenset(sources)
@@ -56,8 +56,8 @@ def make_test_surveillance_inputs(
     def freshness(source: str) -> DataFreshness:
         return DataFreshness(
             source=source,
-            selected_version_date=report_date,
-            run_date=report_date,
+            selected_version_date=forecast_date,
+            forecast_date=forecast_date,
             is_stale=False,
             reason=f"Test {source.upper()} data",
         )
@@ -92,7 +92,7 @@ def make_test_forecast_run(
     output_dir: Path | str,
     disease: str = "covid",
     loc: str = "CA",
-    report_date: dt.date = DEFAULT_REPORT_DATE,
+    forecast_date: dt.date = DEFAULT_FORECAST_DATE,
     n_lookback_days: int | None = 90,
     min_allowed_training_date: dt.date | None = None,
     first_training_date: dt.date | None = None,
@@ -105,19 +105,19 @@ def make_test_forecast_run(
     sources: Collection[ForecastSourceName] = ("nssp", "nhsn"),
 ) -> ForecastRun:
     """Build internally consistent state for one test forecast run."""
-    expected_max_allowed_training_date = report_date - dt.timedelta(
+    expected_max_allowed_training_date = forecast_date - dt.timedelta(
         days=exclude_last_n_days + 1
     )
     if max_allowed_training_date is None:
         max_allowed_training_date = expected_max_allowed_training_date
     elif max_allowed_training_date != expected_max_allowed_training_date:
         raise ValueError(
-            "max_allowed_training_date must agree with report_date and "
+            "max_allowed_training_date must agree with forecast_date and "
             "exclude_last_n_days"
         )
 
     forecast_window = ForecastWindow(
-        report_date=report_date,
+        forecast_date=forecast_date,
         n_lookback_days=n_lookback_days,
         exclude_last_n_days=exclude_last_n_days,
     )
@@ -127,7 +127,7 @@ def make_test_forecast_run(
         and min_allowed_training_date != expected_min_allowed_training_date
     ):
         raise ValueError(
-            "min_allowed_training_date must agree with report_date and n_lookback_days"
+            "min_allowed_training_date must agree with forecast_date and n_lookback_days"
         )
     min_allowed_training_date = expected_min_allowed_training_date
     first_training_date = (
@@ -142,7 +142,7 @@ def make_test_forecast_run(
 
     surveillance = make_test_surveillance_inputs(
         loc_abb=loc,
-        report_date=report_date,
+        forecast_date=forecast_date,
         first_training_date=first_training_date,
         last_training_date=last_training_date,
         loc_pop=loc_pop,

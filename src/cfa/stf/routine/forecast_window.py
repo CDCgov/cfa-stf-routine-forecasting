@@ -12,9 +12,9 @@ EARLIEST_TRAINING_DATE = dt.date(2022, 3, 1)
 
 @dataclass(frozen=True)
 class ForecastWindow:
-    """Report-anchored training and forecast boundaries."""
+    """Forecast-anchored training and forecast boundaries."""
 
-    report_date: dt.date
+    forecast_date: dt.date
     n_lookback_days: int | None = None
     exclude_last_n_days: int = 0
 
@@ -35,20 +35,20 @@ class ForecastWindow:
         requested_start = (
             dt.date.min
             if self.n_lookback_days is None
-            else self.report_date - dt.timedelta(days=self.n_lookback_days)
+            else self.forecast_date - dt.timedelta(days=self.n_lookback_days)
         )
         return max(requested_start, EARLIEST_TRAINING_DATE)
 
     @property
     def max_allowed_training_date(self) -> dt.date:
         """Latest date that may be retained for training."""
-        # The latest available observation is normally report_date - 1.
-        return self.report_date - dt.timedelta(days=self.exclude_last_n_days + 1)
+        # The latest available observation is normally forecast_date - 1.
+        return self.forecast_date - dt.timedelta(days=self.exclude_last_n_days + 1)
 
     @property
     def forecast_through(self) -> dt.date:
-        """Last target date, three MMWR epiweeks beyond the report date."""
-        return ceiling_mmwr_epiweek(self.report_date + dt.timedelta(weeks=3))
+        """Last target date, three MMWR epiweeks beyond the forecast date."""
+        return ceiling_mmwr_epiweek(self.forecast_date + dt.timedelta(weeks=3))
 
     def model_batch_dir_name(self, disease: str) -> str:
         """Return the batch directory name for this window and disease."""

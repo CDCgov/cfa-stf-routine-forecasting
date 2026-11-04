@@ -35,7 +35,7 @@ def py_scalar_to_r_scalar(py_scalar):
 
 def model_fit_dir_to_hub_tbl(
     model_fit_dir: Path | str,
-    report_date: dt.date,
+    forecast_date: dt.date,
     output_type: str = "samples",
 ) -> None:
     """Create a hubverse table from a model fit directory."""
@@ -43,8 +43,8 @@ def model_fit_dir_to_hub_tbl(
         UTILS_DIR / "model_fit_dir_to_hub_tbl.R",
         [
             str(model_fit_dir),
-            "--report-date",
-            report_date.isoformat(),
+            "--forecast-date",
+            forecast_date.isoformat(),
             "--output-type",
             output_type,
         ],

@@ -7,7 +7,7 @@ import pytest
 from tests.integration.generate_test_data import (
     DEFAULT_DISEASES,
     DEFAULT_LOCATIONS,
-    REPORT_DATE,
+    FORECAST_DATE,
 )
 from tests.integration.model_test_utils import (
     EXCLUDE_LAST_N_DAYS,
@@ -93,7 +93,7 @@ def _run_fusions(model_run_dir: Path) -> None:
             save_figs=True,
             save_ci=True,
         )
-        model_fit_dir_to_hub_tbl(fusion_model_dir, report_date=REPORT_DATE)
+        model_fit_dir_to_hub_tbl(fusion_model_dir, forecast_date=FORECAST_DATE)
 
 
 @pytest.mark.pipeline_e2e
@@ -147,7 +147,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             batch_dir = model_batch_dir(workspace, disease)
             batch_info = parse_model_batch_dir_name(batch_dir.name)
             postprocessed_path = (
-                batch_dir / f"{REPORT_DATE}-{batch_info['disease']}"
+                batch_dir / f"{FORECAST_DATE}-{batch_info['disease']}"
                 "-hubverse-table.parquet"
             )
             assert postprocessed_path.is_file(), (

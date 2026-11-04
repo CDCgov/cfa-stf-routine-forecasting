@@ -90,7 +90,7 @@ def serialize_data(
 
     data_for_model_fit = {
         "loc_pop": forecast_run.loc_pop,
-        "right_truncation_offset": forecast_run.right_truncation_offset,
+        "right_truncation_offset": max(0, forecast_run.right_truncation_offset),
         "nssp_training_data": (
             nssp_training_data.to_dict(as_series=False)
             if nssp_training_data is not None

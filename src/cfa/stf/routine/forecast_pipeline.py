@@ -31,7 +31,7 @@ class ForecastPipeline(ABC):
         loc: str,
         output_dir: Path | str,
         n_lookback_days: int | None = None,
-        run_date: dt.date,
+        forecast_date: dt.date,
         exclude_last_n_days: int = 0,
         fail_on_stale_data: bool = False,
         logger: logging.Logger | None = None,
@@ -40,7 +40,7 @@ class ForecastPipeline(ABC):
         self.loc = loc
         self.output_dir = Path(output_dir)
         self.requested_window = ForecastWindow(
-            report_date=run_date,
+            forecast_date=forecast_date,
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=exclude_last_n_days,
         )
@@ -100,7 +100,7 @@ class ForecastPipeline(ABC):
         surveillance = load_surveillance_inputs(
             disease=self.disease,
             loc_abb=self.loc,
-            run_date=effective_window.report_date,
+            forecast_date=effective_window.forecast_date,
             min_allowed_training_date=effective_window.min_allowed_training_date,
             max_allowed_training_date=effective_window.max_allowed_training_date,
             sources=self.sources,
@@ -146,7 +146,7 @@ class ForecastPipeline(ABC):
             save_figs=True,
             save_ci=True,
         )
-        model_fit_dir_to_hub_tbl(run.model_dir, report_date=run.report_date)
+        model_fit_dir_to_hub_tbl(run.model_dir, forecast_date=run.forecast_date)
         self.logger.info("Postprocessing complete.")
 
     def execute(self) -> None:
@@ -156,7 +156,7 @@ class ForecastPipeline(ABC):
             "date %s.",
             self.model_name,
             self.loc,
-            self.requested_window.report_date,
+            self.requested_window.forecast_date,
         )
         self.validate_configuration()
         run = self.build_forecast_run()
@@ -168,5 +168,5 @@ class ForecastPipeline(ABC):
             "date %s.",
             run.model_name,
             run.loc,
-            run.report_date,
+            run.forecast_date,
         )

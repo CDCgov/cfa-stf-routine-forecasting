@@ -22,8 +22,8 @@ from cfa.stf.routine.utils.directory_utils import (
 )
 
 
-def _hubverse_table_filename(report_date: str | dt.date, disease: str) -> str:
-    return f"{report_date}-{disease}-hubverse-table.parquet"
+def _hubverse_table_filename(forecast_date: str | dt.date, disease: str) -> str:
+    return f"{forecast_date}-{disease}-hubverse-table.parquet"
 
 
 # Batch collation assumes producer schemas already match. Type drift such as an
@@ -42,19 +42,19 @@ def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
     combined = pl.scan_parquet(
         parquet_files, cast_options=pl.ScanCastOptions(integer_cast="allow-float")
     )
-    report_dates = (
+    forecast_dates = (
         combined.select("reference_date")
         .unique()
         .collect()
         .get_column("reference_date")
     )
-    if len(report_dates) != 1:
+    if len(forecast_dates) != 1:
         raise ValueError(
             "Expected one reference_date across model batch Hubverse tables, "
-            f"found {report_dates.to_list()}"
+            f"found {forecast_dates.to_list()}"
         )
     output_file_name = _hubverse_table_filename(
-        report_dates.item(), batch_info["disease"]
+        forecast_dates.item(), batch_info["disease"]
     )
     output_path = model_batch_dir_path / output_file_name
     combined.sink_parquet(output_path)

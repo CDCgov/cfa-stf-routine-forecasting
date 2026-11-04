@@ -113,7 +113,7 @@ class HubverseNowcast:
         if hubverse.get_column("origin_date").null_count():
             raise ValueError("Hubverse Parquet contains missing origin_date values.")
         origins = hubverse.get_column("origin_date").unique().to_list()
-        expected_origin = self.forecast_run.report_date
+        expected_origin = self.forecast_run.forecast_date
         if len(origins) != 1 or origins[0] != expected_origin:
             raise ValueError(
                 "Hubverse Parquet must contain exactly the NowcastAutoGP run vintage "

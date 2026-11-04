@@ -294,17 +294,17 @@ class FakeNowcastSource:
 
 
 def _nowcastautogp_run(tmp_path):
-    report_date = dt.date(2024, 1, 3)
+    forecast_date = dt.date(2024, 1, 3)
     run = make_test_forecast_run(
         output_dir=tmp_path,
-        report_date=report_date,
+        forecast_date=forecast_date,
         n_lookback_days=2,
         first_training_date=dt.date(2024, 1, 1),
         max_allowed_training_date=dt.date(2024, 1, 2),
         model_name="test_model",
         sources=("nssp",),
     )
-    dates = pl.date_range(run.first_training_date, report_date, eager=True)
+    dates = pl.date_range(run.first_training_date, forecast_date, eager=True)
     variables = ("observed_ed_visits", "other_ed_visits")
     values_by_date = ((10.0, 90.0), (20.0, 80.0), (999.0, 1.0))
     nssp_data = pl.DataFrame(

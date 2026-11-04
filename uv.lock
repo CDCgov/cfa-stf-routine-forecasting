@@ -677,7 +677,7 @@ dependencies = [
 [[package]]
 name = "cfa-dagster"
 version = "1.7.1"
-source = { git = "https://github.com/cdcgov/cfa-dagster?rev=jk-serialize-namedtuple#26804213c356025649380a786829c4422495b5d7" }
+source = { git = "https://github.com/cdcgov/cfa-dagster?rev=jk-serialize-namedtuple#9ab699b9976c4101077596b22a4116a74dffb898" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },

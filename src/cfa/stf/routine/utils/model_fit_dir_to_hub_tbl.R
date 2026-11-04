@@ -6,7 +6,7 @@ library(forecasttools)
 
 model_fit_dir_to_hub_tbl <- function(
   model_fit_dir,
-  report_date,
+  forecast_date,
   output_type = c("both", "quantiles", "samples")
 ) {
   samples_path <- path(model_fit_dir, "samples", ext = "parquet")
@@ -14,7 +14,7 @@ model_fit_dir_to_hub_tbl <- function(
 
   hubverse_tbl <-
     samples_path |>
-    raw_samples_to_prelim(report_date = report_date) |>
+    raw_samples_to_prelim(forecast_date = forecast_date) |>
     prelim_samples_to_hubverse(output_type = output_type)
 
   forecasttools::write_tabular(hubverse_tbl, hubverse_path)
@@ -24,7 +24,7 @@ p <- arg_parser(
   "Create hubverse table from model fit directory."
 ) |>
   add_argument(
-    "--report-date",
+    "--forecast-date",
     help = "Forecast report date in YYYY-MM-DD format."
   ) |>
   add_argument(
@@ -41,6 +41,6 @@ argv <- parse_args(p)
 
 model_fit_dir_to_hub_tbl(
   model_fit_dir = argv$model_fit_dir,
-  report_date = as.Date(argv$report_date),
+  forecast_date = as.Date(argv$forecast_date),
   output_type = argv$output_type
 )

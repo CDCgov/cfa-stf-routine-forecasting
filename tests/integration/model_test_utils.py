@@ -8,7 +8,7 @@ import polars as pl
 from cfa.stf.forecasttools import ceiling_mmwr_epiweek
 from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from tests.integration.generate_test_data import (
-    REPORT_DATE,
+    FORECAST_DATE,
     REPORTING_DELAY_PMF,
     make_surveillance_inputs,
 )
@@ -23,7 +23,7 @@ from cfa.stf.routine.pyrenew_hew import forecast_pyrenew as pyrenew_module
 from cfa.stf.routine.pyrenew_hew import model_inputs as pyrenew_inputs_module
 from cfa.stf.routine.utils.data_utils import aggregate_nssp_to_epiweekly
 
-FORECAST_DIR_NAME = f"{REPORT_DATE.isoformat()}_forecasts"
+FORECAST_DIR_NAME = f"{FORECAST_DATE.isoformat()}_forecasts"
 N_LOOKBACK_DAYS = 42
 EXCLUDE_LAST_N_DAYS = 1
 MOCK_DATA_MODE = "mock"
@@ -65,7 +65,7 @@ def patch_dataops_with_mock_data(monkeypatch) -> None:
         *,
         disease,
         loc_abb,
-        run_date,
+        forecast_date,
         min_allowed_training_date,
         max_allowed_training_date,
         sources,
@@ -134,7 +134,7 @@ def patch_mock_nssp_with_missing_values(
     epiweekly runs see one dropped week. Returns the nulled and dropped dates.
     """
     window = ForecastWindow(
-        report_date=REPORT_DATE,
+        forecast_date=FORECAST_DATE,
         n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
     )
@@ -166,14 +166,14 @@ def selected_nhsn_observations(
     """Load the NHSN training observations selected for an integration run."""
     logger = logging.getLogger(__name__)
     forecast_window = ForecastWindow(
-        report_date=REPORT_DATE,
+        forecast_date=FORECAST_DATE,
         n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
     )
     surveillance = forecast_pipeline_module.load_surveillance_inputs(
         disease=disease,
         loc_abb=location,
-        run_date=REPORT_DATE,
+        forecast_date=FORECAST_DATE,
         min_allowed_training_date=forecast_window.min_allowed_training_date,
         max_allowed_training_date=forecast_window.max_allowed_training_date,
         sources={"nhsn"},
@@ -209,7 +209,7 @@ def run_fable(
         n_lookback_days=N_LOOKBACK_DAYS,
         exclude_last_n_days=EXCLUDE_LAST_N_DAYS,
         n_samples=40,
-        run_date=REPORT_DATE,
+        forecast_date=FORECAST_DATE,
         ed_visit_input_resolution=ed_visit_input_resolution,
     )
 
@@ -232,7 +232,7 @@ def run_pyrenew(
         n_chains=1,
         n_samples=40,
         n_warmup=40,
-        run_date=REPORT_DATE,
+        forecast_date=FORECAST_DATE,
         rng_key=12345,
         **fit_flags,
         **forecast_flags,
@@ -253,7 +253,7 @@ def run_nowcastautogp(
 ) -> None:
     nowcastautogp_module.main(
         disease=disease,
-        run_date=REPORT_DATE,
+        forecast_date=FORECAST_DATE,
         loc=location,
         output_dir=workspace / FORECAST_DIR_NAME,
         n_lookback_days=N_LOOKBACK_DAYS,
@@ -288,7 +288,7 @@ def assert_model_outputs(
 ) -> None:
     model_run_dir = model_batch_dir(workspace, disease) / "model_runs" / location
     expected_forecast_through = ceiling_mmwr_epiweek(
-        REPORT_DATE + dt.timedelta(weeks=3)
+        FORECAST_DATE + dt.timedelta(weeks=3)
     )
     for model_name in model_names:
         model_dir = model_run_dir / model_name

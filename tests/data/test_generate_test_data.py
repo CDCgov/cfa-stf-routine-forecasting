@@ -5,9 +5,9 @@ import polars as pl
 import pytest
 from tests.integration.generate_test_data import (
     FIRST_OBS_DATE,
+    FORECAST_DATE,
     HUBVERSE_NOWCAST_DIR_NAME,
     LAST_OBS_DATE,
-    REPORT_DATE,
     LocationData,
     _make_hubverse_nowcast_rows,
     _make_nssp,
@@ -60,8 +60,8 @@ def test_make_nssp_returns_location_level_cfa_stf_data_schema():
 
 
 def test_make_surveillance_inputs_respects_nssp_training_window():
-    min_allowed_training_date = REPORT_DATE - dt.timedelta(days=42)
-    max_allowed_training_date = REPORT_DATE - dt.timedelta(days=4)
+    min_allowed_training_date = FORECAST_DATE - dt.timedelta(days=42)
+    max_allowed_training_date = FORECAST_DATE - dt.timedelta(days=4)
 
     result = make_surveillance_inputs(
         location="CA",
@@ -141,6 +141,6 @@ def test_write_hubverse_nowcast_writes_data_and_figure(tmp_path):
         / "covid"
         / HUBVERSE_MODEL_OUTPUT_SUBDIR
     )
-    artifact_stem = f"{REPORT_DATE}-CFA-nowcastNHSN"
+    artifact_stem = f"{FORECAST_DATE}-CFA-nowcastNHSN"
     assert (output_dir / f"{artifact_stem}.parquet").is_file()
     assert (output_dir / f"{artifact_stem}.png").is_file()

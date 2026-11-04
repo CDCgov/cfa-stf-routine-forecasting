@@ -24,7 +24,7 @@ def _common_kwargs(tmp_path):
         "loc": "CA",
         "output_dir": tmp_path,
         "n_lookback_days": 90,
-        "run_date": dt.date(2024, 12, 20),
+        "forecast_date": dt.date(2024, 12, 20),
     }
 
 

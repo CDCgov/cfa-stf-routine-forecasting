@@ -29,14 +29,14 @@ def _run(
     *,
     disease: str = "covid",
     loc: str = "CA",
-    report_date: dt.date = ORIGIN,
+    forecast_date: dt.date = ORIGIN,
 ):
     return make_test_forecast_run(
         output_dir=tmp_path,
         disease=disease,
         loc=loc,
-        report_date=report_date,
-        max_allowed_training_date=report_date - dt.timedelta(days=1),
+        forecast_date=forecast_date,
+        max_allowed_training_date=forecast_date - dt.timedelta(days=1),
         model_name="nowcastautogp_nhsn_epiweekly",
         sources={"nhsn"},
     )

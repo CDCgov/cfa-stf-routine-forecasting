@@ -28,7 +28,7 @@ withr::with_tempdir({
   forecasttools::write_tabular(raw_samples_fixture, samples_path)
   prelim_samples <- raw_samples_to_prelim(
     samples_path,
-    report_date = as.Date("2024-02-03")
+    forecast_date = as.Date("2024-02-03")
   )
 })
 

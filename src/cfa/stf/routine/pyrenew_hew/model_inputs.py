@@ -33,13 +33,13 @@ def resolve_pyrenew_model_inputs(
     generation_interval_pmf = tuple(
         get_nnh_generation_interval_pmf(
             disease=run.disease,
-            as_of=run.report_date,
+            as_of=run.forecast_date,
         )
     )
     raw_delay_pmf = list(
         get_nnh_delay_pmf(
             disease=run.disease,
-            as_of=run.report_date,
+            as_of=run.forecast_date,
         )
     )
     # We do not model a zero infection-to-recorded-admission delay.
@@ -54,8 +54,8 @@ def resolve_pyrenew_model_inputs(
             get_nnh_right_truncation_pmf(
                 state_abb=run.loc,
                 disease=run.disease,
-                as_of=run.report_date,
-                reference_date=run.report_date,
+                as_of=run.forecast_date,
+                reference_date=run.forecast_date,
             )
         )
     except ValueError:
@@ -86,7 +86,10 @@ def serialize_pyrenew_model_params(
         "population_size": run.loc_pop,
         "pop_fraction": [1],
         "generation_interval_pmf": model_inputs.generation_interval_pmf,
-        "right_truncation_pmf": model_inputs.right_truncation_pmf,
+        # PyRenew slices a CDF at a nonnegative offset. Extend its support
+        # when the shared timeline extends beyond the NSSP vintage.
+        "right_truncation_pmf": (0.0,) * max(0, -run.right_truncation_offset)
+        + model_inputs.right_truncation_pmf,
         "inf_to_hosp_admit_lognormal_loc": lognormal_loc,
         "inf_to_hosp_admit_lognormal_scale": lognormal_scale,
         "inf_to_hosp_admit_pmf": model_inputs.infection_to_admission_pmf,

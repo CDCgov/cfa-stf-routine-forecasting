@@ -15,13 +15,13 @@ from cfa.stf.routine.dagster.defs.asset_config import (
     daily_partitions_def,
 )
 from cfa.stf.routine.dagster.defs.asset_helpers import (
-    _fuse_pyrenew_fable_e_other,
     _run_fable_e_other,
     _run_nowcastautogp_e_pct_epiweekly,
     _run_pyrenew_model,
     _throw_if_backfill,
 )
 from cfa.stf.routine.dagster.defs.automation import eager_on_wednesday
+from cfa.stf.routine.run_storage import dagster_execution_directory
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
 # Shared Asset Decorator Arguments
@@ -189,105 +189,16 @@ def nowcastautogp_e_pct_epiweekly(
     )
 
 
-# Fusion Assets
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
-    ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
-    tags=E_DATA_RERUN_TAGS,
-)
-def fuse_pyrenew_e_fable(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
-    _fuse_pyrenew_fable_e_other(
-        context,
-        model_base_config,
-        pyrenew_model_name="pyrenew_e",
-        epiweekly=False,
-    )
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
-    ins={
-        "pyrenew_e": dg.In(dg.Nothing),
-        "epiweekly_fable_e_other": dg.In(dg.Nothing),
-    },
-    tags=E_DATA_RERUN_TAGS,
-)
-def fuse_pyrenew_e_fable_epiweekly(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
-    _fuse_pyrenew_fable_e_other(
-        context,
-        model_base_config,
-        pyrenew_model_name="pyrenew_e",
-        epiweekly=True,
-    )
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
-    ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
-    tags=HE_DATA_RERUN_TAGS,
-)
-def fuse_pyrenew_he_fable(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
-    _fuse_pyrenew_fable_e_other(
-        context,
-        model_base_config,
-        pyrenew_model_name="pyrenew_he",
-        epiweekly=False,
-    )
-
-
-@dynamic_graph_asset(
-    **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
-    group_name="Fusion",
-    ins={
-        "pyrenew_he": dg.In(dg.Nothing),
-        "epiweekly_fable_e_other": dg.In(dg.Nothing),
-    },
-    tags=HE_DATA_RERUN_TAGS,
-)
-def fuse_pyrenew_he_fable_epiweekly(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
-):
-    _fuse_pyrenew_fable_e_other(
-        context,
-        model_base_config,
-        pyrenew_model_name="pyrenew_he",
-        epiweekly=True,
-    )
-
-
 # Postprocessing Asset
 
 
 @dg.asset(
     deps=[
-        "fuse_pyrenew_e_fable",
-        "fuse_pyrenew_e_fable_epiweekly",
-        "fuse_pyrenew_he_fable",
-        "fuse_pyrenew_he_fable_epiweekly",
+        "pyrenew_e",
+        "pyrenew_he",
         "pyrenew_h",
+        "fable_e_other",
+        "epiweekly_fable_e_other",
         "nowcastautogp_e_pct_epiweekly",
     ],
     partitions_def=daily_partitions_def,
@@ -323,6 +234,5 @@ def postprocess_forecasts(
     postprocess(
         base_forecast_dir=daily_forecast_output_dir,
         diseases=config.postprocess_diseases,
-        skip_existing=config.skip_existing,
-        local_copy_dir=daily_forecast_output_dir,
+        execution_dir=dagster_execution_directory(context, daily_forecast_output_dir),
     )

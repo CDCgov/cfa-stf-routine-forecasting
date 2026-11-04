@@ -5,8 +5,6 @@ from dataclasses import dataclass
 
 from cfa.stf.forecasttools import ceiling_mmwr_epiweek
 
-from cfa.stf.routine.lookback import format_lookback_days
-
 EARLIEST_TRAINING_DATE = dt.date(2022, 3, 1)
 
 
@@ -49,8 +47,3 @@ class ForecastWindow:
     def forecast_through(self) -> dt.date:
         """Last target date, three MMWR epiweeks beyond the forecast date."""
         return ceiling_mmwr_epiweek(self.forecast_date + dt.timedelta(weeks=3))
-
-    def model_batch_dir_name(self, disease: str) -> str:
-        """Return the batch directory name for this window and disease."""
-        lookback = format_lookback_days(self.n_lookback_days)
-        return f"{disease}_lookback-{lookback}_omit-{self.exclude_last_n_days}"

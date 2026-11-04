@@ -1,142 +1,151 @@
-"""Unit tests for postprocess_forecast_batches utility functions."""
+"""Execution identity, discovery, and downstream orchestration contracts."""
 
 import datetime as dt
-from pathlib import Path
+import json
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
 
-from cfa.stf.routine.utils.postprocess_forecast_batches import (
-    _hubverse_table_filename,
-    combine_hubverse_tables,
-    model_batch_dir_to_target_path,
+from cfa.stf.routine.run_storage import (
+    dagster_execution_directory,
+    execution_directory,
+    latest_fits,
+    write_json,
 )
+from cfa.stf.routine.utils import postprocess_forecast_batches as postprocess
+
+START = dt.datetime(2026, 9, 2, 12, tzinfo=dt.UTC)
 
 
-class TestHubverseTableFilename:
-    """Tests for _hubverse_table_filename."""
+def execution(base, id, hour=0):
+    return execution_directory(base, START + dt.timedelta(hours=hour), id, {})
 
-    @pytest.mark.parametrize(
-        "forecast_date,disease,expected",
-        [
-            (
-                dt.date(2024, 12, 21),
-                "covid",
-                "2024-12-21-covid-hubverse-table.parquet",
-            ),
-            (
-                "2024-12-21",
-                "flu",
-                "2024-12-21-flu-hubverse-table.parquet",
-            ),
-            (
-                dt.date(2025, 1, 5),
-                "rsv",
-                "2025-01-05-rsv-hubverse-table.parquet",
-            ),
-        ],
+
+def fit(directory, model, value=1.0, location="CA", complete=True):
+    path = directory / location / "covid" / model
+    path.mkdir(parents=True, exist_ok=True)
+    write_json(
+        path / "metadata.json",
+        {
+            "forecast_date": "2026-09-02",
+            "forecast_through": "2026-09-26",
+        },
     )
-    def test_hubverse_table_filename(self, forecast_date, disease, expected):
-        assert _hubverse_table_filename(forecast_date, disease) == expected
+    pl.DataFrame(
+        {"reference_date": [dt.date(2026, 9, 2)], "value": [value]}
+    ).write_parquet(path / "hubverse_table.parquet")
+    if complete:
+        write_json(path / "complete.json", {"complete": True})
+    return path
 
 
-class TestCombineHubverseTables:
-    """Tests for combine_hubverse_tables."""
-
-    def _make_batch_dir(self, tmp_path: Path) -> Path:
-        """Create a model batch directory with a valid name."""
-        batch_dir = tmp_path / "covid_lookback-90_omit-0"
-        batch_dir.mkdir()
-        return batch_dir
-
-    def _write_hubverse_table(self, parent: Path, df: pl.DataFrame) -> Path:
-        """Write a hubverse_table.parquet inside parent directory."""
-        parent.mkdir(parents=True, exist_ok=True)
-        path = parent / "hubverse_table.parquet"
-        df.write_parquet(path)
-        return path
-
-    def test_combine_raises_when_no_tables_found(self, tmp_path):
-        """combine_hubverse_tables raises FileNotFoundError when no tables found."""
-        batch_dir = self._make_batch_dir(tmp_path)
-
-        with pytest.raises(FileNotFoundError, match="No hubverse_table.parquet files"):
-            combine_hubverse_tables(batch_dir)
-
-    def test_combine_creates_output_file(self, tmp_path):
-        """combine_hubverse_tables creates the expected output parquet file."""
-        batch_dir = self._make_batch_dir(tmp_path)
-
-        df = pl.DataFrame(
-            {
-                "reference_date": [dt.date(2024, 12, 21)],
-                "location": ["CA"],
-                "value": [1.0],
-            }
-        )
-        self._write_hubverse_table(batch_dir / "loc_CA", df)
-
-        combine_hubverse_tables(batch_dir)
-
-        output = batch_dir / "2024-12-21-covid-hubverse-table.parquet"
-        assert output.exists()
-
-    def test_combine_concatenates_multiple_tables(self, tmp_path):
-        """combine_hubverse_tables concatenates tables from multiple subdirs."""
-        batch_dir = self._make_batch_dir(tmp_path)
-
-        df_ca = pl.DataFrame(
-            {
-                "reference_date": [dt.date(2024, 12, 21)],
-                "location": ["CA"],
-                "value": [1.0],
-            }
-        )
-        df_tx = pl.DataFrame(
-            {
-                "reference_date": [dt.date(2024, 12, 21)],
-                "location": ["TX"],
-                "value": [2.0],
-            }
-        )
-        self._write_hubverse_table(batch_dir / "loc_CA", df_ca)
-        self._write_hubverse_table(batch_dir / "loc_TX", df_tx)
-
-        combine_hubverse_tables(batch_dir)
-
-        output = batch_dir / "2024-12-21-covid-hubverse-table.parquet"
-        result = pl.read_parquet(output)
-        assert result.shape[0] == 2
-        assert set(result["location"].to_list()) == {"CA", "TX"}
-
-    def test_combine_recursive_search(self, tmp_path):
-        """combine_hubverse_tables finds hubverse_table.parquet files recursively."""
-        batch_dir = self._make_batch_dir(tmp_path)
-
-        df = pl.DataFrame(
-            {
-                "reference_date": [dt.date(2024, 12, 21)],
-                "location": ["WA"],
-                "value": [3.0],
-            }
-        )
-        self._write_hubverse_table(batch_dir / "deep" / "nested" / "loc_WA", df)
-
-        combine_hubverse_tables(batch_dir)
-
-        output = batch_dir / "2024-12-21-covid-hubverse-table.parquet"
-        result = pl.read_parquet(output)
-        assert result.shape[0] == 1
-        assert result["location"][0] == "WA"
+def test_identity_shared_across_workers_and_collision(tmp_path):
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        paths = list(pool.map(lambda _: execution(tmp_path, "same"), range(16)))
+    assert len(set(paths)) == 1
+    assert paths[0].name == "2026-09-02-12-00-00"
+    second = execution(tmp_path, "different")
+    assert second != paths[0]
+    assert execution(tmp_path, "different") == second
+    assert (second / "launchpad.yaml").exists()
 
 
-def test_model_batch_dir_to_target_path_uses_batch_configuration(tmp_path):
-    result = model_batch_dir_to_target_path("covid_lookback-150_omit-3", tmp_path)
+def test_dagster_identity_uses_persisted_start(tmp_path):
+    context = SimpleNamespace(
+        run_id="run",
+        run=SimpleNamespace(run_config={"ops": {}}),
+        instance=SimpleNamespace(
+            get_run_record_by_id=lambda _: SimpleNamespace(start_time=START.timestamp())
+        ),
+    )
+    assert dagster_execution_directory(
+        context, tmp_path
+    ) == dagster_execution_directory(context, tmp_path)
+    assert (tmp_path / "2026-09-02-12-00-00").is_dir()
 
-    assert result == tmp_path / "lookback-150-omit-3-figures" / "covid"
+
+def test_latest_completed_per_location_and_renamed_run(tmp_path):
+    older = execution(tmp_path, "old")
+    newer = execution(tmp_path, "new", 1)
+    first = fit(older, "pyrenew_e")
+    other_location = fit(older, "pyrenew_e", location="TX")
+    fit(newer, "pyrenew_e", complete=False)
+    assert latest_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
+    latest = fit(newer, "pyrenew_e")
+    snapshot = latest_fits(tmp_path)
+    assert snapshot[("CA", "covid", "pyrenew_e")] == latest
+    assert snapshot[("TX", "covid", "pyrenew_e")] == other_location
+    newer.rename(tmp_path / "disabled")
+    assert latest_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
+    assert snapshot[("CA", "covid", "pyrenew_e")] == latest
 
 
-def test_model_batch_dir_to_target_path_formats_unlimited_lookback(tmp_path):
-    result = model_batch_dir_to_target_path("covid_lookback-all_omit-3", tmp_path)
+@pytest.mark.parametrize("separate", [False, True])
+def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, separate):
+    first = execution(tmp_path, "first")
+    second = execution(tmp_path, "second", 1) if separate else first
+    downstream = execution(tmp_path, "downstream", 2) if separate else first
+    numerator = fit(first, "pyrenew_e")
+    other = fit(second, "daily_fable_e_other")
+    calls = []
 
-    assert result == tmp_path / "lookback-all-omit-3-figures" / "covid"
+    def fuse(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["numerator_dir"] == numerator
+        assert kwargs["other_dir"] == other
+        assert kwargs["destination_dir"].parents[2] == downstream
+
+    monkeypatch.setattr(postprocess, "create_prop_fusion_model", fuse)
+    monkeypatch.setattr(
+        postprocess, "make_figures_from_model_fit_dir", lambda *a, **k: None
+    )
+
+    def publish(path, **kwargs):
+        pl.DataFrame(
+            {"reference_date": [dt.date(2026, 9, 2)], "value": [3.0]}
+        ).write_parquet(path / "hubverse_table.parquet")
+
+    monkeypatch.setattr(postprocess, "model_fit_dir_to_hub_tbl", publish)
+    postprocess.main(tmp_path, ["covid"], execution_dir=downstream)
+    assert len(calls) == 1
+    output = downstream / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
+    assert pl.read_parquet(output).height == 3
+    fusion = downstream / "CA/covid/prop_pyrenew_e_daily_fable_e_other"
+    assert (fusion / "complete.json").is_file()
+    assert json.loads((fusion / "metadata.json").read_text())["sources"] == [
+        str(numerator),
+        str(other),
+    ]
+
+
+def test_incompatible_horizons_fail(tmp_path):
+    run = execution(tmp_path, "run")
+    fit(run, "pyrenew_e")
+    other = fit(run, "daily_fable_e_other")
+    write_json(
+        other / "metadata.json",
+        {"forecast_date": "2026-09-02", "forecast_through": "2026-10-03"},
+    )
+    with pytest.raises(ValueError, match="windows differ"):
+        postprocess.main(tmp_path, execution_dir=run)
+
+
+def test_real_dagster_run_shares_identity_across_dependent_assets(tmp_path):
+    import dagster as dg
+
+    paths = []
+
+    @dg.asset
+    def base_model(context):
+        paths.append(dagster_execution_directory(context, tmp_path))
+
+    @dg.asset(deps=[base_model])
+    def fusion(context):
+        paths.append(dagster_execution_directory(context, tmp_path))
+
+    result = dg.materialize([base_model, fusion])
+    assert result.success
+    assert len(paths) == 2
+    assert paths[0] == paths[1]

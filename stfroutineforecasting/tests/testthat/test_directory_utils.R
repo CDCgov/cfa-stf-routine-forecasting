@@ -26,11 +26,16 @@ invalid_model_batch_dirs <- c(
 
 target_locations <- c("ME", "US", "CA")
 
-valid_model_run <- valid_model_batch |>
-  dplyr::mutate(
-    dirname = fs::path(dirname, "model_runs", target_locations),
-    location = target_locations
-  )
+valid_model_run <- tibble::tibble(
+  dirname = fs::path(
+    "2026-09-02_forecasts",
+    "2026-09-02-12-00-00",
+    target_locations,
+    c("covid", "flu", "rsv")
+  ),
+  location = target_locations,
+  disease = c("covid", "flu", "rsv")
+)
 
 
 test_that("parse_model_batch_dir_path() works as expected.", {
@@ -102,7 +107,7 @@ test_that("parse_model_run_dir_path() works as expected.", {
       dplyr::mutate(dirname = fs::path(dirname, "test")) |>
       dplyr::pull(dirname) |>
       parse_model_run_dir_path(),
-    regex = "Invalid format for model batch directory name"
+    regex = "Invalid disease directory"
   )
 })
 

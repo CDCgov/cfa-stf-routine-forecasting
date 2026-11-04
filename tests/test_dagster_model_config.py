@@ -45,7 +45,10 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     )
 
 
-def test_postprocess_always_copies_to_daily_output(monkeypatch):
+def test_postprocess_uses_executing_run(monkeypatch):
+    monkeypatch.setattr(
+        assets, "dagster_execution_directory", lambda context, base: base / "run"
+    )
     postprocess = Mock()
     monkeypatch.setattr(assets, "_throw_if_backfill", Mock())
     monkeypatch.setattr(assets, "postprocess", postprocess)
@@ -56,7 +59,6 @@ def test_postprocess_always_copies_to_daily_output(monkeypatch):
             asset_config.PostProcessConfig(
                 output_basedir="custom-output",
                 postprocess_diseases=["flu"],
-                skip_existing=True,
             ),
         )
 
@@ -64,8 +66,7 @@ def test_postprocess_always_copies_to_daily_output(monkeypatch):
     postprocess.assert_called_once_with(
         base_forecast_dir=daily_output,
         diseases=["flu"],
-        skip_existing=True,
-        local_copy_dir=daily_output,
+        execution_dir=daily_output / "run",
     )
 
 
@@ -113,6 +114,9 @@ def test_location_lookback_override(
 
 
 def test_model_runners_use_their_named_lookbacks(monkeypatch):
+    monkeypatch.setattr(
+        asset_helpers, "dagster_execution_directory", lambda context, base: base / "run"
+    )
     context = SimpleNamespace(
         partition_key="2026-09-09",
         log=Mock(),
@@ -146,7 +150,7 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     )
 
     shared_arguments = {
-        "output_dir": Path("ca-output/2026-09-09_forecasts"),
+        "output_dir": Path("ca-output/2026-09-09_forecasts/run"),
         "exclude_last_n_days": 2,
         "fail_on_stale_data": False,
     }
@@ -158,19 +162,3 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     for name, expected in shared_arguments.items():
         assert forecast_nowcastautogp.call_args.kwargs[name] == expected
     assert forecast_nowcastautogp.call_args.kwargs["n_lookback_days"] == 200
-
-
-def test_fusion_directory_uses_fable_pyrenew_lookback():
-    context = SimpleNamespace(
-        partition_key="2026-09-09",
-        log=Mock(),
-    )
-    model_base_config = _model_base_config()
-
-    assert asset_helpers._get_model_loc_dir(context, model_base_config) == Path(
-        "ca-output",
-        "2026-09-09_forecasts",
-        "covid_lookback-100_omit-2",
-        "model_runs",
-        "CA",
-    )

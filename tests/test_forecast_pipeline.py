@@ -117,7 +117,7 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
         ),
         requested_window=pipeline.requested_window,
         model_name="test_model",
-        output_dir=tmp_path,
+        output_dir=pipeline.output_dir,
         surveillance=surveillance,
     )
     assert calls["load"]["sources"] == {"nssp"}
@@ -125,8 +125,8 @@ def test_build_forecast_run_loads_inputs_and_constructs_canonical_state(
     assert calls["load"]["max_allowed_training_date"] == dt.date(2024, 12, 18)
     assert calls["load"]["ed_visit_input_resolution"] == "epiweekly"
     assert calls["load"]["fail_on_stale_data"] is True
-    assert run.model_batch_dir == (tmp_path / "covid_lookback-90_omit-1")
-    assert run.model_run_dir == run.model_batch_dir / "model_runs" / "CA"
+    assert run.model_batch_dir == pipeline.output_dir
+    assert run.model_run_dir == run.model_batch_dir / "CA" / "covid"
     assert run.model_dir == run.model_run_dir / "test_model"
     assert run.data_dir == run.model_dir / "data"
     assert run.first_training_date == dt.date(2024, 9, 22)
@@ -161,7 +161,7 @@ def test_build_forecast_run_loads_all_supported_history(monkeypatch, tmp_path):
     assert calls["min_allowed_training_date"] == dt.date(2022, 3, 1)
     assert run.first_training_date == dt.date(2022, 3, 1)
     assert run.exclude_last_n_days == 4
-    assert run.model_batch_dir == tmp_path / "covid_lookback-all_omit-1"
+    assert run.model_batch_dir.parent == tmp_path
 
 
 @pytest.mark.parametrize(
@@ -237,9 +237,7 @@ def test_build_forecast_run_applies_minimum_exclusion(
         assert run.forecast_window is not run.requested_window
     assert calls["load"]["min_allowed_training_date"] == dt.date(2024, 9, 21)
     assert calls["load"]["max_allowed_training_date"] == expected_max_allowed
-    assert run.model_batch_dir == (
-        tmp_path / f"covid_lookback-90_omit-{requested_exclusion}"
-    )
+    assert run.model_batch_dir == pipeline.output_dir
     assert run.right_truncation_offset == expected_exclusion
 
 
@@ -264,8 +262,8 @@ def test_model_minimum_does_not_change_batch_directory(monkeypatch, tmp_path):
     assert baseline_run.first_training_date == constrained_run.first_training_date
     assert baseline_run.last_training_date != constrained_run.last_training_date
     assert baseline_run.requested_window == constrained_run.requested_window
-    assert baseline_run.model_batch_dir == constrained_run.model_batch_dir
-    assert baseline_run.model_batch_dir == tmp_path / "covid_lookback-90_omit-1"
+    assert baseline_run.model_batch_dir != constrained_run.model_batch_dir
+    assert baseline_run.model_batch_dir.parent == tmp_path
 
 
 def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):

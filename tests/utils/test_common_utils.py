@@ -89,7 +89,6 @@ class TestValidationUtils:
         )
 
         assert window.forecast_through == dt.date(2026, 10, 3)
-        assert window.model_batch_dir_name("covid") == ("covid_lookback-150_omit-3")
 
     def test_unlimited_forecast_window_uses_all_batch_name(self):
         window = ForecastWindow(
@@ -99,7 +98,6 @@ class TestValidationUtils:
         )
 
         assert window.min_allowed_training_date == dt.date(2022, 3, 1)
-        assert window.model_batch_dir_name("covid") == "covid_lookback-all_omit-30"
 
     @pytest.mark.parametrize(
         ("n_lookback_days", "encoded"),
@@ -180,7 +178,7 @@ class TestDirectoryUtils:
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=3,
         )
-        name = window.model_batch_dir_name("covid")
+        name = f"covid_lookback-{format_lookback_days(window.n_lookback_days)}_omit-3"
 
         assert name == expected_name
         assert parse_model_batch_dir_name(name) == {

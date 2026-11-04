@@ -60,13 +60,11 @@ class ForecastRun:
 
     @property
     def model_batch_dir(self) -> Path:
-        return self.output_dir / self.requested_window.model_batch_dir_name(
-            self.disease
-        )
+        return self.output_dir
 
     @property
     def model_run_dir(self) -> Path:
-        return self.model_batch_dir / "model_runs" / self.loc
+        return self.output_dir / self.loc / self.disease
 
     @property
     def model_dir(self) -> Path:

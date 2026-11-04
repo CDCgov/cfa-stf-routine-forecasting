@@ -10,9 +10,8 @@ parse_model_run_dir_path(model_run_dir_path)
 \item{model_run_dir_path}{Path to parse.}
 }
 \value{
-A one-row tibble containing \code{location}, canonical \code{disease},
-\code{n_lookback_days}, and \code{exclude_last_n_days} values. An unlimited lookback
-is represented by \code{Inf}.
+A tibble containing \code{location} and canonical \code{disease}.
+Training window information is stored in each fit's metadata.json.
 }
 \description{
 Parse path to a model run directory

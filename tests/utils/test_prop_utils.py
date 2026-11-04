@@ -283,3 +283,39 @@ def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
     assert "data_type" not in samples.columns
     assert data.height == 4
     assert data.get_column("data_type").to_list() == expected_data_type
+
+
+@pytest.mark.parametrize("missing_forecast", [False, True])
+def test_cross_run_fusion_intersects_history_and_requires_forecast(
+    tmp_path, missing_forecast
+):
+    numerator = tmp_path / "first/CA/flu/num"
+    other = tmp_path / "second/CA/flu/other"
+    destination = tmp_path / "third/CA/flu/fusion"
+    dates = [dt.date(2025, 1, day) for day in range(1, 5)]
+    num = _model_frame(dates, [2] * 4, variable="observed_ed_visits", draws=1)
+    other_dates = dates[1:-1] if missing_forecast else dates[1:]
+    den = _model_frame(
+        other_dates, [8] * len(other_dates), variable="other_ed_visits", draws=1
+    )
+    _write_model_outputs(numerator, num, num.drop(".draw"))
+    _write_model_outputs(other, den, den.drop(".draw"))
+    kwargs = dict(
+        num_model_name="num",
+        other_model_name="other",
+        numerator_dir=numerator,
+        other_dir=other,
+        destination_dir=destination,
+        augment_other_with_obs=False,
+        forecast_date=dates[2],
+        forecast_through=dates[3],
+    )
+    if missing_forecast:
+        with pytest.raises(ValueError, match="required forecast dates"):
+            create_prop_fusion_model(**kwargs)
+        assert not (destination / "samples.parquet").exists()
+    else:
+        create_prop_fusion_model(**kwargs)
+        samples = read_tabular(destination / "samples.parquet")
+        assert samples["date"].to_list() == dates[1:]
+        assert samples[".value"].to_list() == [0.2] * 3

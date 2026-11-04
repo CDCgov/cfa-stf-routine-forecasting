@@ -16,16 +16,11 @@ from cfa.stf.routine.dagster.defs.asset_config import (
 )
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
-from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
-from cfa.stf.routine.utils.r_utils import (
-    make_figures_from_model_fit_dir,
-    model_fit_dir_to_hub_tbl,
-)
+from cfa.stf.routine.run_storage import dagster_execution_directory
 
 # Utility Functions
 
@@ -38,34 +33,6 @@ def _throw_if_backfill(
     latest_partition = partition_def.get_last_partition_key()
     if current_partition != latest_partition:
         raise RuntimeError("STF forecast models do not support backfills")
-
-
-def _get_model_loc_dir(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-) -> Path:
-    disease = model_base_config.diseases.current_value
-    location = model_base_config.locations.current_value
-
-    loc_config = model_base_config.get_by_location(location)
-    context.log.debug(f"loc_config: '{loc_config}'")
-
-    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
-    forecast_window = ForecastWindow(
-        forecast_date=forecast_date,
-        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
-        exclude_last_n_days=loc_config.exclude_last_n_days,
-    )
-    model_batch_dir_name = forecast_window.model_batch_dir_name(disease)
-
-    model_loc_dir = Path(
-        loc_config.output_basedir,
-        f"{context.partition_key}_forecasts",
-        model_batch_dir_name,
-        "model_runs",
-        location,
-    )
-    return model_loc_dir
 
 
 # Model Runner functions
@@ -95,6 +62,9 @@ def _run_fable_e_other(
     )
 
     context.log.info(f"fable_e_other_config: '{fable_e_other_config}'")
+    daily_forecast_output_dir = dagster_execution_directory(
+        context, daily_forecast_output_dir
+    )
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_fable(
         disease=disease,
@@ -139,6 +109,9 @@ def _run_pyrenew_model(
         flag_prefix="forecast",
     )
     context.log.info(f"config: '{pyrenew_config}'")
+    daily_forecast_output_dir = dagster_execution_directory(
+        context, daily_forecast_output_dir
+    )
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
     forecast_pyrenew(
         disease=disease,
@@ -178,6 +151,9 @@ def _run_nowcastautogp_e_pct_epiweekly(
     context.log.info(
         f"nowcastautogp_e_pct_epiweekly_config: '{nowcastautogp_e_pct_epiweekly_config}'"
     )
+    daily_forecast_output_dir = dagster_execution_directory(
+        context, daily_forecast_output_dir
+    )
     context.log.info(f"Will write to: {daily_forecast_output_dir}")
 
     forecast_nowcastautogp(
@@ -199,65 +175,4 @@ def _run_nowcastautogp_e_pct_epiweekly(
         forecast_date=forecast_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,
         logger=context.log,
-    )
-
-
-def _run_fusion_model(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
-    num_model_name,
-    other_model_name,
-    aggregate_num,
-    aggregate_other,
-    fusion_model_name,
-) -> str | None:
-    """
-    Helper function to run fusion model.
-    """
-    _throw_if_backfill(context, daily_partitions_def)
-    model_loc_dir = _get_model_loc_dir(context, model_base_config)
-    create_prop_fusion_model(
-        model_run_dir=model_loc_dir,
-        num_model_name=num_model_name,
-        other_model_name=other_model_name,
-        aggregate_num=aggregate_num,
-        aggregate_other=aggregate_other,
-    )
-
-    fusion_model_fit_dir = Path(model_loc_dir, fusion_model_name)
-
-    make_figures_from_model_fit_dir(fusion_model_fit_dir)
-
-    make_figures_from_model_fit_dir(
-        fusion_model_fit_dir,
-        save_figs=True,
-        save_ci=True,
-    )
-    forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
-    model_fit_dir_to_hub_tbl(fusion_model_fit_dir, forecast_date=forecast_date)
-
-    context.log.debug(f"config: '{model_base_config}'")
-
-
-def _fuse_pyrenew_fable_e_other(
-    context,
-    model_base_config: ModelBaseConfig,
-    pyrenew_model_name,
-    epiweekly: bool,
-):
-    other_model_name = "epiweekly_fable_e_other" if epiweekly else "daily_fable_e_other"
-    fusion_model_name = (
-        f"prop_epiweekly_aggregated_{pyrenew_model_name}_epiweekly_fable_e_other"
-        if epiweekly
-        else f"prop_{pyrenew_model_name}_daily_fable_e_other"
-    )
-    aggregate_num = epiweekly
-    _run_fusion_model(
-        context=context,
-        model_base_config=model_base_config,
-        num_model_name=pyrenew_model_name,
-        other_model_name=other_model_name,
-        aggregate_num=aggregate_num,
-        aggregate_other=False,
-        fusion_model_name=fusion_model_name,
     )

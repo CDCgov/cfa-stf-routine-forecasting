@@ -1,10 +1,11 @@
 """Shared lifecycle for routine forecast pipelines."""
 
 import datetime as dt
+import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from cfa.stf.routine.data.data_access import (
@@ -15,6 +16,7 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.run_storage import standalone_directory, write_json
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -108,6 +110,13 @@ class ForecastPipeline(ABC):
             fail_on_stale_data=self.fail_on_stale_data,
             logger=self.logger,
         )
+        invocation = json.loads(
+            json.dumps(
+                {key: value for key, value in vars(self).items() if key != "logger"},
+                default=str,
+            )
+        )
+        self.output_dir = standalone_directory(self.output_dir, invocation)
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,
@@ -160,9 +169,26 @@ class ForecastPipeline(ABC):
         )
         self.validate_configuration()
         run = self.build_forecast_run()
+        run.model_dir.mkdir(parents=True, exist_ok=True)
+        (run.model_dir / "complete.json").unlink(missing_ok=True)
+        write_json(
+            run.model_dir / "metadata.json",
+            {
+                "model": run.model_name,
+                "location": run.loc,
+                "disease": run.disease,
+                "forecast_date": run.forecast_date,
+                "forecast_through": run.forecast_through,
+                "requested_window": asdict(run.requested_window),
+                "effective_window": asdict(run.forecast_window),
+                "first_training_date": run.first_training_date,
+                "last_training_date": run.last_training_date,
+            },
+        )
         self.prepare_input_artifacts(run)
         self.run_model(run)
         self.publish_outputs(run)
+        write_json(run.model_dir / "complete.json", {"complete": True})
         self.logger.info(
             "Single-location pipeline complete for model %s, location %s, and run "
             "date %s.",

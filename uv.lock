@@ -776,6 +776,7 @@ dependencies = [
     { name = "pypdf" },
     { name = "pyrenew" },
     { name = "pyrenew-multisignal" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -820,6 +821,7 @@ requires-dist = [
     { name = "pypdf", specifier = ">=6.10.1" },
     { name = "pyrenew" },
     { name = "pyrenew-multisignal", git = "https://github.com/CDCgov/pyrenew-multisignal?rev=1c9fa48" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [package.metadata.requires-dev]

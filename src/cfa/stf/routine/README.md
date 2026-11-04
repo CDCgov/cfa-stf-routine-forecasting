@@ -112,8 +112,7 @@ The pipeline's `requested_window` preserves that caller configuration; the run's
 The resulting layout is:
 
 ```text
-<output_dir>/<disease>_lookback-<days-or-all>_omit-<days>/
-  model_runs/<location>/<model_name>/
+<output_dir>/<run_timestamp>/<location>/<disease>/<model_name>/
     data/
       combined_data.tsv
       data_for_model_fit.json
@@ -205,3 +204,20 @@ Run the reduced end-to-end pipeline when the model participates in fusion or bat
 ```shell
 just e2e mock
 ```
+
+Each Dagster run uses its persisted UTC start time for `run_timestamp`.
+Models and sequential fusion executed in the same run share this directory; separately launched runs have separate directories.
+Timestamp collisions receive an execution ID suffix.
+The root contains `launchpad.yaml` and execution metadata.
+Standalone entrypoints allocate a new execution directory for each invocation.
+
+Postprocessing snapshots the latest completed fit for each location, disease, and model, performs the available PyRenew/Fable fusions sequentially, and saves results under its own execution directory.
+Summaries are in `summary/<disease>/`, with source paths recorded alongside them.
+Fits without `complete.json` are ignored.
+Fusion keeps overlapping historical dates and requires complete forecast coverage.
+Lookback and omission are recorded in `metadata.json`, not encoded in paths.
+
+Old forecast layouts are not discovered.
+Deploy producers and consumers together.
+Rename a timestamp directory to a name such as `disabled-<timestamp>` (or remove it) to exclude it from future discovery.
+A new postprocessing run reflects that change; existing summaries retain their recorded provenance.

@@ -83,20 +83,18 @@ parse_model_batch_dir_path <- function(model_batch_dir_path) {
 #' date, and extract key quantities of interest.
 #'
 #' @param model_run_dir_path Path to parse.
-#' @return A one-row tibble containing `location`, canonical `disease`,
-#' `n_lookback_days`, and `exclude_last_n_days` values. An unlimited lookback
-#' is represented by `Inf`.
+#' @return A tibble containing `location` and canonical `disease`.
+#' Training window information is stored in each fit's metadata.json.
 #'
 #' @export
 parse_model_run_dir_path <- function(model_run_dir_path) {
-  batch_dir <- model_run_dir_path |>
-    fs::path_dir() |>
-    fs::path_dir() |>
-    fs::path_file()
-
-  batch_dir |>
-    parse_model_batch_dir_path() |>
-    dplyr::mutate(location = fs::path_file(model_run_dir_path))
+  if (!all(fs::path_file(model_run_dir_path) %in% disease_names)) {
+    stop("Invalid disease directory")
+  }
+  tibble::tibble(
+    location = fs::path_file(fs::path_dir(model_run_dir_path)),
+    disease = fs::path_file(model_run_dir_path)
+  )
 }
 
 

@@ -14,9 +14,9 @@ base_date <- as.Date("2024-01-01")
 test_that("load_training_data returns training rows without data_type", {
   withr::with_tempdir({
     model_dir <- fs::path(
-      "covid_lookback-2_omit-0",
-      "model_runs",
+      "2026-09-02-12-00-00",
       "CA",
+      "covid",
       "fable_e_daily"
     )
     fs::dir_create(fs::path(model_dir, "data"))

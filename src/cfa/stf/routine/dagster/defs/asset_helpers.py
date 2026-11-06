@@ -16,11 +16,12 @@ from cfa.stf.routine.dagster.defs.asset_config import (
 )
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
+from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion
 from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.run_storage import dagster_execution_directory
+from cfa.stf.routine.run_storage import dagster_execution_directory, latest_fits
 
 # Utility Functions
 
@@ -176,3 +177,24 @@ def _run_nowcastautogp_e_pct_epiweekly(
         fail_on_stale_data=loc_config.fail_on_stale_data,
         logger=context.log,
     )
+
+
+def _fuse_pyrenew_fable_e_other(
+    context: dg.OpExecutionContext,
+    model_base_config: ModelBaseConfig,
+    pyrenew_model_name: str,
+    epiweekly: bool,
+) -> Path:
+    """Materialize one fusion using the latest completed upstream fits."""
+    _throw_if_backfill(context, daily_partitions_def)
+    location = model_base_config.locations.current_value
+    disease = model_base_config.diseases.current_value
+    config = model_base_config.get_by_location(location)
+    base = Path(config.output_basedir, f"{context.partition_key}_forecasts")
+    execution = dagster_execution_directory(context, base)
+    spec = next(
+        spec
+        for spec in FUSION_SPECS
+        if spec.numerator == pyrenew_model_name and spec.aggregate_num == epiweekly
+    )
+    return run_fusion(spec, latest_fits(base), execution, location, disease)

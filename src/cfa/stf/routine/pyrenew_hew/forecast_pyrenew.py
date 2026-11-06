@@ -112,6 +112,21 @@ class PyRenewPipeline(ForecastPipeline):
         self.forecast_wastewater = forecast_wastewater
         self.rng_key = rng_key
 
+    def invocation_config(self) -> dict:
+        return super().invocation_config() | {
+            "n_chains": self.n_chains,
+            "n_warmup": self.n_warmup,
+            "n_samples": self.n_samples,
+            "fit_ed_visits": self.fit_ed_visits,
+            "fit_hospital_admissions": self.fit_hospital_admissions,
+            "fit_wastewater": self.fit_wastewater,
+            "forecast_ed_visits": self.forecast_ed_visits,
+            "forecast_hospital_admissions": self.forecast_hospital_admissions,
+            "forecast_wastewater": self.forecast_wastewater,
+            "rng_key": self.rng_key,
+            "priors_path": str(self.priors_path),
+        }
+
     @property
     def model_name(self) -> str:
         return pyrenew_model_name_from_flags(

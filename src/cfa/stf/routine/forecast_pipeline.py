@@ -1,7 +1,6 @@
 """Shared lifecycle for routine forecast pipelines."""
 
 import datetime as dt
-import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
@@ -72,6 +71,19 @@ class ForecastPipeline(ABC):
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
+    def invocation_config(self) -> dict:
+        """Serializable parameters for standalone execution provenance."""
+        return {
+            "model": self.model_name,
+            "disease": self.disease,
+            "location": self.loc,
+            "output_dir": str(self.output_dir),
+            "forecast_date": self.requested_window.forecast_date.isoformat(),
+            "n_lookback_days": self.requested_window.n_lookback_days,
+            "exclude_last_n_days": self.requested_window.exclude_last_n_days,
+            "fail_on_stale_data": self.fail_on_stale_data,
+        }
+
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
         effective_exclusion = max(
@@ -110,13 +122,9 @@ class ForecastPipeline(ABC):
             fail_on_stale_data=self.fail_on_stale_data,
             logger=self.logger,
         )
-        invocation = json.loads(
-            json.dumps(
-                {key: value for key, value in vars(self).items() if key != "logger"},
-                default=str,
-            )
+        self.output_dir = standalone_directory(
+            self.output_dir, self.invocation_config()
         )
-        self.output_dir = standalone_directory(self.output_dir, invocation)
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,

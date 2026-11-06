@@ -163,3 +163,33 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
         sentinel.samples,
         run.model_dir / "samples.parquet",
     )
+
+
+def test_explicit_invocation_configuration_round_trips(tmp_path):
+    from yaml12 import format_yaml, parse_yaml
+
+    from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
+        NowcastAutoGPPipeline,
+    )
+
+    pipelines = [
+        FablePipeline(**_common_kwargs(tmp_path), n_samples=10),
+        _pyrenew_pipeline(tmp_path),
+        NowcastAutoGPPipeline(
+            **_common_kwargs(tmp_path),
+            target="nssp",
+            frequency="daily",
+            exclude_date_ranges=[(dt.date(2024, 1, 1), dt.date(2024, 1, 2))],
+        ),
+    ]
+    for pipeline in pipelines:
+        pipeline.unrelated_internal_state = object()
+        config = pipeline.invocation_config()
+        assert parse_yaml(format_yaml(config)) == config
+        assert "unrelated_internal_state" not in config
+        assert config["forecast_date"] == "2024-12-20"
+        assert config["model"] == pipeline.model_name
+    assert pipelines[1].invocation_config()["priors_path"] == "priors.py"
+    assert pipelines[2].invocation_config()["exclude_date_ranges"] == [
+        ["2024-01-01", "2024-01-02"]
+    ]

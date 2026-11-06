@@ -8,7 +8,10 @@ from types import SimpleNamespace
 import polars as pl
 import pytest
 
+from cfa.stf.routine import fusion as fusion_module
+from cfa.stf.routine.fusion import FUSION_SPECS, current_fits, run_fusion
 from cfa.stf.routine.run_storage import (
+    FitKey,
     dagster_execution_directory,
     execution_directory,
     latest_fits,
@@ -97,9 +100,9 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
         assert kwargs["other_dir"] == other
         assert kwargs["destination_dir"].parents[2] == downstream
 
-    monkeypatch.setattr(postprocess, "create_prop_fusion_model", fuse)
+    monkeypatch.setattr(fusion_module, "create_prop_fusion_model", fuse)
     monkeypatch.setattr(
-        postprocess, "make_figures_from_model_fit_dir", lambda *a, **k: None
+        fusion_module, "make_figures_from_model_fit_dir", lambda *a, **k: None
     )
 
     def publish(path, **kwargs):
@@ -107,7 +110,8 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
             {"reference_date": [dt.date(2026, 9, 2)], "value": [3.0]}
         ).write_parquet(path / "hubverse_table.parquet")
 
-    monkeypatch.setattr(postprocess, "model_fit_dir_to_hub_tbl", publish)
+    monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
+    run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), downstream, "CA", "covid")
     postprocess.main(tmp_path, ["covid"], execution_dir=downstream)
     assert len(calls) == 1
     output = downstream / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
@@ -129,7 +133,7 @@ def test_incompatible_horizons_fail(tmp_path):
         {"forecast_date": "2026-09-02", "forecast_through": "2026-10-03"},
     )
     with pytest.raises(ValueError, match="windows differ"):
-        postprocess.main(tmp_path, execution_dir=run)
+        run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), run, "CA", "covid")
 
 
 def test_real_dagster_run_shares_identity_across_dependent_assets(tmp_path):
@@ -149,3 +153,48 @@ def test_real_dagster_run_shares_identity_across_dependent_assets(tmp_path):
     assert result.success
     assert len(paths) == 2
     assert paths[0] == paths[1]
+
+
+@pytest.mark.parametrize("changed", ["numerator", "other", "missing", "unrelated"])
+def test_summaries_exclude_stale_fusion_without_recomputing(
+    tmp_path, monkeypatch, changed
+):
+    initial = execution(tmp_path, "first")
+    numerator = fit(initial, "pyrenew_e")
+    other = fit(initial, "daily_fable_e_other")
+    fusion = fit(initial, FUSION_SPECS[0].model_name, value=3.0)
+    write_json(fusion / "metadata.json", {"sources": [str(numerator), str(other)]})
+    newer = execution(tmp_path, "new", 1)
+    if changed == "missing":
+        (other / "complete.json").unlink()
+    else:
+        model = {
+            "numerator": "pyrenew_e",
+            "other": "daily_fable_e_other",
+            "unrelated": "pyrenew_h",
+        }[changed]
+        fit(newer, model, value=10.0)
+
+    def unexpected_fusion(**kwargs):
+        pytest.fail("Postprocessing must never execute fusion")
+
+    monkeypatch.setattr(fusion_module, "create_prop_fusion_model", unexpected_fusion)
+    snapshot = latest_fits(tmp_path)
+    key = FitKey("CA", "covid", FUSION_SPECS[0].model_name)
+    assert (key in current_fits(snapshot)) == (changed == "unrelated")
+    postprocess.main(tmp_path, ["covid"], execution_dir=newer)
+    values = pl.read_parquet(
+        newer / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
+    )["value"].to_list()
+    assert (3.0 in values) == (changed == "unrelated")
+    assert key in snapshot  # Filtering must not mutate the discovery snapshot.
+
+
+def test_fusion_missing_inputs_fails_without_marking_complete(tmp_path):
+    run = execution(tmp_path, "first")
+    fit(run, "pyrenew_e")
+    with pytest.raises(FileNotFoundError, match="Missing completed fusion inputs"):
+        run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), run, "CA", "covid")
+    assert not (
+        run / "CA/covid" / FUSION_SPECS[0].model_name / "complete.json"
+    ).exists()

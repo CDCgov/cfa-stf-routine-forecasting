@@ -152,9 +152,9 @@ def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
     _write_model_outputs(tmp_path / "other_model", other_samples, other_data)
 
     create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
+        numerator_dir=tmp_path / "num_model",
+        other_dir=tmp_path / "other_model",
+        destination_dir=tmp_path / "prop_epiweekly_aggregated_num_model_other_model",
         aggregate_num=True,
         augment_other_with_obs=False,
     )
@@ -203,9 +203,9 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
     _write_model_outputs(tmp_path / "other_model", other_samples, other_data)
 
     create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
+        numerator_dir=tmp_path / "num_model",
+        other_dir=tmp_path / "other_model",
+        destination_dir=tmp_path / "prop_num_model_other_model",
     )
 
     samples = read_tabular(tmp_path / "prop_num_model_other_model" / "samples.parquet")
@@ -270,9 +270,9 @@ def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
     )
 
     create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
+        numerator_dir=tmp_path / "num_model",
+        other_dir=tmp_path / "other_model",
+        destination_dir=tmp_path / "prop_num_model_other_model",
         augment_other_with_obs=False,
     )
 
@@ -301,8 +301,6 @@ def test_cross_run_fusion_intersects_history_and_requires_forecast(
     _write_model_outputs(numerator, num, num.drop(".draw"))
     _write_model_outputs(other, den, den.drop(".draw"))
     kwargs = dict(
-        num_model_name="num",
-        other_model_name="other",
         numerator_dir=numerator,
         other_dir=other,
         destination_dir=destination,
@@ -319,3 +317,35 @@ def test_cross_run_fusion_intersects_history_and_requires_forecast(
         samples = read_tabular(destination / "samples.parquet")
         assert samples["date"].to_list() == dates[1:]
         assert samples[".value"].to_list() == [0.2] * 3
+
+
+def test_epiweekly_coverage_without_aggregation(tmp_path):
+    dates = [dt.date(2025, 1, 11), dt.date(2025, 1, 18)]
+    for model, variable, value in [
+        ("num", "observed_ed_visits", 2),
+        ("other", "other_ed_visits", 8),
+    ]:
+        samples = _model_frame(
+            dates, [value, value], variable=variable, draws=1, resolution="epiweekly"
+        )
+        _write_model_outputs(tmp_path / model, samples, samples.drop(".draw"))
+    create_prop_fusion_model(
+        numerator_dir=tmp_path / "num",
+        other_dir=tmp_path / "other",
+        destination_dir=tmp_path / "fusion",
+        augment_other_with_obs=False,
+        forecast_date=dt.date(2025, 1, 8),
+        forecast_through=dates[-1],
+    )
+    assert read_tabular(tmp_path / "fusion/samples.parquet")["date"].to_list() == dates
+
+
+def test_coverage_requires_every_draw_to_cover_forecast():
+    from cfa.stf.routine.utils.prop_utils import validate_forecast_coverage
+
+    first, last = dt.date(2025, 1, 1), dt.date(2025, 1, 2)
+    samples = _model_frame(
+        [first, last, first], [2, 2, 2], variable="observed_ed_visits", draws=[1, 1, 2]
+    )
+    with pytest.raises(ValueError, match="required forecast dates"):
+        validate_forecast_coverage(samples, first, last)

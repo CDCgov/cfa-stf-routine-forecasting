@@ -5,6 +5,7 @@ import json
 import re
 import time
 from pathlib import Path
+from typing import NamedTuple
 from uuid import uuid4
 
 from yaml12 import format_yaml
@@ -12,9 +13,28 @@ from yaml12 import format_yaml
 RUN_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}(?:_[\w-]+)?")
 
 
+class FitKey(NamedTuple):
+    """Identity of a fit independent of its execution."""
+
+    location: str
+    disease: str
+    model: str
+
+    def directory(self, execution: Path) -> Path:
+        return execution / self.location / self.disease / self.model
+
+
+def _json_value(value):
+    if isinstance(value, (dt.date, dt.datetime)):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Unsupported metadata value: {type(value).__name__}")
+
+
 def write_json(path: Path, value: dict) -> None:
     temporary = path.with_name(f".{path.name}.{uuid4().hex}")
-    temporary.write_text(json.dumps(value, default=str, indent=2))
+    temporary.write_text(json.dumps(value, default=_json_value, indent=2))
     temporary.replace(path)
 
 
@@ -74,7 +94,7 @@ def standalone_directory(base: Path, config: dict) -> Path:
     return execution_directory(base, dt.datetime.now(dt.UTC), uuid4().hex, config)
 
 
-def latest_fits(base: Path) -> dict[tuple[str, str, str], Path]:
+def latest_fits(base: Path) -> dict[FitKey, Path]:
     """Snapshot the latest complete fit for each location/disease/model."""
     selected = {}
     executions = []
@@ -90,5 +110,5 @@ def latest_fits(base: Path) -> dict[tuple[str, str, str], Path]:
     for _, _, directory in sorted(executions):
         for marker in sorted(directory.glob("*/*/*/complete.json")):
             fit = marker.parent
-            selected[(fit.parent.parent.name, fit.parent.name, fit.name)] = fit
+            selected[FitKey(fit.parent.parent.name, fit.parent.name, fit.name)] = fit
     return selected

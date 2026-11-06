@@ -162,6 +162,28 @@ class NowcastAutoGPPipeline(ForecastPipeline):
         self.reporting_delay_pmf = reporting_delay_pmf
         self.hubverse_nowcast_dir = hubverse_nowcast_dir
 
+    def invocation_config(self) -> dict:
+        return super().invocation_config() | {
+            "n_particles": self.n_particles,
+            "n_mcmc": self.n_mcmc,
+            "n_hmc": self.n_hmc,
+            "n_forecast_draws": self.n_forecast_draws,
+            "smc_data_proportion": self.smc_data_proportion,
+            "n_threads": self.n_threads,
+            "nowcast_source_name": self.nowcast_source_name,
+            "reporting_delay_pmf": self.reporting_delay_pmf,
+            "target": self.config.target,
+            "frequency": self.config.frequency,
+            "ed_visit_type": self.config.ed_visit_type,
+            "exclude_date_ranges": [
+                [start.isoformat(), end.isoformat()]
+                for start, end in (self.config.exclude_date_ranges or [])
+            ],
+            "hubverse_nowcast_dir": str(self.hubverse_nowcast_dir)
+            if self.hubverse_nowcast_dir is not None
+            else None,
+        }
+
     @property
     def model_name(self) -> str:
         model_name = f"nowcastautogp_{self.config.target}_{self.config.frequency}"

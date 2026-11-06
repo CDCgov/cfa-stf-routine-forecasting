@@ -206,12 +206,16 @@ just e2e mock
 ```
 
 Each Dagster run uses its persisted UTC start time for `run_timestamp`.
-Models and sequential fusion executed in the same run share this directory; separately launched runs have separate directories.
+Models and fusion assets executed in the same run share this directory; separately launched runs have separate directories.
 Timestamp collisions receive an execution ID suffix.
 The root contains `launchpad.yaml` and execution metadata.
 Standalone entrypoints allocate a new execution directory for each invocation.
 
-Postprocessing snapshots the latest completed fit for each location, disease, and model, performs the available PyRenew/Fable fusions sequentially, and saves results under its own execution directory.
+The four PyRenew/Fable fusion assets remain independently selectable and retain their upstream dependencies.
+Each selects the latest completed input fits across execution directories and writes its result under the executing Dagster run.
+Postprocessing snapshots completed fits and writes summaries under its own execution directory; it does not run fusion.
+A fusion is excluded when its recorded input paths differ from the latest completed inputs, or an input is unavailable.
+Rerun the corresponding fusion asset after updating its inputs to include it in the next summary.
 Summaries are in `summary/<disease>/`, with source paths recorded alongside them.
 Fits without `complete.json` are ignored.
 Fusion keeps overlapping historical dates and requires complete forecast coverage.

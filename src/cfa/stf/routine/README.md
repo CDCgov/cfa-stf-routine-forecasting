@@ -205,7 +205,8 @@ Run the reduced end-to-end pipeline when the model participates in fusion or bat
 just e2e mock
 ```
 
-Each Dagster run uses its persisted UTC start time for `run_timestamp`.
+Each Dagster run uses its persisted start time converted to `America/New_York` for `run_timestamp`.
+Execution metadata records this local time with its UTC offset.
 Models and fusion assets executed in the same run share this directory; separately launched runs have separate directories.
 Timestamp collisions receive an execution ID suffix.
 The root contains `launchpad.yaml` and execution metadata.

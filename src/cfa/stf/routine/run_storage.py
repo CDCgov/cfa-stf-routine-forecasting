@@ -7,10 +7,12 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from yaml12 import format_yaml
 
 RUN_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}(?:_[\w-]+)?")
+NEW_YORK = ZoneInfo("America/New_York")
 
 
 class FitKey(NamedTuple):
@@ -43,7 +45,8 @@ def execution_directory(
 ) -> Path:
     """Claim a timestamp directory, sharing it only with the same execution."""
     base.mkdir(parents=True, exist_ok=True)
-    name = started.astimezone(dt.UTC).strftime("%Y-%m-%d-%H-%M-%S")
+    started = started.astimezone(NEW_YORK)
+    name = started.strftime("%Y-%m-%d-%H-%M-%S")
     # Exclusive owner creation is safe across mapped workers.
     for candidate in (name, f"{name}_{execution_id}"):
         directory = base / candidate
@@ -66,7 +69,7 @@ def execution_directory(
             directory / "execution.json",
             {
                 "execution_id": execution_id,
-                "started_at": started.astimezone(dt.UTC).isoformat(),
+                "started_at": started.isoformat(),
             },
         )
         temporary = directory / f".launchpad.{uuid4().hex}.yaml"

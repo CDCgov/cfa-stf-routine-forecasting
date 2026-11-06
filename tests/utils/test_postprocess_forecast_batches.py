@@ -48,7 +48,7 @@ def test_identity_shared_across_workers_and_collision(tmp_path):
     with ThreadPoolExecutor(max_workers=8) as pool:
         paths = list(pool.map(lambda _: execution(tmp_path, "same"), range(16)))
     assert len(set(paths)) == 1
-    assert paths[0].name == "2026-09-02-12-00-00"
+    assert paths[0].name == "2026-09-02-08-00-00"
     second = execution(tmp_path, "different")
     assert second != paths[0]
     assert execution(tmp_path, "different") == second
@@ -66,7 +66,32 @@ def test_dagster_identity_uses_persisted_start(tmp_path):
     assert dagster_execution_directory(
         context, tmp_path
     ) == dagster_execution_directory(context, tmp_path)
-    assert (tmp_path / "2026-09-02-12-00-00").is_dir()
+    assert (tmp_path / "2026-09-02-08-00-00").is_dir()
+
+
+@pytest.mark.parametrize(
+    "started, name, stored",
+    [
+        (
+            "2026-01-02T17:00:00+00:00",
+            "2026-01-02-12-00-00",
+            "2026-01-02T12:00:00-05:00",
+        ),
+        (
+            "2026-09-02T16:00:00+00:00",
+            "2026-09-02-12-00-00",
+            "2026-09-02T12:00:00-04:00",
+        ),
+    ],
+)
+def test_execution_timestamp_uses_new_york(tmp_path, started, name, stored):
+    directory = execution_directory(
+        tmp_path, dt.datetime.fromisoformat(started), "run", {}
+    )
+    assert directory.name == name
+    assert (
+        json.loads((directory / "execution.json").read_text())["started_at"] == stored
+    )
 
 
 def test_latest_completed_per_location_and_renamed_run(tmp_path):

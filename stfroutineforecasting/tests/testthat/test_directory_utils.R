@@ -4,7 +4,7 @@ target_diseases <- c("covid", "flu", "rsv")
 valid_model_run <- tibble::tibble(
   dirname = fs::path(
     "2026-09-02_forecasts",
-    "2026-09-02-12-00-00",
+    "2026-09-02-12-00-00_run",
     target_locations,
     target_diseases
   ),

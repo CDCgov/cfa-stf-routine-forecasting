@@ -3,15 +3,16 @@
 import datetime as dt
 import json
 import re
-import time
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import NamedTuple
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from pydantic_core import to_json
 from yaml12 import format_yaml
 
-RUN_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}(?:_[\w-]+)?")
+RUN_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}_[\w-]+")
 NEW_YORK = ZoneInfo("America/New_York")
 
 
@@ -26,57 +27,36 @@ class FitKey(NamedTuple):
         return execution / self.location / self.disease / self.model
 
 
-def _json_value(value):
-    if isinstance(value, (dt.date, dt.datetime)):
-        return value.isoformat()
-    if isinstance(value, Path):
-        return str(value)
-    raise TypeError(f"Unsupported metadata value: {type(value).__name__}")
+def _atomic_write(path: Path, content: bytes) -> None:
+    """Stage a file on the same filesystem and clean up after publication or failure."""
+    with TemporaryDirectory(prefix=f".{path.name}.", dir=path.parent) as staging:
+        temporary = Path(staging) / path.name
+        temporary.write_bytes(content)
+        temporary.replace(path)
 
 
 def write_json(path: Path, value: dict) -> None:
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}")
-    temporary.write_text(json.dumps(value, default=_json_value, indent=2))
-    temporary.replace(path)
+    """Serialize metadata and atomically replace the destination file."""
+    _atomic_write(path, to_json(value, indent=2))
 
 
 def execution_directory(
     base: Path, started: dt.datetime, execution_id: str, config: dict
 ) -> Path:
-    """Claim a timestamp directory, sharing it only with the same execution."""
-    base.mkdir(parents=True, exist_ok=True)
+    """Create the deterministic directory shared by workers of one execution."""
     started = started.astimezone(NEW_YORK)
     name = started.strftime("%Y-%m-%d-%H-%M-%S")
-    # Exclusive owner creation is safe across mapped workers.
-    for candidate in (name, f"{name}_{execution_id}"):
-        directory = base / candidate
-        directory.mkdir(exist_ok=True)
-        owner = directory / "execution_id"
-        try:
-            with owner.open("x") as stream:
-                stream.write(execution_id)
-        except FileExistsError:
-            for _ in range(100):
-                existing = owner.read_text()
-                if existing:
-                    break
-                time.sleep(0.01)
-            if not existing:
-                raise RuntimeError("Execution owner claim was not completed")
-            if existing != execution_id:
-                continue
-        write_json(
-            directory / "execution.json",
-            {
-                "execution_id": execution_id,
-                "started_at": started.isoformat(),
-            },
-        )
-        temporary = directory / f".launchpad.{uuid4().hex}.yaml"
-        temporary.write_text(format_yaml(config))
-        temporary.replace(directory / "launchpad.yaml")
-        return directory
-    raise RuntimeError("Execution directory is owned by another run")
+    directory = base / f"{name}_{execution_id}"
+    directory.mkdir(parents=True, exist_ok=True)
+    write_json(
+        directory / "execution.json",
+        {
+            "execution_id": execution_id,
+            "started_at": started.isoformat(),
+        },
+    )
+    _atomic_write(directory / "launchpad.yaml", format_yaml(config).encode("utf-8"))
+    return directory
 
 
 def dagster_execution_directory(context, base: Path) -> Path:

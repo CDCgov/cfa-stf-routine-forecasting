@@ -3,12 +3,14 @@
 import datetime as dt
 import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from types import SimpleNamespace
 
 import polars as pl
 import pytest
 
 from cfa.stf.routine import fusion as fusion_module
+from cfa.stf.routine.forecast_window import ForecastWindow
 from cfa.stf.routine.fusion import FUSION_SPECS, current_fits, run_fusion
 from cfa.stf.routine.run_storage import (
     FitKey,
@@ -32,8 +34,8 @@ def fit(directory, model, value=1.0, location="CA", complete=True):
     write_json(
         path / "metadata.json",
         {
-            "forecast_date": "2026-09-02",
-            "forecast_through": "2026-09-26",
+            "forecast_date": dt.date(2026, 9, 2),
+            "forecast_through": dt.date(2026, 9, 26),
         },
     )
     pl.DataFrame(
@@ -44,13 +46,56 @@ def fit(directory, model, value=1.0, location="CA", complete=True):
     return path
 
 
+def test_write_json_serializes_forecast_metadata(tmp_path):
+    path = tmp_path / "metadata.json"
+    write_json(
+        path,
+        {
+            "window": ForecastWindow(dt.date(2026, 9, 2), n_lookback_days=150),
+            "source": tmp_path / "source",
+        },
+    )
+    assert json.loads(path.read_text()) == {
+        "window": {
+            "forecast_date": "2026-09-02",
+            "n_lookback_days": 150,
+            "exclude_last_n_days": 0,
+        },
+        "source": str(tmp_path / "source"),
+    }
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("operation", ["write_bytes", "replace"])
+def test_failed_metadata_write_preserves_destination_and_cleans_staging(
+    tmp_path, monkeypatch, operation
+):
+    path = tmp_path / "metadata.json"
+    write_json(path, {"original": True})
+
+    def fail(*args, **kwargs):
+        raise OSError("Simulated storage failure")
+
+    monkeypatch.setattr(Path, operation, fail)
+    with pytest.raises(OSError, match="Simulated storage failure"):
+        write_json(path, {"original": False})
+
+    assert json.loads(path.read_text()) == {"original": True}
+    assert list(tmp_path.iterdir()) == [path]
+
+
 def test_identity_shared_across_workers_and_collision(tmp_path):
     with ThreadPoolExecutor(max_workers=8) as pool:
         paths = list(pool.map(lambda _: execution(tmp_path, "same"), range(16)))
     assert len(set(paths)) == 1
-    assert paths[0].name == "2026-09-02-08-00-00"
+    assert paths[0].name == "2026-09-02-08-00-00_same"
+    assert sorted(entry.name for entry in paths[0].iterdir()) == [
+        "execution.json",
+        "launchpad.yaml",
+    ]
     second = execution(tmp_path, "different")
     assert second != paths[0]
+    assert second.name == "2026-09-02-08-00-00_different"
     assert execution(tmp_path, "different") == second
     assert (second / "launchpad.yaml").exists()
 
@@ -66,7 +111,7 @@ def test_dagster_identity_uses_persisted_start(tmp_path):
     assert dagster_execution_directory(
         context, tmp_path
     ) == dagster_execution_directory(context, tmp_path)
-    assert (tmp_path / "2026-09-02-08-00-00").is_dir()
+    assert (tmp_path / "2026-09-02-08-00-00_run").is_dir()
 
 
 @pytest.mark.parametrize(
@@ -74,12 +119,12 @@ def test_dagster_identity_uses_persisted_start(tmp_path):
     [
         (
             "2026-01-02T17:00:00+00:00",
-            "2026-01-02-12-00-00",
+            "2026-01-02-12-00-00_run",
             "2026-01-02T12:00:00-05:00",
         ),
         (
             "2026-09-02T16:00:00+00:00",
-            "2026-09-02-12-00-00",
+            "2026-09-02-12-00-00_run",
             "2026-09-02T12:00:00-04:00",
         ),
     ],

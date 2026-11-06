@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from dataclasses import asdict, replace
+from dataclasses import replace
 from pathlib import Path
 
 from pydantic_core import to_jsonable_python
@@ -182,8 +182,8 @@ class ForecastPipeline(ABC):
                 "disease": run.disease,
                 "forecast_date": run.forecast_date,
                 "forecast_through": run.forecast_through,
-                "requested_window": asdict(run.requested_window),
-                "effective_window": asdict(run.forecast_window),
+                "requested_window": run.requested_window,
+                "effective_window": run.forecast_window,
                 "first_training_date": run.first_training_date,
                 "last_training_date": run.last_training_date,
             },

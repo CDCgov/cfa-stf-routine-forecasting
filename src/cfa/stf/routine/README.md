@@ -112,7 +112,7 @@ The pipeline's `requested_window` preserves that caller configuration; the run's
 The resulting layout is:
 
 ```text
-<output_dir>/<run_timestamp>/<location>/<disease>/<model_name>/
+<output_dir>/<run_timestamp>_<execution_id>/<location>/<disease>/<model_name>/
     data/
       combined_data.tsv
       data_for_model_fit.json
@@ -208,7 +208,7 @@ just e2e mock
 Each Dagster run uses its persisted start time converted to `America/New_York` for `run_timestamp`.
 Execution metadata records this local time with its UTC offset.
 Models and fusion assets executed in the same run share this directory; separately launched runs have separate directories.
-Timestamp collisions receive an execution ID suffix.
+Every execution directory is named `<run_timestamp>_<execution_id>`, using the Dagster run ID or a UUID for standalone invocations.
 The root contains `launchpad.yaml` and execution metadata.
 Standalone entrypoints allocate a new execution directory for each invocation.
 

@@ -25,16 +25,17 @@ invalid_model_batch_dirs <- c(
 )
 
 target_locations <- c("ME", "US", "CA")
+target_diseases <- c("covid", "flu", "rsv")
 
 valid_model_run <- tibble::tibble(
   dirname = fs::path(
     "2026-09-02_forecasts",
     "2026-09-02-12-00-00",
     target_locations,
-    c("covid", "flu", "rsv")
+    target_diseases
   ),
   location = target_locations,
-  disease = c("covid", "flu", "rsv")
+  disease = target_diseases
 )
 
 
@@ -156,12 +157,12 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
 
     result_valid <- get_all_model_batch_dirs(
       ".",
-      c("covid", "flu", "rsv")
+      target_diseases
     )
 
     result_valid_alt <- get_all_model_batch_dirs(
       ".",
-      c("flu", "rsv", "covid")
+      rev(target_diseases)
     )
 
     result_valid_covid <- get_all_model_batch_dirs(

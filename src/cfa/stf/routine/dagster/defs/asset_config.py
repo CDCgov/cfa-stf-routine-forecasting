@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 import dagster as dg
 from cfa.stf.forecasttools import LOCATION_LIST
-from cfa_dagster import GraphDimension, GraphDimensionExclusion
+from cfa_dagster import GraphDimension
 from cfa_dagster import is_production as is_prod
 from pydantic import BaseModel, Field
 
@@ -168,11 +168,6 @@ class NowcastAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
     n_threads: str = "auto"
 
 
-class EModelExclusions(dg.ConfigurableResource):
-    # filter out WY
-    locations: GraphDimensionExclusion[Location] = GraphDimensionExclusion(["WY"])  # type: ignore[reportInvalidTypeForm]
-
-
 class WModelExclusions(dg.ConfigurableResource):
     # only covid is valid for W
     diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
@@ -195,7 +190,6 @@ def resources():
             "pyrenew_config": PyrenewConfig(),
             "nowcastautogp_e_pct_epiweekly_config": NowcastAutoGPEPctEpiweeklyConfig(),
             "fable_e_other_config": FableEOtherConfig(),
-            "e_model_exclusions": EModelExclusions(),
             "w_model_exclusions": WModelExclusions(),
         }
     )

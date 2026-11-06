@@ -6,7 +6,6 @@ import dagster as dg
 from cfa_dagster import dynamic_graph_asset
 
 from cfa.stf.routine.dagster.defs.asset_config import (
-    EModelExclusions,
     FableEOtherConfig,
     ModelBaseConfig,
     NowcastAutoGPEPctEpiweeklyConfig,
@@ -127,7 +126,6 @@ def pyrenew_e(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
 ):
     _run_pyrenew_model(context, pyrenew_config, model_base_config, "e")
 
@@ -165,7 +163,6 @@ def pyrenew_he(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
 ):
     _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
 
@@ -203,7 +200,6 @@ def nowcastautogp_e_pct_epiweekly(
 def fuse_pyrenew_e_fable(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
@@ -226,7 +222,6 @@ def fuse_pyrenew_e_fable(
 def fuse_pyrenew_e_fable_epiweekly(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
@@ -246,7 +241,6 @@ def fuse_pyrenew_e_fable_epiweekly(
 def fuse_pyrenew_he_fable(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
@@ -269,7 +263,6 @@ def fuse_pyrenew_he_fable(
 def fuse_pyrenew_he_fable_epiweekly(
     context: dg.OpExecutionContext,
     model_base_config: ModelBaseConfig,
-    e_model_exclusions: EModelExclusions,
 ):
     _fuse_pyrenew_fable_e_other(
         context,

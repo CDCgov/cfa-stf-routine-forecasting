@@ -1,79 +1,10 @@
 #' Canonical disease names
 #'
-#' Disease identifiers used in model batch directory names and forecast outputs.
+#' Disease identifiers used in directory paths and forecast outputs.
 #'
 #' @format A character vector containing `"covid"`, `"flu"`, and `"rsv"`.
 
 disease_names <- c("covid", "flu", "rsv")
-
-#' Parse model batch directory name.
-#'
-#' Parse the name of a model batch directory
-#' (i.e. a directory representing a single
-#' lookback/omission configuration and disease, but potentially
-#' with fits for multiple locations), returning
-#' a named list of quantities of interest.
-#'
-#' @param model_batch_dir_path Path to the model batch
-#' directory to parse. Will parse only the basename.
-#' @return A one-row tibble containing canonical `disease`, `n_lookback_days`,
-#' and `exclude_last_n_days` values. An unlimited lookback is represented by
-#' `Inf`.
-#' @export
-parse_model_batch_dir_path <- function(model_batch_dir_path) {
-  pattern <- "^(.+)_lookback-([0-9]+|all)_omit-([0-9]+)$"
-  model_batch_dir_name <- fs::path_file(model_batch_dir_path)
-  matches <- stringr::str_match(
-    model_batch_dir_name,
-    pattern
-  )
-
-  if (anyNA(matches)) {
-    stop(
-      "Invalid format for model batch directory name; ",
-      "could not parse. Expected ",
-      "'<disease>_lookback-<n_lookback_days>_omit-",
-      "<exclude_last_n_days>'."
-    )
-  }
-
-  result <-
-    matches[, -1, drop = FALSE] |>
-    tibble::as_tibble(.name_repair = \(x) {
-      c(
-        "disease",
-        "n_lookback_days",
-        "exclude_last_n_days"
-      )
-    }) |>
-    dplyr::mutate(
-      disease = dplyr::if_else(
-        .data$disease %in% disease_names,
-        .data$disease,
-        NA_character_
-      ),
-      n_lookback_days = dplyr::coalesce(
-        as.double(dplyr::na_if(.data$n_lookback_days, "all")),
-        Inf
-      ),
-      exclude_last_n_days = as.integer(.data$exclude_last_n_days)
-    )
-
-  if (anyNA(result)) {
-    stop(
-      "Could not parse extracted values; expected 'disease' to be one of ",
-      "'covid', 'flu', or 'rsv', lookback to be 'all' or an integer, ",
-      "and omitted days to be an integer. Got: ",
-      glue::glue(
-        "disease: {matches[2]}, ",
-        "n_lookback_days: {matches[3]}, ",
-        "exclude_last_n_days: {matches[4]}."
-      )
-    )
-  }
-
-  return(result)
-}
 
 #' Parse model run directory path.
 #'
@@ -97,37 +28,6 @@ parse_model_run_dir_path <- function(model_run_dir_path) {
   )
 }
 
-
-#' Get forecast directories.
-#'
-#' Get all the subdirectories within a parent directory
-#' that match the pattern for a forecast run for a
-#' given disease.
-#'
-#' @param dir_of_batch_dirs Directory in which to look for
-#' "model batch" directories, each of which represents an
-#' individual lookback/omission / pathogen configuration.
-#' @param diseases Canonical disease identifiers to match (`"covid"`, `"flu"`,
-#' or `"rsv"`), supplied as a character vector.
-#' @return A vector of paths to the forecast subdirectories.
-#' @export
-get_all_model_batch_dirs <- function(dir_of_batch_dirs, diseases) {
-  match_patterns <- stringr::str_c(diseases, "_lookback-", collapse = "|")
-
-  dirs <- tibble::tibble(
-    dir_path = fs::dir_ls(
-      dir_of_batch_dirs,
-      type = "directory"
-    )
-  ) |>
-    dplyr::filter(stringr::str_starts(
-      fs::path_file(.data$dir_path),
-      !!match_patterns
-    )) |>
-    dplyr::pull(.data$dir_path)
-
-  return(dirs)
-}
 
 #' Parse variable name.
 #'
@@ -171,21 +71,4 @@ parse_variable_name <- function(variable_name) {
     full_name = full_name,
     y_axis_labels = y_axis_labels
   )
-}
-
-
-#' Get path up to a specific directory.
-#'
-#' @param path A character vector of paths.
-#' @param up_to A character string specifying the directory name
-#'
-#' @returns A character vector of paths that go up to the specified directory.
-#' @export
-path_up_to <- function(path, up_to) {
-  path_parts <- fs::path_split(path)
-  up_to_index <- purrr::map(path_parts, \(x) which(x == up_to))
-  stopifnot(lengths(up_to_index) == 1)
-  purrr::map2_vec(path_parts, up_to_index, \(parts, index) {
-    fs::path_join(utils::head(parts, index))
-  })
 }

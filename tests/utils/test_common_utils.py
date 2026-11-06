@@ -45,9 +45,9 @@ class TestValidationUtils:
         expected_max_allowed,
     ):
         """Test training date calculation with various parameters."""
-        report_date = dt.date(2024, 12, 21)
+        forecast_date = dt.date(2024, 12, 21)
         window = ForecastWindow(
-            report_date=report_date,
+            forecast_date=forecast_date,
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=exclude_last_n_days,
         )
@@ -57,7 +57,7 @@ class TestValidationUtils:
         requested_start = (
             dt.date.min
             if n_lookback_days is None
-            else report_date - dt.timedelta(days=n_lookback_days)
+            else forecast_date - dt.timedelta(days=n_lookback_days)
         )
         assert window.min_allowed_training_date == max(
             requested_start, EARLIEST_TRAINING_DATE
@@ -76,14 +76,14 @@ class TestValidationUtils:
     ):
         with pytest.raises(ValueError, match=message):
             ForecastWindow(
-                report_date=dt.date(2024, 12, 21),
+                forecast_date=dt.date(2024, 12, 21),
                 n_lookback_days=n_lookback_days,
                 exclude_last_n_days=exclude_last_n_days,
             )
 
     def test_forecast_window_owns_horizon_and_batch_name(self):
         window = ForecastWindow(
-            report_date=dt.date(2026, 9, 8),
+            forecast_date=dt.date(2026, 9, 8),
             n_lookback_days=150,
             exclude_last_n_days=3,
         )
@@ -93,7 +93,7 @@ class TestValidationUtils:
 
     def test_unlimited_forecast_window_uses_all_batch_name(self):
         window = ForecastWindow(
-            report_date=dt.date(2026, 9, 8),
+            forecast_date=dt.date(2026, 9, 8),
             n_lookback_days=None,
             exclude_last_n_days=30,
         )
@@ -176,7 +176,7 @@ class TestDirectoryUtils:
     )
     def test_model_batch_directory_round_trip(self, n_lookback_days, expected_name):
         window = ForecastWindow(
-            report_date=dt.date(2026, 9, 8),
+            forecast_date=dt.date(2026, 9, 8),
             n_lookback_days=n_lookback_days,
             exclude_last_n_days=3,
         )

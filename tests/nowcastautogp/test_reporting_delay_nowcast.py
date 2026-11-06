@@ -90,7 +90,9 @@ class TestReportingDelayNowcastGetNowcastData:
     def test_returns_inflated_estimates_for_partial_tail(self):
         # PMF = [0.5, 0.5] -> CDF = [0.5, 1.0] -> incomplete = [0.5];
         # only the most-recent observation gets inflated.
-        source = ReportingDelayNowcast(reporting_delay_pmf=[0.5, 0.5])
+        source = ReportingDelayNowcast(
+            reporting_delay_pmf=[0.5, 0.5], as_of=dt.date(2024, 1, 4)
+        )
         dates = [dt.date(2024, 1, 1), dt.date(2024, 1, 2), dt.date(2024, 1, 3)]
         reports = [10.0, 20.0, 4.0]
 
@@ -104,7 +106,9 @@ class TestReportingDelayNowcastGetNowcastData:
     def test_two_partial_rows(self):
         # PMF = [0.4, 0.5, 0.1] -> CDF = [0.4, 0.9, 1.0] -> incomplete = [0.4, 0.9]
         # Most-recent observation pairs with the smallest fraction (0.4).
-        source = ReportingDelayNowcast(reporting_delay_pmf=[0.4, 0.5, 0.1])
+        source = ReportingDelayNowcast(
+            reporting_delay_pmf=[0.4, 0.5, 0.1], as_of=dt.date(2024, 1, 5)
+        )
         dates = [
             dt.date(2024, 1, 1),
             dt.date(2024, 1, 2),
@@ -124,7 +128,9 @@ class TestReportingDelayNowcastGetNowcastData:
         assert result.reports[0] == pytest.approx(expected)
 
     def test_fully_reported_pmf_returns_empty(self):
-        source = ReportingDelayNowcast(reporting_delay_pmf=[1.0])
+        source = ReportingDelayNowcast(
+            reporting_delay_pmf=[1.0], as_of=dt.date(2024, 1, 2)
+        )
         result = source.get_nowcast_data(
             dates=[dt.date(2024, 1, 1)],
             reports=[5.0],
@@ -132,7 +138,9 @@ class TestReportingDelayNowcastGetNowcastData:
         assert result == NowcastData()
 
     def test_length_mismatch_raises(self):
-        source = ReportingDelayNowcast(reporting_delay_pmf=[0.5, 0.5])
+        source = ReportingDelayNowcast(
+            reporting_delay_pmf=[0.5, 0.5], as_of=dt.date(2024, 1, 2)
+        )
         with pytest.raises(ValueError, match="same length"):
             source.get_nowcast_data(
                 dates=[dt.date(2024, 1, 1)],
@@ -144,7 +152,9 @@ class TestReportingDelayNowcastGetNowcastData:
         # inflate_report returns 0 rather than dividing by zero.
         # Construct a PMF whose first incomplete fraction is exactly 0.
         # This is contrived; the safety path matters more than realism.
-        source = ReportingDelayNowcast(reporting_delay_pmf=[0.0, 1.0])
+        source = ReportingDelayNowcast(
+            reporting_delay_pmf=[0.0, 1.0], as_of=dt.date(2024, 1, 3)
+        )
         result = source.get_nowcast_data(
             dates=[dt.date(2024, 1, 1), dt.date(2024, 1, 2)],
             reports=[5.0, 0.0],
@@ -168,3 +178,16 @@ def test_no_nan_in_inflate():
     # Sanity: typical numbers should not produce NaN/inf.
     value = inflate_report(7.0, 0.25)
     assert math.isfinite(value)
+
+
+@pytest.mark.parametrize("age, fraction", [(0, 0.25), (1, 0.75), (3, None)])
+def test_vintage_aligns_reporting_fraction_by_calendar_age(age, fraction):
+    as_of = dt.date(2026, 10, 30)
+    date = as_of - dt.timedelta(days=age + 1)
+    source = ReportingDelayNowcast([0.25, 0.5, 0.25], as_of=as_of)
+    result = source.get_nowcast_data(dates=[date], reports=[10.0])
+    if fraction is None:
+        assert result == NowcastData()
+    else:
+        assert result.dates == [date]
+        assert result.reports[0] == pytest.approx([(11.0 - fraction) / fraction])

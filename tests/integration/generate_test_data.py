@@ -36,12 +36,12 @@ from cfa.stf.routine.data.hubverse_nowcast import (
 
 DEFAULT_LOCATIONS = ["CA", "US"]
 DEFAULT_DISEASES = ["covid", "flu"]
-REPORT_DATE = dt.date.today()
-LAST_OBS_DATE = REPORT_DATE - dt.timedelta(
+FORECAST_DATE = dt.date.today()
+LAST_OBS_DATE = FORECAST_DATE - dt.timedelta(
     days=1
 )  # nssp data typically available through report date - 1
 OBS_WINDOW_DAYS = 120
-FIRST_OBS_DATE = REPORT_DATE - dt.timedelta(days=OBS_WINDOW_DAYS)
+FIRST_OBS_DATE = FORECAST_DATE - dt.timedelta(days=OBS_WINDOW_DAYS)
 
 ED_BASELINE_PERCENT = 0.0012
 ED_DISEASE_INCREMENT_PERCENT = 0.0003
@@ -157,7 +157,7 @@ def _nssp_row(
 
 def _weekending_dates() -> list[dt.date]:
     first_week = _first_weekday_on_or_after(FIRST_OBS_DATE, WEEK_ENDING_WEEKDAY)
-    return _date_range(first_week, REPORT_DATE, step_days=DAYS_PER_WEEK)
+    return _date_range(first_week, FORECAST_DATE, step_days=DAYS_PER_WEEK)
 
 
 def _make_nssp(
@@ -237,7 +237,7 @@ def make_surveillance_inputs(
     disease: str,
     sources: Collection[ForecastSourceName],
     min_allowed_training_date: dt.date = FIRST_OBS_DATE,
-    max_allowed_training_date: dt.date = REPORT_DATE,
+    max_allowed_training_date: dt.date = FORECAST_DATE,
 ) -> SurveillanceInputs:
     requested_sources = frozenset(sources)
     locations = sorted(set(DEFAULT_LOCATIONS + [location]))
@@ -261,15 +261,15 @@ def make_surveillance_inputs(
 
     nssp_freshness = DataFreshness(
         source="nssp",
-        selected_version_date=REPORT_DATE,
-        run_date=REPORT_DATE,
+        selected_version_date=FORECAST_DATE,
+        forecast_date=FORECAST_DATE,
         is_stale=False,
         reason="Synthetic NSSP data",
     )
     nhsn_freshness = DataFreshness(
         source="nhsn",
-        selected_version_date=REPORT_DATE,
-        run_date=REPORT_DATE,
+        selected_version_date=FORECAST_DATE,
+        forecast_date=FORECAST_DATE,
         is_stale=False,
         reason="Synthetic NHSN data",
     )
@@ -353,7 +353,7 @@ def _make_hubverse_nowcast_rows(
     dates = recent_reports.get_column("date").to_list()
     reports = recent_reports.get_column("value").to_numpy()
     horizons = [
-        (target_end_date - REPORT_DATE).days // DAYS_PER_WEEK
+        (target_end_date - FORECAST_DATE).days // DAYS_PER_WEEK
         for target_end_date in dates
     ]
     revision_rates = np.linspace(
@@ -373,7 +373,7 @@ def _make_hubverse_nowcast_rows(
     return pl.DataFrame(
         [
             {
-                "origin_date": REPORT_DATE,
+                "origin_date": FORECAST_DATE,
                 "target_end_date": target_end_date,
                 "horizon": horizon,
                 "target": HUBVERSE_TARGETS[disease],
@@ -499,11 +499,11 @@ def write_hubverse_nowcast(
         / HUBVERSE_MODEL_OUTPUT_SUBDIR
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    nowcasts.write_parquet(output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.parquet")
+    nowcasts.write_parquet(output_dir / f"{FORECAST_DATE}-CFA-nowcastNHSN.parquet")
     _write_hubverse_nowcast_figure(
         nowcasts=nowcasts,
         nhsn_observations=nhsn_observations,
-        output_path=output_dir / f"{REPORT_DATE}-CFA-nowcastNHSN.png",
+        output_path=output_dir / f"{FORECAST_DATE}-CFA-nowcastNHSN.png",
         disease=disease,
         location=location,
     )

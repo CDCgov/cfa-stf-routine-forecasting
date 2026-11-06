@@ -27,6 +27,15 @@ purrr::walk(script_packages, \(pkg) {
 #' This function fits a combination ensemble model to the training data and
 #' generates forecast samples for a specified number of days.
 #'
+#' @details
+#' This function is hardened against missing data in two ways:
+#'
+#' 1. Checks for missing daily dates and adds them to the data with `NA`
+#' values if missing.
+#' 2. Checks for missing values in the target column and imputes
+#' them using an ARIMA Kalman smoother if necessary as per
+#' [standard practise](https://otexts.com/fpp3/practical.html#missing-values)
+#'
 #' @param data A data frame containing only the training time series data.
 #' @param n_forecast_days An integer specifying the number of days to forecast.
 #' Default is 28.
@@ -51,8 +60,19 @@ fit_and_forecast_ensemble <- function(
 
   offset <- 1
 
-  fit <- data |>
+  series <- data |>
     as_tsibble(index = date) |>
+    tsibble::fill_gaps()
+  if (all(is.na(series[[target_col]]))) {
+    stop(glue::glue("All training values of {target_col} are missing"))
+  }
+  if (anyNA(series[[target_col]])) {
+    series <- series |>
+      model(ARIMA(log(!!target_sym + !!offset))) |>
+      interpolate(series)
+  }
+
+  fit <- series |>
     model(
       comb_model = combination_ensemble(
         ETS(
@@ -74,8 +94,11 @@ fit_and_forecast_ensemble <- function(
     ) |>
     select("date", ".draw", all_of(output_col))
 
-  if (any(forecast_samples[[output_col]] < 0)) {
-    stop(glue::glue("Negative count forecast for {output_col}"))
+  if (
+    !all(is.finite(forecast_samples[[output_col]])) ||
+      any(forecast_samples[[output_col]] < 0)
+  ) {
+    stop(glue::glue("Non-finite or negative count forecast for {output_col}"))
   }
 
   forecast_samples

@@ -3,7 +3,6 @@
 from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
-DATA_DIR = PACKAGE_ROOT / "data"
 NOWCASTAUTOGP_DIR = PACKAGE_ROOT / "nowcastautogp"
 FABLE_DIR = PACKAGE_ROOT / "fable"
 PYRENEW_HEW_DIR = PACKAGE_ROOT / "pyrenew_hew"

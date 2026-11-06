@@ -43,12 +43,6 @@ class FablePipeline(ForecastPipeline):
         self.n_samples = n_samples
         self._ed_visit_input_resolution = ed_visit_input_resolution
 
-    def invocation_config(self) -> dict:
-        return super().invocation_config() | {
-            "n_samples": self.n_samples,
-            "ed_visit_input_resolution": self.ed_visit_input_resolution,
-        }
-
     @property
     def model_name(self) -> str:
         return f"{self.ed_visit_input_resolution}_fable_e_other"

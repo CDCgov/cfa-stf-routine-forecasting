@@ -165,7 +165,7 @@ def test_pyrenew_pipeline_fits_predicts_and_converts_samples(
     )
 
 
-def test_explicit_invocation_configuration_round_trips(tmp_path):
+def test_invocation_configuration_preserves_structure_and_round_trips(tmp_path):
     from yaml12 import format_yaml, parse_yaml
 
     from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
@@ -183,13 +183,22 @@ def test_explicit_invocation_configuration_round_trips(tmp_path):
         ),
     ]
     for pipeline in pipelines:
-        pipeline.unrelated_internal_state = object()
+        pipeline.additional_option = 42
         config = pipeline.invocation_config()
         assert parse_yaml(format_yaml(config)) == config
-        assert "unrelated_internal_state" not in config
-        assert config["forecast_date"] == "2024-12-20"
-        assert config["model"] == pipeline.model_name
+        assert "logger" not in config
+        assert config["additional_option"] == 42
+        assert config["output_dir"] == str(tmp_path)
+        assert config["requested_window"] == {
+            "forecast_date": "2024-12-20",
+            "n_lookback_days": 90,
+            "exclude_last_n_days": 0,
+        }
+    assert pipelines[0].invocation_config()["n_samples"] == 10
     assert pipelines[1].invocation_config()["priors_path"] == "priors.py"
-    assert pipelines[2].invocation_config()["exclude_date_ranges"] == [
-        ["2024-01-01", "2024-01-02"]
-    ]
+    assert pipelines[2].invocation_config()["config"] == {
+        "target": "nssp",
+        "frequency": "daily",
+        "ed_visit_type": "observed",
+        "exclude_date_ranges": [["2024-01-01", "2024-01-02"]],
+    }

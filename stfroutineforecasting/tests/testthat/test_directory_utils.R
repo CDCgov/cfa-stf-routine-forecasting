@@ -149,14 +149,16 @@ test_that("get_all_model_batch_dirs() returns expected output.", {
 
     result_all <- fs::dir_ls(".") |> fs::path_file()
 
+    diseases <- c("covid", "flu", "rsv")
+
     result_valid <- get_all_model_batch_dirs(
       ".",
-      c("covid", "flu", "rsv")
+      diseases
     )
 
     result_valid_alt <- get_all_model_batch_dirs(
       ".",
-      c("flu", "rsv", "covid")
+      rev(diseases)
     )
 
     result_valid_covid <- get_all_model_batch_dirs(

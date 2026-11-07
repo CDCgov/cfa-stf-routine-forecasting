@@ -233,7 +233,7 @@ jobs:
                 echo $LOG_MSG
 
                 cfa-dg launch --job end_to_end \
-                --config-json "$(python -c 'from cfa.stf.routine.dagster_defs import e2e_json; print(e2e_json())')" \
+                --config-json "$(python -c 'from cfa.stf.routine.dagster.defs.jobs import e2e_json; print(e2e_json())')" \
                 --partition $REPORT_DATE
 
                   if [ $? -ne 0 ]; then
@@ -252,7 +252,7 @@ jobs:
       # Conditional step execution that runs only when:
       # the workflow is manually dispatched and the 'push_to_dagster' input is set to 'yes'
       # OR
-      # the event is a push to main where the dagster_defs_changed
+      # the event is a push to main that changes Dagster definitions
       runs-on: ubuntu-latest
       name: Check Dagster Changes and Update Prod Server
       permissions:
@@ -277,7 +277,7 @@ jobs:
 
             HEAD="${{ github.sha }}"
 
-            if git diff --name-only "$BASE" "$HEAD" | grep -Eq '^(dagster_defs\.py|src/cfa/stf/routine/dagster_defs\.py)$'; then
+            if git diff --name-only "$BASE" "$HEAD" | grep -Eq '^src/cfa/stf/routine/dagster/.*\.py$'; then
               echo "changed=true" >> $GITHUB_OUTPUT
               echo "Dagster defs changed: true"
             else

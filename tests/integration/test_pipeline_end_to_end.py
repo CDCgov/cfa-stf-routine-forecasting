@@ -1,6 +1,5 @@
 import time
 from contextlib import contextmanager
-from pathlib import Path
 
 import polars as pl
 import pytest
@@ -10,25 +9,16 @@ from tests.integration.generate_test_data import (
     FORECAST_DATE,
 )
 from tests.integration.model_test_utils import (
-    EXCLUDE_LAST_N_DAYS,
     FORECAST_DIR_NAME,
-    N_LOOKBACK_DAYS,
     assert_model_outputs,
     configure_data_mode,
-    model_batch_dir,
     run_fable,
     run_nowcastautogp,
     run_pyrenew,
 )
 
-from cfa.stf.routine.utils.directory_utils import parse_model_batch_dir_name
 from cfa.stf.routine.utils.postprocess_forecast_batches import (
     main as postprocess_batches,
-)
-from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
-from cfa.stf.routine.utils.r_utils import (
-    make_figures_from_model_fit_dir,
-    model_fit_dir_to_hub_tbl,
 )
 
 EXPECTED_MODELS = [
@@ -38,7 +28,6 @@ EXPECTED_MODELS = [
     "nowcastautogp_nssp_daily_other",
     "prop_pyrenew_e_daily_fable_e_other",
     "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other",
-    "prop_pyrenew_e_nowcastautogp_nssp_daily_other",
 ]
 
 
@@ -55,45 +44,6 @@ def _status_step(message: str):
     else:
         elapsed = time.perf_counter() - started_at
         print(f"[pipeline-e2e] {message} complete in {elapsed:.1f}s", flush=True)
-
-
-def _run_fusions(model_run_dir: Path) -> None:
-    fusion_specs = [
-        {
-            "num_model_name": "pyrenew_e",
-            "other_model_name": "daily_fable_e_other",
-            "aggregate_num": False,
-            "fusion_model_name": "prop_pyrenew_e_daily_fable_e_other",
-        },
-        {
-            "num_model_name": "pyrenew_e",
-            "other_model_name": "epiweekly_fable_e_other",
-            "aggregate_num": True,
-            "fusion_model_name": (
-                "prop_epiweekly_aggregated_pyrenew_e_epiweekly_fable_e_other"
-            ),
-        },
-        {
-            "num_model_name": "pyrenew_e",
-            "other_model_name": "nowcastautogp_nssp_daily_other",
-            "aggregate_num": False,
-            "fusion_model_name": "prop_pyrenew_e_nowcastautogp_nssp_daily_other",
-        },
-    ]
-    for fusion_spec in fusion_specs:
-        create_prop_fusion_model(
-            model_run_dir=model_run_dir,
-            num_model_name=fusion_spec["num_model_name"],
-            other_model_name=fusion_spec["other_model_name"],
-            aggregate_num=fusion_spec["aggregate_num"],
-        )
-        fusion_model_dir = model_run_dir / fusion_spec["fusion_model_name"]
-        make_figures_from_model_fit_dir(
-            fusion_model_dir,
-            save_figs=True,
-            save_ci=True,
-        )
-        model_fit_dir_to_hub_tbl(fusion_model_dir, forecast_date=FORECAST_DATE)
 
 
 @pytest.mark.pipeline_e2e
@@ -120,36 +70,35 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             with _status_step(f"Running NowcastAutoGP for {disease}, {location}"):
                 run_nowcastautogp(workspace, disease, location)
 
-            model_run_dir = (
-                model_batch_dir(workspace, disease) / "model_runs" / location
-            )
-            with _status_step(f"Running fusion models for {disease}, {location}"):
-                _run_fusions(model_run_dir)
+    from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion
+    from cfa.stf.routine.run_storage import latest_fits, standalone_directory
 
-            with _status_step(f"Checking model outputs for {disease}, {location}"):
-                assert_model_outputs(
-                    workspace,
-                    disease,
-                    location,
-                    EXPECTED_MODELS,
-                )
+    base = workspace / FORECAST_DIR_NAME
+    fusion_execution = standalone_directory(base, {"operation": "fusion"})
+    inputs = latest_fits(base)
+    for disease in DEFAULT_DISEASES:
+        for location in DEFAULT_LOCATIONS:
+            for spec in FUSION_SPECS:
+                if spec.numerator == "pyrenew_e":
+                    run_fusion(spec, inputs, fusion_execution, location, disease)
 
     with _status_step("Postprocessing forecast batches"):
         postprocess_batches(
             workspace / FORECAST_DIR_NAME,
             diseases=DEFAULT_DISEASES,
-            skip_existing=False,
-            local_copy_dir=workspace / FORECAST_DIR_NAME,
         )
 
     for disease in DEFAULT_DISEASES:
         with _status_step(f"Checking postprocessed outputs for {disease}"):
-            batch_dir = model_batch_dir(workspace, disease)
-            batch_info = parse_model_batch_dir_name(batch_dir.name)
-            postprocessed_path = (
-                batch_dir / f"{FORECAST_DATE}-{batch_info['disease']}"
-                "-hubverse-table.parquet"
+            summaries = list(
+                (workspace / FORECAST_DIR_NAME).glob(f"*/summary/{disease}")
             )
+            assert len(summaries) == 1
+            postprocessed_path = (
+                summaries[0] / f"{FORECAST_DATE}-{disease}-hubverse-table.parquet"
+            )
+            for location in DEFAULT_LOCATIONS:
+                assert_model_outputs(workspace, disease, location, EXPECTED_MODELS)
             assert postprocessed_path.is_file(), (
                 f"Missing postprocessed hubverse table: {postprocessed_path}"
             )
@@ -159,12 +108,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
                 DEFAULT_LOCATIONS
             )
 
-            copied_figures_dir = (
-                workspace
-                / FORECAST_DIR_NAME
-                / f"lookback-{N_LOOKBACK_DAYS}-omit-{EXCLUDE_LAST_N_DAYS}-figures"
-                / disease
-            )
+            copied_figures_dir = summaries[0] / "figures"
             assert copied_figures_dir.is_dir(), (
                 f"Missing postprocessed figures directory: {copied_figures_dir}"
             )

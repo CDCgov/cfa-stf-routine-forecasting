@@ -1,13 +1,15 @@
 import polars as pl
 import pytest
 from tests.integration.model_test_utils import (
+    FORECAST_DIR_NAME,
     MOCK_DATA_MODE,
     assert_model_outputs,
     configure_data_mode,
-    model_batch_dir,
     patch_mock_nssp_with_missing_values,
     run_fable,
 )
+
+from cfa.stf.routine.run_storage import latest_fits
 
 
 @pytest.mark.model_integration
@@ -35,10 +37,9 @@ def test_fable_forecast(
 
     if missing_training_data:
         combined_data = pl.read_csv(
-            model_batch_dir(pipeline_workspace, disease)
-            / "model_runs"
-            / location
-            / "daily_fable_e_other"
+            latest_fits(pipeline_workspace / FORECAST_DIR_NAME)[
+                (location, disease, "daily_fable_e_other")
+            ]
             / "data"
             / "combined_data.tsv",
             separator="\t",

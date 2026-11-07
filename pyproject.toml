@@ -27,6 +27,7 @@ dependencies = [
     "pyrenew",
     "pyrenew-multisignal",
     "pypdf>=6.10.1",
+    "py-yaml12",
 ]
 
 [project.scripts]

@@ -21,6 +21,7 @@ from cfa.stf.routine.dagster.defs.asset_helpers import (
     _throw_if_backfill,
 )
 from cfa.stf.routine.dagster.defs.automation import eager_on_wednesday
+from cfa.stf.routine.run_storage import dagster_execution_directory
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
 # Shared Asset Decorator Arguments
@@ -280,7 +281,11 @@ def fuse_pyrenew_he_fable_epiweekly(
         "fuse_pyrenew_e_fable_epiweekly",
         "fuse_pyrenew_he_fable",
         "fuse_pyrenew_he_fable_epiweekly",
+        "pyrenew_e",
+        "pyrenew_he",
         "pyrenew_h",
+        "fable_e_other",
+        "epiweekly_fable_e_other",
         "nowcastautogp_e_pct_epiweekly",
     ],
     partitions_def=daily_partitions_def,
@@ -316,6 +321,5 @@ def postprocess_forecasts(
     postprocess(
         base_forecast_dir=daily_forecast_output_dir,
         diseases=config.postprocess_diseases,
-        skip_existing=config.skip_existing,
-        local_copy_dir=daily_forecast_output_dir,
+        execution_dir=dagster_execution_directory(context, daily_forecast_output_dir),
     )

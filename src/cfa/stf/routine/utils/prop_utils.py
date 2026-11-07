@@ -1,11 +1,13 @@
 """Utilities for creating and appending disease proportion data."""
 
+import datetime as dt
 from pathlib import Path
 
 import polars as pl
 from cfa.stf.forecasttools import (
     append_prop_data,
     augment_samples_with_observations,
+    ceiling_mmwr_epiweek,
     create_proportions,
     read_tabular,
     write_tabular,
@@ -14,10 +16,30 @@ from cfa.stf.forecasttools import (
 from cfa.stf.routine.utils.data_utils import aggregate_long_to_epiweekly
 
 
+def validate_forecast_coverage(
+    samples: pl.DataFrame, origin: dt.date, through: dt.date
+) -> None:
+    """Require every draw to cover the forecast interval at its output resolution."""
+    resolutions = samples["resolution"].unique().to_list()
+    if len(resolutions) != 1 or resolutions[0] not in ("daily", "epiweekly"):
+        raise ValueError("Expected one daily or epiweekly fusion resolution")
+    weekly = resolutions[0] == "epiweekly"
+    start = ceiling_mmwr_epiweek(origin) if weekly else origin
+    if through < start:
+        raise ValueError("Forecast horizon precedes the first required forecast date")
+    required = set(
+        pl.date_range(start, through, interval="1w" if weekly else "1d", eager=True)
+    )
+    groups = samples.partition_by(".draw") if ".draw" in samples.columns else [samples]
+    if not groups or any(not required <= set(group["date"]) for group in groups):
+        raise ValueError("Fusion samples do not cover the required forecast dates")
+
+
 def create_prop_fusion_model(
-    model_run_dir: Path | str,
-    num_model_name: str,
-    other_model_name: str,
+    *,
+    numerator_dir: Path,
+    other_dir: Path,
+    destination_dir: Path,
     num_var_name: str = "observed_ed_visits",
     other_var_name: str = "other_ed_visits",
     prop_var_name: str = "prop_disease_ed_visits",
@@ -25,14 +47,15 @@ def create_prop_fusion_model(
     augment_other_with_obs: bool = True,
     aggregate_num: bool = False,
     aggregate_other: bool = False,
+    forecast_date: dt.date | None = None,
+    forecast_through: dt.date | None = None,
 ) -> None:
     """Create and save a proportion fusion model from two model outputs."""
-    model_run_dir = Path(model_run_dir)
 
     def read_model_output(
-        model_name: str, var_name: str, filename: str
+        model_dir: Path, var_name: str, filename: str
     ) -> pl.DataFrame:
-        data = read_tabular(model_run_dir / model_name / filename)
+        data = read_tabular(model_dir / filename)
         data = (
             data.filter(pl.col(".variable") == var_name)
             .drop(".variable")
@@ -47,15 +70,13 @@ def create_prop_fusion_model(
         return data.select(populated_columns)
 
     num_samples = read_model_output(
-        num_model_name, num_var_name, "samples.parquet"
+        numerator_dir, num_var_name, "samples.parquet"
     ).drop("data_type", strict=False)
     other_samples = read_model_output(
-        other_model_name, other_var_name, "samples.parquet"
+        other_dir, other_var_name, "samples.parquet"
     ).drop("data_type", strict=False)
-    num_data = read_model_output(num_model_name, num_var_name, "data/combined_data.tsv")
-    other_data = read_model_output(
-        other_model_name, other_var_name, "data/combined_data.tsv"
-    )
+    num_data = read_model_output(numerator_dir, num_var_name, "data/combined_data.tsv")
+    other_data = read_model_output(other_dir, other_var_name, "data/combined_data.tsv")
 
     if augment_num_with_obs:
         num_samples = augment_samples_with_observations(
@@ -76,6 +97,17 @@ def create_prop_fusion_model(
         )
         other_data = aggregate_long_to_epiweekly(other_data, value_col=other_var_name)
 
+    common_dates = set(num_samples["date"]) & set(other_samples["date"])
+    if (forecast_date is None) != (forecast_through is None):
+        raise ValueError("Supply both forecast_date and forecast_through")
+    if forecast_date is not None:
+        if set(num_samples["resolution"]) != set(other_samples["resolution"]):
+            raise ValueError("Fusion input resolutions differ")
+        validate_forecast_coverage(num_samples, forecast_date, forecast_through)
+        validate_forecast_coverage(other_samples, forecast_date, forecast_through)
+    num_samples = num_samples.filter(pl.col("date").is_in(sorted(common_dates)))
+    other_samples = other_samples.filter(pl.col("date").is_in(sorted(common_dates)))
+
     prop_samples = create_proportions(
         numerator_df=num_samples,
         other_df=other_samples,
@@ -83,6 +115,13 @@ def create_prop_fusion_model(
         other_val_col=other_var_name,
         prop_var=prop_var_name,
     ).sort("date", ".draw")
+    if forecast_date is not None:
+        validate_forecast_coverage(prop_samples, forecast_date, forecast_through)
+        if (
+            prop_samples[".value"].null_count()
+            or not prop_samples[".value"].is_finite().all()
+        ):
+            raise ValueError("Fusion output contains missing or nonfinite proportions")
     prop_data = (
         create_proportions(
             numerator_df=num_data.rename({"data_type": "num_data_type"}),
@@ -106,17 +145,7 @@ def create_prop_fusion_model(
         )
     )
 
-    def aggregated_model_name(model_name: str, aggregate: bool) -> str:
-        return f"epiweekly_aggregated_{model_name}" if aggregate else model_name
-
-    prop_model_name = "_".join(
-        [
-            "prop",
-            aggregated_model_name(num_model_name, aggregate_num),
-            aggregated_model_name(other_model_name, aggregate_other),
-        ]
-    )
-    prop_model_dir = model_run_dir / prop_model_name
+    prop_model_dir = destination_dir
     data_dir = prop_model_dir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     write_tabular(prop_samples, prop_model_dir / "samples.parquet")

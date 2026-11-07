@@ -272,26 +272,17 @@ def run_nowcastautogp(
     )
 
 
-def model_batch_dir(workspace: Path, disease: str) -> Path:
-    candidates = list(
-        (workspace / FORECAST_DIR_NAME).glob(f"{disease}_lookback-*_omit-*")
-    )
-    assert len(candidates) == 1, (
-        f"Expected one batch directory for {disease}, "
-        f"found {len(candidates)} in {workspace / FORECAST_DIR_NAME}"
-    )
-    return candidates[0]
-
-
 def assert_model_outputs(
     workspace: Path, disease: str, location: str, model_names: list[str]
 ) -> None:
-    model_run_dir = model_batch_dir(workspace, disease) / "model_runs" / location
+    from cfa.stf.routine.run_storage import latest_fits
+
+    selected = latest_fits(workspace / FORECAST_DIR_NAME)
     expected_forecast_through = ceiling_mmwr_epiweek(
         FORECAST_DATE + dt.timedelta(weeks=3)
     )
     for model_name in model_names:
-        model_dir = model_run_dir / model_name
+        model_dir = selected[(location, disease, model_name)]
         assert model_dir.is_dir(), f"Missing model directory: {model_dir}"
         assert (model_dir / "samples.parquet").is_file(), (
             f"Missing samples parquet: {model_dir}"

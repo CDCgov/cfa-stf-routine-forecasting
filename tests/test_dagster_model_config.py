@@ -45,7 +45,10 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     )
 
 
-def test_postprocess_always_copies_to_daily_output(monkeypatch):
+def test_postprocess_uses_executing_run(monkeypatch):
+    monkeypatch.setattr(
+        assets, "dagster_execution_directory", lambda context, base: base / "run"
+    )
     postprocess = Mock()
     monkeypatch.setattr(assets, "_throw_if_backfill", Mock())
     monkeypatch.setattr(assets, "postprocess", postprocess)
@@ -56,7 +59,6 @@ def test_postprocess_always_copies_to_daily_output(monkeypatch):
             asset_config.PostProcessConfig(
                 output_basedir="custom-output",
                 postprocess_diseases=["flu"],
-                skip_existing=True,
             ),
         )
 
@@ -64,8 +66,7 @@ def test_postprocess_always_copies_to_daily_output(monkeypatch):
     postprocess.assert_called_once_with(
         base_forecast_dir=daily_output,
         diseases=["flu"],
-        skip_existing=True,
-        local_copy_dir=daily_output,
+        execution_dir=daily_output / "run",
     )
 
 
@@ -113,6 +114,9 @@ def test_location_lookback_override(
 
 
 def test_model_runners_use_their_named_lookbacks(monkeypatch):
+    monkeypatch.setattr(
+        asset_helpers, "dagster_execution_directory", lambda context, base: base / "run"
+    )
     context = SimpleNamespace(
         partition_key="2026-09-09",
         log=Mock(),
@@ -146,7 +150,7 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     )
 
     shared_arguments = {
-        "output_dir": Path("ca-output/2026-09-09_forecasts"),
+        "output_dir": Path("ca-output/2026-09-09_forecasts/run"),
         "exclude_last_n_days": 2,
         "fail_on_stale_data": False,
     }
@@ -160,17 +164,57 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     assert forecast_nowcastautogp.call_args.kwargs["n_lookback_days"] == 200
 
 
-def test_fusion_directory_uses_fable_pyrenew_lookback():
-    context = SimpleNamespace(
-        partition_key="2026-09-09",
-        log=Mock(),
-    )
-    model_base_config = _model_base_config()
+@pytest.mark.parametrize(
+    "name,numerator,other,weekly",
+    [
+        ("fuse_pyrenew_e_fable", "pyrenew_e", "fable_e_other", False),
+        (
+            "fuse_pyrenew_e_fable_epiweekly",
+            "pyrenew_e",
+            "epiweekly_fable_e_other",
+            True,
+        ),
+        ("fuse_pyrenew_he_fable", "pyrenew_he", "fable_e_other", False),
+        (
+            "fuse_pyrenew_he_fable_epiweekly",
+            "pyrenew_he",
+            "epiweekly_fable_e_other",
+            True,
+        ),
+    ],
+)
+def test_fusion_assets_keep_dependencies_and_resolve_current_inputs(
+    monkeypatch, name, numerator, other, weekly
+):
+    from cfa.stf.routine.fusion import FUSION_SPECS
 
-    assert asset_helpers._get_model_loc_dir(context, model_base_config) == Path(
-        "ca-output",
-        "2026-09-09_forecasts",
-        "covid_lookback-100_omit-2",
-        "model_runs",
-        "CA",
+    asset = getattr(assets, name)
+    key = dg.AssetKey(name)
+    assert asset.asset_deps[key] == {dg.AssetKey(numerator), dg.AssetKey(other)}
+    assert asset.group_names_by_key[key] == "Fusion"
+    assert (
+        key
+        in assets.postprocess_forecasts.asset_deps[dg.AssetKey("postprocess_forecasts")]
+    )
+    runner = Mock()
+    snapshot = {}
+    monkeypatch.setattr(asset_helpers, "_throw_if_backfill", Mock())
+    monkeypatch.setattr(
+        asset_helpers,
+        "dagster_execution_directory",
+        lambda ctx, base: base / "execution",
+    )
+    monkeypatch.setattr(asset_helpers, "latest_fits", lambda base: snapshot)
+    monkeypatch.setattr(asset_helpers, "run_fusion", runner)
+    context = SimpleNamespace(partition_key="2026-09-09")
+    asset_helpers._fuse_pyrenew_fable_e_other(
+        context, _model_base_config(), numerator, weekly
+    )
+    spec = next(
+        spec
+        for spec in FUSION_SPECS
+        if spec.numerator == numerator and spec.aggregate_num == weekly
+    )
+    runner.assert_called_once_with(
+        spec, snapshot, Path("ca-output/2026-09-09_forecasts/execution"), "CA", "covid"
     )

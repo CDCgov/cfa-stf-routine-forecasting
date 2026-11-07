@@ -55,7 +55,7 @@ def execution_directory(
             "started_at": started.isoformat(),
         },
     )
-    _atomic_write(directory / "launchpad.yaml", format_yaml(config).encode("utf-8"))
+    _atomic_write(directory / "run_config.yaml", format_yaml(config).encode("utf-8"))
     return directory
 
 

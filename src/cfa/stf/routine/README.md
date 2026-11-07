@@ -209,7 +209,7 @@ Each Dagster run uses its persisted start time converted to `America/New_York` f
 Execution metadata records this local time with its UTC offset.
 Models and fusion assets executed in the same run share this directory; separately launched runs have separate directories.
 Every execution directory is named `<run_timestamp>_<execution_id>`, using the Dagster run ID or a UUID for standalone invocations.
-The root contains `launchpad.yaml` and execution metadata.
+The root contains `run_config.yaml` and execution metadata.
 Standalone entrypoints allocate a new execution directory for each invocation.
 
 The four PyRenew/Fable fusion assets remain independently selectable and retain their upstream dependencies.

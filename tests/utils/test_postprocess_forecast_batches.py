@@ -91,13 +91,13 @@ def test_identity_shared_across_workers_and_collision(tmp_path):
     assert paths[0].name == "2026-09-02-08-00-00_same"
     assert sorted(entry.name for entry in paths[0].iterdir()) == [
         "execution.json",
-        "launchpad.yaml",
+        "run_config.yaml",
     ]
     second = execution(tmp_path, "different")
     assert second != paths[0]
     assert second.name == "2026-09-02-08-00-00_different"
     assert execution(tmp_path, "different") == second
-    assert (second / "launchpad.yaml").exists()
+    assert (second / "run_config.yaml").exists()
 
 
 def test_dagster_identity_uses_persisted_start(tmp_path):

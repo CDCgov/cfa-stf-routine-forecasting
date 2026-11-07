@@ -124,6 +124,11 @@ The resulting layout is:
 The base pipeline creates `data/`, `combined_data.tsv`, and `data_for_model_fit.json`.
 The model creates `samples.parquet`; common post-processing creates `ci.parquet`, figures, and `hubverse_table.parquet`.
 
+Models and fusion assets in the same Dagster run share an execution directory.
+`run_timestamp` is the execution start time in `America/New_York`, formatted as `YYYY-MM-DD-HH-MM-SS`; `execution_id` is the Dagster run ID or a UUID for standalone invocations.
+The execution root contains `run_config.yaml` and `execution.json`.
+Each fit records its training-window settings in `metadata.json` and receives an empty `_COMPLETE` marker after all outputs are successfully published.
+
 ### Forecast sample format
 
 Standard post-processing expects `samples.parquet` in long format with these columns:
@@ -181,6 +186,10 @@ To run the new model in production, update [`dagster/defs/`](./dagster/defs/) to
 Declare the correct upstream data asset dependencies for the pipeline's `sources`.
 Keep this orchestration change separate from the model class so the single-location pipeline remains directly testable.
 
+Fusion assets select the latest completed input fits across execution directories and write results under the current execution.
+Postprocessing saves summaries in `summary/<disease>/` under its execution directory, with source paths recorded alongside them.
+Rerun a fusion after updating its inputs; summaries exclude fusions whose recorded inputs differ from the latest completed fits.
+
 ## 5. Test the model
 
 At minimum, add tests that cover:
@@ -204,29 +213,3 @@ Run the reduced end-to-end pipeline when the model participates in fusion or bat
 ```shell
 just e2e mock
 ```
-
-Each Dagster run uses its persisted start time converted to `America/New_York` for `run_timestamp`.
-Execution metadata records this local time with its UTC offset.
-Models and fusion assets executed in the same run share this directory; separately launched runs have separate directories.
-Every execution directory is named `<run_timestamp>_<execution_id>`, using the Dagster run ID or a UUID for standalone invocations.
-The root contains `run_config.yaml` and execution metadata.
-Standalone entrypoints allocate a new execution directory for each invocation.
-
-The four PyRenew/Fable fusion assets remain independently selectable and retain their upstream dependencies.
-Each selects the latest completed input fits across execution directories and writes its result under the executing Dagster run.
-Discovery orders executions by directory name: the Eastern timestamp to the second, followed by the execution ID to break ties.
-It does not read `execution.json`.
-Postprocessing snapshots completed fits and writes summaries under its own execution directory; it does not run fusion.
-A fusion is excluded when its recorded input paths differ from the latest completed inputs, or an input is unavailable.
-Rerun the corresponding fusion asset after updating its inputs to include it in the next summary.
-Summaries are in `summary/<disease>/`, with source paths recorded alongside them.
-An empty `_COMPLETE` file marks each forecast or fusion whose outputs were successfully published.
-The marker is removed before rewriting outputs and created only after all required steps succeed.
-Fits without `_COMPLETE` are ignored.
-Fusion keeps overlapping historical dates and requires complete forecast coverage.
-Lookback and omission are recorded in `metadata.json`, not encoded in paths.
-
-Old forecast layouts are not discovered.
-Deploy producers and consumers together.
-Rename a timestamp directory to a name such as `disabled-<timestamp>` (or remove it) to exclude it from future discovery.
-A new postprocessing run reflects that change; existing summaries retain their recorded provenance.

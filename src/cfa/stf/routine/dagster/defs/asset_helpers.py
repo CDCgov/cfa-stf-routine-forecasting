@@ -197,4 +197,5 @@ def _fuse_pyrenew_fable_e_other(
         for spec in FUSION_SPECS
         if spec.numerator == pyrenew_model_name and spec.aggregate_num == epiweekly
     )
-    return run_fusion(spec, latest_fits(base), execution, location, disease)
+    inputs = latest_fits(base, keys=spec.input_keys(location, disease))
+    return run_fusion(spec, inputs, execution, location, disease)

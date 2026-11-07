@@ -204,7 +204,8 @@ def test_fusion_assets_keep_dependencies_and_resolve_current_inputs(
         "dagster_execution_directory",
         lambda ctx, base: base / "execution",
     )
-    monkeypatch.setattr(asset_helpers, "latest_fits", lambda base: snapshot)
+    discover = Mock(return_value=snapshot)
+    monkeypatch.setattr(asset_helpers, "latest_fits", discover)
     monkeypatch.setattr(asset_helpers, "run_fusion", runner)
     context = SimpleNamespace(partition_key="2026-09-09")
     asset_helpers._fuse_pyrenew_fable_e_other(
@@ -214,6 +215,9 @@ def test_fusion_assets_keep_dependencies_and_resolve_current_inputs(
         spec
         for spec in FUSION_SPECS
         if spec.numerator == numerator and spec.aggregate_num == weekly
+    )
+    discover.assert_called_once_with(
+        Path("ca-output/2026-09-09_forecasts"), keys=spec.input_keys("CA", "covid")
     )
     runner.assert_called_once_with(
         spec, snapshot, Path("ca-output/2026-09-09_forecasts/execution"), "CA", "covid"

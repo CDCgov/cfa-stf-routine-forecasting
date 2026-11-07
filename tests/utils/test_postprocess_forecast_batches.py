@@ -170,6 +170,53 @@ def test_latest_fits_uses_directory_names_without_execution_metadata(
     assert latest_fits(tmp_path) == {FitKey("CA", "covid", "pyrenew_e"): latest}
 
 
+@pytest.mark.parametrize("include_missing", [False, True])
+def test_latest_fits_looks_up_only_requested_inputs(
+    tmp_path, monkeypatch, include_missing
+):
+    oldest = execution(tmp_path, "oldest", -1)
+    older = execution(tmp_path, "older")
+    newer = execution(tmp_path, "newer", 1)
+    keys = FUSION_SPECS[0].input_keys("CA", "covid")
+    numerator = fit(older, "pyrenew_e")
+    fit(newer, "pyrenew_e", complete=False)
+    fit(older, "daily_fable_e_other")
+    other = fit(newer, "daily_fable_e_other")
+    fit(newer, "pyrenew_e", location="TX")
+    fit(newer, "pyrenew_h")
+    fit(oldest, "pyrenew_e")
+    fit(oldest, "daily_fable_e_other")
+    disabled = tmp_path / "disabled"
+    fit(disabled, "pyrenew_e")
+    fit(disabled, "daily_fable_e_other")
+    requested = (*keys, FitKey("CA", "covid", "missing")) if include_missing else keys
+    inspected = []
+    is_file = Path.is_file
+
+    def inspect_marker(path):
+        inspected.append(path)
+        return is_file(path)
+
+    def unexpected_glob(*args, **kwargs):
+        pytest.fail("Requested inputs must be looked up without scanning all fits")
+
+    monkeypatch.setattr(Path, "is_file", inspect_marker)
+    monkeypatch.setattr(Path, "glob", unexpected_glob)
+    assert latest_fits(tmp_path, keys=iter(requested)) == {
+        keys[0]: numerator,
+        keys[1]: other,
+    }
+    assert {FitKey(*path.parent.parts[-3:]) for path in inspected} <= set(requested)
+    assert not any(path.is_relative_to(disabled) for path in inspected)
+    if not include_missing:
+        assert not any(path.is_relative_to(oldest) for path in inspected)
+
+
+def test_latest_fits_with_no_requested_keys(tmp_path):
+    fit(execution(tmp_path, "run"), "pyrenew_e")
+    assert latest_fits(tmp_path, keys=[]) == {}
+
+
 @pytest.mark.parametrize("separate", [False, True])
 def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, separate):
     first = execution(tmp_path, "first")
@@ -196,7 +243,9 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
         ).write_parquet(path / "hubverse_table.parquet")
 
     monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
-    run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), downstream, "CA", "covid")
+    spec = FUSION_SPECS[0]
+    inputs = latest_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
+    run_fusion(spec, inputs, downstream, "CA", "covid")
     postprocess.main(tmp_path, ["covid"], execution_dir=downstream)
     assert len(calls) == 1
     output = downstream / "summary/covid/2026-09-02-covid-hubverse-table.parquet"

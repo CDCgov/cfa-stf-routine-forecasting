@@ -2,6 +2,7 @@
 
 import datetime as dt
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import NamedTuple
@@ -76,13 +77,31 @@ def standalone_directory(base: Path, config: dict) -> Path:
     return execution_directory(base, dt.datetime.now(dt.UTC), uuid4().hex, config)
 
 
-def latest_fits(base: Path) -> dict[FitKey, Path]:
-    """Select the latest complete fits by execution directory name."""
+def latest_fits(base: Path, keys: Iterable[FitKey] | None = None) -> dict[FitKey, Path]:
+    """Select the latest complete fits by execution directory name.
+
+    If keys are supplied, inspect only those fit paths and stop once all are found.
+    Missing fits are omitted. Without keys, discover all completed fits.
+    """
+    requested = None if keys is None else set(keys)
     selected = {}
-    for directory in sorted(base.iterdir()):
+    for directory in sorted(base.iterdir(), reverse=True):
+        if requested is not None and len(selected) == len(requested):
+            break
         if not directory.is_dir() or not RUN_PATTERN.fullmatch(directory.name):
             continue
-        for marker in sorted(directory.glob("*/*/*/_COMPLETE")):
+        markers = (
+            directory.glob("*/*/*/_COMPLETE")
+            if requested is None
+            else (
+                key.directory(directory) / "_COMPLETE"
+                for key in requested - selected.keys()
+            )
+        )
+        for marker in markers:
+            if not marker.is_file():
+                continue
             fit = marker.parent
-            selected[FitKey(fit.parent.parent.name, fit.parent.name, fit.name)] = fit
+            key = FitKey(fit.parent.parent.name, fit.parent.name, fit.name)
+            selected.setdefault(key, fit)
     return selected

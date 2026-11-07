@@ -214,11 +214,15 @@ Standalone entrypoints allocate a new execution directory for each invocation.
 
 The four PyRenew/Fable fusion assets remain independently selectable and retain their upstream dependencies.
 Each selects the latest completed input fits across execution directories and writes its result under the executing Dagster run.
+Discovery orders executions by directory name: the Eastern timestamp to the second, followed by the execution ID to break ties.
+It does not read `execution.json`.
 Postprocessing snapshots completed fits and writes summaries under its own execution directory; it does not run fusion.
 A fusion is excluded when its recorded input paths differ from the latest completed inputs, or an input is unavailable.
 Rerun the corresponding fusion asset after updating its inputs to include it in the next summary.
 Summaries are in `summary/<disease>/`, with source paths recorded alongside them.
-Fits without `complete.json` are ignored.
+An empty `_COMPLETE` file marks each forecast or fusion whose outputs were successfully published.
+The marker is removed before rewriting outputs and created only after all required steps succeed.
+Fits without `_COMPLETE` are ignored.
 Fusion keeps overlapping historical dates and requires complete forecast coverage.
 Lookback and omission are recorded in `metadata.json`, not encoded in paths.
 

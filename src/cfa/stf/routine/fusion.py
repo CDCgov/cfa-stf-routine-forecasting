@@ -72,7 +72,7 @@ def run_fusion(
     origin = dt.date.fromisoformat(metadata["forecast_date"])
     destination = FitKey(location, disease, spec.model_name).directory(execution)
     destination.mkdir(parents=True, exist_ok=True)
-    (destination / "complete.json").unlink(missing_ok=True)
+    (destination / "_COMPLETE").unlink(missing_ok=True)
     create_prop_fusion_model(
         numerator_dir=numerator,
         other_dir=other,
@@ -95,7 +95,7 @@ def run_fusion(
     )
     make_figures_from_model_fit_dir(destination, save_figs=True, save_ci=True)
     model_fit_dir_to_hub_tbl(destination, forecast_date=origin)
-    write_json(destination / "complete.json", {"complete": True})
+    (destination / "_COMPLETE").touch()
     return destination
 
 

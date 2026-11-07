@@ -42,7 +42,7 @@ def fit(directory, model, value=1.0, location="CA", complete=True):
         {"reference_date": [dt.date(2026, 9, 2)], "value": [value]}
     ).write_parquet(path / "hubverse_table.parquet")
     if complete:
-        write_json(path / "complete.json", {"complete": True})
+        (path / "_COMPLETE").touch()
     return path
 
 
@@ -155,6 +155,21 @@ def test_latest_completed_per_location_and_renamed_run(tmp_path):
     assert snapshot[("CA", "covid", "pyrenew_e")] == latest
 
 
+@pytest.mark.parametrize(
+    "newer_name", ["2026-09-02-09-00-00_a", "2026-09-02-08-00-00_z"]
+)
+def test_latest_fits_uses_directory_names_without_execution_metadata(
+    tmp_path, newer_name
+):
+    older = tmp_path / "2026-09-02-08-00-00_a"
+    newer = tmp_path / newer_name
+    latest = fit(newer, "pyrenew_e")
+    fit(older, "pyrenew_e")
+    (older / "execution.json").write_text("invalid JSON")
+
+    assert latest_fits(tmp_path) == {FitKey("CA", "covid", "pyrenew_e"): latest}
+
+
 @pytest.mark.parametrize("separate", [False, True])
 def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, separate):
     first = execution(tmp_path, "first")
@@ -187,7 +202,7 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     output = downstream / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
     assert pl.read_parquet(output).height == 3
     fusion = downstream / "CA/covid/prop_pyrenew_e_daily_fable_e_other"
-    assert (fusion / "complete.json").is_file()
+    assert (fusion / "_COMPLETE").read_bytes() == b""
     assert json.loads((fusion / "metadata.json").read_text())["sources"] == [
         str(numerator),
         str(other),
@@ -236,7 +251,7 @@ def test_summaries_exclude_stale_fusion_without_recomputing(
     write_json(fusion / "metadata.json", {"sources": [str(numerator), str(other)]})
     newer = execution(tmp_path, "new", 1)
     if changed == "missing":
-        (other / "complete.json").unlink()
+        (other / "_COMPLETE").unlink()
     else:
         model = {
             "numerator": "pyrenew_e",
@@ -265,6 +280,4 @@ def test_fusion_missing_inputs_fails_without_marking_complete(tmp_path):
     fit(run, "pyrenew_e")
     with pytest.raises(FileNotFoundError, match="Missing completed fusion inputs"):
         run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), run, "CA", "covid")
-    assert not (
-        run / "CA/covid" / FUSION_SPECS[0].model_name / "complete.json"
-    ).exists()
+    assert not (run / "CA/covid" / FUSION_SPECS[0].model_name / "_COMPLETE").exists()

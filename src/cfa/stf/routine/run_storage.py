@@ -1,7 +1,6 @@
 """Execution-scoped forecast storage and completed-fit discovery."""
 
 import datetime as dt
-import json
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -78,20 +77,12 @@ def standalone_directory(base: Path, config: dict) -> Path:
 
 
 def latest_fits(base: Path) -> dict[FitKey, Path]:
-    """Snapshot the latest complete fit for each location/disease/model."""
+    """Select the latest complete fits by execution directory name."""
     selected = {}
-    executions = []
-    for directory in base.iterdir():
+    for directory in sorted(base.iterdir()):
         if not directory.is_dir() or not RUN_PATTERN.fullmatch(directory.name):
             continue
-        metadata = directory / "execution.json"
-        if metadata.is_file():
-            identity = json.loads(metadata.read_text())
-            executions.append(
-                (identity["started_at"], identity["execution_id"], directory)
-            )
-    for _, _, directory in sorted(executions):
-        for marker in sorted(directory.glob("*/*/*/complete.json")):
+        for marker in sorted(directory.glob("*/*/*/_COMPLETE")):
             fit = marker.parent
             selected[FitKey(fit.parent.parent.name, fit.parent.name, fit.name)] = fit
     return selected

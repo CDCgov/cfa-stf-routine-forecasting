@@ -278,6 +278,9 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         output_dir=tmp_path,
         sources={"nssp"},
     )
+    run.model_dir.mkdir(parents=True)
+    marker = run.model_dir / "_COMPLETE"
+    marker.touch()
 
     monkeypatch.setattr(
         pipeline,
@@ -287,6 +290,7 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     serialize_kwargs = {}
 
     def serialize(*, forecast_run, logger):
+        assert not marker.exists()
         serialize_kwargs.update(
             forecast_run=forecast_run,
             logger=logger,
@@ -319,6 +323,7 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
     ]
     assert serialize_kwargs["forecast_run"] is run
     assert run.data_dir.is_dir()
+    assert marker.read_bytes() == b""
     messages = [record.getMessage() for record in caplog.records]
     assert messages[0] == (
         "Starting single-location pipeline for model test_model, location CA, "

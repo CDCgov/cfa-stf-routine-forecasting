@@ -173,7 +173,7 @@ class ForecastPipeline(ABC):
         self.validate_configuration()
         run = self.build_forecast_run()
         run.model_dir.mkdir(parents=True, exist_ok=True)
-        (run.model_dir / "complete.json").unlink(missing_ok=True)
+        (run.model_dir / "_COMPLETE").unlink(missing_ok=True)
         write_json(
             run.model_dir / "metadata.json",
             {
@@ -191,7 +191,7 @@ class ForecastPipeline(ABC):
         self.prepare_input_artifacts(run)
         self.run_model(run)
         self.publish_outputs(run)
-        write_json(run.model_dir / "complete.json", {"complete": True})
+        (run.model_dir / "_COMPLETE").touch()
         self.logger.info(
             "Single-location pipeline complete for model %s, location %s, and run "
             "date %s.",

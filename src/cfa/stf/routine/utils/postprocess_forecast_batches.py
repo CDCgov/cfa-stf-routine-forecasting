@@ -10,7 +10,6 @@ from cfa.stf.routine.run_storage import (
     FitKey,
     find_fits,
     standalone_directory,
-    write_json,
 )
 from cfa.stf.routine.utils.collate_plots import merge_pdfs
 
@@ -72,10 +71,16 @@ def main(
     }
     summary_dir = destination / "summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
-    write_json(
-        summary_dir / "sources.json",
-        {"/".join(key): str(path) for key, path in selected.items()},
-    )
+    pl.DataFrame(
+        [(*key, str(path)) for key, path in sorted(selected.items())],
+        schema={
+            "location": pl.String,
+            "disease": pl.String,
+            "model": pl.String,
+            "path": pl.String,
+        },
+        orient="row",
+    ).write_csv(summary_dir / "sources.tsv", separator="\t")
     write_summaries(selected, destination, diseases)
 
 

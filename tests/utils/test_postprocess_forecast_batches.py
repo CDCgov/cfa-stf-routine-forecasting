@@ -287,6 +287,15 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     output = downstream / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
     assert pl.read_parquet(output).height == 3
     fusion = downstream / "CA/covid/prop_pyrenew_e_daily_fable_e_other"
+    sources = pl.read_csv(downstream / "summary/sources.tsv", separator="\t")
+    assert sources.columns == ["location", "disease", "model", "path"]
+    assert sources.rows() == sorted(
+        [
+            ("CA", "covid", spec.numerator, str(numerator)),
+            ("CA", "covid", spec.other, str(other)),
+            ("CA", "covid", spec.model_name, str(fusion)),
+        ]
+    )
     assert (fusion / "_COMPLETE").read_bytes() == b""
     assert json.loads((fusion / "metadata.json").read_text())["sources"] == [
         str(numerator),

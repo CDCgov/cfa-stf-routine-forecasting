@@ -188,6 +188,7 @@ Keep this orchestration change separate from the model class so the single-locat
 
 Fusion assets select the latest completed input fits across execution directories and write results under the current execution.
 Postprocessing saves summaries in `00_summary/<disease>/` and records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
+It includes every disease with completed, current fits in the forecast-date directory.
 Rerun a fusion after updating its inputs; summaries exclude fusions whose recorded inputs differ from the latest completed fits.
 
 ## 5. Test the model

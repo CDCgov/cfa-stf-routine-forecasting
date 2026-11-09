@@ -28,8 +28,8 @@ def execution(base, id, hour=0):
     return execution_directory(base, START + dt.timedelta(hours=hour), id, {})
 
 
-def fit(directory, model, value=1.0, location="CA", complete=True):
-    path = directory / location / "covid" / model
+def fit(directory, model, value=1.0, location="CA", complete=True, disease="covid"):
+    path = directory / location / disease / model
     path.mkdir(parents=True, exist_ok=True)
     write_json(
         path / "metadata.json",
@@ -282,7 +282,7 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     spec = FUSION_SPECS[0]
     inputs = find_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
     run_fusion(spec, inputs, downstream, "CA", "covid")
-    postprocess.main(tmp_path, ["covid"], execution_dir=downstream)
+    postprocess.main(tmp_path, execution_dir=downstream)
     assert len(calls) == 1
     output = downstream / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
     assert pl.read_parquet(output).height == 3
@@ -301,6 +301,27 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
         str(numerator),
         str(other),
     ]
+
+
+@pytest.mark.parametrize("diseases", [[], ["covid", "flu"]])
+def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
+    first = execution(tmp_path, "first")
+    for disease in diseases:
+        fit(first, "daily_fable_e_other", disease=disease)
+    fit(first, "daily_fable_e_other", disease="rsv", complete=False)
+    destination = execution(tmp_path, "summary", 1)
+
+    postprocess.main(tmp_path, execution_dir=destination)
+
+    summary = destination / "00_summary"
+    sources = pl.read_csv(summary / "sources.tsv", separator="\t")
+    assert set(sources["disease"]) == set(diseases)
+    assert {path.name for path in summary.iterdir()} == {"sources.tsv", *diseases}
+    for disease in diseases:
+        table = pl.read_parquet(
+            summary / disease / f"2026-09-02-{disease}-hubverse-table.parquet"
+        )
+        assert table.height == 1
 
 
 def test_incompatible_horizons_fail(tmp_path):
@@ -361,7 +382,7 @@ def test_summaries_exclude_stale_fusion_without_recomputing(
     snapshot = find_fits(tmp_path)
     key = FitKey("CA", "covid", FUSION_SPECS[0].model_name)
     assert (key in current_fits(snapshot)) == (changed == "unrelated")
-    postprocess.main(tmp_path, ["covid"], execution_dir=newer)
+    postprocess.main(tmp_path, execution_dir=newer)
     values = pl.read_parquet(
         newer / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
     )["value"].to_list()

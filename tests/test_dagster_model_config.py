@@ -46,6 +46,7 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
 
 
 def test_postprocess_uses_executing_run(monkeypatch):
+    assert "postprocess_diseases" not in asset_config.PostProcessConfig.model_fields
     monkeypatch.setattr(
         assets, "dagster_execution_directory", lambda context, base: base / "run"
     )
@@ -58,14 +59,12 @@ def test_postprocess_uses_executing_run(monkeypatch):
             context,
             asset_config.PostProcessConfig(
                 output_basedir="custom-output",
-                postprocess_diseases=["flu"],
             ),
         )
 
     daily_output = Path("custom-output/2026-09-09_forecasts")
     postprocess.assert_called_once_with(
         base_forecast_dir=daily_output,
-        diseases=["flu"],
         execution_dir=daily_output / "run",
     )
 

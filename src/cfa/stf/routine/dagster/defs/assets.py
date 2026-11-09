@@ -320,6 +320,5 @@ def postprocess_forecasts(
     context.log.info(f"config: '{config}'")
     postprocess(
         base_forecast_dir=daily_forecast_output_dir,
-        diseases=config.postprocess_diseases,
         execution_dir=dagster_execution_directory(context, daily_forecast_output_dir),
     )

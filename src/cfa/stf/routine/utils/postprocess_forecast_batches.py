@@ -33,14 +33,12 @@ def combine_hubverse_tables(fits: list[Path], output: Path, disease: str) -> Non
     combined.write_parquet(output / _hubverse_table_filename(origins.item(), disease))
 
 
-def write_summaries(selected: dict[FitKey, Path], destination: Path, diseases) -> None:
+def write_summaries(selected: dict[FitKey, Path], destination: Path) -> None:
     """Collate exactly the fits in the supplied snapshot."""
-    for disease in diseases:
+    for disease in sorted({key.disease for key in selected}):
         fits = [
             path for key, path in sorted(selected.items()) if key.disease == disease
         ]
-        if not fits:
-            continue
         output = destination / "00_summary" / disease
         output.mkdir(parents=True, exist_ok=True)
         combine_hubverse_tables(fits, output, disease)
@@ -56,19 +54,14 @@ def write_summaries(selected: dict[FitKey, Path], destination: Path, diseases) -
 
 def main(
     base_forecast_dir: Path | str,
-    diseases=("covid", "flu", "rsv"),
     *,
     execution_dir: Path | None = None,
 ) -> None:
     base = Path(base_forecast_dir)
     destination = execution_dir or standalone_directory(
-        base, {"diseases": list(diseases)}
+        base, {"operation": "postprocess"}
     )
-    selected = {
-        key: path
-        for key, path in current_fits(find_fits(base)).items()
-        if key.disease in diseases
-    }
+    selected = current_fits(find_fits(base))
     summary_dir = destination / "00_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(
@@ -81,11 +74,10 @@ def main(
         },
         orient="row",
     ).write_csv(summary_dir / "sources.tsv", separator="\t")
-    write_summaries(selected, destination, diseases)
+    write_summaries(selected, destination)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("base_forecast_dir", type=Path)
-    parser.add_argument("--diseases", nargs="+", default=["covid", "flu", "rsv"])
     main(**vars(parser.parse_args()))

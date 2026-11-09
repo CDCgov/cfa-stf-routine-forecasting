@@ -179,7 +179,6 @@ class PostProcessConfig(dg.Config):
     """
 
     output_basedir: str = "output" if is_prod() else "test-output"
-    postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
 
 
 @dg.definitions

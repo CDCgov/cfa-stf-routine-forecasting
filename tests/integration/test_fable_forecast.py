@@ -9,7 +9,7 @@ from tests.integration.model_test_utils import (
     run_fable,
 )
 
-from cfa.stf.routine.run_storage import latest_fits
+from cfa.stf.routine.run_storage import find_fits
 
 
 @pytest.mark.model_integration
@@ -37,7 +37,7 @@ def test_fable_forecast(
 
     if missing_training_data:
         combined_data = pl.read_csv(
-            latest_fits(pipeline_workspace / FORECAST_DIR_NAME)[
+            find_fits(pipeline_workspace / FORECAST_DIR_NAME)[
                 (location, disease, "daily_fable_e_other")
             ]
             / "data"

@@ -275,9 +275,9 @@ def run_nowcastautogp(
 def assert_model_outputs(
     workspace: Path, disease: str, location: str, model_names: list[str]
 ) -> None:
-    from cfa.stf.routine.run_storage import latest_fits
+    from cfa.stf.routine.run_storage import find_fits
 
-    selected = latest_fits(workspace / FORECAST_DIR_NAME)
+    selected = find_fits(workspace / FORECAST_DIR_NAME)
     expected_forecast_through = ceiling_mmwr_epiweek(
         FORECAST_DATE + dt.timedelta(weeks=3)
     )

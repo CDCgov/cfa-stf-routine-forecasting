@@ -16,7 +16,7 @@ from cfa.stf.routine.run_storage import (
     FitKey,
     dagster_execution_directory,
     execution_directory,
-    latest_fits,
+    find_fits,
     write_json,
 )
 from cfa.stf.routine.utils import postprocess_forecast_batches as postprocess
@@ -145,33 +145,63 @@ def test_latest_completed_per_location_and_renamed_run(tmp_path):
     first = fit(older, "pyrenew_e")
     other_location = fit(older, "pyrenew_e", location="TX")
     fit(newer, "pyrenew_e", complete=False)
-    assert latest_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
+    assert find_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
     latest = fit(newer, "pyrenew_e")
-    snapshot = latest_fits(tmp_path)
+    snapshot = find_fits(tmp_path)
     assert snapshot[("CA", "covid", "pyrenew_e")] == latest
     assert snapshot[("TX", "covid", "pyrenew_e")] == other_location
     newer.rename(tmp_path / "disabled")
-    assert latest_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
+    assert find_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
     assert snapshot[("CA", "covid", "pyrenew_e")] == latest
 
 
 @pytest.mark.parametrize(
     "newer_name", ["2026-09-02-09-00-00_a", "2026-09-02-08-00-00_z"]
 )
-def test_latest_fits_uses_directory_names_without_execution_metadata(
-    tmp_path, newer_name
+@pytest.mark.parametrize("keep", ["all", "earliest", "latest"])
+def test_find_fits_uses_directory_names_without_execution_metadata(
+    tmp_path, newer_name, keep
 ):
     older = tmp_path / "2026-09-02-08-00-00_a"
     newer = tmp_path / newer_name
     latest = fit(newer, "pyrenew_e")
-    fit(older, "pyrenew_e")
+    first = fit(older, "pyrenew_e")
     (older / "execution.json").write_text("invalid JSON")
 
-    assert latest_fits(tmp_path) == {FitKey("CA", "covid", "pyrenew_e"): latest}
+    expected = {"all": [first, latest], "earliest": first, "latest": latest}
+    assert find_fits(tmp_path, keep=keep) == {
+        FitKey("CA", "covid", "pyrenew_e"): expected[keep]
+    }
+
+
+@pytest.mark.parametrize("keep", ["all", "earliest", "latest"])
+@pytest.mark.parametrize("filtered", [False, True])
+def test_find_fits_retains_requested_executions(tmp_path, keep, filtered):
+    older = execution(tmp_path, "older")
+    newer = execution(tmp_path, "newer", 1)
+    incomplete = execution(tmp_path, "incomplete", 2)
+    first = fit(older, "pyrenew_e")
+    last = fit(newer, "pyrenew_e")
+    fit(incomplete, "pyrenew_e", complete=False)
+    other = fit(newer, "daily_fable_e_other")
+    unrelated = fit(newer, "pyrenew_e", location="TX")
+    disabled = tmp_path / "disabled"
+    fit(disabled, "pyrenew_e")
+    numerator_key, other_key = FUSION_SPECS[0].input_keys("CA", "covid")
+    keys = [numerator_key, other_key, FitKey("CA", "covid", "missing")]
+    expected = {
+        numerator_key: {"all": [first, last], "earliest": first, "latest": last}[keep],
+        other_key: [other] if keep == "all" else other,
+    }
+    if not filtered:
+        expected[FitKey("TX", "covid", "pyrenew_e")] = (
+            [unrelated] if keep == "all" else unrelated
+        )
+    assert find_fits(tmp_path, keys=keys if filtered else None, keep=keep) == expected
 
 
 @pytest.mark.parametrize("include_missing", [False, True])
-def test_latest_fits_looks_up_only_requested_inputs(
+def test_find_fits_looks_up_only_requested_inputs(
     tmp_path, monkeypatch, include_missing
 ):
     oldest = execution(tmp_path, "oldest", -1)
@@ -202,7 +232,7 @@ def test_latest_fits_looks_up_only_requested_inputs(
 
     monkeypatch.setattr(Path, "is_file", inspect_marker)
     monkeypatch.setattr(Path, "glob", unexpected_glob)
-    assert latest_fits(tmp_path, keys=iter(requested)) == {
+    assert find_fits(tmp_path, keys=iter(requested)) == {
         keys[0]: numerator,
         keys[1]: other,
     }
@@ -212,9 +242,15 @@ def test_latest_fits_looks_up_only_requested_inputs(
         assert not any(path.is_relative_to(oldest) for path in inspected)
 
 
-def test_latest_fits_with_no_requested_keys(tmp_path):
+@pytest.mark.parametrize("keep", ["all", "earliest", "latest"])
+def test_find_fits_with_no_requested_keys(tmp_path, keep):
     fit(execution(tmp_path, "run"), "pyrenew_e")
-    assert latest_fits(tmp_path, keys=[]) == {}
+    assert find_fits(tmp_path, keys=[], keep=keep) == {}
+
+
+def test_find_fits_rejects_unknown_keep(tmp_path):
+    with pytest.raises(ValueError, match="keep must be"):
+        find_fits(tmp_path, keep="newest")
 
 
 @pytest.mark.parametrize("separate", [False, True])
@@ -244,7 +280,7 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
 
     monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
     spec = FUSION_SPECS[0]
-    inputs = latest_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
+    inputs = find_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
     run_fusion(spec, inputs, downstream, "CA", "covid")
     postprocess.main(tmp_path, ["covid"], execution_dir=downstream)
     assert len(calls) == 1
@@ -267,7 +303,7 @@ def test_incompatible_horizons_fail(tmp_path):
         {"forecast_date": "2026-09-02", "forecast_through": "2026-10-03"},
     )
     with pytest.raises(ValueError, match="windows differ"):
-        run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), run, "CA", "covid")
+        run_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
 
 
 def test_real_dagster_run_shares_identity_across_dependent_assets(tmp_path):
@@ -313,7 +349,7 @@ def test_summaries_exclude_stale_fusion_without_recomputing(
         pytest.fail("Postprocessing must never execute fusion")
 
     monkeypatch.setattr(fusion_module, "create_prop_fusion_model", unexpected_fusion)
-    snapshot = latest_fits(tmp_path)
+    snapshot = find_fits(tmp_path)
     key = FitKey("CA", "covid", FUSION_SPECS[0].model_name)
     assert (key in current_fits(snapshot)) == (changed == "unrelated")
     postprocess.main(tmp_path, ["covid"], execution_dir=newer)
@@ -328,5 +364,5 @@ def test_fusion_missing_inputs_fails_without_marking_complete(tmp_path):
     run = execution(tmp_path, "first")
     fit(run, "pyrenew_e")
     with pytest.raises(FileNotFoundError, match="Missing completed fusion inputs"):
-        run_fusion(FUSION_SPECS[0], latest_fits(tmp_path), run, "CA", "covid")
+        run_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
     assert not (run / "CA/covid" / FUSION_SPECS[0].model_name / "_COMPLETE").exists()

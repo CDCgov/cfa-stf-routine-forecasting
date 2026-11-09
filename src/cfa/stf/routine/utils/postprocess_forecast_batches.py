@@ -8,7 +8,7 @@ import polars as pl
 from cfa.stf.routine.fusion import current_fits
 from cfa.stf.routine.run_storage import (
     FitKey,
-    latest_fits,
+    find_fits,
     standalone_directory,
     write_json,
 )
@@ -45,7 +45,6 @@ def write_summaries(selected: dict[FitKey, Path], destination: Path, diseases) -
         output = destination / "summary" / disease
         output.mkdir(parents=True, exist_ok=True)
         combine_hubverse_tables(fits, output, disease)
-        write_json(output / "sources.json", {"fits": [str(path) for path in fits]})
         pdfs = {}
         for fit in fits:
             for pdf in sorted((fit / "figures").glob("*.pdf")):
@@ -68,11 +67,13 @@ def main(
     )
     selected = {
         key: path
-        for key, path in current_fits(latest_fits(base)).items()
+        for key, path in current_fits(find_fits(base)).items()
         if key.disease in diseases
     }
+    summary_dir = destination / "summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
     write_json(
-        destination / "sources.json",
+        summary_dir / "sources.json",
         {"/".join(key): str(path) for key, path in selected.items()},
     )
     write_summaries(selected, destination, diseases)

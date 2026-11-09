@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import NamedTuple
+from typing import Literal, NamedTuple, overload
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -77,16 +77,44 @@ def standalone_directory(base: Path, config: dict) -> Path:
     return execution_directory(base, dt.datetime.now(dt.UTC), uuid4().hex, config)
 
 
-def latest_fits(base: Path, keys: Iterable[FitKey] | None = None) -> dict[FitKey, Path]:
-    """Select the latest complete fits by execution directory name.
+@overload
+def find_fits(
+    base: Path,
+    keys: Iterable[FitKey] | None = None,
+    *,
+    keep: Literal["earliest", "latest"] = "latest",
+) -> dict[FitKey, Path]: ...
 
-    If keys are supplied, inspect only those fit paths and stop once all are found.
-    Missing fits are omitted. Without keys, discover all completed fits.
+
+@overload
+def find_fits(
+    base: Path,
+    keys: Iterable[FitKey] | None = None,
+    *,
+    keep: Literal["all"],
+) -> dict[FitKey, list[Path]]: ...
+
+
+def find_fits(
+    base: Path,
+    keys: Iterable[FitKey] | None = None,
+    *,
+    keep: Literal["all", "earliest", "latest"] = "latest",
+) -> dict[FitKey, Path] | dict[FitKey, list[Path]]:
+    """Find completed fits, ordered by execution directory name.
+
+    Keep one path per key with "earliest" or "latest" (the default), or a list
+    of paths per key in ascending execution order with "all".
+    Supplied keys restrict filesystem lookups; missing fits are omitted.
     """
+    if keep not in ("all", "earliest", "latest"):
+        raise ValueError('keep must be "all", "earliest", or "latest"')
     requested = None if keys is None else set(keys)
-    selected = {}
-    for directory in sorted(base.iterdir(), reverse=True):
-        if requested is not None and len(selected) == len(requested):
+    if requested is not None and not requested:
+        return {}
+    selected: dict[FitKey, list[Path]] = {}
+    for directory in sorted(base.iterdir(), reverse=keep == "latest"):
+        if keep != "all" and requested is not None and len(selected) == len(requested):
             break
         if not directory.is_dir() or not RUN_PATTERN.fullmatch(directory.name):
             continue
@@ -95,7 +123,7 @@ def latest_fits(base: Path, keys: Iterable[FitKey] | None = None) -> dict[FitKey
             if requested is None
             else (
                 key.directory(directory) / "_COMPLETE"
-                for key in requested - selected.keys()
+                for key in (requested if keep == "all" else requested - selected.keys())
             )
         )
         for marker in markers:
@@ -103,5 +131,9 @@ def latest_fits(base: Path, keys: Iterable[FitKey] | None = None) -> dict[FitKey
                 continue
             fit = marker.parent
             key = FitKey(fit.parent.parent.name, fit.parent.name, fit.name)
-            selected.setdefault(key, fit)
-    return selected
+            paths = selected.setdefault(key, [])
+            if keep == "all" or not paths:
+                paths.append(fit)
+    if keep == "all":
+        return selected
+    return {key: paths[0] for key, paths in selected.items()}

@@ -205,7 +205,7 @@ def test_fusion_assets_keep_dependencies_and_resolve_current_inputs(
         lambda ctx, base: base / "execution",
     )
     discover = Mock(return_value=snapshot)
-    monkeypatch.setattr(asset_helpers, "latest_fits", discover)
+    monkeypatch.setattr(asset_helpers, "find_fits", discover)
     monkeypatch.setattr(asset_helpers, "run_fusion", runner)
     context = SimpleNamespace(partition_key="2026-09-09")
     asset_helpers._fuse_pyrenew_fable_e_other(

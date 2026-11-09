@@ -71,11 +71,11 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
                 run_nowcastautogp(workspace, disease, location)
 
     from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion
-    from cfa.stf.routine.run_storage import latest_fits, standalone_directory
+    from cfa.stf.routine.run_storage import find_fits, standalone_directory
 
     base = workspace / FORECAST_DIR_NAME
     fusion_execution = standalone_directory(base, {"operation": "fusion"})
-    inputs = latest_fits(base)
+    inputs = find_fits(base)
     for disease in DEFAULT_DISEASES:
         for location in DEFAULT_LOCATIONS:
             for spec in FUSION_SPECS:

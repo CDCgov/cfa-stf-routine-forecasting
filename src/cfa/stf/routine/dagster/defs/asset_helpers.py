@@ -21,7 +21,7 @@ from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.run_storage import dagster_execution_directory, latest_fits
+from cfa.stf.routine.run_storage import dagster_execution_directory, find_fits
 
 # Utility Functions
 
@@ -197,5 +197,5 @@ def _fuse_pyrenew_fable_e_other(
         for spec in FUSION_SPECS
         if spec.numerator == pyrenew_model_name and spec.aggregate_num == epiweekly
     )
-    inputs = latest_fits(base, keys=spec.input_keys(location, disease))
+    inputs = find_fits(base, keys=spec.input_keys(location, disease))
     return run_fusion(spec, inputs, execution, location, disease)

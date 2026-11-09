@@ -5,7 +5,7 @@ from pathlib import Path
 
 import polars as pl
 
-from cfa.stf.routine.fusion import current_fits
+from cfa.stf.routine.fusion import validate_fusion_sources
 from cfa.stf.routine.run_storage import (
     FitKey,
     find_fits,
@@ -61,7 +61,8 @@ def main(
     destination = execution_dir or standalone_directory(
         base, {"operation": "postprocess"}
     )
-    selected = current_fits(find_fits(base))
+    selected = find_fits(base)
+    validate_fusion_sources(selected)
     summary_dir = destination / "00_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(

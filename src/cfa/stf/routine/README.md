@@ -191,7 +191,7 @@ Fusion assets take only `output_basedir` and discover every location/disease pai
 They retain their upstream dependencies and use the completed fits on disk to select pairs.
 Postprocessing saves summaries in `00_summary/<disease>/` and records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
 It includes every disease with completed, current fits in the forecast-date directory.
-Rerun a fusion after updating its inputs; summaries exclude fusions whose recorded inputs differ from the latest completed fits.
+Rerun a fusion after updating its inputs; postprocessing and plot collation raise an error if a fusion's recorded inputs differ from the latest completed fits, an input is missing, or its provenance cannot be validated.
 
 ## 5. Test the model
 

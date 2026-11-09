@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pypdf import PdfWriter
 
-from cfa.stf.routine.fusion import current_fits
+from cfa.stf.routine.fusion import validate_fusion_sources
 from cfa.stf.routine.run_storage import find_fits, standalone_directory
 
 
@@ -39,10 +39,10 @@ def merge_pdfs(to_merge: list[Path], output_path: Path) -> None:
 
 def collect_pdfs(model_batch_dir: Path) -> dict[str, dict[str, list[Path]]]:
     """Find and group PDFs by their shared filenames within each model folder."""
+    selected = find_fits(model_batch_dir)
+    validate_fusion_sources(selected)
     pdf_groups = defaultdict(lambda: defaultdict(list))
-    for (_, disease, model), model_path in sorted(
-        current_fits(find_fits(model_batch_dir)).items()
-    ):
+    for (_, disease, model), model_path in sorted(selected.items()):
         for file_path in sorted((model_path / "figures").glob("*.pdf")):
             signal_name = re.sub(
                 f"^{re.escape(model)}_|(_epiweekly|_daily|_log|_agg_num|_agg_denom)+$",

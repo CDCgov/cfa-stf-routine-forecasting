@@ -11,7 +11,7 @@ import pytest
 
 from cfa.stf.routine import fusion as fusion_module
 from cfa.stf.routine.forecast_window import ForecastWindow
-from cfa.stf.routine.fusion import FUSION_SPECS, current_fits, run_fusion
+from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion, validate_fusion_sources
 from cfa.stf.routine.run_storage import (
     FitKey,
     dagster_execution_directory,
@@ -20,6 +20,7 @@ from cfa.stf.routine.run_storage import (
     write_json,
 )
 from cfa.stf.routine.utils import postprocess_forecast_batches as postprocess
+from cfa.stf.routine.utils.collate_plots import collect_pdfs
 
 START = dt.datetime(2026, 9, 2, 12, tzinfo=dt.UTC)
 
@@ -355,8 +356,20 @@ def test_real_dagster_run_shares_identity_across_dependent_assets(tmp_path):
     assert paths[0] == paths[1]
 
 
-@pytest.mark.parametrize("changed", ["numerator", "other", "missing", "unrelated"])
-def test_summaries_exclude_stale_fusion_without_recomputing(
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "numerator",
+        "other",
+        "missing_numerator",
+        "missing_other",
+        "missing_sources",
+        "incomplete_sources",
+        "swapped_sources",
+        "unrelated",
+    ],
+)
+def test_summaries_reject_stale_fusion_without_recomputing(
     tmp_path, monkeypatch, changed
 ):
     initial = execution(tmp_path, "first")
@@ -365,8 +378,16 @@ def test_summaries_exclude_stale_fusion_without_recomputing(
     fusion = fit(initial, FUSION_SPECS[0].model_name, value=3.0)
     write_json(fusion / "metadata.json", {"sources": [str(numerator), str(other)]})
     newer = execution(tmp_path, "new", 1)
-    if changed == "missing":
+    if changed == "missing_numerator":
+        (numerator / "_COMPLETE").unlink()
+    elif changed == "missing_other":
         (other / "_COMPLETE").unlink()
+    elif changed == "missing_sources":
+        write_json(fusion / "metadata.json", {})
+    elif changed == "incomplete_sources":
+        write_json(fusion / "metadata.json", {"sources": [str(numerator)]})
+    elif changed == "swapped_sources":
+        write_json(fusion / "metadata.json", {"sources": [str(other), str(numerator)]})
     else:
         model = {
             "numerator": "pyrenew_e",
@@ -380,14 +401,40 @@ def test_summaries_exclude_stale_fusion_without_recomputing(
 
     monkeypatch.setattr(fusion_module, "create_prop_fusion_model", unexpected_fusion)
     snapshot = find_fits(tmp_path)
-    key = FitKey("CA", "covid", FUSION_SPECS[0].model_name)
-    assert (key in current_fits(snapshot)) == (changed == "unrelated")
-    postprocess.main(tmp_path, execution_dir=newer)
-    values = pl.read_parquet(
-        newer / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
-    )["value"].to_list()
-    assert (3.0 in values) == (changed == "unrelated")
-    assert key in snapshot  # Filtering must not mutate the discovery snapshot.
+    original = snapshot.copy()
+    if changed == "unrelated":
+        validate_fusion_sources(snapshot)
+        postprocess.main(tmp_path, execution_dir=newer)
+        values = pl.read_parquet(
+            newer / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
+        )["value"].to_list()
+        assert 3.0 in values
+        collect_pdfs(tmp_path)
+    else:
+        with pytest.raises(ValueError, match="Stale fusion") as error:
+            validate_fusion_sources(snapshot)
+        assert str(fusion) in str(error.value)
+        assert "recorded sources" in str(error.value)
+        assert "latest completed inputs" in str(error.value)
+        assert "Rerun the fusion" in str(error.value)
+        with pytest.raises(ValueError, match="Stale fusion"):
+            postprocess.main(tmp_path, execution_dir=newer)
+        with pytest.raises(ValueError, match="Stale fusion"):
+            collect_pdfs(tmp_path)
+        assert not (newer / "00_summary").exists()
+    assert snapshot == original
+
+
+def test_summaries_reject_unknown_fusion_recipe(tmp_path):
+    run = execution(tmp_path, "run")
+    fusion = fit(run, "prop_unknown")
+
+    with pytest.raises(ValueError, match="Unknown fusion recipe") as error:
+        postprocess.main(tmp_path, execution_dir=run)
+    assert str(fusion) in str(error.value)
+    with pytest.raises(ValueError, match="Unknown fusion recipe"):
+        collect_pdfs(tmp_path)
+    assert not (run / "00_summary").exists()
 
 
 def test_fusion_missing_inputs_fails_without_marking_complete(tmp_path):

@@ -108,26 +108,28 @@ def run_fusion(
     return destination
 
 
-def current_fits(snapshot: dict[FitKey, Path]) -> dict[FitKey, Path]:
-    """Exclude fusions whose recorded inputs no longer match the latest fits."""
+def validate_fusion_sources(snapshot: dict[FitKey, Path]) -> None:
+    """Raise if a fusion's recorded inputs differ from the selected completed fits."""
     specs = {spec.model_name: spec for spec in FUSION_SPECS}
-    selected = {}
     for key, path in snapshot.items():
-        if key.model.startswith("prop_"):
-            spec = specs.get(key.model)
-            if spec is None:
-                continue
-            expected = [
-                snapshot.get(source)
-                for source in spec.input_keys(key.location, key.disease)
-            ]
-            metadata = json.loads((path / "metadata.json").read_text())
-            sources = metadata.get("sources", [])
-            if None in expected or len(sources) != 2:
-                continue
-            if [Path(source).resolve() for source in sources] != [
-                source.resolve() for source in expected
-            ]:
-                continue
-        selected[key] = path
-    return selected
+        if not key.model.startswith("prop_"):
+            continue
+        spec = specs.get(key.model)
+        if spec is None:
+            raise ValueError(f"Unknown fusion recipe {key.model!r} at {path}")
+        expected = [
+            str(snapshot[source].resolve()) if source in snapshot else None
+            for source in spec.input_keys(key.location, key.disease)
+        ]
+        metadata = json.loads((path / "metadata.json").read_text())
+        sources = metadata.get("sources", [])
+        if (
+            None in expected
+            or len(sources) != 2
+            or [str(Path(source).resolve()) for source in sources] != expected
+        ):
+            raise ValueError(
+                f"Stale fusion at {path}: recorded sources {sources!r} do not match "
+                f"the latest completed inputs {expected!r}. "
+                "Rerun the fusion before postprocessing."
+            )

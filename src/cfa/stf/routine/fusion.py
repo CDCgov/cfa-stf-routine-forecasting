@@ -39,13 +39,11 @@ class FusionSpec:
         )
 
 
-FUSION_SPECS = tuple(
-    FusionSpec(numerator, other, aggregate_num=weekly)
-    for numerator in ("pyrenew_e", "pyrenew_he")
-    for other, weekly in (
-        ("daily_fable_e_other", False),
-        ("epiweekly_fable_e_other", True),
-    )
+FUSION_SPECS = (
+    FusionSpec("pyrenew_e", "daily_fable_e_other"),
+    FusionSpec("pyrenew_e", "epiweekly_fable_e_other", aggregate_num=True),
+    FusionSpec("pyrenew_he", "daily_fable_e_other"),
+    FusionSpec("pyrenew_he", "epiweekly_fable_e_other", aggregate_num=True),
 )
 
 

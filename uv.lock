@@ -677,7 +677,7 @@ dependencies = [
 [[package]]
 name = "cfa-dagster"
 version = "1.7.2"
-source = { git = "https://github.com/cdcgov/cfa-dagster?rev=jk-trycatch-batch#6be9abbde7123bd41eb2860191bcfc339b83ed4c" }
+source = { git = "https://github.com/cdcgov/cfa-dagster?rev=jk-trycatch-batch#e3d6c2b17096f8ff2db5c0b8dda7110503d6797a" }
 dependencies = [
     { name = "aiofiles" },
     { name = "azure-batch" },

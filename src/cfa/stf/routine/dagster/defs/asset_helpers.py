@@ -180,12 +180,12 @@ def _run_nowcastautogp_e_pct_epiweekly(
     )
 
 
-def _fuse_pyrenew_fable_e_other(
+def _run_fusion_model(
     context: dg.AssetExecutionContext,
     config: FusionConfig,
     spec: FusionSpec,
 ) -> list[Path]:
-    """Fuse every location/disease pair with both completed inputs on disk."""
+    """Run a fusion recipe for every location/disease pair with completed inputs."""
     _throw_if_backfill(context, daily_partitions_def)
     base = Path(config.output_basedir, f"{context.partition_key}_forecasts")
     execution = dagster_execution_directory(context, base)

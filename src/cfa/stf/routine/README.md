@@ -189,6 +189,8 @@ Keep this orchestration change separate from the model class so the single-locat
 All locations use the model-level `output_basedir`; location overrides apply to training settings.
 Fusion assets take only `output_basedir` and discover every location/disease pair with both required completed inputs across execution directories, writing results under the current execution.
 They retain their upstream dependencies and use the completed fits on disk to select pairs.
+To add a fusion of another model pair, define a named `FusionSpec` in `fusion.py` and include it in `FUSION_SPECS` so provenance validation recognizes it.
+Pass that spec to `_run_fusion_model(context, config, spec)` from a Dagster asset declaring both upstream dependencies, and add the asset to the postprocessing dependencies.
 Postprocessing saves summaries in `00_summary/<disease>/` and records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
 It includes every disease with completed, current fits in the forecast-date directory.
 Rerun a fusion after updating its inputs; postprocessing and plot collation raise an error if a fusion's recorded inputs differ from the latest completed fits, an input is missing, or its provenance cannot be validated.

@@ -15,8 +15,8 @@ from cfa.stf.routine.dagster.defs.asset_config import (
     daily_partitions_def,
 )
 from cfa.stf.routine.dagster.defs.asset_helpers import (
-    _fuse_pyrenew_fable_e_other,
     _run_fable_e_other,
+    _run_fusion_model,
     _run_nowcastautogp_e_pct_epiweekly,
     _run_pyrenew_model,
     _throw_if_backfill,
@@ -208,7 +208,7 @@ def fuse_pyrenew_e_fable(
     context: dg.AssetExecutionContext,
     config: FusionConfig,
 ):
-    _fuse_pyrenew_fable_e_other(
+    _run_fusion_model(
         context,
         config,
         spec=PYRENEW_E_FABLE,
@@ -226,7 +226,7 @@ def fuse_pyrenew_e_fable_epiweekly(
     context: dg.AssetExecutionContext,
     config: FusionConfig,
 ):
-    _fuse_pyrenew_fable_e_other(
+    _run_fusion_model(
         context,
         config,
         spec=PYRENEW_E_FABLE_EPIWEEKLY,
@@ -244,7 +244,7 @@ def fuse_pyrenew_he_fable(
     context: dg.AssetExecutionContext,
     config: FusionConfig,
 ):
-    _fuse_pyrenew_fable_e_other(
+    _run_fusion_model(
         context,
         config,
         spec=PYRENEW_HE_FABLE,
@@ -262,7 +262,7 @@ def fuse_pyrenew_he_fable_epiweekly(
     context: dg.AssetExecutionContext,
     config: FusionConfig,
 ):
-    _fuse_pyrenew_fable_e_other(
+    _run_fusion_model(
         context,
         config,
         spec=PYRENEW_HE_FABLE_EPIWEEKLY,

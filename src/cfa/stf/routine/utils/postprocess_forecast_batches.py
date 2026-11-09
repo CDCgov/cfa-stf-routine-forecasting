@@ -33,22 +33,47 @@ def combine_hubverse_tables(fits: list[Path], output: Path, disease: str) -> Non
     combined.write_parquet(output / _hubverse_table_filename(origins.item(), disease))
 
 
-def write_summaries(selected: dict[FitKey, Path], destination: Path) -> None:
-    """Collate exactly the fits in the supplied snapshot."""
-    for disease in sorted({key.disease for key in selected}):
-        fits = [
-            path for key, path in sorted(selected.items()) if key.disease == disease
-        ]
+def _fits_by_disease(selected: dict[FitKey, Path]) -> dict[str, list[Path]]:
+    fits: dict[str, list[Path]] = {}
+    for key, path in sorted(selected.items()):
+        fits.setdefault(key.disease, []).append(path)
+    return dict(sorted(fits.items()))
+
+
+def write_sources_manifest(selected: dict[FitKey, Path], destination: Path) -> None:
+    """Record the selected fits in the summary's sources.tsv file."""
+    summary_dir = destination / "00_summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(
+        [(*key, str(path)) for key, path in sorted(selected.items())],
+        schema={
+            "location": pl.String,
+            "disease": pl.String,
+            "model": pl.String,
+            "path": pl.String,
+        },
+        orient="row",
+    ).write_csv(summary_dir / "sources.tsv", separator="\t")
+
+
+def write_hubverse_summaries(selected: dict[FitKey, Path], destination: Path) -> None:
+    """Combine the selected fits' Hubverse tables separately for each disease."""
+    for disease, fits in _fits_by_disease(selected).items():
         output = destination / "00_summary" / disease
-        output.mkdir(parents=True, exist_ok=True)
         combine_hubverse_tables(fits, output, disease)
+
+
+def merge_summary_plots(selected: dict[FitKey, Path], destination: Path) -> None:
+    """Merge matching plot filenames separately for each disease."""
+    for disease, fits in _fits_by_disease(selected).items():
+        output = destination / "00_summary" / disease
         pdfs = {}
         for fit in fits:
             for pdf in sorted((fit / "figures").glob("*.pdf")):
                 pdfs.setdefault(pdf.name, []).append(pdf)
         for name, paths in pdfs.items():
             figure = output / "figures" / name
-            figure.parent.mkdir(exist_ok=True)
+            figure.parent.mkdir(parents=True, exist_ok=True)
             merge_pdfs(paths, figure)
 
 
@@ -63,19 +88,9 @@ def main(
     )
     selected = find_fits(base)
     validate_fusion_sources(selected)
-    summary_dir = destination / "00_summary"
-    summary_dir.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame(
-        [(*key, str(path)) for key, path in sorted(selected.items())],
-        schema={
-            "location": pl.String,
-            "disease": pl.String,
-            "model": pl.String,
-            "path": pl.String,
-        },
-        orient="row",
-    ).write_csv(summary_dir / "sources.tsv", separator="\t")
-    write_summaries(selected, destination)
+    write_sources_manifest(selected, destination)
+    write_hubverse_summaries(selected, destination)
+    merge_summary_plots(selected, destination)
 
 
 if __name__ == "__main__":

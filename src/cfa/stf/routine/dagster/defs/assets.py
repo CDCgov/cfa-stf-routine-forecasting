@@ -7,6 +7,7 @@ from cfa_dagster import dynamic_graph_asset
 
 from cfa.stf.routine.dagster.defs.asset_config import (
     FableEOtherConfig,
+    FusionConfig,
     ModelBaseConfig,
     NowcastAutoGPEPctEpiweeklyConfig,
     PostProcessConfig,
@@ -190,83 +191,77 @@ def nowcastautogp_e_pct_epiweekly(
 # Fusion Assets
 
 
-@dynamic_graph_asset(
+@dg.asset(
     **common_asset_args,
     automation_condition=dg.AutomationCondition.eager(),
     group_name="Fusion",
-    ins={"pyrenew_e": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
+    deps=["pyrenew_e", "fable_e_other"],
     tags=E_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_e_fable(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
+    context: dg.AssetExecutionContext,
+    config: FusionConfig,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
-        model_base_config,
+        config,
         pyrenew_model_name="pyrenew_e",
         epiweekly=False,
     )
 
 
-@dynamic_graph_asset(
+@dg.asset(
     **common_asset_args,
     automation_condition=dg.AutomationCondition.eager(),
     group_name="Fusion",
-    ins={
-        "pyrenew_e": dg.In(dg.Nothing),
-        "epiweekly_fable_e_other": dg.In(dg.Nothing),
-    },
+    deps=["pyrenew_e", "epiweekly_fable_e_other"],
     tags=E_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_e_fable_epiweekly(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
+    context: dg.AssetExecutionContext,
+    config: FusionConfig,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
-        model_base_config,
+        config,
         pyrenew_model_name="pyrenew_e",
         epiweekly=True,
     )
 
 
-@dynamic_graph_asset(
+@dg.asset(
     **common_asset_args,
     automation_condition=dg.AutomationCondition.eager(),
     group_name="Fusion",
-    ins={"pyrenew_he": dg.In(dg.Nothing), "fable_e_other": dg.In(dg.Nothing)},
+    deps=["pyrenew_he", "fable_e_other"],
     tags=HE_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_he_fable(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
+    context: dg.AssetExecutionContext,
+    config: FusionConfig,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
-        model_base_config,
+        config,
         pyrenew_model_name="pyrenew_he",
         epiweekly=False,
     )
 
 
-@dynamic_graph_asset(
+@dg.asset(
     **common_asset_args,
     automation_condition=dg.AutomationCondition.eager(),
     group_name="Fusion",
-    ins={
-        "pyrenew_he": dg.In(dg.Nothing),
-        "epiweekly_fable_e_other": dg.In(dg.Nothing),
-    },
+    deps=["pyrenew_he", "epiweekly_fable_e_other"],
     tags=HE_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_he_fable_epiweekly(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
+    context: dg.AssetExecutionContext,
+    config: FusionConfig,
 ):
     _fuse_pyrenew_fable_e_other(
         context,
-        model_base_config,
+        config,
         pyrenew_model_name="pyrenew_he",
         epiweekly=True,
     )

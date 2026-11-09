@@ -9,6 +9,7 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.dagster.defs.asset_config import (
     FableEOtherConfig,
+    FusionConfig,
     ModelBaseConfig,
     NowcastAutoGPEPctEpiweeklyConfig,
     PyrenewConfig,
@@ -21,7 +22,7 @@ from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.run_storage import dagster_execution_directory, find_fits
+from cfa.stf.routine.run_storage import FitKey, dagster_execution_directory, find_fits
 
 # Utility Functions
 
@@ -58,7 +59,7 @@ def _run_fable_e_other(
     # We let the user potentially override the basedir, but the subdirectory is
     # locked to the partition date.
     daily_forecast_output_dir: Path = Path(
-        loc_config.output_basedir,
+        model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
 
@@ -101,7 +102,7 @@ def _run_pyrenew_model(
     # We let the user potentially override the basedir, but the subdirectory is
     # locked to the partition date.
     daily_forecast_output_dir: Path = Path(
-        loc_config.output_basedir, f"{context.partition_key}_forecasts"
+        model_base_config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
@@ -146,7 +147,7 @@ def _run_nowcastautogp_e_pct_epiweekly(
     loc_config = model_base_config.get_by_location(location)
     context.log.debug(f"loc_config: '{loc_config}'")
     daily_forecast_output_dir = Path(
-        loc_config.output_basedir,
+        model_base_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
     context.log.info(
@@ -180,16 +181,13 @@ def _run_nowcastautogp_e_pct_epiweekly(
 
 
 def _fuse_pyrenew_fable_e_other(
-    context: dg.OpExecutionContext,
-    model_base_config: ModelBaseConfig,
+    context: dg.AssetExecutionContext,
+    config: FusionConfig,
     pyrenew_model_name: str,
     epiweekly: bool,
-) -> Path:
-    """Materialize one fusion using the latest completed upstream fits."""
+) -> list[Path]:
+    """Fuse every location/disease pair with both completed inputs on disk."""
     _throw_if_backfill(context, daily_partitions_def)
-    location = model_base_config.locations.current_value
-    disease = model_base_config.diseases.current_value
-    config = model_base_config.get_by_location(location)
     base = Path(config.output_basedir, f"{context.partition_key}_forecasts")
     execution = dagster_execution_directory(context, base)
     spec = next(
@@ -197,5 +195,17 @@ def _fuse_pyrenew_fable_e_other(
         for spec in FUSION_SPECS
         if spec.numerator == pyrenew_model_name and spec.aggregate_num == epiweekly
     )
-    inputs = find_fits(base, keys=spec.input_keys(location, disease))
-    return run_fusion(spec, inputs, execution, location, disease)
+    inputs = find_fits(base)
+    pairs = sorted(
+        (key.location, key.disease)
+        for key in inputs
+        if key.model == spec.numerator
+        and FitKey(key.location, key.disease, spec.other) in inputs
+    )
+    context.log.info(
+        "Fusing %d completed input pairs for %s", len(pairs), spec.model_name
+    )
+    return [
+        run_fusion(spec, inputs, execution, location, disease)
+        for location, disease in pairs
+    ]

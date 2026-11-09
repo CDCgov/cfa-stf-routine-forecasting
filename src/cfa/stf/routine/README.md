@@ -186,7 +186,9 @@ To run the new model in production, update [`dagster/defs/`](./dagster/defs/) to
 Declare the correct upstream data asset dependencies for the pipeline's `sources`.
 Keep this orchestration change separate from the model class so the single-location pipeline remains directly testable.
 
-Fusion assets select the latest completed input fits across execution directories and write results under the current execution.
+All locations use the model-level `output_basedir`; location overrides apply to training settings.
+Fusion assets take only `output_basedir` and discover every location/disease pair with both required completed inputs across execution directories, writing results under the current execution.
+They retain their upstream dependencies and use the completed fits on disk to select pairs.
 Postprocessing saves summaries in `00_summary/<disease>/` and records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
 It includes every disease with completed, current fits in the forecast-date directory.
 Rerun a fusion after updating its inputs; summaries exclude fusions whose recorded inputs differ from the latest completed fits.

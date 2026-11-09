@@ -45,10 +45,6 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 # Use default_factory to prevent ConfigOverrides from populating fields in the
 # Launchpad unless the user explicitly sets them.
 class _SharedModelConfigFields(BaseModel):
-    output_basedir: str = Field(
-        default_factory=lambda: "",
-        description="Output directory used by all forecast models.",
-    )
     exclude_last_n_days: int = Field(
         default_factory=lambda: 0,
         description="Requested recent-data omission used by all forecast models.",
@@ -171,6 +167,12 @@ class NowcastAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
 class WModelExclusions(dg.ConfigurableResource):
     # only covid is valid for W
     diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
+
+
+class FusionConfig(dg.Config):
+    """Output root for fusion of completed fits across locations and diseases."""
+
+    output_basedir: str = "output" if is_prod() else "test-output"
 
 
 class PostProcessConfig(dg.Config):

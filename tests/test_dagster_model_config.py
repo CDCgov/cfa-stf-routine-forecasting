@@ -1,11 +1,12 @@
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import dagster as dg
 import pytest
 
 from cfa.stf.routine.dagster.defs import asset_config, asset_helpers, assets
+from cfa.stf.routine.run_storage import FitKey
 
 
 def _model_base_config() -> asset_config.ModelBaseConfig:
@@ -18,7 +19,6 @@ def _model_base_config() -> asset_config.ModelBaseConfig:
         config_overrides=[
             asset_config.ConfigOverride(
                 location="CA",
-                output_basedir="ca-output",
                 exclude_last_n_days=2,
                 fail_on_stale_data=False,
             ).as_dict()
@@ -36,6 +36,9 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
 
     assert "n_lookback_days" not in base_fields
     assert "n_lookback_days" in override_fields
+    assert "output_basedir" not in override_fields
+    assert config.get_by_location("CA").output_basedir == config.output_basedir
+    assert config.get_by_location("US").output_basedir == config.output_basedir
     assert "fable_pyrenew_n_lookback_days" not in override_fields
     assert "nowcastautogp_n_lookback_days" not in override_fields
     assert config.fable_pyrenew_n_lookback_days == 150
@@ -149,7 +152,7 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
     )
 
     shared_arguments = {
-        "output_dir": Path("ca-output/2026-09-09_forecasts/run"),
+        "output_dir": Path("default-output/2026-09-09_forecasts/run"),
         "exclude_last_n_days": 2,
         "fail_on_stale_data": False,
     }
@@ -182,8 +185,9 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
         ),
     ],
 )
-def test_fusion_assets_keep_dependencies_and_resolve_current_inputs(
-    monkeypatch, name, numerator, other, weekly
+@pytest.mark.parametrize("pairs_present", [False, True])
+def test_fusion_assets_discover_pairs_without_model_configuration(
+    tmp_path, monkeypatch, name, numerator, other, weekly, pairs_present
 ):
     from cfa.stf.routine.fusion import FUSION_SPECS
 
@@ -191,33 +195,55 @@ def test_fusion_assets_keep_dependencies_and_resolve_current_inputs(
     key = dg.AssetKey(name)
     assert asset.asset_deps[key] == {dg.AssetKey(numerator), dg.AssetKey(other)}
     assert asset.group_names_by_key[key] == "Fusion"
+    assert isinstance(asset.node_def, dg.OpDefinition)
+    assert "model_base_config" not in asset.required_resource_keys
+    assert set(asset_config.FusionConfig.model_fields) == {"output_basedir"}
     assert (
         key
         in assets.postprocess_forecasts.asset_deps[dg.AssetKey("postprocess_forecasts")]
-    )
-    runner = Mock()
-    snapshot = {}
-    monkeypatch.setattr(asset_helpers, "_throw_if_backfill", Mock())
-    monkeypatch.setattr(
-        asset_helpers,
-        "dagster_execution_directory",
-        lambda ctx, base: base / "execution",
-    )
-    discover = Mock(return_value=snapshot)
-    monkeypatch.setattr(asset_helpers, "find_fits", discover)
-    monkeypatch.setattr(asset_helpers, "run_fusion", runner)
-    context = SimpleNamespace(partition_key="2026-09-09")
-    asset_helpers._fuse_pyrenew_fable_e_other(
-        context, _model_base_config(), numerator, weekly
     )
     spec = next(
         spec
         for spec in FUSION_SPECS
         if spec.numerator == numerator and spec.aggregate_num == weekly
     )
-    discover.assert_called_once_with(
-        Path("ca-output/2026-09-09_forecasts"), keys=spec.input_keys("CA", "covid")
+    partition = asset_config.daily_partitions_def.get_last_partition_key()
+    base = tmp_path / f"{partition}_forecasts"
+    older = base / "2026-09-09-08-00-00_first"
+    newer = base / "2026-09-09-09-00-00_second"
+    entries = [
+        (older, FitKey("CA", "rsv", spec.numerator)),
+        (older, FitKey("US", "covid", spec.other)),
+    ]
+    pairs = [("CA", "covid"), ("US", "flu")] if pairs_present else []
+    for location, disease in pairs:
+        entries.extend((older, source) for source in spec.input_keys(location, disease))
+    if pairs_present:
+        entries.append((newer, FitKey("CA", "covid", spec.other)))
+    snapshot = {}
+    for execution, source in entries:
+        path = source.directory(execution)
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "_COMPLETE").touch()
+        snapshot[source] = path
+    # An unfinished newer input must not displace a completed source.
+    unfinished = FitKey("CA", "covid", spec.numerator).directory(newer)
+    unfinished.mkdir(parents=True, exist_ok=True)
+    runner = Mock()
+    monkeypatch.setattr(asset_helpers, "_throw_if_backfill", Mock())
+    monkeypatch.setattr(
+        asset_helpers,
+        "dagster_execution_directory",
+        lambda ctx, base: base / "execution",
     )
-    runner.assert_called_once_with(
-        spec, snapshot, Path("ca-output/2026-09-09_forecasts/execution"), "CA", "covid"
+    monkeypatch.setattr(asset_helpers, "run_fusion", runner)
+    result = dg.materialize(
+        [asset, dg.AssetSpec(numerator), dg.AssetSpec(other)],
+        partition_key=partition,
+        run_config={"ops": {name: {"config": {"output_basedir": str(tmp_path)}}}},
     )
+    assert result.success
+    assert runner.call_args_list == [
+        call(spec, snapshot, base / "execution", location, disease)
+        for location, disease in pairs
+    ]

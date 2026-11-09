@@ -9,9 +9,9 @@ from pyrenew_multisignal.hew.utils import flags_from_hew_letters
 from cfa.stf.routine._paths import PRODUCTION_PRIORS
 from cfa.stf.routine.dagster.defs.asset_config import (
     FableEOtherConfig,
-    FusionConfig,
     ModelBaseConfig,
     NowcastAutoGPEPctEpiweeklyConfig,
+    OutputConfig,
     PyrenewConfig,
     daily_partitions_def,
 )
@@ -44,6 +44,7 @@ def _run_fable_e_other(
     context: dg.OpExecutionContext,
     fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
     ed_visit_input_resolution: DataResolution,
 ) -> str | None:
     """Run a Fable E-other model at the requested ED-visit resolution."""
@@ -54,12 +55,15 @@ def _run_fable_e_other(
     forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
     loc_config = model_base_config.get_by_location(location)
+    fable_e_other_config = model_base_config.apply_location_overrides(
+        location, fable_e_other_config
+    )
     context.log.debug(f"loc_config: '{loc_config}'")
 
     # We let the user potentially override the basedir, but the subdirectory is
     # locked to the partition date.
     daily_forecast_output_dir: Path = Path(
-        model_base_config.output_basedir,
+        output_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
 
@@ -72,7 +76,7 @@ def _run_fable_e_other(
         disease=disease,
         loc=location,
         output_dir=daily_forecast_output_dir,
-        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
+        n_lookback_days=fable_e_other_config.n_lookback_days,
         n_samples=fable_e_other_config.n_samples,
         exclude_last_n_days=loc_config.exclude_last_n_days,
         ed_visit_input_resolution=ed_visit_input_resolution,
@@ -85,6 +89,7 @@ def _run_pyrenew_model(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
     model_letters: str,
 ) -> str | None:
     """
@@ -97,12 +102,15 @@ def _run_pyrenew_model(
     forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
 
     loc_config = model_base_config.get_by_location(location)
+    pyrenew_config = model_base_config.apply_location_overrides(
+        location, pyrenew_config
+    )
     context.log.debug(f"loc_config: '{loc_config}'")
 
     # We let the user potentially override the basedir, but the subdirectory is
     # locked to the partition date.
     daily_forecast_output_dir: Path = Path(
-        model_base_config.output_basedir, f"{context.partition_key}_forecasts"
+        output_config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
     fit_flags = flags_from_hew_letters(model_letters)
@@ -120,7 +128,7 @@ def _run_pyrenew_model(
         loc=location,
         priors_path=PRODUCTION_PRIORS,
         output_dir=daily_forecast_output_dir,
-        n_lookback_days=loc_config.fable_pyrenew_n_lookback_days,
+        n_lookback_days=pyrenew_config.n_lookback_days,
         n_chains=pyrenew_config.n_chains,
         n_warmup=pyrenew_config.n_warmup,
         n_samples=pyrenew_config.n_samples,
@@ -137,6 +145,7 @@ def _run_nowcastautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,
     nowcastautogp_e_pct_epiweekly_config: NowcastAutoGPEPctEpiweeklyConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ) -> None:
     """Run NowcastAutoGP directly on epiweekly NSSP percentage data."""
     _throw_if_backfill(context, daily_partitions_def)
@@ -145,9 +154,12 @@ def _run_nowcastautogp_e_pct_epiweekly(
     location = model_base_config.locations.current_value
     forecast_date = dt.datetime.strptime(context.partition_key, "%Y-%m-%d").date()
     loc_config = model_base_config.get_by_location(location)
+    nowcastautogp_e_pct_epiweekly_config = model_base_config.apply_location_overrides(
+        location, nowcastautogp_e_pct_epiweekly_config
+    )
     context.log.debug(f"loc_config: '{loc_config}'")
     daily_forecast_output_dir = Path(
-        model_base_config.output_basedir,
+        output_config.output_basedir,
         f"{context.partition_key}_forecasts",
     )
     context.log.info(
@@ -162,7 +174,7 @@ def _run_nowcastautogp_e_pct_epiweekly(
         disease=disease,
         loc=location,
         output_dir=daily_forecast_output_dir,
-        n_lookback_days=loc_config.nowcastautogp_n_lookback_days,
+        n_lookback_days=nowcastautogp_e_pct_epiweekly_config.n_lookback_days,
         target="nssp",
         frequency="epiweekly",
         ed_visit_type="pct",
@@ -182,12 +194,12 @@ def _run_nowcastautogp_e_pct_epiweekly(
 
 def _run_fusion_model(
     context: dg.AssetExecutionContext,
-    config: FusionConfig,
+    output_config: OutputConfig,
     spec: FusionSpec,
 ) -> list[Path]:
     """Run a fusion recipe for every location/disease pair with completed inputs."""
     _throw_if_backfill(context, daily_partitions_def)
-    base = Path(config.output_basedir, f"{context.partition_key}_forecasts")
+    base = Path(output_config.output_basedir, f"{context.partition_key}_forecasts")
     execution = dagster_execution_directory(context, base)
     inputs = find_fits(base)
 

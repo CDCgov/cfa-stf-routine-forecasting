@@ -9,11 +9,10 @@ from cfa.stf.routine.dagster.defs import asset_config, asset_helpers, assets
 from cfa.stf.routine.run_storage import FitKey
 
 
-def _model_base_config() -> asset_config.ModelBaseConfig:
+def _model_base_config(
+    override_fields: dict[str, object],
+) -> asset_config.ModelBaseConfig:
     config = asset_config.ModelBaseConfig(
-        output_basedir="default-output",
-        fable_pyrenew_n_lookback_days=100,
-        nowcastautogp_n_lookback_days=200,
         exclude_last_n_days=1,
         fail_on_stale_data=True,
         config_overrides=[
@@ -21,6 +20,7 @@ def _model_base_config() -> asset_config.ModelBaseConfig:
                 location="CA",
                 exclude_last_n_days=2,
                 fail_on_stale_data=False,
+                **override_fields,
             ).as_dict()
         ],
     )
@@ -32,24 +32,36 @@ def _model_base_config() -> asset_config.ModelBaseConfig:
 def test_launchpad_has_model_defaults_and_shared_location_override():
     base_fields = asset_config.ModelBaseConfig.model_fields
     override_fields = asset_config.ConfigOverride.model_fields
-    config = asset_config.ModelBaseConfig()
 
     assert "n_lookback_days" not in base_fields
     assert "n_lookback_days" in override_fields
     assert "output_basedir" not in override_fields
-    assert config.get_by_location("CA").output_basedir == config.output_basedir
-    assert config.get_by_location("US").output_basedir == config.output_basedir
+    assert "output_basedir" not in base_fields
     assert "fable_pyrenew_n_lookback_days" not in override_fields
     assert "nowcastautogp_n_lookback_days" not in override_fields
-    assert config.fable_pyrenew_n_lookback_days == 150
+    assert "fable_pyrenew_n_lookback_days" not in base_fields
+    assert "nowcastautogp_n_lookback_days" not in base_fields
+    assert asset_config.FableEOtherConfig().n_lookback_days == 150
+    assert asset_config.PyrenewConfig().n_lookback_days == 150
+    expected_nowcastautogp = None if asset_config.is_prod() else 150
     assert (
-        "n_lookback_days"
-        not in asset_config.NowcastAutoGPEPctEpiweeklyConfig.model_fields
+        asset_config.NowcastAutoGPEPctEpiweeklyConfig().n_lookback_days
+        == expected_nowcastautogp
     )
 
 
+def test_location_lookback_override_preserves_other_locations_and_model_config():
+    base = _model_base_config({"n_lookback_days": None})
+    model = asset_config.PyrenewConfig(n_lookback_days=120)
+
+    assert base.apply_location_overrides("CA", model).n_lookback_days is None
+    assert base.apply_location_overrides("US", model).n_lookback_days == 120
+    assert model.n_lookback_days == 120
+    assert base.get_by_location("US").exclude_last_n_days == 1
+    assert base.get_by_location("US").fail_on_stale_data is True
+
+
 def test_postprocess_uses_executing_run(monkeypatch):
-    assert "postprocess_diseases" not in asset_config.PostProcessConfig.model_fields
     monkeypatch.setattr(
         assets, "dagster_execution_directory", lambda context, base: base / "run"
     )
@@ -60,7 +72,7 @@ def test_postprocess_uses_executing_run(monkeypatch):
     with dg.build_asset_context(partition_key="2026-09-09") as context:
         assets.postprocess_forecasts(
             context,
-            asset_config.PostProcessConfig(
+            asset_config.OutputConfig(
                 output_basedir="custom-output",
             ),
         )
@@ -76,46 +88,27 @@ def test_postprocess_uses_executing_run(monkeypatch):
     ("override_fields", "expected_lookbacks"),
     [
         pytest.param(
-            {"exclude_last_n_days": 2},
-            (100, 200),
+            {},
+            (100, 120, 200),
             id="omitted-retains-model-defaults",
         ),
         pytest.param(
             {"n_lookback_days": 101},
-            (101, 101),
+            (101, 101, 101),
             id="value-applies-to-all-models",
         ),
         pytest.param(
             {"n_lookback_days": None},
-            (None, None),
+            (None, None, None),
             id="explicit-null-applies-to-all-models",
         ),
     ],
 )
-def test_location_lookback_override(
+def test_model_runners_use_per_model_lookbacks_and_location_overrides(
+    monkeypatch,
     override_fields: dict[str, object],
-    expected_lookbacks: tuple[int | None, int | None],
+    expected_lookbacks: tuple[int | None, int | None, int | None],
 ):
-    config = asset_config.ModelBaseConfig(
-        fable_pyrenew_n_lookback_days=100,
-        nowcastautogp_n_lookback_days=200,
-        config_overrides=[
-            asset_config.ConfigOverride(
-                location="CA",
-                **override_fields,
-            ).as_dict()
-        ],
-    )
-
-    loc_config = config.get_by_location("CA")
-
-    assert (
-        loc_config.fable_pyrenew_n_lookback_days,
-        loc_config.nowcastautogp_n_lookback_days,
-    ) == expected_lookbacks
-
-
-def test_model_runners_use_their_named_lookbacks(monkeypatch):
     monkeypatch.setattr(
         asset_helpers, "dagster_execution_directory", lambda context, base: base / "run"
     )
@@ -123,7 +116,8 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
         partition_key="2026-09-09",
         log=Mock(),
     )
-    model_base_config = _model_base_config()
+    model_base_config = _model_base_config(override_fields)
+    output_config = asset_config.OutputConfig(output_basedir="default-output")
     forecast_fable = Mock()
     forecast_pyrenew = Mock()
     forecast_nowcastautogp = Mock()
@@ -135,20 +129,23 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
 
     asset_helpers._run_fable_e_other(
         context,
-        asset_config.FableEOtherConfig(),
+        asset_config.FableEOtherConfig(n_lookback_days=100),
         model_base_config,
+        output_config,
         ed_visit_input_resolution="daily",
     )
     asset_helpers._run_pyrenew_model(
         context,
-        asset_config.PyrenewConfig(),
+        asset_config.PyrenewConfig(n_lookback_days=120),
         model_base_config,
+        output_config,
         model_letters="e",
     )
     asset_helpers._run_nowcastautogp_e_pct_epiweekly(
         context,
-        asset_config.NowcastAutoGPEPctEpiweeklyConfig(),
+        asset_config.NowcastAutoGPEPctEpiweeklyConfig(n_lookback_days=200),
         model_base_config,
+        output_config,
     )
 
     shared_arguments = {
@@ -156,14 +153,14 @@ def test_model_runners_use_their_named_lookbacks(monkeypatch):
         "exclude_last_n_days": 2,
         "fail_on_stale_data": False,
     }
-    for forecast in (forecast_fable, forecast_pyrenew):
+    for forecast, expected_lookback in zip(
+        (forecast_fable, forecast_pyrenew, forecast_nowcastautogp),
+        expected_lookbacks,
+        strict=True,
+    ):
         for name, expected in shared_arguments.items():
             assert forecast.call_args.kwargs[name] == expected
-        assert forecast.call_args.kwargs["n_lookback_days"] == 100
-
-    for name, expected in shared_arguments.items():
-        assert forecast_nowcastautogp.call_args.kwargs[name] == expected
-    assert forecast_nowcastautogp.call_args.kwargs["n_lookback_days"] == 200
+        assert forecast.call_args.kwargs["n_lookback_days"] == expected_lookback
 
 
 @pytest.mark.parametrize(
@@ -197,7 +194,7 @@ def test_fusion_assets_discover_pairs_without_model_configuration(
     assert asset.group_names_by_key[key] == "Fusion"
     assert isinstance(asset.node_def, dg.OpDefinition)
     assert "model_base_config" not in asset.required_resource_keys
-    assert set(asset_config.FusionConfig.model_fields) == {"output_basedir"}
+    assert "output_config" in asset.required_resource_keys
     assert (
         key
         in assets.postprocess_forecasts.asset_deps[dg.AssetKey("postprocess_forecasts")]
@@ -240,7 +237,12 @@ def test_fusion_assets_discover_pairs_without_model_configuration(
     result = dg.materialize(
         [asset, dg.AssetSpec(numerator), dg.AssetSpec(other)],
         partition_key=partition,
-        run_config={"ops": {name: {"config": {"output_basedir": str(tmp_path)}}}},
+        resources={"output_config": asset_config.OutputConfig()},
+        run_config={
+            "resources": {
+                "output_config": {"config": {"output_basedir": str(tmp_path)}}
+            }
+        },
     )
     assert result.success
     assert runner.call_args_list == [

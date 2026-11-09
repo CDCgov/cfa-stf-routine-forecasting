@@ -7,10 +7,9 @@ from cfa_dagster import dynamic_graph_asset
 
 from cfa.stf.routine.dagster.defs.asset_config import (
     FableEOtherConfig,
-    FusionConfig,
     ModelBaseConfig,
     NowcastAutoGPEPctEpiweeklyConfig,
-    PostProcessConfig,
+    OutputConfig,
     PyrenewConfig,
     daily_partitions_def,
 )
@@ -89,11 +88,13 @@ def fable_e_other(
     context: dg.OpExecutionContext,
     fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ):
     _run_fable_e_other(
         context,
         fable_e_other_config,
         model_base_config,
+        output_config,
         ed_visit_input_resolution="daily",
     )
 
@@ -110,11 +111,13 @@ def epiweekly_fable_e_other(
     context: dg.OpExecutionContext,
     fable_e_other_config: FableEOtherConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ):
     _run_fable_e_other(
         context,
         fable_e_other_config,
         model_base_config,
+        output_config,
         ed_visit_input_resolution="epiweekly",
     )
 
@@ -133,8 +136,9 @@ def pyrenew_e(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ):
-    _run_pyrenew_model(context, pyrenew_config, model_base_config, "e")
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, output_config, "e")
 
 
 # Pyrenew H
@@ -151,8 +155,9 @@ def pyrenew_h(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ):
-    _run_pyrenew_model(context, pyrenew_config, model_base_config, "h")
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, output_config, "h")
 
 
 # Pyrenew HE
@@ -170,8 +175,9 @@ def pyrenew_he(
     context: dg.OpExecutionContext,
     pyrenew_config: PyrenewConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ):
-    _run_pyrenew_model(context, pyrenew_config, model_base_config, "he")
+    _run_pyrenew_model(context, pyrenew_config, model_base_config, output_config, "he")
 
 
 # NowcastAutoGP E-pct (epiweekly)
@@ -186,11 +192,13 @@ def nowcastautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,
     nowcastautogp_e_pct_epiweekly_config: NowcastAutoGPEPctEpiweeklyConfig,
     model_base_config: ModelBaseConfig,
+    output_config: OutputConfig,
 ):
     _run_nowcastautogp_e_pct_epiweekly(
         context,
         nowcastautogp_e_pct_epiweekly_config,
         model_base_config,
+        output_config,
     )
 
 
@@ -206,11 +214,11 @@ def nowcastautogp_e_pct_epiweekly(
 )
 def fuse_pyrenew_e_fable(
     context: dg.AssetExecutionContext,
-    config: FusionConfig,
+    output_config: OutputConfig,
 ):
     _run_fusion_model(
         context,
-        config,
+        output_config,
         spec=PYRENEW_E_FABLE,
     )
 
@@ -224,11 +232,11 @@ def fuse_pyrenew_e_fable(
 )
 def fuse_pyrenew_e_fable_epiweekly(
     context: dg.AssetExecutionContext,
-    config: FusionConfig,
+    output_config: OutputConfig,
 ):
     _run_fusion_model(
         context,
-        config,
+        output_config,
         spec=PYRENEW_E_FABLE_EPIWEEKLY,
     )
 
@@ -242,11 +250,11 @@ def fuse_pyrenew_e_fable_epiweekly(
 )
 def fuse_pyrenew_he_fable(
     context: dg.AssetExecutionContext,
-    config: FusionConfig,
+    output_config: OutputConfig,
 ):
     _run_fusion_model(
         context,
-        config,
+        output_config,
         spec=PYRENEW_HE_FABLE,
     )
 
@@ -260,11 +268,11 @@ def fuse_pyrenew_he_fable(
 )
 def fuse_pyrenew_he_fable_epiweekly(
     context: dg.AssetExecutionContext,
-    config: FusionConfig,
+    output_config: OutputConfig,
 ):
     _run_fusion_model(
         context,
-        config,
+        output_config,
         spec=PYRENEW_HE_FABLE_EPIWEEKLY,
     )
 
@@ -302,7 +310,7 @@ def fuse_pyrenew_he_fable_epiweekly(
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,
-    config: PostProcessConfig,
+    output_config: OutputConfig,
 ):
     """
     Postprocess forecast batches
@@ -311,10 +319,10 @@ def postprocess_forecasts(
     _throw_if_backfill(context, daily_partitions_def)
 
     daily_forecast_output_dir: Path = Path(
-        config.output_basedir, f"{context.partition_key}_forecasts"
+        output_config.output_basedir, f"{context.partition_key}_forecasts"
     )
 
-    context.log.info(f"config: '{config}'")
+    context.log.info(f"output_config: '{output_config}'")
     postprocess(
         base_forecast_dir=daily_forecast_output_dir,
         execution_dir=dagster_execution_directory(context, daily_forecast_output_dir),

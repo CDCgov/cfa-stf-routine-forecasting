@@ -91,7 +91,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
     for disease in DEFAULT_DISEASES:
         with _status_step(f"Checking postprocessed outputs for {disease}"):
             summaries = list(
-                (workspace / FORECAST_DIR_NAME).glob(f"*/summary/{disease}")
+                (workspace / FORECAST_DIR_NAME).glob(f"*/00_summary/{disease}")
             )
             assert len(summaries) == 1
             postprocessed_path = (

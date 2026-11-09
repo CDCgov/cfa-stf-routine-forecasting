@@ -67,7 +67,7 @@ def merge_and_save_pdfs(model_batch_dir: Path) -> None:
     )
     for signal, file_dict in pdf_groups.items():
         for original_file_name, pdf_list in file_dict.items():
-            output_path = execution_dir / "summary" / signal / original_file_name
+            output_path = execution_dir / "00_summary" / signal / original_file_name
             output_path.parent.mkdir(parents=True, exist_ok=True)
             merge_pdfs(pdf_list, output_path)
 

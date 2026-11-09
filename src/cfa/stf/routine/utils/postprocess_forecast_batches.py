@@ -41,7 +41,7 @@ def write_summaries(selected: dict[FitKey, Path], destination: Path, diseases) -
         ]
         if not fits:
             continue
-        output = destination / "summary" / disease
+        output = destination / "00_summary" / disease
         output.mkdir(parents=True, exist_ok=True)
         combine_hubverse_tables(fits, output, disease)
         pdfs = {}
@@ -69,7 +69,7 @@ def main(
         for key, path in current_fits(find_fits(base)).items()
         if key.disease in diseases
     }
-    summary_dir = destination / "summary"
+    summary_dir = destination / "00_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(
         [(*key, str(path)) for key, path in sorted(selected.items())],

@@ -284,10 +284,10 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     run_fusion(spec, inputs, downstream, "CA", "covid")
     postprocess.main(tmp_path, ["covid"], execution_dir=downstream)
     assert len(calls) == 1
-    output = downstream / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
+    output = downstream / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
     assert pl.read_parquet(output).height == 3
     fusion = downstream / "CA/covid/prop_pyrenew_e_daily_fable_e_other"
-    sources = pl.read_csv(downstream / "summary/sources.tsv", separator="\t")
+    sources = pl.read_csv(downstream / "00_summary/sources.tsv", separator="\t")
     assert sources.columns == ["location", "disease", "model", "path"]
     assert sources.rows() == sorted(
         [
@@ -363,7 +363,7 @@ def test_summaries_exclude_stale_fusion_without_recomputing(
     assert (key in current_fits(snapshot)) == (changed == "unrelated")
     postprocess.main(tmp_path, ["covid"], execution_dir=newer)
     values = pl.read_parquet(
-        newer / "summary/covid/2026-09-02-covid-hubverse-table.parquet"
+        newer / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
     )["value"].to_list()
     assert (3.0 in values) == (changed == "unrelated")
     assert key in snapshot  # Filtering must not mutate the discovery snapshot.

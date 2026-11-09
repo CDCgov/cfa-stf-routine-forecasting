@@ -22,6 +22,12 @@ from cfa.stf.routine.dagster.defs.asset_helpers import (
     _throw_if_backfill,
 )
 from cfa.stf.routine.dagster.defs.automation import eager_on_wednesday
+from cfa.stf.routine.fusion import (
+    PYRENEW_E_FABLE,
+    PYRENEW_E_FABLE_EPIWEEKLY,
+    PYRENEW_HE_FABLE,
+    PYRENEW_HE_FABLE_EPIWEEKLY,
+)
 from cfa.stf.routine.run_storage import dagster_execution_directory
 from cfa.stf.routine.utils.postprocess_forecast_batches import main as postprocess
 
@@ -205,8 +211,7 @@ def fuse_pyrenew_e_fable(
     _fuse_pyrenew_fable_e_other(
         context,
         config,
-        pyrenew_model_name="pyrenew_e",
-        epiweekly=False,
+        spec=PYRENEW_E_FABLE,
     )
 
 
@@ -224,8 +229,7 @@ def fuse_pyrenew_e_fable_epiweekly(
     _fuse_pyrenew_fable_e_other(
         context,
         config,
-        pyrenew_model_name="pyrenew_e",
-        epiweekly=True,
+        spec=PYRENEW_E_FABLE_EPIWEEKLY,
     )
 
 
@@ -243,8 +247,7 @@ def fuse_pyrenew_he_fable(
     _fuse_pyrenew_fable_e_other(
         context,
         config,
-        pyrenew_model_name="pyrenew_he",
-        epiweekly=False,
+        spec=PYRENEW_HE_FABLE,
     )
 
 
@@ -262,8 +265,7 @@ def fuse_pyrenew_he_fable_epiweekly(
     _fuse_pyrenew_fable_e_other(
         context,
         config,
-        pyrenew_model_name="pyrenew_he",
-        epiweekly=True,
+        spec=PYRENEW_HE_FABLE_EPIWEEKLY,
     )
 
 

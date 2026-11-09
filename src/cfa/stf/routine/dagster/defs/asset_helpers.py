@@ -17,7 +17,7 @@ from cfa.stf.routine.dagster.defs.asset_config import (
 )
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
-from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion
+from cfa.stf.routine.fusion import FusionSpec, run_fusion
 from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
@@ -183,18 +183,12 @@ def _run_nowcastautogp_e_pct_epiweekly(
 def _fuse_pyrenew_fable_e_other(
     context: dg.AssetExecutionContext,
     config: FusionConfig,
-    pyrenew_model_name: str,
-    epiweekly: bool,
+    spec: FusionSpec,
 ) -> list[Path]:
     """Fuse every location/disease pair with both completed inputs on disk."""
     _throw_if_backfill(context, daily_partitions_def)
     base = Path(config.output_basedir, f"{context.partition_key}_forecasts")
     execution = dagster_execution_directory(context, base)
-    spec = next(
-        spec
-        for spec in FUSION_SPECS
-        if spec.numerator == pyrenew_model_name and spec.aggregate_num == epiweekly
-    )
     inputs = find_fits(base)
     pairs = sorted(
         (key.location, key.disease)

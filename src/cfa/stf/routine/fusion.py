@@ -15,6 +15,8 @@ from cfa.stf.routine.utils.r_utils import (
 
 @dataclass(frozen=True)
 class FusionSpec:
+    """Input models and aggregation settings shared by fusion and provenance checks."""
+
     numerator: str
     other: str
     aggregate_num: bool = False
@@ -39,11 +41,20 @@ class FusionSpec:
         )
 
 
+PYRENEW_E_FABLE = FusionSpec("pyrenew_e", "daily_fable_e_other")
+PYRENEW_E_FABLE_EPIWEEKLY = FusionSpec(
+    "pyrenew_e", "epiweekly_fable_e_other", aggregate_num=True
+)
+PYRENEW_HE_FABLE = FusionSpec("pyrenew_he", "daily_fable_e_other")
+PYRENEW_HE_FABLE_EPIWEEKLY = FusionSpec(
+    "pyrenew_he", "epiweekly_fable_e_other", aggregate_num=True
+)
+
 FUSION_SPECS = (
-    FusionSpec("pyrenew_e", "daily_fable_e_other"),
-    FusionSpec("pyrenew_e", "epiweekly_fable_e_other", aggregate_num=True),
-    FusionSpec("pyrenew_he", "daily_fable_e_other"),
-    FusionSpec("pyrenew_he", "epiweekly_fable_e_other", aggregate_num=True),
+    PYRENEW_E_FABLE,
+    PYRENEW_E_FABLE_EPIWEEKLY,
+    PYRENEW_HE_FABLE,
+    PYRENEW_HE_FABLE_EPIWEEKLY,
 )
 
 

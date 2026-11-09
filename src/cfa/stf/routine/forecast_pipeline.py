@@ -73,8 +73,8 @@ class ForecastPipeline(ABC):
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
-    def invocation_config(self) -> dict:
-        """Serializable parameters for standalone execution provenance."""
+    def run_config(self) -> dict:
+        """Return serializable settings for run_config.yaml."""
         return to_jsonable_python(
             {key: value for key, value in vars(self).items() if key != "logger"}
         )
@@ -117,9 +117,7 @@ class ForecastPipeline(ABC):
             fail_on_stale_data=self.fail_on_stale_data,
             logger=self.logger,
         )
-        self.output_dir = standalone_directory(
-            self.output_dir, self.invocation_config()
-        )
+        self.output_dir = standalone_directory(self.output_dir, self.run_config())
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,

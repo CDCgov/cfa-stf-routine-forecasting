@@ -1,7 +1,9 @@
 import datetime as dt
 import logging
 from dataclasses import replace
+from unittest.mock import patch
 
+import polars as pl
 import pytest
 
 from cfa.stf.routine.forecast_pipeline import ForecastPipeline
@@ -241,7 +243,9 @@ def test_build_forecast_run_applies_minimum_exclusion(
     assert run.right_truncation_offset == expected_exclusion
 
 
-def test_model_minimum_does_not_change_batch_directory(monkeypatch, tmp_path):
+def test_model_minimum_changes_training_tail_but_preserves_requested_window(
+    monkeypatch, tmp_path
+):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     def load(**kwargs):
@@ -262,11 +266,12 @@ def test_model_minimum_does_not_change_batch_directory(monkeypatch, tmp_path):
     assert baseline_run.first_training_date == constrained_run.first_training_date
     assert baseline_run.last_training_date != constrained_run.last_training_date
     assert baseline_run.requested_window == constrained_run.requested_window
-    assert baseline_run.model_batch_dir != constrained_run.model_batch_dir
-    assert baseline_run.model_batch_dir.parent == tmp_path
 
 
-def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
+@pytest.mark.parametrize("failure_stage", [None, "figures", "hubverse"])
+def test_execute_runs_lifecycle_and_completes_only_after_publication(
+    monkeypatch, tmp_path, caplog, failure_stage
+):
     from cfa.stf.routine import forecast_pipeline as pipeline_module
 
     events = []
@@ -298,18 +303,31 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         events.append("serialize")
 
     monkeypatch.setattr(pipeline_module, "serialize_data", serialize)
+
+    def publish(stage):
+        assert not marker.exists()
+        events.append(stage)
+        if failure_stage == stage:
+            raise OSError("Simulated publication failure")
+
     monkeypatch.setattr(
         pipeline_module,
         "make_figures_from_model_fit_dir",
-        lambda **kwargs: events.append("figures"),
+        lambda **kwargs: publish("figures"),
     )
     monkeypatch.setattr(
         pipeline_module,
         "model_fit_dir_to_hub_tbl",
-        lambda *args, **kwargs: events.append("hubverse"),
+        lambda *args, **kwargs: publish("hubverse"),
     )
 
     with caplog.at_level(logging.INFO, logger="test-forecast-pipeline"):
+        if failure_stage:
+            with pytest.raises(OSError, match="Simulated publication failure"):
+                pipeline.execute()
+            assert not marker.exists()
+            assert events[-1] == failure_stage
+            return
         pipeline.execute()
 
     assert events == [
@@ -329,6 +347,77 @@ def test_execute_runs_lifecycle_in_order(monkeypatch, tmp_path, caplog):
         "Starting single-location pipeline for model test_model, location CA, "
         "and run date 2024-12-20."
     )
+
+
+def test_identical_standalone_rerun_preserves_first_fit_and_summary(
+    monkeypatch, tmp_path
+):
+    from cfa.stf.routine import forecast_pipeline as pipeline_module
+    from cfa.stf.routine.run_storage import FitKey, find_fits
+    from cfa.stf.routine.utils import postprocess_forecast_batches as postprocess
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "load_surveillance_inputs",
+        lambda **kwargs: make_test_surveillance_inputs(sources={"nssp"}),
+    )
+    monkeypatch.setattr(pipeline_module, "serialize_data", lambda **kwargs: None)
+    monkeypatch.setattr(
+        pipeline_module, "make_figures_from_model_fit_dir", lambda **kwargs: None
+    )
+    values = iter([1.0, 2.0])
+
+    def run_model(self, run):
+        pl.DataFrame({"value": [next(values)]}).write_parquet(
+            run.model_dir / "samples.parquet"
+        )
+
+    def publish(model_dir, *, forecast_date):
+        pl.read_parquet(model_dir / "samples.parquet").with_columns(
+            reference_date=pl.lit(forecast_date)
+        ).write_parquet(model_dir / "hubverse_table.parquet")
+
+    monkeypatch.setattr(TestPipeline, "run_model", run_model)
+    monkeypatch.setattr(pipeline_module, "model_fit_dir_to_hub_tbl", publish)
+    first, second = _pipeline(tmp_path), _pipeline(tmp_path)
+    assert first.run_config() == second.run_config()
+    started = dt.datetime(2026, 9, 2, 12, tzinfo=dt.UTC)
+    key = FitKey("CA", "covid", "test_model")
+
+    def snapshot(directory):
+        return {
+            path.relative_to(directory): path.read_bytes()
+            for path in directory.rglob("*")
+            if path.is_file()
+        }
+
+    # Advance the execution clock so latest selection is independent of UUID order.
+    with patch("cfa.stf.routine.run_storage.dt.datetime", wraps=dt.datetime) as clock:
+        clock.now.side_effect = [started, started + dt.timedelta(hours=1)]
+        first.execute()
+        postprocess.main(tmp_path, execution_dir=first.output_dir)
+        original = snapshot(first.output_dir)
+
+        second.execute()
+        postprocess.main(tmp_path, execution_dir=second.output_dir)
+
+    assert first.output_dir != second.output_dir
+    assert snapshot(first.output_dir) == original
+    assert (first.output_dir / "run_config.yaml").read_bytes() == (
+        second.output_dir / "run_config.yaml"
+    ).read_bytes()
+    assert find_fits(tmp_path, keep="all")[key] == [
+        key.directory(first.output_dir),
+        key.directory(second.output_dir),
+    ]
+    assert find_fits(tmp_path)[key] == key.directory(second.output_dir)
+    table = "00_summary/covid/2024-12-20-covid-hubverse-table.parquet"
+    assert pl.read_parquet(first.output_dir / table)["value"].to_list() == [1.0]
+    summary = second.output_dir / "00_summary"
+    assert pl.read_parquet(second.output_dir / table)["value"].to_list() == [2.0]
+    assert pl.read_csv(summary / "sources.tsv", separator="\t")["path"].to_list() == [
+        str(key.directory(second.output_dir))
+    ]
 
 
 @pytest.mark.parametrize(

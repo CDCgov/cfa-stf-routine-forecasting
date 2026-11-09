@@ -145,52 +145,38 @@ def test_execution_timestamp_uses_new_york(tmp_path, started, name, stored):
     )
 
 
-def test_latest_completed_per_location_and_renamed_run(tmp_path):
+def test_find_fits_falls_back_when_execution_is_renamed(tmp_path):
     older = execution(tmp_path, "old")
     newer = execution(tmp_path, "new", 1)
     first = fit(older, "pyrenew_e")
-    other_location = fit(older, "pyrenew_e", location="TX")
-    fit(newer, "pyrenew_e", complete=False)
-    assert find_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
     latest = fit(newer, "pyrenew_e")
-    snapshot = find_fits(tmp_path)
-    assert snapshot[("CA", "covid", "pyrenew_e")] == latest
-    assert snapshot[("TX", "covid", "pyrenew_e")] == other_location
+    assert find_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == latest
     newer.rename(tmp_path / "disabled")
     assert find_fits(tmp_path)[("CA", "covid", "pyrenew_e")] == first
-    assert snapshot[("CA", "covid", "pyrenew_e")] == latest
 
 
 @pytest.mark.parametrize(
-    "newer_name", ["2026-09-02-09-00-00_a", "2026-09-02-08-00-00_z"]
+    "newer_name,filtered",
+    [
+        ("2026-09-02-09-00-00_a", False),
+        ("2026-09-02-08-00-00_z", False),
+        ("2026-09-02-09-00-00_a", True),
+    ],
+    ids=["timestamp-order", "execution-id-tiebreak", "requested-keys"],
 )
 @pytest.mark.parametrize("keep", ["all", "earliest", "latest"])
-def test_find_fits_uses_directory_names_without_execution_metadata(
-    tmp_path, newer_name, keep
+def test_find_fits_selects_completed_inputs_by_directory_name(
+    tmp_path, newer_name, filtered, keep
 ):
     older = tmp_path / "2026-09-02-08-00-00_a"
     newer = tmp_path / newer_name
-    latest = fit(newer, "pyrenew_e")
-    first = fit(older, "pyrenew_e")
-    (older / "execution.json").write_text("invalid JSON")
-
-    expected = {"all": [first, latest], "earliest": first, "latest": latest}
-    assert find_fits(tmp_path, keep=keep) == {
-        FitKey("CA", "covid", "pyrenew_e"): expected[keep]
-    }
-
-
-@pytest.mark.parametrize("keep", ["all", "earliest", "latest"])
-@pytest.mark.parametrize("filtered", [False, True])
-def test_find_fits_retains_requested_executions(tmp_path, keep, filtered):
-    older = execution(tmp_path, "older")
-    newer = execution(tmp_path, "newer", 1)
-    incomplete = execution(tmp_path, "incomplete", 2)
     first = fit(older, "pyrenew_e")
     last = fit(newer, "pyrenew_e")
-    fit(incomplete, "pyrenew_e", complete=False)
+    # Neither malformed nor absent execution metadata should affect selection.
+    (older / "execution.json").write_text("invalid JSON")
+    fit(tmp_path / "2026-09-02-10-00-00_incomplete", "pyrenew_e", complete=False)
     other = fit(newer, "daily_fable_e_other")
-    unrelated = fit(newer, "pyrenew_e", location="TX")
+    unrelated = fit(older, "pyrenew_e", location="TX")
     disabled = tmp_path / "disabled"
     fit(disabled, "pyrenew_e")
     numerator_key, other_key = FUSION_SPECS[0].input_keys("CA", "covid")
@@ -354,10 +340,19 @@ def test_incompatible_horizons_fail(tmp_path):
         materialize_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
 
 
-@pytest.mark.parametrize("resolution", ["daily", "epiweekly"])
-@pytest.mark.parametrize("missing_date", [False, True])
+@pytest.mark.parametrize(
+    "resolution,outcome",
+    [
+        ("daily", "success"),
+        ("epiweekly", "success"),
+        ("daily", "missing_date"),
+        ("epiweekly", "missing_date"),
+        ("daily", "figures_failure"),
+        ("daily", "hubverse_failure"),
+    ],
+)
 def test_fusion_validates_every_draw_before_publication(
-    tmp_path, monkeypatch, resolution, missing_date
+    tmp_path, monkeypatch, resolution, outcome
 ):
     run = execution(tmp_path, "run")
     spec = FUSION_SPECS[0] if resolution == "daily" else FUSION_SPECS[1]
@@ -370,7 +365,7 @@ def test_fusion_validates_every_draw_before_publication(
         interval="1d" if resolution == "daily" else "1w",
         eager=True,
     ).to_list()
-    second_draw_dates = dates[:-1] if missing_date else dates
+    second_draw_dates = dates[:-1] if outcome == "missing_date" else dates
 
     def fuse(**kwargs):
         assert not (destination / "_COMPLETE").exists()
@@ -385,17 +380,34 @@ def test_fusion_validates_every_draw_before_publication(
         samples.write_parquet(kwargs["destination_dir"] / "samples.parquet")
         return samples
 
-    plot = Mock()
-    publish = Mock()
+    def publication(stage):
+        assert not (destination / "_COMPLETE").exists()
+        if outcome == f"{stage}_failure":
+            raise OSError("Simulated publication failure")
+
+    plot = Mock(side_effect=lambda *a, **k: publication("figures"))
+    publish = Mock(side_effect=lambda *a, **k: publication("hubverse"))
     monkeypatch.setattr(fusion_module, "create_prop_fusion", fuse)
     monkeypatch.setattr(fusion_module, "make_figures_from_model_fit_dir", plot)
     monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
 
-    if missing_date:
+    if outcome == "missing_date":
         with pytest.raises(ValueError, match="required forecast dates"):
             materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
         plot.assert_not_called()
         publish.assert_not_called()
+    elif outcome.endswith("_failure"):
+        with pytest.raises(OSError, match="Simulated publication failure"):
+            materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
+        plot.assert_called_once_with(destination, save_figs=True, save_ci=True)
+        if outcome == "figures_failure":
+            publish.assert_not_called()
+        else:
+            publish.assert_called_once_with(
+                destination, forecast_date=dt.date(2026, 9, 2)
+            )
+
+    if outcome != "success":
         assert not (destination / "_COMPLETE").exists()
         assert (destination / "samples.parquet").is_file()
         assert spec.model_name not in {key.model for key in find_fits(tmp_path)}

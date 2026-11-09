@@ -22,7 +22,7 @@ from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
 from cfa.stf.routine.pyrenew_hew.forecast_pyrenew import main as forecast_pyrenew
-from cfa.stf.routine.run_storage import FitKey, dagster_execution_directory, find_fits
+from cfa.stf.routine.run_storage import dagster_execution_directory, find_fits
 
 # Utility Functions
 
@@ -190,12 +190,11 @@ def _run_fusion_model(
     base = Path(config.output_basedir, f"{context.partition_key}_forecasts")
     execution = dagster_execution_directory(context, base)
     inputs = find_fits(base)
-    pairs = sorted(
-        (key.location, key.disease)
-        for key in inputs
-        if key.model == spec.numerator
-        and FitKey(key.location, key.disease, spec.other) in inputs
-    )
+
+    def pairs_for(model: str) -> set[tuple[str, str]]:
+        return {(key.location, key.disease) for key in inputs if key.model == model}
+
+    pairs = sorted(pairs_for(spec.numerator) & pairs_for(spec.other))
     context.log.info(
         "Fusing %d completed input pairs for %s", len(pairs), spec.model_name
     )

@@ -236,7 +236,7 @@ def test_fusion_assets_discover_pairs_without_model_configuration(
         "dagster_execution_directory",
         lambda ctx, base: base / "execution",
     )
-    monkeypatch.setattr(asset_helpers, "run_fusion", runner)
+    monkeypatch.setattr(asset_helpers, "materialize_fusion", runner)
     result = dg.materialize(
         [asset, dg.AssetSpec(numerator), dg.AssetSpec(other)],
         partition_key=partition,

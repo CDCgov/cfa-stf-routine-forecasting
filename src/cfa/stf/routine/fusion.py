@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cfa.stf.routine.run_storage import FitKey, write_json
-from cfa.stf.routine.utils.prop_utils import create_prop_fusion_model
+from cfa.stf.routine.utils.prop_utils import (
+    create_prop_fusion,
+    validate_forecast_date_coverage,
+)
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -58,7 +61,7 @@ FUSION_SPECS = (
 )
 
 
-def run_fusion(
+def materialize_fusion(
     spec: FusionSpec,
     inputs: dict[FitKey, Path],
     execution: Path,
@@ -82,14 +85,17 @@ def run_fusion(
     destination = FitKey(location, disease, spec.model_name).directory(execution)
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "_COMPLETE").unlink(missing_ok=True)
-    create_prop_fusion_model(
+    samples = create_prop_fusion(
         numerator_dir=numerator,
         other_dir=other,
         destination_dir=destination,
         aggregate_num=spec.aggregate_num,
         aggregate_other=spec.aggregate_other,
-        forecast_date=origin,
-        forecast_through=dt.date.fromisoformat(metadata["forecast_through"]),
+    )
+    validate_forecast_date_coverage(
+        samples,
+        origin,
+        dt.date.fromisoformat(metadata["forecast_through"]),
     )
     write_json(
         destination / "metadata.json",

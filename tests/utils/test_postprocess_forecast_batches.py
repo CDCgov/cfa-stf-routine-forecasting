@@ -5,13 +5,18 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import polars as pl
 import pytest
 
 from cfa.stf.routine import fusion as fusion_module
 from cfa.stf.routine.forecast_window import ForecastWindow
-from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion, validate_fusion_sources
+from cfa.stf.routine.fusion import (
+    FUSION_SPECS,
+    materialize_fusion,
+    validate_fusion_sources,
+)
 from cfa.stf.routine.run_storage import (
     FitKey,
     dagster_execution_directory,
@@ -268,8 +273,20 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
         assert kwargs["numerator_dir"] == numerator
         assert kwargs["other_dir"] == other
         assert kwargs["destination_dir"].parents[2] == downstream
+        samples = pl.DataFrame(
+            {
+                "date": pl.date_range(
+                    dt.date(2026, 9, 2), dt.date(2026, 9, 26), eager=True
+                ),
+                ".draw": 1,
+                ".value": 0.3,
+                "resolution": "daily",
+            }
+        )
+        samples.write_parquet(kwargs["destination_dir"] / "samples.parquet")
+        return samples
 
-    monkeypatch.setattr(fusion_module, "create_prop_fusion_model", fuse)
+    monkeypatch.setattr(fusion_module, "create_prop_fusion", fuse)
     monkeypatch.setattr(
         fusion_module, "make_figures_from_model_fit_dir", lambda *a, **k: None
     )
@@ -282,7 +299,7 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
     spec = FUSION_SPECS[0]
     inputs = find_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
-    run_fusion(spec, inputs, downstream, "CA", "covid")
+    materialize_fusion(spec, inputs, downstream, "CA", "covid")
     postprocess.main(tmp_path, execution_dir=downstream)
     assert len(calls) == 1
     output = downstream / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
@@ -334,7 +351,62 @@ def test_incompatible_horizons_fail(tmp_path):
         {"forecast_date": "2026-09-02", "forecast_through": "2026-10-03"},
     )
     with pytest.raises(ValueError, match="windows differ"):
-        run_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
+        materialize_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
+
+
+@pytest.mark.parametrize("resolution", ["daily", "epiweekly"])
+@pytest.mark.parametrize("missing_date", [False, True])
+def test_fusion_validates_every_draw_before_publication(
+    tmp_path, monkeypatch, resolution, missing_date
+):
+    run = execution(tmp_path, "run")
+    spec = FUSION_SPECS[0] if resolution == "daily" else FUSION_SPECS[1]
+    fit(run, spec.numerator)
+    fit(run, spec.other)
+    destination = fit(run, spec.model_name)
+    dates = pl.date_range(
+        dt.date(2026, 9, 2) if resolution == "daily" else dt.date(2026, 9, 5),
+        dt.date(2026, 9, 26),
+        interval="1d" if resolution == "daily" else "1w",
+        eager=True,
+    ).to_list()
+    second_draw_dates = dates[:-1] if missing_date else dates
+
+    def fuse(**kwargs):
+        assert not (destination / "_COMPLETE").exists()
+        samples = pl.DataFrame(
+            {
+                "date": dates + second_draw_dates,
+                ".draw": [1] * len(dates) + [2] * len(second_draw_dates),
+                ".value": 0.3,
+                "resolution": resolution,
+            }
+        )
+        samples.write_parquet(kwargs["destination_dir"] / "samples.parquet")
+        return samples
+
+    plot = Mock()
+    publish = Mock()
+    monkeypatch.setattr(fusion_module, "create_prop_fusion", fuse)
+    monkeypatch.setattr(fusion_module, "make_figures_from_model_fit_dir", plot)
+    monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
+
+    if missing_date:
+        with pytest.raises(ValueError, match="required forecast dates"):
+            materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
+        plot.assert_not_called()
+        publish.assert_not_called()
+        assert not (destination / "_COMPLETE").exists()
+        assert (destination / "samples.parquet").is_file()
+        assert spec.model_name not in {key.model for key in find_fits(tmp_path)}
+    else:
+        assert (
+            materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
+            == destination
+        )
+        plot.assert_called_once_with(destination, save_figs=True, save_ci=True)
+        publish.assert_called_once_with(destination, forecast_date=dt.date(2026, 9, 2))
+        assert (destination / "_COMPLETE").is_file()
 
 
 def test_real_dagster_run_shares_identity_across_dependent_assets(tmp_path):
@@ -399,7 +471,7 @@ def test_summaries_reject_stale_fusion_without_recomputing(
     def unexpected_fusion(**kwargs):
         pytest.fail("Postprocessing must never execute fusion")
 
-    monkeypatch.setattr(fusion_module, "create_prop_fusion_model", unexpected_fusion)
+    monkeypatch.setattr(fusion_module, "create_prop_fusion", unexpected_fusion)
     snapshot = find_fits(tmp_path)
     original = snapshot.copy()
     if changed == "unrelated":
@@ -441,5 +513,5 @@ def test_fusion_missing_inputs_fails_without_marking_complete(tmp_path):
     run = execution(tmp_path, "first")
     fit(run, "pyrenew_e")
     with pytest.raises(FileNotFoundError, match="Missing completed fusion inputs"):
-        run_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
+        materialize_fusion(FUSION_SPECS[0], find_fits(tmp_path), run, "CA", "covid")
     assert not (run / "CA/covid" / FUSION_SPECS[0].model_name / "_COMPLETE").exists()

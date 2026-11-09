@@ -70,7 +70,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             with _status_step(f"Running NowcastAutoGP for {disease}, {location}"):
                 run_nowcastautogp(workspace, disease, location)
 
-    from cfa.stf.routine.fusion import FUSION_SPECS, run_fusion
+    from cfa.stf.routine.fusion import FUSION_SPECS, materialize_fusion
     from cfa.stf.routine.run_storage import find_fits, standalone_directory
 
     base = workspace / FORECAST_DIR_NAME
@@ -80,7 +80,9 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
         for location in DEFAULT_LOCATIONS:
             for spec in FUSION_SPECS:
                 if spec.numerator == "pyrenew_e":
-                    run_fusion(spec, inputs, fusion_execution, location, disease)
+                    materialize_fusion(
+                        spec, inputs, fusion_execution, location, disease
+                    )
 
     with _status_step("Postprocessing forecast batches"):
         postprocess_batches(

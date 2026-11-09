@@ -16,10 +16,10 @@ from cfa.stf.forecasttools import (
 from cfa.stf.routine.utils.data_utils import aggregate_long_to_epiweekly
 
 
-def validate_forecast_coverage(
+def validate_forecast_date_coverage(
     samples: pl.DataFrame, origin: dt.date, through: dt.date
 ) -> None:
-    """Require every draw to cover the forecast interval at its output resolution."""
+    """Require every draw to contain all forecast dates at its output resolution."""
     resolutions = samples["resolution"].unique().to_list()
     if len(resolutions) != 1 or resolutions[0] not in ("daily", "epiweekly"):
         raise ValueError("Expected one daily or epiweekly fusion resolution")
@@ -35,7 +35,7 @@ def validate_forecast_coverage(
         raise ValueError("Fusion samples do not cover the required forecast dates")
 
 
-def create_prop_fusion_model(
+def create_prop_fusion(
     *,
     numerator_dir: Path,
     other_dir: Path,
@@ -47,10 +47,8 @@ def create_prop_fusion_model(
     augment_other_with_obs: bool = True,
     aggregate_num: bool = False,
     aggregate_other: bool = False,
-    forecast_date: dt.date | None = None,
-    forecast_through: dt.date | None = None,
-) -> None:
-    """Create and save a proportion fusion model from two model outputs."""
+) -> pl.DataFrame:
+    """Save a proportion fusion model and return its constructed samples."""
 
     def read_model_output(
         model_dir: Path, var_name: str, filename: str
@@ -97,14 +95,9 @@ def create_prop_fusion_model(
         )
         other_data = aggregate_long_to_epiweekly(other_data, value_col=other_var_name)
 
+    if set(num_samples["resolution"]) != set(other_samples["resolution"]):
+        raise ValueError("Fusion input resolutions differ")
     common_dates = set(num_samples["date"]) & set(other_samples["date"])
-    if (forecast_date is None) != (forecast_through is None):
-        raise ValueError("Supply both forecast_date and forecast_through")
-    if forecast_date is not None:
-        if set(num_samples["resolution"]) != set(other_samples["resolution"]):
-            raise ValueError("Fusion input resolutions differ")
-        validate_forecast_coverage(num_samples, forecast_date, forecast_through)
-        validate_forecast_coverage(other_samples, forecast_date, forecast_through)
     num_samples = num_samples.filter(pl.col("date").is_in(sorted(common_dates)))
     other_samples = other_samples.filter(pl.col("date").is_in(sorted(common_dates)))
 
@@ -115,13 +108,11 @@ def create_prop_fusion_model(
         other_val_col=other_var_name,
         prop_var=prop_var_name,
     ).sort("date", ".draw")
-    if forecast_date is not None:
-        validate_forecast_coverage(prop_samples, forecast_date, forecast_through)
-        if (
-            prop_samples[".value"].null_count()
-            or not prop_samples[".value"].is_finite().all()
-        ):
-            raise ValueError("Fusion output contains missing or nonfinite proportions")
+    if (
+        prop_samples[".value"].null_count()
+        or not prop_samples[".value"].is_finite().all()
+    ):
+        raise ValueError("Fusion output contains missing or nonfinite proportions")
     prop_data = (
         create_proportions(
             numerator_df=num_data.rename({"data_type": "num_data_type"}),
@@ -150,6 +141,7 @@ def create_prop_fusion_model(
     data_dir.mkdir(parents=True, exist_ok=True)
     write_tabular(prop_samples, prop_model_dir / "samples.parquet")
     write_tabular(prop_data, data_dir / "combined_data.tsv")
+    return prop_samples
 
 
 def append_prop_ed_data(

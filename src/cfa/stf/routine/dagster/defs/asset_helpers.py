@@ -17,7 +17,7 @@ from cfa.stf.routine.dagster.defs.asset_config import (
 )
 from cfa.stf.routine.data.data_access import DataResolution
 from cfa.stf.routine.fable.forecast_fable import main as forecast_fable
-from cfa.stf.routine.fusion import FusionSpec, run_fusion
+from cfa.stf.routine.fusion import FusionSpec, materialize_fusion
 from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     main as forecast_nowcastautogp,
 )
@@ -200,6 +200,6 @@ def _run_fusion_model(
         "Fusing %d completed input pairs for %s", len(pairs), spec.model_name
     )
     return [
-        run_fusion(spec, inputs, execution, location, disease)
+        materialize_fusion(spec, inputs, execution, location, disease)
         for location, disease in pairs
     ]

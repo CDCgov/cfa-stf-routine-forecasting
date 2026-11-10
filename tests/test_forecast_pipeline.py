@@ -411,7 +411,7 @@ def test_identical_standalone_rerun_preserves_first_fit_and_summary(
         key.directory(second.output_dir),
     ]
     assert find_fits(tmp_path)[key] == key.directory(second.output_dir)
-    table = "00_summary/covid/2024-12-20-covid-hubverse-table.parquet"
+    table = "00_summary/hub_tables/2024-12-20-covid-hubverse-table.parquet"
     assert pl.read_parquet(first.output_dir / table)["value"].to_list() == [1.0]
     summary = second.output_dir / "00_summary"
     assert pl.read_parquet(second.output_dir / table)["value"].to_list() == [2.0]

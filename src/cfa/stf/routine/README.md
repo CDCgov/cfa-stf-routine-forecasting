@@ -196,7 +196,8 @@ Fusion assets discover every location/disease pair with both required completed 
 They retain their upstream dependencies and use the completed fits on disk to select pairs.
 To add a fusion of another model pair, define a named `FusionSpec` in `fusion.py` and include it in `FUSION_SPECS` so provenance validation recognizes it.
 Pass that spec to `_run_fusion_model(context, output_config, spec)` from a Dagster asset declaring both upstream dependencies, and add the asset to the postprocessing dependencies.
-Postprocessing saves summaries in `00_summary/<disease>/` and records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
+Postprocessing saves combined tables in `00_summary/hub_tables/<forecast_date>-<disease>-hubverse-table.parquet` and merged figures in `00_summary/figures/<disease>/`.
+It records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
 It includes every disease with completed, current fits in the forecast-date directory.
 Rerun a fusion after updating its inputs; postprocessing and plot collation raise an error if a fusion's recorded inputs differ from the latest completed fits, an input is missing, or its provenance cannot be validated.
 

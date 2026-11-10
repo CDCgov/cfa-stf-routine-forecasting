@@ -89,14 +89,15 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
             workspace / FORECAST_DIR_NAME,
         )
 
+    summaries = list((workspace / FORECAST_DIR_NAME).glob("*/00_summary"))
+    assert len(summaries) == 1
+    summary = summaries[0]
     for disease in DEFAULT_DISEASES:
         with _status_step(f"Checking postprocessed outputs for {disease}"):
-            summaries = list(
-                (workspace / FORECAST_DIR_NAME).glob(f"*/00_summary/{disease}")
-            )
-            assert len(summaries) == 1
             postprocessed_path = (
-                summaries[0] / f"{FORECAST_DATE}-{disease}-hubverse-table.parquet"
+                summary
+                / "hub_tables"
+                / f"{FORECAST_DATE}-{disease}-hubverse-table.parquet"
             )
             for location in DEFAULT_LOCATIONS:
                 assert_model_outputs(workspace, disease, location, EXPECTED_MODELS)
@@ -109,7 +110,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
                 DEFAULT_LOCATIONS
             )
 
-            copied_figures_dir = summaries[0] / "figures"
+            copied_figures_dir = summary / "figures" / disease
             assert copied_figures_dir.is_dir(), (
                 f"Missing postprocessed figures directory: {copied_figures_dir}"
             )

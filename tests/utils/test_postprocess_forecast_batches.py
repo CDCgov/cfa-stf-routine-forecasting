@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import polars as pl
 import pytest
+from pypdf import PdfReader, PdfWriter
 
 from cfa.stf.routine import fusion as fusion_module
 from cfa.stf.routine.forecast_window import ForecastWindow
@@ -288,7 +289,9 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     materialize_fusion(spec, inputs, downstream, "CA", "covid")
     postprocess.main(tmp_path, execution_dir=downstream)
     assert len(calls) == 1
-    output = downstream / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
+    output = (
+        downstream / "00_summary/hub_tables/2026-09-02-covid-hubverse-table.parquet"
+    )
     assert pl.read_parquet(output).height == 3
     fusion = downstream / "CA/covid/prop_pyrenew_e_daily_fable_e_other"
     sources = pl.read_csv(downstream / "00_summary/sources.tsv", separator="\t")
@@ -311,7 +314,13 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
 def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     first = execution(tmp_path, "first")
     for disease in diseases:
-        fit(first, "daily_fable_e_other", disease=disease)
+        for location in ("CA", "US"):
+            path = fit(first, "daily_fable_e_other", location=location, disease=disease)
+            figures = path / "figures"
+            figures.mkdir()
+            with PdfWriter() as writer:
+                writer.add_blank_page(width=72, height=72)
+                writer.write(figures / "forecast.pdf")
     fit(first, "daily_fable_e_other", disease="rsv", complete=False)
     destination = execution(tmp_path, "summary", 1)
 
@@ -320,12 +329,18 @@ def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     summary = destination / "00_summary"
     sources = pl.read_csv(summary / "sources.tsv", separator="\t")
     assert set(sources["disease"]) == set(diseases)
-    assert {path.name for path in summary.iterdir()} == {"sources.tsv", *diseases}
+    assert {path.name for path in summary.iterdir()} == {
+        "sources.tsv",
+        "figures",
+        "hub_tables",
+    }
     for disease in diseases:
         table = pl.read_parquet(
-            summary / disease / f"2026-09-02-{disease}-hubverse-table.parquet"
+            summary / "hub_tables" / f"2026-09-02-{disease}-hubverse-table.parquet"
         )
-        assert table.height == 1
+        assert table.height == 2
+        figure = summary / "figures" / disease / "forecast.pdf"
+        assert len(PdfReader(figure).pages) == 2
 
 
 def test_incompatible_horizons_fail(tmp_path):
@@ -490,7 +505,7 @@ def test_summaries_reject_stale_fusion_without_recomputing(
         validate_fusion_sources(snapshot)
         postprocess.main(tmp_path, execution_dir=newer)
         values = pl.read_parquet(
-            newer / "00_summary/covid/2026-09-02-covid-hubverse-table.parquet"
+            newer / "00_summary/hub_tables/2026-09-02-covid-hubverse-table.parquet"
         )["value"].to_list()
         assert 3.0 in values
         collect_pdfs(tmp_path)

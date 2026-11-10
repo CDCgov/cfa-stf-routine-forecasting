@@ -58,21 +58,23 @@ def write_sources_manifest(selected: dict[FitKey, Path], destination: Path) -> N
 
 def write_hubverse_summaries(selected: dict[FitKey, Path], destination: Path) -> None:
     """Combine the selected fits' Hubverse tables separately for each disease."""
+    output = destination / "00_summary" / "hub_tables"
+    output.mkdir(parents=True, exist_ok=True)
     for disease, fits in _fits_by_disease(selected).items():
-        output = destination / "00_summary" / disease
         combine_hubverse_tables(fits, output, disease)
 
 
 def merge_summary_plots(selected: dict[FitKey, Path], destination: Path) -> None:
     """Merge matching plot filenames separately for each disease."""
+    output = destination / "00_summary" / "figures"
+    output.mkdir(parents=True, exist_ok=True)
     for disease, fits in _fits_by_disease(selected).items():
-        output = destination / "00_summary" / disease
         pdfs = {}
         for fit in fits:
             for pdf in sorted((fit / "figures").glob("*.pdf")):
                 pdfs.setdefault(pdf.name, []).append(pdf)
         for name, paths in pdfs.items():
-            figure = output / "figures" / name
+            figure = output / disease / name
             figure.parent.mkdir(parents=True, exist_ok=True)
             merge_pdfs(paths, figure)
 

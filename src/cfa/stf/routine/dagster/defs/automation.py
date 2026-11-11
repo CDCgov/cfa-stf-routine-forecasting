@@ -84,6 +84,7 @@ pyrenew_sensor = dg.AutomationConditionSensorDefinition(
 
 fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="Fusion",
+    default_status=dg.DefaultSensorStatus.RUNNING,
     target=dg.AssetSelection.groups("Fusion"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
@@ -91,6 +92,7 @@ fusion_sensor = dg.AutomationConditionSensorDefinition(
 
 postprocess_sensor = dg.AutomationConditionSensorDefinition(
     name="Postprocess",
+    default_status=dg.DefaultSensorStatus.RUNNING,
     target=dg.AssetSelection.groups("Postprocess"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions

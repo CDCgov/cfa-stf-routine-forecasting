@@ -1,84 +1,17 @@
-valid_model_batch <- dplyr::bind_rows(
-  tibble::tibble(
-    dirname = "covid_lookback-150_omit-1",
-    disease = "covid",
-    n_lookback_days = 150L,
-    exclude_last_n_days = 1L
-  ),
-  tibble::tibble(
-    dirname = "flu_lookback-90_omit-5",
-    disease = "flu",
-    n_lookback_days = 90L,
-    exclude_last_n_days = 5L
-  ),
-  tibble::tibble(
-    dirname = "rsv_lookback-all_omit-2",
-    disease = "rsv",
-    n_lookback_days = Inf,
-    exclude_last_n_days = 2L
-  )
-)
-
-invalid_model_batch_dirs <- c(
-  "qcovid_lookback-150_omit-1",
-  "flu_lookback-many_omit-2"
-)
-
 target_locations <- c("ME", "US", "CA")
+target_diseases <- c("covid", "flu", "rsv")
 
-valid_model_run <- valid_model_batch |>
-  dplyr::mutate(
-    dirname = fs::path(dirname, "model_runs", target_locations),
-    location = target_locations
-  )
+valid_model_run <- tibble::tibble(
+  dirname = fs::path(
+    "2026-09-02_forecasts",
+    "2026-09-02-12-00-00_run",
+    target_locations,
+    target_diseases
+  ),
+  location = target_locations,
+  disease = target_diseases
+)
 
-
-test_that("parse_model_batch_dir_path() works as expected.", {
-  ## should work with base dirnames that are valid
-  expect_equal(
-    parse_model_batch_dir_path(valid_model_batch$dirname),
-    dplyr::select(valid_model_batch, -dirname)
-  )
-
-  ## should work identically with a full path rather
-  ## than just base dir
-  expect_equal(
-    valid_model_batch |>
-      dplyr::mutate(dirname = fs::path("this", "is", "a", "test", dirname)) |>
-      dplyr::pull(dirname) |>
-      parse_model_batch_dir_path(),
-    dplyr::select(valid_model_batch, -dirname)
-  )
-
-  ## should error if the terminal directory is not
-  ## what is to be parsed
-  expect_error(
-    valid_model_batch |>
-      dplyr::mutate(dirname = fs::path(dirname, "test")) |>
-      dplyr::pull(dirname) |>
-      parse_model_batch_dir_path(),
-    regex = "Invalid format for model batch directory name"
-  )
-
-  ## should error if entries cannot be parsed as what is expected
-  expect_error(
-    parse_model_batch_dir_path(invalid_model_batch_dirs),
-    regex = "Invalid format for model batch directory name|Could not parse extracted values"
-  )
-})
-
-test_that("unlimited lookbacks sort after finite lookbacks", {
-  parsed_lookbacks <- parse_model_batch_dir_path(c(
-    "covid_lookback-150_omit-1",
-    "covid_lookback-all_omit-1",
-    "covid_lookback-90_omit-1"
-  ))
-
-  expect_equal(
-    dplyr::arrange(parsed_lookbacks, .data$n_lookback_days)$n_lookback_days,
-    c(90, 150, Inf)
-  )
-})
 
 test_that("parse_model_run_dir_path() works as expected.", {
   expect_equal(
@@ -102,83 +35,6 @@ test_that("parse_model_run_dir_path() works as expected.", {
       dplyr::mutate(dirname = fs::path(dirname, "test")) |>
       dplyr::pull(dirname) |>
       parse_model_run_dir_path(),
-    regex = "Invalid format for model batch directory name"
+    regex = "Invalid disease directory"
   )
-})
-
-test_that("get_all_model_batch_dirs() returns expected output.", {
-  withr::with_tempdir({
-    ## create some directories
-    valid_covid <- c(
-      "covid_lookback-150_omit-1",
-      "covid_lookback-"
-    )
-    valid_flu <- c(
-      "flu_lookback-90_omit-3",
-      "flu_lookback-"
-    )
-    valid_rsv <- c(
-      "rsv_lookback-60_omit-5",
-      "rsv_lookback-",
-      "rsv_lookback-all_omit-5"
-    )
-    valid_dirs <- c(valid_flu, valid_covid, valid_rsv)
-
-    invalid_dirs <- c(
-      "this_is_not_valid",
-      "covid19_r",
-      "covid-r",
-      "flu-r",
-      "influnza_r",
-      "covid",
-      "flu"
-    )
-
-    invalid_files <- c(
-      "covid_lookback-.txt",
-      "flu_lookback-.txt",
-      "rsv_lookback-.txt"
-    )
-    fs::dir_create(c(valid_dirs, invalid_dirs))
-    fs::file_create(invalid_files)
-    expected_all_files <- c(
-      valid_dirs,
-      invalid_dirs,
-      invalid_files
-    )
-
-    result_all <- fs::dir_ls(".") |> fs::path_file()
-
-    result_valid <- get_all_model_batch_dirs(
-      ".",
-      c("covid", "flu", "rsv")
-    )
-
-    result_valid_alt <- get_all_model_batch_dirs(
-      ".",
-      c("flu", "rsv", "covid")
-    )
-
-    result_valid_covid <- get_all_model_batch_dirs(
-      ".",
-      "covid"
-    )
-
-    result_valid_flu <- get_all_model_batch_dirs(
-      ".",
-      "flu"
-    )
-
-    result_valid_rsv <- get_all_model_batch_dirs(
-      ".",
-      "rsv"
-    )
-
-    expect_setequal(result_all, expected_all_files)
-    expect_setequal(result_valid, c(valid_flu, valid_covid, valid_rsv))
-    expect_setequal(result_valid_alt, c(valid_flu, valid_covid, valid_rsv))
-    expect_setequal(result_valid_covid, valid_covid)
-    expect_setequal(result_valid_flu, valid_flu)
-    expect_setequal(result_valid_rsv, valid_rsv)
-  })
 })

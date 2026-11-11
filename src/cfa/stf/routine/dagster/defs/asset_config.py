@@ -8,7 +8,7 @@ import dagster as dg
 from cfa.stf.forecasttools import LOCATION_LIST
 from cfa_dagster import GraphDimension
 from cfa_dagster import is_production as is_prod
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 # ============================================================================
 # GRAPH DIMENSIONS AND PARTITIONS
@@ -44,23 +44,12 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 
 # Use default_factory to prevent ConfigOverrides from populating fields in the
 # Launchpad unless the user explicitly sets them.
-class _SharedModelConfigFields(BaseModel):
-    output_basedir: str = Field(
-        default_factory=lambda: "",
-        description="Output directory used by all forecast models.",
-    )
+class ConfigOverride(dg.Config):
+    location: Location  # type: ignore[reportInvalidTypeForm]
     exclude_last_n_days: int = Field(
         default_factory=lambda: 0,
         description="Requested recent-data omission used by all forecast models.",
     )
-    fail_on_stale_data: bool = Field(
-        default_factory=lambda: is_prod(),
-        description="Stale-input policy used by all forecast models.",
-    )
-
-
-class ConfigOverride(_SharedModelConfigFields, dg.Config):
-    location: Location  # type: ignore[reportInvalidTypeForm]
     n_lookback_days: int | None = Field(
         default_factory=lambda: None,
         description=(
@@ -72,30 +61,25 @@ class ConfigOverride(_SharedModelConfigFields, dg.Config):
         return self.model_dump(mode="json", exclude_unset=True)
 
 
-class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
-    """
-    Shared configuration and explicitly model-scoped lookbacks for model assets.
-    """
+class OutputConfig(dg.ConfigurableResource):
+    """Shared output root for models, fusion, and postprocessing."""
 
     output_basedir: str = Field(
         default="output" if is_prod() else "test-output",
-        description="Output directory used by all forecast models.",
+        description="Output directory used by models, fusion, and postprocessing.",
     )
-    fable_pyrenew_n_lookback_days: int | None = Field(
-        default=150,
-        description="Training lookback used only by Fable and PyRenew models.",
-    )
-    nowcastautogp_n_lookback_days: int | None = Field(
-        default=None if is_prod() else 150,
-        description="Training lookback used only by NowcastAutoGP models.",
-    )
+
+
+class ModelBaseConfig(dg.ConfigurableResource):
+    """Shared execution dimensions, training settings, and location overrides."""
+
     exclude_last_n_days: int = Field(
         default=1,
         description="Requested recent-data omission used by all forecast models.",
     )
     fail_on_stale_data: bool = Field(
         default=is_prod(),
-        description="Stale-input policy used by all forecast models.",
+        description="Run-level stale-input policy used by all forecast models.",
     )
     diseases: GraphDimension[Disease] = Field(  # type: ignore[reportInvalidTypeForm]
         default=GraphDimension(DISEASES),
@@ -120,18 +104,25 @@ class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
     )  # type: ignore[reportInvalidTypeForm]
 
     def get_by_location(self, loc: Location) -> "ModelBaseConfig":  # type: ignore[reportInvalidTypeForm]
+        return self.apply_location_overrides(loc, self)
+
+    def apply_location_overrides[T: dg.ConfigurableResource](
+        self,
+        loc: Location,  # type: ignore[reportInvalidTypeForm]
+        config: T,
+    ) -> T:
+        """Apply explicitly set overrides for fields belonging to this resource."""
         overrides = {}
         for entry in self.config_overrides:
             if isinstance(entry, dict):
                 entry = ConfigOverride(**entry)
             if entry.location == loc:
-                overrides = entry.model_dump(exclude={"location"}, exclude_unset=True)
-                if "n_lookback_days" in overrides:
-                    n_lookback_days = overrides.pop("n_lookback_days")
-                    overrides["fable_pyrenew_n_lookback_days"] = n_lookback_days
-                    overrides["nowcastautogp_n_lookback_days"] = n_lookback_days
+                overrides = entry.model_dump(
+                    include=set(type(config).model_fields) - {"location"},
+                    exclude_unset=True,
+                )
                 break
-        return self.model_copy(update=overrides)
+        return config.model_copy(update=overrides)
 
 
 class FableEOtherConfig(dg.ConfigurableResource):
@@ -141,6 +132,7 @@ class FableEOtherConfig(dg.ConfigurableResource):
     These default values can be modified in the Dagster asset materialization launchpad.
     """
 
+    n_lookback_days: int | None = 150
     n_samples: int = 400 if not is_prod() else 2000
 
 
@@ -150,6 +142,7 @@ class PyrenewConfig(dg.ConfigurableResource):
     These default values can be modified in the Dagster asset materialization launchpad.
     """
 
+    n_lookback_days: int | None = 150
     n_warmup: int = 200 if not is_prod() else 1000
     n_samples: int = 200 if not is_prod() else 500
     n_chains: int = 2 if not is_prod() else 4
@@ -160,6 +153,7 @@ class PyrenewConfig(dg.ConfigurableResource):
 class NowcastAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
     """Configuration for the epiweekly NowcastAutoGP E-pct model asset."""
 
+    n_lookback_days: int | None = None if is_prod() else 150
     n_particles: int = 64 if is_prod() else 4
     n_mcmc: int = 200 if is_prod() else 100
     n_hmc: int = 50 if is_prod() else 25
@@ -173,20 +167,11 @@ class WModelExclusions(dg.ConfigurableResource):
     diseases: GraphDimension[Disease] = GraphDimension(["covid"])  # type: ignore[reportInvalidTypeForm]
 
 
-class PostProcessConfig(dg.Config):
-    """
-    Configuration for the Post-Processing asset.
-    """
-
-    output_basedir: str = "output" if is_prod() else "test-output"
-    skip_existing: bool = False
-    postprocess_diseases: list[str] = ["covid", "flu", "rsv"]
-
-
 @dg.definitions
 def resources():
     return dg.Definitions(
         resources={
+            "output_config": OutputConfig(),
             "model_base_config": ModelBaseConfig(),
             "pyrenew_config": PyrenewConfig(),
             "nowcastautogp_e_pct_epiweekly_config": NowcastAutoGPEPctEpiweeklyConfig(),

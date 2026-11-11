@@ -7,6 +7,21 @@ from cfa.stf.routine._paths import UTILS_DIR
 from cfa.stf.routine.utils.language_utils import run_r_script
 
 
+def postprocess_model_fit_dir(model_fit_dir: Path, forecast_date: dt.date) -> None:
+    """Save figures, intervals, and Hubverse samples in a single R process."""
+    run_r_script(
+        UTILS_DIR / "make_figures_from_model_fit_dir.R",
+        [
+            str(model_fit_dir),
+            "--save-ci",
+            "--save-figs",
+            "--hub-forecast-date",
+            forecast_date.isoformat(),
+        ],
+        function_name="postprocess_model_fit_dir",
+    )
+
+
 def make_figures_from_model_fit_dir(
     model_fit_dir: Path,
     save_ci: bool = False,

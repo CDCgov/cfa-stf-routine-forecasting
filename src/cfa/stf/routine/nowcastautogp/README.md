@@ -54,4 +54,4 @@ The Julia adapter writes `{model_dir}/samples.parquet`; the shared publication s
 
 Model identifiers use `nowcastautogp_{target}_{frequency}`, with an `_other` or `_pct` suffix for those NSSP visit types.
 Downstream model-name mappings in [the handbook](https://github.com/cdcent/cfa-stf-handbook) and [the Hubverse processor](https://github.com/cdcent/cfa-hubverse-processor) must use these identifiers, including any identifiers embedded in fusion model names.
-Dagster uses the `NowcastAutoGP` asset group and sensor, the `nowcastautogp_e_pct_epiweekly` asset, and the `nowcastautogp_e_pct_epiweekly_config` resource; model lookback configuration uses `nowcastautogp_n_lookback_days`.
+Dagster uses the `NowcastAutoGP` asset group and sensor, the `nowcastautogp_e_pct_epiweekly` asset, and the `nowcastautogp_e_pct_epiweekly_config` resource; set `n_lookback_days` in that resource's config to choose the training history.

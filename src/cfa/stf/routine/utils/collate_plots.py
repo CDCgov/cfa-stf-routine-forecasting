@@ -8,6 +8,9 @@ from pathlib import Path
 
 from pypdf import PdfWriter
 
+from cfa.stf.routine.fusion import validate_fusion_sources
+from cfa.stf.routine.run_storage import find_fits, standalone_directory
+
 
 def merge_pdfs(to_merge: list[Path], output_path: Path) -> None:
     """
@@ -36,29 +39,17 @@ def merge_pdfs(to_merge: list[Path], output_path: Path) -> None:
 
 def collect_pdfs(model_batch_dir: Path) -> dict[str, dict[str, list[Path]]]:
     """Find and group PDFs by their shared filenames within each model folder."""
-    model_runs_dir = model_batch_dir / "model_runs"
-
-    if not model_runs_dir.exists():
-        print("Error: model_runs directory not found.")
-        return {}
-
+    selected = find_fits(model_batch_dir)
+    validate_fusion_sources(selected)
     pdf_groups = defaultdict(lambda: defaultdict(list))
-
-    for location_path in filter(Path.is_dir, model_runs_dir.iterdir()):
-        for model_path in filter(Path.is_dir, location_path.iterdir()):
-            figures_path = model_path / "figures"
-            if not figures_path.is_dir():
-                continue
-
-            for file_path in figures_path.glob("*.pdf"):
-                base_name = file_path.name  # Keep full filename
-                # signal name is prefixed by the model name and may be postfixed with _epiweekly, _daily, etc.
-                signal_name = re.sub(
-                    f"^{model_path.name}_|(_epiweekly|_daily|_log|_agg_num|_agg_denom)+$",
-                    "",
-                    file_path.stem,
-                )
-                pdf_groups[signal_name][base_name].append(file_path)
+    for (_, disease, model), model_path in sorted(selected.items()):
+        for file_path in sorted((model_path / "figures").glob("*.pdf")):
+            signal_name = re.sub(
+                f"^{re.escape(model)}_|(_epiweekly|_daily|_log|_agg_num|_agg_denom)+$",
+                "",
+                file_path.stem,
+            )
+            pdf_groups[f"{disease}/{signal_name}"][file_path.name].append(file_path)
 
     return pdf_groups
 
@@ -71,9 +62,14 @@ def merge_and_save_pdfs(model_batch_dir: Path) -> None:
         print("No PDFs found to merge.")
         return
 
+    execution_dir = standalone_directory(
+        model_batch_dir, {"operation": "collate_plots"}
+    )
     for signal, file_dict in pdf_groups.items():
         for original_file_name, pdf_list in file_dict.items():
-            output_path = model_batch_dir / "figures" / signal / original_file_name
+            output_path = (
+                execution_dir / "00_summary" / "figures" / signal / original_file_name
+            )
             output_path.parent.mkdir(parents=True, exist_ok=True)
             merge_pdfs(pdf_list, output_path)
 

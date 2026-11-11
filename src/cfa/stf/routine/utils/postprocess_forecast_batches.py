@@ -1,153 +1,101 @@
-#!/usr/bin/env python3
-
-"""
-Postprocess batches of forecasts, creating
-summary files including collated PDFs of plots
-and .tsv-format hubverse tables.
-"""
+"""Summaries from a snapshot of completed, current fits."""
 
 import argparse
-import datetime as dt
-import logging
-import shutil
 from pathlib import Path
 
 import polars as pl
 
-from cfa.stf.routine.lookback import format_lookback_days
-from cfa.stf.routine.utils import collate_plots as cp
-from cfa.stf.routine.utils.directory_utils import (
-    get_all_forecast_dirs,
-    parse_model_batch_dir_name,
+from cfa.stf.routine.fusion import validate_fusion_sources
+from cfa.stf.routine.run_storage import (
+    FitKey,
+    find_fits,
+    standalone_directory,
 )
+from cfa.stf.routine.utils.collate_plots import merge_pdfs
 
 
-def _hubverse_table_filename(forecast_date: str | dt.date, disease: str) -> str:
+def _hubverse_table_filename(forecast_date, disease):
     return f"{forecast_date}-{disease}-hubverse-table.parquet"
 
 
-# Batch collation assumes producer schemas already match. Type drift such as an
-# output_type_id integer/float mismatch should be fixed in the model output.
-def combine_hubverse_tables(model_batch_dir_path: str | Path) -> None:
-    model_batch_dir_path = Path(model_batch_dir_path)
-    model_batch_dir_name = model_batch_dir_path.name
-    batch_info = parse_model_batch_dir_name(model_batch_dir_name)
-
-    expected_file_name = "hubverse_table.parquet"
-    parquet_files = list(model_batch_dir_path.rglob(expected_file_name))
-    if not parquet_files:
-        raise FileNotFoundError(
-            f"No {expected_file_name} files found under {model_batch_dir_path}"
-        )
-    combined = pl.scan_parquet(
-        parquet_files, cast_options=pl.ScanCastOptions(integer_cast="allow-float")
+def combine_hubverse_tables(fits: list[Path], output: Path, disease: str) -> None:
+    """Collate only the explicitly selected fits."""
+    if not fits:
+        raise FileNotFoundError("No hubverse_table.parquet files selected")
+    combined = pl.concat(
+        [pl.read_parquet(path / "hubverse_table.parquet") for path in fits],
+        how="vertical_relaxed",
     )
-    forecast_dates = (
-        combined.select("reference_date")
-        .unique()
-        .collect()
-        .get_column("reference_date")
-    )
-    if len(forecast_dates) != 1:
-        raise ValueError(
-            "Expected one reference_date across model batch Hubverse tables, "
-            f"found {forecast_dates.to_list()}"
-        )
-    output_file_name = _hubverse_table_filename(
-        forecast_dates.item(), batch_info["disease"]
-    )
-    output_path = model_batch_dir_path / output_file_name
-    combined.sink_parquet(output_path)
-    return None
+    origins = combined["reference_date"].unique()
+    if len(origins) != 1:
+        raise ValueError("Expected one reference_date across selected fits")
+    output.mkdir(parents=True, exist_ok=True)
+    combined.write_parquet(output / _hubverse_table_filename(origins.item(), disease))
 
 
-def process_model_batch_dir(model_batch_dir_path: Path) -> None:
-    logger = logging.getLogger(__name__)
-    logger.info("Collating plots...")
-    cp.merge_and_save_pdfs(model_batch_dir_path)
-    logger.info("Creating hubverse table...")
-    combine_hubverse_tables(model_batch_dir_path)
+def _fits_by_disease(selected: dict[FitKey, Path]) -> dict[str, list[Path]]:
+    fits: dict[str, list[Path]] = {}
+    for key, path in sorted(selected.items()):
+        fits.setdefault(key.disease, []).append(path)
+    return dict(sorted(fits.items()))
 
 
-def model_batch_dir_to_target_path(
-    model_batch_dir: str,
-    pre_path: Path | str,
-) -> Path:
-    parts = parse_model_batch_dir_name(model_batch_dir)
-    lookback = format_lookback_days(parts["n_lookback_days"])
-    target_path = Path(
-        pre_path,
-        f"lookback-{lookback}-omit-{parts['exclude_last_n_days']}-figures",
-        parts["disease"],
-    )
-    return target_path
+def write_sources_manifest(selected: dict[FitKey, Path], destination: Path) -> None:
+    """Record the selected fits in the summary's sources.tsv file."""
+    summary_dir = destination / "00_summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(
+        [(*key, str(path)) for key, path in sorted(selected.items())],
+        schema={
+            "location": pl.String,
+            "disease": pl.String,
+            "model": pl.String,
+            "path": pl.String,
+        },
+        orient="row",
+    ).write_csv(summary_dir / "sources.tsv", separator="\t")
+
+
+def write_hubverse_summaries(selected: dict[FitKey, Path], destination: Path) -> None:
+    """Combine the selected fits' Hubverse tables separately for each disease."""
+    output = destination / "00_summary" / "hub_tables"
+    output.mkdir(parents=True, exist_ok=True)
+    for disease, fits in _fits_by_disease(selected).items():
+        combine_hubverse_tables(fits, output, disease)
+
+
+def merge_summary_plots(selected: dict[FitKey, Path], destination: Path) -> None:
+    """Merge matching plot filenames separately for each disease."""
+    output = destination / "00_summary" / "figures"
+    output.mkdir(parents=True, exist_ok=True)
+    for disease, fits in _fits_by_disease(selected).items():
+        pdfs = {}
+        for fit in fits:
+            for pdf in sorted((fit / "figures").glob("*.pdf")):
+                pdfs.setdefault(pdf.name, []).append(pdf)
+        for name, paths in pdfs.items():
+            figure = output / disease / name
+            figure.parent.mkdir(parents=True, exist_ok=True)
+            merge_pdfs(paths, figure)
 
 
 def main(
     base_forecast_dir: Path | str,
-    diseases: list[str] | set[str] = ["covid", "flu", "rsv"],
-    skip_existing: bool = True,
-    local_copy_dir: Path | str = "",
+    *,
+    execution_dir: Path | None = None,
 ) -> None:
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    to_process = get_all_forecast_dirs(base_forecast_dir, diseases)
-    if skip_existing:
-        to_process = [
-            batch_dir
-            for batch_dir in to_process
-            if not any(
-                Path(base_forecast_dir, batch_dir).glob("*-hubverse-table.parquet")
-            )
-        ]
-
-    for batch_dir in to_process:
-        model_batch_dir_path = Path(base_forecast_dir, batch_dir)
-        logger.info(f"Processing {batch_dir}...")
-        process_model_batch_dir(model_batch_dir_path)
-        logger.info(f"Finished processing {batch_dir}")
-        if local_copy_dir:
-            source_dir = Path(base_forecast_dir, batch_dir, "figures")
-            target_dir = model_batch_dir_to_target_path(batch_dir, local_copy_dir)
-            logger.info(
-                f"Copying from {source_dir.relative_to(base_forecast_dir)} to {target_dir.relative_to(local_copy_dir)}..."
-            )
-            shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
-    logger.info(f"Finished processing {base_forecast_dir}.")
+    base = Path(base_forecast_dir)
+    destination = execution_dir or standalone_directory(
+        base, {"operation": "postprocess"}
+    )
+    selected = find_fits(base)
+    validate_fusion_sources(selected)
+    write_sources_manifest(selected, destination)
+    write_hubverse_summaries(selected, destination)
+    merge_summary_plots(selected, destination)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Postprocess forecasts across locations."
-    )
-    parser.add_argument(
-        "base_forecast_dir",
-        type=Path,
-        help="Directory containing forecast subdirectories.",
-    )
-    parser.add_argument(
-        "--diseases",
-        type=str,
-        default="covid flu rsv",
-        help=(
-            "Name(s) of disease(s) to postprocess, "
-            "as a whitespace-separated string. Supported "
-            "values are 'covid', 'flu', and 'rsv'. "
-            "Default 'covid flu rsv' (i.e. postprocess all)."
-        ),
-    )
-    parser.add_argument(
-        "--skip-existing",
-        action="store_true",
-        help="Skip processing for model batch directories that already have been processed.",
-    )
-    parser.add_argument(
-        "--local-copy-dir",
-        type=str,
-        default="",
-        help="Save a local copy of the processed files to this directory, if supplied.",
-    )
-
-    args = parser.parse_args()
-    args.diseases = args.diseases.split()
-    main(**vars(args))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("base_forecast_dir", type=Path)
+    main(**vars(parser.parse_args()))

@@ -7,6 +7,8 @@ from collections.abc import Collection
 from dataclasses import replace
 from pathlib import Path
 
+from pydantic_core import to_jsonable_python
+
 from cfa.stf.routine.data.data_access import (
     DataResolution,
     ForecastSourceName,
@@ -15,6 +17,7 @@ from cfa.stf.routine.data.data_access import (
 from cfa.stf.routine.data.prep_data import serialize_data
 from cfa.stf.routine.forecast_run import ForecastRun
 from cfa.stf.routine.forecast_window import ForecastWindow
+from cfa.stf.routine.run_storage import standalone_directory, write_json
 from cfa.stf.routine.utils.r_utils import (
     make_figures_from_model_fit_dir,
     model_fit_dir_to_hub_tbl,
@@ -70,6 +73,12 @@ class ForecastPipeline(ABC):
     def validate_configuration(self) -> None:
         """Validate model-specific configuration before loading data."""
 
+    def run_config(self) -> dict:
+        """Return serializable settings for run_config.yaml."""
+        return to_jsonable_python(
+            {key: value for key, value in vars(self).items() if key != "logger"}
+        )
+
     def build_forecast_run(self) -> ForecastRun:
         """Calculate shared run state and load the requested forecast inputs."""
         effective_exclusion = max(
@@ -108,6 +117,7 @@ class ForecastPipeline(ABC):
             fail_on_stale_data=self.fail_on_stale_data,
             logger=self.logger,
         )
+        self.output_dir = standalone_directory(self.output_dir, self.run_config())
         run = ForecastRun(
             disease=self.disease,
             loc=self.loc,
@@ -160,9 +170,26 @@ class ForecastPipeline(ABC):
         )
         self.validate_configuration()
         run = self.build_forecast_run()
+        run.model_dir.mkdir(parents=True, exist_ok=True)
+        (run.model_dir / "_COMPLETE").unlink(missing_ok=True)
+        write_json(
+            run.model_dir / "metadata.json",
+            {
+                "model": run.model_name,
+                "location": run.loc,
+                "disease": run.disease,
+                "forecast_date": run.forecast_date,
+                "forecast_through": run.forecast_through,
+                "requested_window": run.requested_window,
+                "effective_window": run.forecast_window,
+                "first_training_date": run.first_training_date,
+                "last_training_date": run.last_training_date,
+            },
+        )
         self.prepare_input_artifacts(run)
         self.run_model(run)
         self.publish_outputs(run)
+        (run.model_dir / "_COMPLETE").touch()
         self.logger.info(
             "Single-location pipeline complete for model %s, location %s, and run "
             "date %s.",

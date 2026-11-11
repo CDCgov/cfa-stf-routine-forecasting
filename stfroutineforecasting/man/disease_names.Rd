@@ -10,5 +10,5 @@ A character vector containing \code{"covid"}, \code{"flu"}, and \code{"rsv"}.
 disease_names
 }
 \description{
-Disease identifiers used in model batch directory names and forecast outputs.
+Disease identifiers used in directory paths and forecast outputs.
 }

@@ -104,8 +104,8 @@ def nowcastautogp_interop_paths(
 ) -> Iterator[NowcastAutoGPInteropPaths]:
     tmp_dir = tmp_path_factory.mktemp("nowcastautogp-parquet-interop")
     try:
-        batch_dir = tmp_dir / "covid_lookback-33_omit-1"
-        model_fit_dir = batch_dir / "model_runs" / "US" / "nowcastautogp_nssp_daily_pct"
+        batch_dir = tmp_dir / "2026-09-02-12-00-00_run"
+        model_fit_dir = batch_dir / "US" / "covid" / "nowcastautogp_nssp_daily_pct"
         input_path = tmp_dir / "nowcastautogp-input.json"
         _write_nowcastautogp_input(input_path)
 
@@ -141,7 +141,7 @@ def nowcastautogp_interop_paths(
 
 
 def _write_fable_reference_model_samples(batch_dir: Path) -> Path:
-    fable_model_fit_dir = batch_dir / "model_runs" / "US" / "fable_daily"
+    fable_model_fit_dir = batch_dir / "US" / "covid" / "fable_daily"
     r_code = textwrap.dedent(
         f"""
         library(dplyr)
@@ -178,7 +178,7 @@ def _write_fable_reference_model_samples(batch_dir: Path) -> Path:
 
 
 def _write_pyrenew_reference_model_samples(batch_dir: Path) -> Path:
-    pyrenew_model_fit_dir = batch_dir / "model_runs" / "US" / "pyrenew_e"
+    pyrenew_model_fit_dir = batch_dir / "US" / "covid" / "pyrenew_e"
     mcmc_output_dir = pyrenew_model_fit_dir / "mcmc_output"
     mcmc_output_dir.mkdir(parents=True, exist_ok=True)
     posterior_predictive = pl.DataFrame(
@@ -283,7 +283,11 @@ def test_nowcastautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
             # Sample .draw values become hubverse output_type_id values.
             assert hubverse_table.schema["output_type_id"] == pl.Int32
 
-        combine_hubverse_tables(nowcastautogp_interop_paths.batch_dir)
+        combine_hubverse_tables(
+            list((nowcastautogp_interop_paths.batch_dir / "US" / "covid").iterdir()),
+            nowcastautogp_interop_paths.batch_dir,
+            "covid",
+        )
     except FileNotFoundError:
         pytest.skip("Rscript is not available")
 

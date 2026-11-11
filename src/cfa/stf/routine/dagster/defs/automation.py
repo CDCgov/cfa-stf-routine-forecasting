@@ -52,6 +52,21 @@ eager_on_wednesday = (
     dg.AutomationCondition.eager() & IsWeekday(Day.WEDNESDAY)
 ).with_label("eager_on_wednesday")
 
+# Fusion and postprocessing discover completed fits from storage, so they can
+# run even when some upstream assets have no Dagster materialization. Require
+# at least one input to avoid launching empty runs before any model completes.
+eager_with_any_input = (
+    dg.AutomationCondition.eager()
+    .replace(
+        old=~dg.AutomationCondition.any_deps_missing(),
+        new=dg.AutomationCondition.any_deps_match(
+            ~dg.AutomationCondition.missing()
+            | dg.AutomationCondition.will_be_requested()
+        ),
+    )
+    .with_label("eager_with_any_input")
+)
+
 
 fable_sensor = dg.AutomationConditionSensorDefinition(
     name="Fable",
@@ -69,6 +84,7 @@ pyrenew_sensor = dg.AutomationConditionSensorDefinition(
 
 fusion_sensor = dg.AutomationConditionSensorDefinition(
     name="Fusion",
+    default_status=dg.DefaultSensorStatus.RUNNING,
     target=dg.AssetSelection.groups("Fusion"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions
@@ -76,6 +92,7 @@ fusion_sensor = dg.AutomationConditionSensorDefinition(
 
 postprocess_sensor = dg.AutomationConditionSensorDefinition(
     name="Postprocess",
+    default_status=dg.DefaultSensorStatus.RUNNING,
     target=dg.AssetSelection.groups("Postprocess"),
     run_tags=azure_batch_2cpu_execution_config.to_run_tags(),
     use_user_code_server=True,  # allows for custom automation conditions

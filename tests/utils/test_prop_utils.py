@@ -9,7 +9,7 @@ from polars.testing import assert_frame_equal
 
 from cfa.stf.routine.utils.prop_utils import (
     append_prop_ed_data,
-    create_prop_fusion_model,
+    create_prop_fusion,
 )
 
 
@@ -122,7 +122,7 @@ def _write_model_outputs(
     write_tabular(data, model_dir / "data" / "combined_data.tsv")
 
 
-def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
+def test_create_prop_fusion_aggregates_with_forecasttools(tmp_path):
     daily_dates = pl.date_range(dt.date(2025, 1, 5), dt.date(2025, 1, 18), eager=True)
     num_samples = (
         _model_frame(
@@ -151,10 +151,10 @@ def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
     _write_model_outputs(tmp_path / "num_model", num_samples, num_data)
     _write_model_outputs(tmp_path / "other_model", other_samples, other_data)
 
-    create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
+    create_prop_fusion(
+        numerator_dir=tmp_path / "num_model",
+        other_dir=tmp_path / "other_model",
+        destination_dir=tmp_path / "prop_epiweekly_aggregated_num_model_other_model",
         aggregate_num=True,
         augment_other_with_obs=False,
     )
@@ -176,7 +176,7 @@ def test_create_prop_fusion_model_aggregates_with_forecasttools(tmp_path):
     assert_frame_equal(data.select(expected.columns), expected, check_exact=False)
 
 
-def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
+def test_create_prop_fusion_augments_samples_with_observations(tmp_path):
     training_date = dt.date(2025, 1, 1)
     forecast_date = dt.date(2025, 1, 2)
     num_samples = _model_frame(
@@ -202,10 +202,10 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
     _write_model_outputs(tmp_path / "num_model", num_samples, num_data)
     _write_model_outputs(tmp_path / "other_model", other_samples, other_data)
 
-    create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
+    create_prop_fusion(
+        numerator_dir=tmp_path / "num_model",
+        other_dir=tmp_path / "other_model",
+        destination_dir=tmp_path / "prop_num_model_other_model",
     )
 
     samples = read_tabular(tmp_path / "prop_num_model_other_model" / "samples.parquet")
@@ -237,7 +237,7 @@ def test_create_prop_fusion_model_augments_samples_with_observations(tmp_path):
     ],
     ids=["other-earlier", "disagreement", "other-later"],
 )
-def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
+def test_create_prop_fusion_requires_inputs_to_agree_on_evaluation(
     tmp_path,
     other_data_type,
     expected_data_type,
@@ -269,10 +269,10 @@ def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
         other_samples.drop(".draw"),
     )
 
-    create_prop_fusion_model(
-        model_run_dir=tmp_path,
-        num_model_name="num_model",
-        other_model_name="other_model",
+    create_prop_fusion(
+        numerator_dir=tmp_path / "num_model",
+        other_dir=tmp_path / "other_model",
+        destination_dir=tmp_path / "prop_num_model_other_model",
         augment_other_with_obs=False,
     )
 
@@ -283,3 +283,60 @@ def test_create_prop_fusion_model_requires_inputs_to_agree_on_evaluation(
     assert "data_type" not in samples.columns
     assert data.height == 4
     assert data.get_column("data_type").to_list() == expected_data_type
+
+
+@pytest.mark.parametrize("short_other", [False, True])
+def test_cross_run_fusion_intersects_dates(tmp_path, short_other):
+    numerator = tmp_path / "first/CA/flu/num"
+    other = tmp_path / "second/CA/flu/other"
+    destination = tmp_path / "third/CA/flu/fusion"
+    dates = [dt.date(2025, 1, day) for day in range(1, 5)]
+    num = _model_frame(dates, [2] * 4, variable="observed_ed_visits", draws=1)
+    other_dates = dates[1:-1] if short_other else dates[1:]
+    den = _model_frame(
+        other_dates, [8] * len(other_dates), variable="other_ed_visits", draws=1
+    )
+    _write_model_outputs(numerator, num, num.drop(".draw"))
+    _write_model_outputs(other, den, den.drop(".draw"))
+    samples = create_prop_fusion(
+        numerator_dir=numerator,
+        other_dir=other,
+        destination_dir=destination,
+        augment_other_with_obs=False,
+    )
+    assert_frame_equal(
+        samples.select("date", ".value"),
+        read_tabular(destination / "samples.parquet").select("date", ".value"),
+    )
+    assert samples["date"].to_list() == other_dates
+    assert samples[".value"].to_list() == [0.2] * len(other_dates)
+
+
+def test_epiweekly_fusion_without_aggregation(tmp_path):
+    dates = [dt.date(2025, 1, 11), dt.date(2025, 1, 18)]
+    for model, variable, value in [
+        ("num", "observed_ed_visits", 2),
+        ("other", "other_ed_visits", 8),
+    ]:
+        samples = _model_frame(
+            dates, [value, value], variable=variable, draws=1, resolution="epiweekly"
+        )
+        _write_model_outputs(tmp_path / model, samples, samples.drop(".draw"))
+    create_prop_fusion(
+        numerator_dir=tmp_path / "num",
+        other_dir=tmp_path / "other",
+        destination_dir=tmp_path / "fusion",
+        augment_other_with_obs=False,
+    )
+    assert read_tabular(tmp_path / "fusion/samples.parquet")["date"].to_list() == dates
+
+
+def test_coverage_requires_every_draw_to_cover_forecast():
+    from cfa.stf.routine.utils.prop_utils import validate_forecast_date_coverage
+
+    first, last = dt.date(2025, 1, 1), dt.date(2025, 1, 2)
+    samples = _model_frame(
+        [first, last, first], [2, 2, 2], variable="observed_ed_visits", draws=[1, 1, 2]
+    )
+    with pytest.raises(ValueError, match="required forecast dates"):
+        validate_forecast_date_coverage(samples, first, last)

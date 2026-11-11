@@ -102,18 +102,18 @@ Every subclass must implement:
   Supporting a new source also requires changes to [`data/data_access.py`](data/data_access.py) and [`data/prep_data.py`](data/prep_data.py).
 - `run_model(run)`: run the model and create a standardized `run.model_dir / "samples.parquet"`.
 
-`ForecastWindow` is the source of truth for the report-anchored training bounds, final forecast date, and model-batch directory name.
+`ForecastWindow` is the source of truth for the report-anchored training bounds and final forecast date.
 Set `n_lookback_days` to `None` to retain all supported training history, beginning March 1, 2022.
 A positive integer limits training data to that many days before the report date, subject to the same earliest supported date.
 `ForecastRun` combines that configured window with the surveillance observations that were actually retained, the population, and the model output paths.
 In particular, use `run.model_dir`, `run.data_dir`, and `run.model_run_dir` rather than rebuilding paths in model code.
 Models can override `minimum_exclude_last_n_days` when they require a longer omitted tail than the caller requested.
-The pipeline's `requested_window` preserves that caller configuration; the run's `forecast_window` records the effective omission, while `run.requested_window` determines the batch directory so all models remain in the same batch.
+The pipeline's `requested_window` preserves that caller configuration; the run's `forecast_window` records the effective omission.
+Output paths are determined by execution, location, disease, and model, independently of the training window.
 The resulting layout is:
 
 ```text
-<output_dir>/<disease>_lookback-<days-or-all>_omit-<days>/
-  model_runs/<location>/<model_name>/
+<output_dir>/<run_timestamp>_<execution_id>/<location>/<disease>/<model_name>/
     data/
       combined_data.tsv
       data_for_model_fit.json
@@ -124,6 +124,11 @@ The resulting layout is:
 
 The base pipeline creates `data/`, `combined_data.tsv`, and `data_for_model_fit.json`.
 The model creates `samples.parquet`; common post-processing creates `ci.parquet`, figures, and `hubverse_table.parquet`.
+
+Models and fusion assets in the same Dagster run share an execution directory.
+`run_timestamp` is the execution start time in `America/New_York`, formatted as `YYYY-MM-DD-HH-MM-SS`; `execution_id` is the Dagster run ID or a UUID for standalone invocations.
+The execution root contains `run_config.yaml` and `execution.json`.
+Each fit records its training-window settings in `metadata.json` and receives an empty `_COMPLETE` marker after all outputs are successfully published.
 
 ### Forecast sample format
 
@@ -181,6 +186,21 @@ To run the new model in production, update [`dagster/defs/`](./dagster/defs/) to
 
 Declare the correct upstream data asset dependencies for the pipeline's `sources`.
 Keep this orchestration change separate from the model class so the single-location pipeline remains directly testable.
+
+Models, fusion, and postprocessing share `resources.output_config.config.output_basedir`; location overrides apply to training settings.
+The output root defaults to `output` in production and `test-output` otherwise.
+Set `n_lookback_days` in each model's resource config: `fable_e_other_config`, `pyrenew_config`, or `nowcastautogp_e_pct_epiweekly_config`.
+Fable and PyRenew default to 150 days; NowcastAutoGP defaults to all supported history (`null`) in production and 150 days otherwise.
+An explicitly set `n_lookback_days` in `model_base_config.config_overrides` takes precedence for that location across models; omitting it preserves each model's setting, while `null` selects all supported history.
+Location overrides support `n_lookback_days` and `exclude_last_n_days`; set `fail_on_stale_data` in `model_base_config` to apply one stale-input policy across locations.
+Fusion assets discover every location/disease pair with both required completed inputs across execution directories, writing results under the current execution.
+They retain their upstream dependencies and use the completed fits on disk to select pairs.
+To add a fusion of another model pair, define a named `FusionSpec` in `fusion.py` and include it in `FUSION_SPECS` so provenance validation recognizes it.
+Pass that spec to `_run_fusion_model(context, output_config, spec)` from a Dagster asset declaring both upstream dependencies, and add the asset to the postprocessing dependencies.
+Postprocessing saves combined tables in `00_summary/hub_tables/<forecast_date>-<disease>-hubverse-table.parquet` and merged figures in `00_summary/figures/<disease>/`.
+It records the selected fits in `00_summary/sources.tsv`, with columns `location`, `disease`, `model`, and `path`.
+It includes every disease with completed, current fits in the forecast-date directory.
+Rerun a fusion after updating its inputs; postprocessing and plot collation raise an error if a fusion's recorded inputs differ from the latest completed fits, an input is missing, or its provenance cannot be validated.
 
 ## 5. Test the model
 

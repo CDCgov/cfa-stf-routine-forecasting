@@ -20,7 +20,10 @@ from cfa.stf.routine.dagster.defs.asset_helpers import (
     _run_pyrenew_model,
     _throw_if_backfill,
 )
-from cfa.stf.routine.dagster.defs.automation import eager_on_wednesday
+from cfa.stf.routine.dagster.defs.automation import (
+    eager_on_wednesday,
+    eager_with_any_input,
+)
 from cfa.stf.routine.fusion import (
     PYRENEW_E_FABLE,
     PYRENEW_E_FABLE_EPIWEEKLY,
@@ -207,7 +210,7 @@ def nowcastautogp_e_pct_epiweekly(
 
 @dg.asset(
     **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_e", "fable_e_other"],
     tags=E_DATA_RERUN_TAGS,
@@ -225,7 +228,7 @@ def fuse_pyrenew_e_fable(
 
 @dg.asset(
     **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_e", "epiweekly_fable_e_other"],
     tags=E_DATA_RERUN_TAGS,
@@ -243,7 +246,7 @@ def fuse_pyrenew_e_fable_epiweekly(
 
 @dg.asset(
     **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_he", "fable_e_other"],
     tags=HE_DATA_RERUN_TAGS,
@@ -261,7 +264,7 @@ def fuse_pyrenew_he_fable(
 
 @dg.asset(
     **common_asset_args,
-    automation_condition=dg.AutomationCondition.eager(),
+    automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_he", "epiweekly_fable_e_other"],
     tags=HE_DATA_RERUN_TAGS,
@@ -294,16 +297,7 @@ def fuse_pyrenew_he_fable_epiweekly(
         "nowcastautogp_e_pct_epiweekly",
     ],
     partitions_def=daily_partitions_def,
-    # Runs when any dependency has been updated as long as at least one exists
-    automation_condition=(
-        dg.AutomationCondition.eager().replace(
-            old=~dg.AutomationCondition.any_deps_missing(),
-            new=dg.AutomationCondition.any_deps_match(
-                ~dg.AutomationCondition.missing()
-                | dg.AutomationCondition.will_be_requested()
-            ),
-        )
-    ).with_label("postprocess_custom_eager"),
+    automation_condition=eager_with_any_input,
     group_name="Postprocess",
     # retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
     tags=HE_DATA_RERUN_TAGS,

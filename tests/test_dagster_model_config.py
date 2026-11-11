@@ -11,15 +11,16 @@ from cfa.stf.routine.run_storage import FitKey
 
 def _model_base_config(
     override_fields: dict[str, object],
+    *,
+    fail_on_stale_data: bool = True,
 ) -> asset_config.ModelBaseConfig:
     config = asset_config.ModelBaseConfig(
         exclude_last_n_days=1,
-        fail_on_stale_data=True,
+        fail_on_stale_data=fail_on_stale_data,
         config_overrides=[
             asset_config.ConfigOverride(
                 location="CA",
                 exclude_last_n_days=2,
-                fail_on_stale_data=False,
                 **override_fields,
             ).as_dict()
         ],
@@ -35,6 +36,8 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
 
     assert "n_lookback_days" not in base_fields
     assert "n_lookback_days" in override_fields
+    assert "fail_on_stale_data" in base_fields
+    assert "fail_on_stale_data" not in override_fields
     assert "output_basedir" not in override_fields
     assert "output_basedir" not in base_fields
     assert "fable_pyrenew_n_lookback_days" not in override_fields
@@ -50,15 +53,22 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     )
 
 
-def test_location_lookback_override_preserves_other_locations_and_model_config():
-    base = _model_base_config({"n_lookback_days": None})
+@pytest.mark.parametrize("fail_on_stale_data", [False, True])
+def test_location_lookback_override_preserves_other_locations_and_model_config(
+    fail_on_stale_data,
+):
+    base = _model_base_config(
+        {"n_lookback_days": None}, fail_on_stale_data=fail_on_stale_data
+    )
     model = asset_config.PyrenewConfig(n_lookback_days=120)
 
     assert base.apply_location_overrides("CA", model).n_lookback_days is None
     assert base.apply_location_overrides("US", model).n_lookback_days == 120
     assert model.n_lookback_days == 120
     assert base.get_by_location("US").exclude_last_n_days == 1
-    assert base.get_by_location("US").fail_on_stale_data is True
+    assert base.get_by_location("CA").exclude_last_n_days == 2
+    assert base.get_by_location("CA").fail_on_stale_data is fail_on_stale_data
+    assert base.get_by_location("US").fail_on_stale_data is fail_on_stale_data
 
 
 def test_postprocess_uses_executing_run(monkeypatch):
@@ -151,7 +161,7 @@ def test_model_runners_use_per_model_lookbacks_and_location_overrides(
     shared_arguments = {
         "output_dir": Path("default-output/2026-09-09_forecasts/run"),
         "exclude_last_n_days": 2,
-        "fail_on_stale_data": False,
+        "fail_on_stale_data": True,
     }
     for forecast, expected_lookback in zip(
         (forecast_fable, forecast_pyrenew, forecast_nowcastautogp),

@@ -192,6 +192,7 @@ The output root defaults to `output` in production and `test-output` otherwise.
 Set `n_lookback_days` in each model's resource config: `fable_e_other_config`, `pyrenew_config`, or `nowcastautogp_e_pct_epiweekly_config`.
 Fable and PyRenew default to 150 days; NowcastAutoGP defaults to all supported history (`null`) in production and 150 days otherwise.
 An explicitly set `n_lookback_days` in `model_base_config.config_overrides` takes precedence for that location across models; omitting it preserves each model's setting, while `null` selects all supported history.
+Location overrides support `n_lookback_days` and `exclude_last_n_days`; set `fail_on_stale_data` in `model_base_config` to apply one stale-input policy across locations.
 Fusion assets discover every location/disease pair with both required completed inputs across execution directories, writing results under the current execution.
 They retain their upstream dependencies and use the completed fits on disk to select pairs.
 To add a fusion of another model pair, define a named `FusionSpec` in `fusion.py` and include it in `FUSION_SPECS` so provenance validation recognizes it.

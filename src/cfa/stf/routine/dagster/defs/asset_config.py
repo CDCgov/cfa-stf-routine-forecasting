@@ -8,7 +8,7 @@ import dagster as dg
 from cfa.stf.forecasttools import LOCATION_LIST
 from cfa_dagster import GraphDimension
 from cfa_dagster import is_production as is_prod
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 # ============================================================================
 # GRAPH DIMENSIONS AND PARTITIONS
@@ -44,19 +44,12 @@ daily_partitions_def = dg.DailyPartitionsDefinition(
 
 # Use default_factory to prevent ConfigOverrides from populating fields in the
 # Launchpad unless the user explicitly sets them.
-class _SharedModelConfigFields(BaseModel):
+class ConfigOverride(dg.Config):
+    location: Location  # type: ignore[reportInvalidTypeForm]
     exclude_last_n_days: int = Field(
         default_factory=lambda: 0,
         description="Requested recent-data omission used by all forecast models.",
     )
-    fail_on_stale_data: bool = Field(
-        default_factory=lambda: is_prod(),
-        description="Stale-input policy used by all forecast models.",
-    )
-
-
-class ConfigOverride(_SharedModelConfigFields, dg.Config):
-    location: Location  # type: ignore[reportInvalidTypeForm]
     n_lookback_days: int | None = Field(
         default_factory=lambda: None,
         description=(
@@ -77,7 +70,7 @@ class OutputConfig(dg.ConfigurableResource):
     )
 
 
-class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
+class ModelBaseConfig(dg.ConfigurableResource):
     """Shared execution dimensions, training settings, and location overrides."""
 
     exclude_last_n_days: int = Field(
@@ -86,7 +79,7 @@ class ModelBaseConfig(_SharedModelConfigFields, dg.ConfigurableResource):
     )
     fail_on_stale_data: bool = Field(
         default=is_prod(),
-        description="Stale-input policy used by all forecast models.",
+        description="Run-level stale-input policy used by all forecast models.",
     )
     diseases: GraphDimension[Disease] = Field(  # type: ignore[reportInvalidTypeForm]
         default=GraphDimension(DISEASES),

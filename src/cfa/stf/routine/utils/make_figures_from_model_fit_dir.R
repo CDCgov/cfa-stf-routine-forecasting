@@ -171,6 +171,10 @@ p <- arg_parser(
     "--save-figs",
     help = "Whether to save figures to disk.",
     flag = TRUE
+  ) |>
+  add_argument(
+    "--hub-forecast-date",
+    help = "Also export Hubverse samples for this forecast date (YYYY-MM-DD)."
   )
 
 argv <- parse_args(p)
@@ -180,3 +184,12 @@ make_forecast_figure_from_model_fit_dir(
   save_figs = argv$save_figs,
   save_ci = argv$save_ci
 )
+
+if (!is.na(argv$hub_forecast_date)) {
+  samples_path <- path(argv$model_fit_dir, "samples", ext = "parquet")
+  hubverse_path <- path(argv$model_fit_dir, "hubverse_table", ext = "parquet")
+  samples_path |>
+    raw_samples_to_prelim(forecast_date = as.Date(argv$hub_forecast_date)) |>
+    prelim_samples_to_hubverse(output_type = "samples") |>
+    forecasttools::write_tabular(hubverse_path)
+}

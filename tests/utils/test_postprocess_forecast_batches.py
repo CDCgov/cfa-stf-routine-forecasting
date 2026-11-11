@@ -274,16 +274,13 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
         return samples
 
     monkeypatch.setattr(fusion_module, "create_prop_fusion", fuse)
-    monkeypatch.setattr(
-        fusion_module, "make_figures_from_model_fit_dir", lambda *a, **k: None
-    )
 
     def publish(path, **kwargs):
         pl.DataFrame(
             {"reference_date": [dt.date(2026, 9, 2)], "value": [3.0]}
         ).write_parquet(path / "hubverse_table.parquet")
 
-    monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
+    monkeypatch.setattr(fusion_module, "postprocess_model_fit_dir", publish)
     spec = FUSION_SPECS[0]
     inputs = find_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
     materialize_fusion(spec, inputs, downstream, "CA", "covid")
@@ -362,8 +359,7 @@ def test_incompatible_horizons_fail(tmp_path):
         ("epiweekly", "success"),
         ("daily", "missing_date"),
         ("epiweekly", "missing_date"),
-        ("daily", "figures_failure"),
-        ("daily", "hubverse_failure"),
+        ("daily", "postprocessing_failure"),
     ],
 )
 def test_fusion_validates_every_draw_before_publication(
@@ -395,32 +391,23 @@ def test_fusion_validates_every_draw_before_publication(
         samples.write_parquet(kwargs["destination_dir"] / "samples.parquet")
         return samples
 
-    def publication(stage):
+    def publication(*args, **kwargs):
         assert not (destination / "_COMPLETE").exists()
-        if outcome == f"{stage}_failure":
+        if outcome == "postprocessing_failure":
             raise OSError("Simulated publication failure")
 
-    plot = Mock(side_effect=lambda *a, **k: publication("figures"))
-    publish = Mock(side_effect=lambda *a, **k: publication("hubverse"))
+    publish = Mock(side_effect=publication)
     monkeypatch.setattr(fusion_module, "create_prop_fusion", fuse)
-    monkeypatch.setattr(fusion_module, "make_figures_from_model_fit_dir", plot)
-    monkeypatch.setattr(fusion_module, "model_fit_dir_to_hub_tbl", publish)
+    monkeypatch.setattr(fusion_module, "postprocess_model_fit_dir", publish)
 
     if outcome == "missing_date":
         with pytest.raises(ValueError, match="required forecast dates"):
             materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
-        plot.assert_not_called()
         publish.assert_not_called()
     elif outcome.endswith("_failure"):
         with pytest.raises(OSError, match="Simulated publication failure"):
             materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
-        plot.assert_called_once_with(destination, save_figs=True, save_ci=True)
-        if outcome == "figures_failure":
-            publish.assert_not_called()
-        else:
-            publish.assert_called_once_with(
-                destination, forecast_date=dt.date(2026, 9, 2)
-            )
+        publish.assert_called_once_with(destination, forecast_date=dt.date(2026, 9, 2))
 
     if outcome != "success":
         assert not (destination / "_COMPLETE").exists()
@@ -431,7 +418,6 @@ def test_fusion_validates_every_draw_before_publication(
             materialize_fusion(spec, find_fits(tmp_path), run, "CA", "covid")
             == destination
         )
-        plot.assert_called_once_with(destination, save_figs=True, save_ci=True)
         publish.assert_called_once_with(destination, forecast_date=dt.date(2026, 9, 2))
         assert (destination / "_COMPLETE").is_file()
 

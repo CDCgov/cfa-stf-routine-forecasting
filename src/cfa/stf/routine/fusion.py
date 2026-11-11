@@ -10,10 +10,7 @@ from cfa.stf.routine.utils.prop_utils import (
     create_prop_fusion,
     validate_forecast_date_coverage,
 )
-from cfa.stf.routine.utils.r_utils import (
-    make_figures_from_model_fit_dir,
-    model_fit_dir_to_hub_tbl,
-)
+from cfa.stf.routine.utils.r_utils import postprocess_model_fit_dir
 
 
 @dataclass(frozen=True)
@@ -108,8 +105,7 @@ def materialize_fusion(
             "sources": [str(numerator), str(other)],
         },
     )
-    make_figures_from_model_fit_dir(destination, save_figs=True, save_ci=True)
-    model_fit_dir_to_hub_tbl(destination, forecast_date=origin)
+    postprocess_model_fit_dir(destination, forecast_date=origin)
     (destination / "_COMPLETE").touch()
     return destination
 

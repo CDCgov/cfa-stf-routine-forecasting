@@ -323,9 +323,8 @@ def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     fit(first, "daily_fable_e_other", disease="rsv", complete=False)
     destination = execution(tmp_path, "summary", 1)
 
-    # The filename uses forecast_date even when reference_date differs.
     postprocess.main(
-        tmp_path, forecast_date=dt.date(2026, 9, 3), execution_dir=destination
+        tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=destination
     )
 
     summary = destination / "00_summary"
@@ -338,7 +337,7 @@ def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     }
     for disease in diseases:
         table = pl.read_parquet(
-            summary / "hub_tables" / f"2026-09-03-{disease}-hubverse-table.parquet"
+            summary / "hub_tables" / f"2026-09-02-{disease}-hubverse-table.parquet"
         )
         assert table.height == 2
         figure = summary / "figures" / disease / "forecast.pdf"

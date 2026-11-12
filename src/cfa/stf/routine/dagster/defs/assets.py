@@ -1,5 +1,6 @@
 "Our dagster assets"
 
+import datetime as dt
 from pathlib import Path
 
 import dagster as dg
@@ -319,5 +320,6 @@ def postprocess_forecasts(
     context.log.info(f"output_config: '{output_config}'")
     postprocess(
         base_forecast_dir=daily_forecast_output_dir,
+        forecast_date=dt.date.fromisoformat(context.partition_key),
         execution_dir=dagster_execution_directory(context, daily_forecast_output_dir),
     )

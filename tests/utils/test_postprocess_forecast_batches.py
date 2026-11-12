@@ -54,11 +54,21 @@ def fit(directory, model, value=1.0, location="CA", complete=True, disease="covi
     return path
 
 
-def test_combine_hubverse_tables_preserves_rows_order_and_relaxed_schema(tmp_path):
+@pytest.mark.parametrize(
+    "reference_dates",
+    [
+        [dt.date(2026, 9, 5)] * 2,
+        [dt.date(2026, 8, 29), dt.date(2026, 9, 5)],
+    ],
+    ids=["shared-reference-date", "multiple-reference-dates"],
+)
+def test_combine_hubverse_tables_uses_forecast_date_and_preserves_rows_and_schema(
+    tmp_path, reference_dates
+):
     tables = [
         pl.DataFrame(
             {
-                "reference_date": [dt.date(2026, 9, 2)] * 2,
+                "reference_date": reference_dates,
                 "output_type_id": pl.Series([1, 2], dtype=dtype),
                 "value": [value, value + 1],
             }
@@ -73,40 +83,26 @@ def test_combine_hubverse_tables_preserves_rows_order_and_relaxed_schema(tmp_pat
         fits.append(path)
     output = tmp_path / "summary"
 
-    postprocess.combine_hubverse_tables(fits, output, "covid")
+    postprocess.combine_hubverse_tables(
+        fits, output, "covid", forecast_date=dt.date(2026, 9, 2)
+    )
 
     actual = pl.read_parquet(output / "2026-09-02-covid-hubverse-table.parquet")
     assert_frame_equal(actual, pl.concat(tables, how="vertical_relaxed"))
+    assert [path.name for path in output.iterdir()] == [
+        "2026-09-02-covid-hubverse-table.parquet"
+    ]
 
 
-@pytest.mark.parametrize(
-    "reference_dates",
-    [
-        [],
-        [[], []],
-        [[dt.date(2026, 9, 2)], [dt.date(2026, 9, 3)]],
-        [[dt.date(2026, 9, 2), dt.date(2026, 9, 3)]],
-    ],
-    ids=["no-fits", "empty-tables", "different-dates-across-fits", "mixed-dates"],
-)
-def test_combine_hubverse_tables_rejects_invalid_origins(tmp_path, reference_dates):
-    fits = []
-    for index, dates in enumerate(reference_dates):
-        path = tmp_path / f"fit-{index}"
-        path.mkdir()
-        pl.DataFrame({"reference_date": pl.Series(dates, dtype=pl.Date)}).write_parquet(
-            path / "hubverse_table.parquet"
-        )
-        fits.append(path)
+def test_combine_hubverse_tables_rejects_no_fits(tmp_path):
     output = tmp_path / "summary"
-    error, message = (
-        (ValueError, "Expected one reference_date")
-        if fits
-        else (FileNotFoundError, "No hubverse_table.parquet files selected")
-    )
 
-    with pytest.raises(error, match=message):
-        postprocess.combine_hubverse_tables(fits, output, "covid")
+    with pytest.raises(
+        FileNotFoundError, match="No hubverse_table.parquet files selected"
+    ):
+        postprocess.combine_hubverse_tables(
+            [], output, "covid", forecast_date=dt.date(2026, 9, 2)
+        )
 
     assert not output.exists()
 
@@ -342,7 +338,9 @@ def test_fusion_uses_executing_run_and_latest_sources(tmp_path, monkeypatch, sep
     spec = FUSION_SPECS[0]
     inputs = find_fits(tmp_path, keys=spec.input_keys("CA", "covid"))
     materialize_fusion(spec, inputs, downstream, "CA", "covid")
-    postprocess.main(tmp_path, execution_dir=downstream)
+    postprocess.main(
+        tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=downstream
+    )
     assert len(calls) == 1
     output = (
         downstream / "00_summary/hub_tables/2026-09-02-covid-hubverse-table.parquet"
@@ -379,7 +377,9 @@ def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     fit(first, "daily_fable_e_other", disease="rsv", complete=False)
     destination = execution(tmp_path, "summary", 1)
 
-    postprocess.main(tmp_path, execution_dir=destination)
+    postprocess.main(
+        tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=destination
+    )
 
     summary = destination / "00_summary"
     sources = pl.read_csv(summary / "sources.tsv", separator="\t")
@@ -547,7 +547,9 @@ def test_summaries_reject_stale_fusion_without_recomputing(
     original = snapshot.copy()
     if changed == "unrelated":
         validate_fusion_sources(snapshot)
-        postprocess.main(tmp_path, execution_dir=newer)
+        postprocess.main(
+            tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=newer
+        )
         values = pl.read_parquet(
             newer / "00_summary/hub_tables/2026-09-02-covid-hubverse-table.parquet"
         )["value"].to_list()
@@ -561,7 +563,9 @@ def test_summaries_reject_stale_fusion_without_recomputing(
         assert "latest completed inputs" in str(error.value)
         assert "Rerun the fusion" in str(error.value)
         with pytest.raises(ValueError, match="Stale fusion"):
-            postprocess.main(tmp_path, execution_dir=newer)
+            postprocess.main(
+                tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=newer
+            )
         with pytest.raises(ValueError, match="Stale fusion"):
             collect_pdfs(tmp_path)
         assert not (newer / "00_summary").exists()
@@ -573,7 +577,7 @@ def test_summaries_reject_unknown_fusion_recipe(tmp_path):
     fusion = fit(run, "prop_unknown")
 
     with pytest.raises(ValueError, match="Unknown fusion recipe") as error:
-        postprocess.main(tmp_path, execution_dir=run)
+        postprocess.main(tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=run)
     assert str(fusion) in str(error.value)
     with pytest.raises(ValueError, match="Unknown fusion recipe"):
         collect_pdfs(tmp_path)

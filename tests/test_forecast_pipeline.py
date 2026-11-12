@@ -395,11 +395,19 @@ def test_identical_standalone_rerun_preserves_first_fit_and_summary(
     with patch("cfa.stf.routine.run_storage.dt.datetime", wraps=dt.datetime) as clock:
         clock.now.side_effect = [started, started + dt.timedelta(hours=1)]
         first.execute()
-        postprocess.main(tmp_path, execution_dir=first.output_dir)
+        postprocess.main(
+            tmp_path,
+            forecast_date=first.requested_window.forecast_date,
+            execution_dir=first.output_dir,
+        )
         original = snapshot(first.output_dir)
 
         second.execute()
-        postprocess.main(tmp_path, execution_dir=second.output_dir)
+        postprocess.main(
+            tmp_path,
+            forecast_date=second.requested_window.forecast_date,
+            execution_dir=second.output_dir,
+        )
 
     assert first.output_dir != second.output_dir
     assert snapshot(first.output_dir) == original

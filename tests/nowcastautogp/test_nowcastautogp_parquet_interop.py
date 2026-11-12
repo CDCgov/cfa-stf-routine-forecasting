@@ -287,6 +287,7 @@ def test_nowcastautogp_hubverse_table_combines_with_fable_and_pyrenew_outputs(
             list((nowcastautogp_interop_paths.batch_dir / "US" / "covid").iterdir()),
             nowcastautogp_interop_paths.batch_dir,
             "covid",
+            forecast_date=FORECAST_DATE,
         )
     except FileNotFoundError:
         pytest.skip("Rscript is not available")

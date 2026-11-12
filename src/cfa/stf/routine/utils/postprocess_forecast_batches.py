@@ -1,6 +1,7 @@
 """Summaries from a snapshot of completed, current fits."""
 
 import argparse
+import datetime as dt
 from pathlib import Path
 
 import polars as pl
@@ -18,7 +19,9 @@ def _hubverse_table_filename(forecast_date, disease):
     return f"{forecast_date}-{disease}-hubverse-table.parquet"
 
 
-def combine_hubverse_tables(fits: list[Path], output: Path, disease: str) -> None:
+def combine_hubverse_tables(
+    fits: list[Path], output: Path, disease: str, *, forecast_date: dt.date
+) -> None:
     """Stream only the explicitly selected fits into a combined Parquet table."""
     if not fits:
         raise FileNotFoundError("No hubverse_table.parquet files selected")
@@ -27,18 +30,9 @@ def combine_hubverse_tables(fits: list[Path], output: Path, disease: str) -> Non
         how="vertical_relaxed",
         parallel=False,
     )
-    origins = (
-        combined.select("reference_date")
-        .unique()
-        .limit(2)
-        .collect(engine="streaming")
-        .to_series()
-    )
-    if len(origins) != 1:
-        raise ValueError("Expected one reference_date across selected fits")
     output.mkdir(parents=True, exist_ok=True)
     combined.sink_parquet(
-        output / _hubverse_table_filename(origins.item(), disease), engine="streaming"
+        output / _hubverse_table_filename(forecast_date, disease), engine="streaming"
     )
 
 
@@ -65,12 +59,14 @@ def write_sources_manifest(selected: dict[FitKey, Path], destination: Path) -> N
     ).write_csv(summary_dir / "sources.tsv", separator="\t")
 
 
-def write_hubverse_summaries(selected: dict[FitKey, Path], destination: Path) -> None:
+def write_hubverse_summaries(
+    selected: dict[FitKey, Path], destination: Path, *, forecast_date: dt.date
+) -> None:
     """Combine the selected fits' Hubverse tables separately for each disease."""
     output = destination / "00_summary" / "hub_tables"
     output.mkdir(parents=True, exist_ok=True)
     for disease, fits in _fits_by_disease(selected).items():
-        combine_hubverse_tables(fits, output, disease)
+        combine_hubverse_tables(fits, output, disease, forecast_date=forecast_date)
 
 
 def merge_summary_plots(selected: dict[FitKey, Path], destination: Path) -> None:
@@ -91,6 +87,7 @@ def merge_summary_plots(selected: dict[FitKey, Path], destination: Path) -> None
 def main(
     base_forecast_dir: Path | str,
     *,
+    forecast_date: dt.date,
     execution_dir: Path | None = None,
 ) -> None:
     base = Path(base_forecast_dir)
@@ -100,11 +97,12 @@ def main(
     selected = find_fits(base)
     validate_fusion_sources(selected)
     write_sources_manifest(selected, destination)
-    write_hubverse_summaries(selected, destination)
+    write_hubverse_summaries(selected, destination, forecast_date=forecast_date)
     merge_summary_plots(selected, destination)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("base_forecast_dir", type=Path)
+    parser.add_argument("--forecast-date", type=dt.date.fromisoformat, required=True)
     main(**vars(parser.parse_args()))

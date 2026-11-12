@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 from pypdf import PdfReader, PdfWriter
 
 from cfa.stf.routine import fusion as fusion_module
@@ -51,6 +52,63 @@ def fit(directory, model, value=1.0, location="CA", complete=True, disease="covi
     if complete:
         (path / "_COMPLETE").touch()
     return path
+
+
+def test_combine_hubverse_tables_preserves_rows_order_and_relaxed_schema(tmp_path):
+    tables = [
+        pl.DataFrame(
+            {
+                "reference_date": [dt.date(2026, 9, 2)] * 2,
+                "output_type_id": pl.Series([1, 2], dtype=dtype),
+                "value": [value, value + 1],
+            }
+        )
+        for dtype, value in [(pl.Int32, 1), (pl.Int64, 3.5)]
+    ]
+    fits = []
+    for index, table in enumerate(tables):
+        path = tmp_path / f"fit-{index}"
+        path.mkdir()
+        table.write_parquet(path / "hubverse_table.parquet")
+        fits.append(path)
+    output = tmp_path / "summary"
+
+    postprocess.combine_hubverse_tables(fits, output, "covid")
+
+    actual = pl.read_parquet(output / "2026-09-02-covid-hubverse-table.parquet")
+    assert_frame_equal(actual, pl.concat(tables, how="vertical_relaxed"))
+
+
+@pytest.mark.parametrize(
+    "reference_dates",
+    [
+        [],
+        [[], []],
+        [[dt.date(2026, 9, 2)], [dt.date(2026, 9, 3)]],
+        [[dt.date(2026, 9, 2), dt.date(2026, 9, 3)]],
+    ],
+    ids=["no-fits", "empty-tables", "different-dates-across-fits", "mixed-dates"],
+)
+def test_combine_hubverse_tables_rejects_invalid_origins(tmp_path, reference_dates):
+    fits = []
+    for index, dates in enumerate(reference_dates):
+        path = tmp_path / f"fit-{index}"
+        path.mkdir()
+        pl.DataFrame({"reference_date": pl.Series(dates, dtype=pl.Date)}).write_parquet(
+            path / "hubverse_table.parquet"
+        )
+        fits.append(path)
+    output = tmp_path / "summary"
+    error, message = (
+        (ValueError, "Expected one reference_date")
+        if fits
+        else (FileNotFoundError, "No hubverse_table.parquet files selected")
+    )
+
+    with pytest.raises(error, match=message):
+        postprocess.combine_hubverse_tables(fits, output, "covid")
+
+    assert not output.exists()
 
 
 def test_write_json_serializes_forecast_metadata(tmp_path):

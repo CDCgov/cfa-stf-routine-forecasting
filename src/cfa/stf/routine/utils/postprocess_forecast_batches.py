@@ -19,18 +19,27 @@ def _hubverse_table_filename(forecast_date, disease):
 
 
 def combine_hubverse_tables(fits: list[Path], output: Path, disease: str) -> None:
-    """Collate only the explicitly selected fits."""
+    """Stream only the explicitly selected fits into a combined Parquet table."""
     if not fits:
         raise FileNotFoundError("No hubverse_table.parquet files selected")
     combined = pl.concat(
-        [pl.read_parquet(path / "hubverse_table.parquet") for path in fits],
+        [pl.scan_parquet(path / "hubverse_table.parquet") for path in fits],
         how="vertical_relaxed",
+        parallel=False,
     )
-    origins = combined["reference_date"].unique()
+    origins = (
+        combined.select("reference_date")
+        .unique()
+        .limit(2)
+        .collect(engine="streaming")
+        .to_series()
+    )
     if len(origins) != 1:
         raise ValueError("Expected one reference_date across selected fits")
     output.mkdir(parents=True, exist_ok=True)
-    combined.write_parquet(output / _hubverse_table_filename(origins.item(), disease))
+    combined.sink_parquet(
+        output / _hubverse_table_filename(origins.item(), disease), engine="streaming"
+    )
 
 
 def _fits_by_disease(selected: dict[FitKey, Path]) -> dict[str, list[Path]]:

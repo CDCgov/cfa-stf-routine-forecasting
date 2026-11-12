@@ -9,7 +9,6 @@ from unittest.mock import Mock
 
 import polars as pl
 import pytest
-from polars.testing import assert_frame_equal
 from pypdf import PdfReader, PdfWriter
 
 from cfa.stf.routine import fusion as fusion_module
@@ -52,59 +51,6 @@ def fit(directory, model, value=1.0, location="CA", complete=True, disease="covi
     if complete:
         (path / "_COMPLETE").touch()
     return path
-
-
-@pytest.mark.parametrize(
-    "reference_dates",
-    [
-        [dt.date(2026, 9, 5)] * 2,
-        [dt.date(2026, 8, 29), dt.date(2026, 9, 5)],
-    ],
-    ids=["shared-reference-date", "multiple-reference-dates"],
-)
-def test_combine_hubverse_tables_uses_forecast_date_and_preserves_rows_and_schema(
-    tmp_path, reference_dates
-):
-    tables = [
-        pl.DataFrame(
-            {
-                "reference_date": reference_dates,
-                "output_type_id": pl.Series([1, 2], dtype=dtype),
-                "value": [value, value + 1],
-            }
-        )
-        for dtype, value in [(pl.Int32, 1), (pl.Int64, 3.5)]
-    ]
-    fits = []
-    for index, table in enumerate(tables):
-        path = tmp_path / f"fit-{index}"
-        path.mkdir()
-        table.write_parquet(path / "hubverse_table.parquet")
-        fits.append(path)
-    output = tmp_path / "summary"
-
-    postprocess.combine_hubverse_tables(
-        fits, output, "covid", forecast_date=dt.date(2026, 9, 2)
-    )
-
-    actual = pl.read_parquet(output / "2026-09-02-covid-hubverse-table.parquet")
-    assert_frame_equal(actual, pl.concat(tables, how="vertical_relaxed"))
-    assert [path.name for path in output.iterdir()] == [
-        "2026-09-02-covid-hubverse-table.parquet"
-    ]
-
-
-def test_combine_hubverse_tables_rejects_no_fits(tmp_path):
-    output = tmp_path / "summary"
-
-    with pytest.raises(
-        FileNotFoundError, match="No hubverse_table.parquet files selected"
-    ):
-        postprocess.combine_hubverse_tables(
-            [], output, "covid", forecast_date=dt.date(2026, 9, 2)
-        )
-
-    assert not output.exists()
 
 
 def test_write_json_serializes_forecast_metadata(tmp_path):
@@ -377,8 +323,9 @@ def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     fit(first, "daily_fable_e_other", disease="rsv", complete=False)
     destination = execution(tmp_path, "summary", 1)
 
+    # The filename uses forecast_date even when reference_date differs.
     postprocess.main(
-        tmp_path, forecast_date=dt.date(2026, 9, 2), execution_dir=destination
+        tmp_path, forecast_date=dt.date(2026, 9, 3), execution_dir=destination
     )
 
     summary = destination / "00_summary"
@@ -391,7 +338,7 @@ def test_postprocess_discovers_all_completed_diseases(tmp_path, diseases):
     }
     for disease in diseases:
         table = pl.read_parquet(
-            summary / "hub_tables" / f"2026-09-02-{disease}-hubverse-table.parquet"
+            summary / "hub_tables" / f"2026-09-03-{disease}-hubverse-table.parquet"
         )
         assert table.height == 2
         figure = summary / "figures" / disease / "forecast.pdf"

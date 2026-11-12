@@ -28,7 +28,6 @@ def combine_hubverse_tables(
     combined = pl.concat(
         [pl.scan_parquet(path / "hubverse_table.parquet") for path in fits],
         how="vertical_relaxed",
-        parallel=False,
     )
     output.mkdir(parents=True, exist_ok=True)
     combined.sink_parquet(

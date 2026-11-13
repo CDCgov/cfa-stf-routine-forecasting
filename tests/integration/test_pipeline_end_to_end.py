@@ -87,6 +87,7 @@ def test_reduced_pipeline_end_to_end(pipeline_workspace, monkeypatch, request):
     with _status_step("Postprocessing forecast batches"):
         postprocess_batches(
             workspace / FORECAST_DIR_NAME,
+            forecast_date=FORECAST_DATE,
         )
 
     summaries = list((workspace / FORECAST_DIR_NAME).glob("*/00_summary"))

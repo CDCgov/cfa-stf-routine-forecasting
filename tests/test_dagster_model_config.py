@@ -1,3 +1,4 @@
+import datetime as dt
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call
@@ -90,6 +91,7 @@ def test_postprocess_uses_executing_run(monkeypatch):
     daily_output = Path("custom-output/2026-09-09_forecasts")
     postprocess.assert_called_once_with(
         base_forecast_dir=daily_output,
+        forecast_date=dt.date(2026, 9, 9),
         execution_dir=daily_output / "run",
     )
 

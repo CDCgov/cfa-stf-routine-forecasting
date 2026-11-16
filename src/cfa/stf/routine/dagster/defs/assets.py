@@ -44,15 +44,15 @@ common_asset_args = {
     # "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
 }
 
-# Dagster tag keys cannot contain spaces. These tags make it easy to select all
-# assets that need rerunning after their corresponding source data changes.
-E_DATA_RERUN_TAGS = {
-    "e-data-rerun": "",
-    "e-data-rerun-no-nowcastautogp": "",
+# Select forecast models according to whether the E-only models have already run.
+E_ONLY_TAGS = {
+    "stf-routine-e-only": "",
+    "stf-routine-h-without-prev-e-run": "",
 }
-NOWCASTAUTOGP_E_DATA_RERUN_TAGS = {"e-data-rerun": ""}
-H_DATA_RERUN_TAGS = {"h-data-rerun": ""}
-HE_DATA_RERUN_TAGS = E_DATA_RERUN_TAGS | H_DATA_RERUN_TAGS
+H_AFTER_E_RUN_TAGS = {
+    "stf-routine-h-after-e-run": "",
+    "stf-routine-h-without-prev-e-run": "",
+}
 
 # ============================================================================
 # ASSET DEFINITIONS
@@ -86,7 +86,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
     automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_DATA_RERUN_TAGS,
+    tags=E_ONLY_TAGS,
 )
 def fable_e_other(
     context: dg.OpExecutionContext,
@@ -109,7 +109,7 @@ def fable_e_other(
     automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_DATA_RERUN_TAGS,
+    tags=E_ONLY_TAGS,
 )
 def epiweekly_fable_e_other(
     context: dg.OpExecutionContext,
@@ -134,7 +134,7 @@ def epiweekly_fable_e_other(
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
     },
-    tags=E_DATA_RERUN_TAGS,
+    tags=E_ONLY_TAGS,
 )
 def pyrenew_e(
     context: dg.OpExecutionContext,
@@ -153,7 +153,6 @@ def pyrenew_e(
     ins={
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
-    tags=H_DATA_RERUN_TAGS,
 )
 def pyrenew_h(
     context: dg.OpExecutionContext,
@@ -173,7 +172,7 @@ def pyrenew_h(
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
-    tags=HE_DATA_RERUN_TAGS,
+    tags=H_AFTER_E_RUN_TAGS,
 )
 def pyrenew_he(
     context: dg.OpExecutionContext,
@@ -190,7 +189,7 @@ def pyrenew_he(
     automation_condition=eager_on_wednesday,
     group_name="NowcastAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=NOWCASTAUTOGP_E_DATA_RERUN_TAGS,
+    tags=E_ONLY_TAGS,
 )
 def nowcastautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,
@@ -214,7 +213,6 @@ def nowcastautogp_e_pct_epiweekly(
     automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_e", "fable_e_other"],
-    tags=E_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_e_fable(
     context: dg.AssetExecutionContext,
@@ -232,7 +230,6 @@ def fuse_pyrenew_e_fable(
     automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_e", "epiweekly_fable_e_other"],
-    tags=E_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_e_fable_epiweekly(
     context: dg.AssetExecutionContext,
@@ -250,7 +247,6 @@ def fuse_pyrenew_e_fable_epiweekly(
     automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_he", "fable_e_other"],
-    tags=HE_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_he_fable(
     context: dg.AssetExecutionContext,
@@ -268,7 +264,6 @@ def fuse_pyrenew_he_fable(
     automation_condition=eager_with_any_input,
     group_name="Fusion",
     deps=["pyrenew_he", "epiweekly_fable_e_other"],
-    tags=HE_DATA_RERUN_TAGS,
 )
 def fuse_pyrenew_he_fable_epiweekly(
     context: dg.AssetExecutionContext,
@@ -301,7 +296,6 @@ def fuse_pyrenew_he_fable_epiweekly(
     automation_condition=eager_with_any_input,
     group_name="Postprocess",
     # retry_policy=dg.RetryPolicy(),  # allow the asset to retry once on failure
-    tags=HE_DATA_RERUN_TAGS,
 )
 def postprocess_forecasts(
     context: dg.AssetExecutionContext,

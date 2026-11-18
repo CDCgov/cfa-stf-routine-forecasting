@@ -44,12 +44,13 @@ common_asset_args = {
     # "retry_policy": dg.RetryPolicy(),  # allow the assets to retry once on failure
 }
 
-# Select forecast models according to whether the E-only models have already run.
-E_ONLY_TAGS = {
+# Selection tags attached to each model type. E-only models participate in E-only
+# runs and H runs without a previous E run; HE models participate in both H runs.
+E_ONLY_MODEL_SELECTION_TAGS = {
     "stf-routine-e-only": "",
     "stf-routine-h-without-prev-e-run": "",
 }
-H_AFTER_E_RUN_TAGS = {
+HE_MODEL_SELECTION_TAGS = {
     "stf-routine-h-after-e-run": "",
     "stf-routine-h-without-prev-e-run": "",
 }
@@ -86,7 +87,7 @@ nhsn_hrd_prelim = dg.AssetSpec(
     automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_ONLY_TAGS,
+    tags=E_ONLY_MODEL_SELECTION_TAGS,
 )
 def fable_e_other(
     context: dg.OpExecutionContext,
@@ -109,7 +110,7 @@ def fable_e_other(
     automation_condition=eager_on_wednesday,
     group_name="Fable",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_ONLY_TAGS,
+    tags=E_ONLY_MODEL_SELECTION_TAGS,
 )
 def epiweekly_fable_e_other(
     context: dg.OpExecutionContext,
@@ -134,7 +135,7 @@ def epiweekly_fable_e_other(
     ins={
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
     },
-    tags=E_ONLY_TAGS,
+    tags=E_ONLY_MODEL_SELECTION_TAGS,
 )
 def pyrenew_e(
     context: dg.OpExecutionContext,
@@ -172,7 +173,7 @@ def pyrenew_h(
         "comprehensive_nssp_gold": dg.In(dg.Nothing),
         "nhsn_hrd_prelim": dg.In(dg.Nothing),
     },
-    tags=H_AFTER_E_RUN_TAGS,
+    tags=HE_MODEL_SELECTION_TAGS,
 )
 def pyrenew_he(
     context: dg.OpExecutionContext,
@@ -189,7 +190,7 @@ def pyrenew_he(
     automation_condition=eager_on_wednesday,
     group_name="NowcastAutoGP",
     ins={"comprehensive_nssp_gold": dg.In(dg.Nothing)},
-    tags=E_ONLY_TAGS,
+    tags=E_ONLY_MODEL_SELECTION_TAGS,
 )
 def nowcastautogp_e_pct_epiweekly(
     context: dg.OpExecutionContext,

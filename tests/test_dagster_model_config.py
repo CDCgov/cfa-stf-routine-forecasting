@@ -47,6 +47,7 @@ def test_launchpad_has_model_defaults_and_shared_location_override():
     assert "nowcastautogp_n_lookback_days" not in base_fields
     assert asset_config.FableEOtherConfig().n_lookback_days == 150
     assert asset_config.PyrenewConfig().n_lookback_days == 150
+    assert asset_config.NowcastAutoGPEPctEpiweeklyConfig().timeout_seconds == 7200
     expected_nowcastautogp = None if asset_config.is_prod() else 150
     assert (
         asset_config.NowcastAutoGPEPctEpiweeklyConfig().n_lookback_days
@@ -155,7 +156,9 @@ def test_model_runners_use_per_model_lookbacks_and_location_overrides(
     )
     asset_helpers._run_nowcastautogp_e_pct_epiweekly(
         context,
-        asset_config.NowcastAutoGPEPctEpiweeklyConfig(n_lookback_days=200),
+        asset_config.NowcastAutoGPEPctEpiweeklyConfig(
+            n_lookback_days=200, timeout_seconds=1800
+        ),
         model_base_config,
         output_config,
     )
@@ -165,6 +168,7 @@ def test_model_runners_use_per_model_lookbacks_and_location_overrides(
         "exclude_last_n_days": 2,
         "fail_on_stale_data": True,
     }
+    assert forecast_nowcastautogp.call_args.kwargs["timeout_seconds"] == 1800
     for forecast, expected_lookback in zip(
         (forecast_fable, forecast_pyrenew, forecast_nowcastautogp),
         expected_lookbacks,

@@ -51,8 +51,10 @@ def run_julia_script(
     function_name: str | None = None,
     capture_output: bool = True,
     text: bool = False,
+    *,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run a Julia script and handle command failures."""
+    """Run a Julia script, optionally limiting its runtime in seconds."""
     command_args = (executor_flags or []) + [str(script_name)] + args
     return run_command(
         "julia",
@@ -60,6 +62,7 @@ def run_julia_script(
         function_name=function_name,
         capture_output=capture_output,
         text=text,
+        timeout=timeout,
     )
 
 

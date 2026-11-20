@@ -9,6 +9,8 @@ def run_command(
     function_name: str | None = None,
     capture_output: bool = True,
     text: bool = False,
+    *,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess:
     """
     Run a command-line executable with arguments and handle errors.
@@ -28,6 +30,8 @@ def run_command(
         Whether to capture `stdout` and `stderr`, by default `True`.
     text : bool, optional
         Whether to decode output as text, by default `False`.
+    timeout : float | None, optional
+        Maximum subprocess runtime in seconds. By default, wait indefinitely.
 
     Returns
     -------
@@ -38,6 +42,8 @@ def run_command(
     ------
     RuntimeError
         If the command execution fails, returns a non-zero exit code and captures `stderr`.
+    subprocess.TimeoutExpired
+        If the timeout expires, after killing and waiting for the child process.
     """
     command = [executable] + args
 
@@ -45,6 +51,7 @@ def run_command(
         command,
         capture_output=capture_output,
         text=text,
+        timeout=timeout,
     )
 
     if result.returncode != 0:

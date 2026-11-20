@@ -1,6 +1,8 @@
 """Unit tests for shared utility functions."""
 
 import datetime as dt
+import os
+import subprocess
 import sys
 
 import pytest
@@ -184,6 +186,7 @@ class TestCLIUtils:
                     "function_name": None,
                     "capture_output": True,
                     "text": False,
+                    **({"timeout": None} if runner is run_julia_script else {}),
                 },
             )
         ]
@@ -198,6 +201,24 @@ class TestCLIUtils:
 
         assert result.returncode == 0
         assert "hello from python" in result.stdout
+
+    def test_run_command_timeout_kills_and_reaps_child(self):
+        with pytest.raises(subprocess.TimeoutExpired) as error:
+            run_command(
+                sys.executable,
+                [
+                    "-c",
+                    "import os, time; print(os.getpid(), flush=True); time.sleep(60)",
+                ],
+                text=True,
+                timeout=1,
+            )
+
+        pid = int(error.value.output)
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        with pytest.raises(ChildProcessError):
+            os.waitpid(pid, os.WNOHANG)
 
     def test_run_command_inline_code_failure_raises_runtime_error(self):
         """Test that failed inline code raises RuntimeError."""

@@ -37,7 +37,7 @@ def run_nowcastautogp_forecast(
     transformation: str,
     smc_data_proportion: float,
     n_threads: int | str,
-    timeout_seconds: float = 7200,
+    timeout_seconds: float | None = 7200,
 ) -> None:
     """Run the repository's Julia adapter around NowcastAutoGP."""
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -143,7 +143,7 @@ class NowcastAutoGPPipeline(ForecastPipeline):
         n_forecast_draws: int = 2000,
         smc_data_proportion: float = 0.1,
         n_threads: int | str = "auto",
-        timeout_seconds: float = 7200,
+        timeout_seconds: float | None = 7200,
         nowcast_source_name: NowcastSourceName = "none",
         reporting_delay_pmf: list[float] | None = None,
         hubverse_nowcast_dir: Path | str | None = None,
@@ -189,8 +189,10 @@ class NowcastAutoGPPipeline(ForecastPipeline):
         return 3 if self.nowcast_source_name == "none" else 0
 
     def validate_configuration(self) -> None:
-        if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be finite and positive")
+        if self.timeout_seconds is not None and (
+            not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds must be finite and positive, or None")
         _validate_nowcastautogp_parameters(
             self.config.target,
             self.config.frequency,
@@ -217,10 +219,12 @@ class NowcastAutoGPPipeline(ForecastPipeline):
         transformation = (
             "percentage" if self.config.ed_visit_type == "pct" else "boxcox"
         )
-        self.logger.info(
-            "Performing NowcastAutoGP forecasting with a %s-second time limit...",
-            self.timeout_seconds,
+        time_limit = (
+            "no time limit"
+            if self.timeout_seconds is None
+            else f"a {self.timeout_seconds}-second time limit"
         )
+        self.logger.info("Performing NowcastAutoGP forecasting with %s...", time_limit)
         run_nowcastautogp_forecast(
             json_input_path=run.model_dir / f"{run.model_name}_input.json",
             model_dir=run.model_dir,
@@ -257,7 +261,7 @@ def main(
     hubverse_nowcast_dir: Path | str | None = None,
     fail_on_stale_data: bool = False,
     logger: logging.Logger | None = None,
-    timeout_seconds: float = 7200,
+    timeout_seconds: float | None = 7200,
 ) -> None:
     """Run the complete NowcastAutoGP pipeline for one location."""
     if logger is None:

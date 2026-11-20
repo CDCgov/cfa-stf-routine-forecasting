@@ -58,6 +58,15 @@ Dagster uses the `NowcastAutoGP` asset group and sensor, the `nowcastautogp_e_pc
 
 Each location/disease fit has a default Julia subprocess timeout of 7,200 seconds (two hours).
 Set `timeout_seconds` in `resources.nowcastautogp_e_pct_epiweekly_config.config` in Dagster, or pass it to the Python entrypoint or pipeline constructor, to choose a different positive, finite limit.
+Set it to `null` in Dagster YAML or `None` in Python to disable the timeout:
+
+```yaml
+resources:
+  nowcastautogp_e_pct_epiweekly_config:
+    config:
+      timeout_seconds: null
+```
+
 The limit includes Julia startup, fitting, forecasting, and sample output; it excludes data preparation, Python publication, and time waiting for a worker.
 On timeout, Python kills and waits for Julia, then raises `subprocess.TimeoutExpired`, failing the fit without creating its `_COMPLETE` marker.
 Other fits can finish, and downstream discovery ignores the incomplete fit.

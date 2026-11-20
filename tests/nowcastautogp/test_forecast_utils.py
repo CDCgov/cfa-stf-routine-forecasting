@@ -270,7 +270,7 @@ def test_epiweekly_input_includes_forecast_through(tmp_path):
 
 @patch("cfa.stf.routine.nowcastautogp.forecast_nowcastautogp.run_julia_script")
 @pytest.mark.parametrize(
-    "options,expected_timeout", [({}, 7200), ({"timeout_seconds": 60}, 60)]
+    "options,expected_timeout", [({}, 7200), ({"timeout_seconds": None}, None)]
 )
 def test_runner_builds_explicit_julia_command(
     mock_run_julia, tmp_path, options, expected_timeout

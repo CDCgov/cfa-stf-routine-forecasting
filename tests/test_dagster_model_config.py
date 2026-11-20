@@ -157,7 +157,7 @@ def test_model_runners_use_per_model_lookbacks_and_location_overrides(
     asset_helpers._run_nowcastautogp_e_pct_epiweekly(
         context,
         asset_config.NowcastAutoGPEPctEpiweeklyConfig(
-            n_lookback_days=200, timeout_seconds=1800
+            n_lookback_days=200, timeout_seconds=None
         ),
         model_base_config,
         output_config,
@@ -168,7 +168,7 @@ def test_model_runners_use_per_model_lookbacks_and_location_overrides(
         "exclude_last_n_days": 2,
         "fail_on_stale_data": True,
     }
-    assert forecast_nowcastautogp.call_args.kwargs["timeout_seconds"] == 1800
+    assert forecast_nowcastautogp.call_args.kwargs["timeout_seconds"] is None
     for forecast, expected_lookback in zip(
         (forecast_fable, forecast_pyrenew, forecast_nowcastautogp),
         expected_lookbacks,

@@ -186,7 +186,7 @@ class TestCLIUtils:
                     "function_name": None,
                     "capture_output": True,
                     "text": False,
-                    **({"timeout": None} if runner is run_julia_script else {}),
+                    "timeout": None,
                 },
             )
         ]

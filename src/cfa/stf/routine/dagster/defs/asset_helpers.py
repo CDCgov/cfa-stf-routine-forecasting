@@ -185,6 +185,7 @@ def _run_nowcastautogp_e_pct_epiweekly(
         n_forecast_draws=nowcastautogp_e_pct_epiweekly_config.n_forecast_draws,
         smc_data_proportion=nowcastautogp_e_pct_epiweekly_config.smc_data_proportion,
         n_threads=nowcastautogp_e_pct_epiweekly_config.n_threads,
+        timeout_seconds=nowcastautogp_e_pct_epiweekly_config.timeout_seconds,
         nowcast_source_name="none",
         forecast_date=forecast_date,
         fail_on_stale_data=loc_config.fail_on_stale_data,

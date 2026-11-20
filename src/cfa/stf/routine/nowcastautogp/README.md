@@ -55,3 +55,20 @@ The Julia adapter writes `{model_dir}/samples.parquet`; the shared publication s
 Model identifiers use `nowcastautogp_{target}_{frequency}`, with an `_other` or `_pct` suffix for those NSSP visit types.
 Downstream model-name mappings in [the handbook](https://github.com/cdcent/cfa-stf-handbook) and [the Hubverse processor](https://github.com/cdcent/cfa-hubverse-processor) must use these identifiers, including any identifiers embedded in fusion model names.
 Dagster uses the `NowcastAutoGP` asset group and sensor, the `nowcastautogp_e_pct_epiweekly` asset, and the `nowcastautogp_e_pct_epiweekly_config` resource; set `n_lookback_days` in that resource's config to choose the training history.
+
+Each location/disease fit has a default Julia subprocess timeout of 7,200 seconds (two hours).
+Set `timeout_seconds` in `resources.nowcastautogp_e_pct_epiweekly_config.config` in Dagster, or pass it to the Python entrypoint or pipeline constructor, to choose a different positive, finite limit.
+Set it to `null` in Dagster YAML or `None` in Python to disable the timeout:
+
+```yaml
+resources:
+  nowcastautogp_e_pct_epiweekly_config:
+    config:
+      timeout_seconds: null
+```
+
+The limit includes Julia startup, fitting, forecasting, and sample output; it excludes data preparation, Python publication, and time waiting for a worker.
+On timeout, Python kills and waits for Julia, then raises `subprocess.TimeoutExpired`, failing the fit without creating its `_COMPLETE` marker.
+Other fits can finish, and downstream discovery ignores the incomplete fit.
+The separate fusion and postprocessing automation sensors can run using completed inputs once their upstream assets are no longer in progress.
+Postprocessing requires at least one upstream materialization; dependent steps in the same failed run can be skipped, with continuation handled by the separate sensors.

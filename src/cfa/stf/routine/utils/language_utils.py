@@ -13,8 +13,10 @@ def run_r_script(
     function_name: str | None = None,
     capture_output: bool = True,
     text: bool = False,
+    *,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run an R script and handle command failures."""
+    """Run an R script with an optional timeout in seconds; None disables it."""
     command_args = (executor_flags or []) + [str(script_name)] + args
     return run_command(
         "Rscript",
@@ -22,6 +24,7 @@ def run_r_script(
         function_name=function_name,
         capture_output=capture_output,
         text=text,
+        timeout=timeout,
     )
 
 
@@ -31,8 +34,10 @@ def run_r_code(
     function_name: str | None = None,
     capture_output: bool = True,
     text: bool = False,
+    *,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run inline R code and handle command failures."""
+    """Run inline R code with an optional timeout in seconds; None disables it."""
     flags_with_inline = (executor_flags or []) + ["-e"]
     return run_r_script(
         r_code,
@@ -41,6 +46,7 @@ def run_r_code(
         function_name=function_name,
         capture_output=capture_output,
         text=text,
+        timeout=timeout,
     )
 
 
@@ -51,8 +57,10 @@ def run_julia_script(
     function_name: str | None = None,
     capture_output: bool = True,
     text: bool = False,
+    *,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run a Julia script and handle command failures."""
+    """Run a Julia script with an optional timeout in seconds; None disables it."""
     command_args = (executor_flags or []) + [str(script_name)] + args
     return run_command(
         "julia",
@@ -60,6 +68,7 @@ def run_julia_script(
         function_name=function_name,
         capture_output=capture_output,
         text=text,
+        timeout=timeout,
     )
 
 
@@ -69,8 +78,10 @@ def run_julia_code(
     function_name: str | None = None,
     capture_output: bool = True,
     text: bool = False,
+    *,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run inline Julia code and handle command failures."""
+    """Run inline Julia code with an optional timeout in seconds; None disables it."""
     flags_with_inline = (executor_flags or []) + ["-e"]
     return run_julia_script(
         julia_code,
@@ -79,4 +90,5 @@ def run_julia_code(
         function_name=function_name,
         capture_output=capture_output,
         text=text,
+        timeout=timeout,
     )

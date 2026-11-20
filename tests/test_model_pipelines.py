@@ -194,6 +194,7 @@ def test_run_config_preserves_structure_and_round_trips(tmp_path):
         }
     assert pipelines[0].run_config()["n_samples"] == 10
     assert pipelines[1].run_config()["priors_path"] == "priors.py"
+    assert pipelines[2].run_config()["timeout_seconds"] == 7200
     assert pipelines[2].run_config()["config"] == {
         "target": "nssp",
         "frequency": "daily",

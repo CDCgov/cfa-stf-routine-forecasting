@@ -1,8 +1,10 @@
 import datetime as dt
 import json
 import logging
+import subprocess
+import sys
 from dataclasses import replace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import polars as pl
 import pytest
@@ -17,6 +19,8 @@ from cfa.stf.routine.nowcastautogp.forecast_nowcastautogp import (
     run_nowcastautogp_forecast,
 )
 from cfa.stf.routine.nowcastautogp.reporting_delay_nowcast import ReportingDelayNowcast
+from cfa.stf.routine.utils import language_utils
+from cfa.stf.routine.utils.cli_utils import run_command
 
 
 def _run(tmp_path, *, sources=("nssp", "nhsn")):
@@ -71,6 +75,38 @@ def test_pipeline_validates_configuration_before_loading(tmp_path):
     pipeline = _pipeline(tmp_path, target="nhsn", frequency="daily")
     with pytest.raises(ValueError, match="only available in epiweekly"):
         pipeline.validate_configuration()
+
+
+@pytest.mark.parametrize("timeout_seconds", [0, -1, float("inf"), float("nan")])
+def test_pipeline_rejects_invalid_timeout(tmp_path, timeout_seconds):
+    with pytest.raises(ValueError, match="timeout_seconds must be finite and positive"):
+        _pipeline(tmp_path, timeout_seconds=timeout_seconds).validate_configuration()
+
+
+def test_timeout_leaves_fit_incomplete_and_skips_publication(monkeypatch, tmp_path):
+    pipeline = _pipeline(tmp_path, timeout_seconds=0.1)
+    run = _run(tmp_path)
+    run.model_dir.mkdir(parents=True)
+    marker = run.model_dir / "_COMPLETE"
+    marker.touch()
+    monkeypatch.setattr(pipeline, "build_forecast_run", lambda: run)
+    monkeypatch.setattr(pipeline, "prepare_input_artifacts", Mock())
+    publish = Mock()
+    monkeypatch.setattr(pipeline, "publish_outputs", publish)
+
+    def run_sleeping_process(executable, args, **kwargs):
+        assert executable == "julia"
+        assert kwargs["timeout"] == 0.1
+        return run_command(
+            sys.executable, ["-c", "import time; time.sleep(60)"], **kwargs
+        )
+
+    monkeypatch.setattr(language_utils, "run_command", run_sleeping_process)
+    with pytest.raises(subprocess.TimeoutExpired):
+        pipeline.execute()
+
+    assert not marker.exists()
+    publish.assert_not_called()
 
 
 @patch("cfa.stf.routine.forecast_pipeline.ForecastPipeline.publish_outputs")
@@ -183,6 +219,7 @@ def test_run_model_passes_prepared_input_and_model_options(
         n_forecast_draws=5,
         smc_data_proportion=0.2,
         n_threads=6,
+        timeout_seconds=1800,
     )
     run = _run(tmp_path)
 
@@ -198,6 +235,7 @@ def test_run_model_passes_prepared_input_and_model_options(
         "transformation": "percentage",
         "smc_data_proportion": 0.2,
         "n_threads": 6,
+        "timeout_seconds": 1800,
     }
 
 
@@ -231,7 +269,12 @@ def test_epiweekly_input_includes_forecast_through(tmp_path):
 
 
 @patch("cfa.stf.routine.nowcastautogp.forecast_nowcastautogp.run_julia_script")
-def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
+@pytest.mark.parametrize(
+    "options,expected_timeout", [({}, 7200), ({"timeout_seconds": None}, None)]
+)
+def test_runner_builds_explicit_julia_command(
+    mock_run_julia, tmp_path, options, expected_timeout
+):
     input_path = tmp_path / "input.json"
     model_dir = tmp_path / "model"
 
@@ -245,6 +288,7 @@ def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
         transformation="boxcox",
         smc_data_proportion=0.25,
         n_threads=6,
+        **options,
     )
 
     assert model_dir.is_dir()
@@ -259,6 +303,7 @@ def test_runner_builds_explicit_julia_command(mock_run_julia, tmp_path):
         "--smc-data-proportion=0.25",
     ]
     assert mock_run_julia.call_args.kwargs["executor_flags"][1] == "--threads=6"
+    assert mock_run_julia.call_args.kwargs["timeout"] == expected_timeout
 
 
 def test_reporting_delay_fetches_pmf_from_run(tmp_path):

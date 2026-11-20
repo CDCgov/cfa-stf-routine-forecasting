@@ -160,6 +160,15 @@ class NowcastAutoGPEPctEpiweeklyConfig(dg.ConfigurableResource):
     n_forecast_draws: int = 2000
     smc_data_proportion: float = 0.1
     n_threads: str = "auto"
+    timeout_seconds: float | None = Field(
+        default=7200,
+        gt=0,
+        allow_inf_nan=False,
+        description=(
+            "Maximum Julia subprocess runtime in seconds for each location/disease fit. "
+            "Includes Julia startup, fitting, and forecasting. Null disables the timeout."
+        ),
+    )
 
 
 class WModelExclusions(dg.ConfigurableResource):
